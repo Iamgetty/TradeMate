@@ -766,7 +766,26 @@ function trade(){
  if(fxm){
   return h+'<div class="empty"><b>Live FX market feed not connected yet</b>Forex is an over-the-counter market. TradeMate will show provider-sourced bid/ask quotes when the live FX feed is integrated. No synthetic spread or invented trade records are displayed.</div>';
  }
- return h+'<div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Order book</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">Trades</button></div><div class="empty"><b>No TradeMate records yet</b>Real offers and completed transactions from this marketplace will appear here as users trade. No sample activity is displayed.</div>';
+ var kind=it.m==="Services"?"service":"product";
+ loadInternalTrades(kind);
+ var marketItems=items.filter(function(x){return x.srv&&x.m===it.m});
+ var bookHtml=marketItems.length?marketItems.map(function(x){return '<div class="ad"><div class="who"><b>'+esc(x.n)+'</b><small>Published listing · '+esc(x.seller||"TradeMate seller")+'</small></div><div class="pr">'+esc(x.p)+'</div><div class="kv">'+esc(x.desc||"")+'</div></div>'}).join(""):'<div class="empty"><b>No published '+esc(it.m.toLowerCase())+' yet</b>Approved TradeMate listings will appear in Book when available.</div>';
+ var tradeRows=internalTradeCache.data;
+ var tradeHtml=internalTradeCache.loading?'<div class="empty"><b>Loading completed transactions…</b>Checking the TradeMate transaction ledger.</div>':
+ internalTradeCache.error?'<div class="empty"><b>Trade records unavailable</b>'+esc(internalTradeCache.error)+'<button class="btn sm" data-act="markettraderetry">Retry</button></div>':
+ tradeRows.length?tradeRows.map(function(x){return '<div class="ad"><div class="who"><b>'+esc(x.side)+' · '+esc(x.listing_title)+'</b><small>Completed · '+fmtT(x.completed_at)+'</small></div><div class="pr">'+esc(x.currency_code)+' '+(Number(x.total_minor_units)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+'</div><div class="kv">Quantity<b>'+esc(String(x.quantity))+'</b><br>Unit price<b>'+esc(x.currency_code)+' '+(Number(x.unit_price_minor_units)/100).toLocaleString()+'</b></div><small>Reference '+esc(x.transaction_reference)+'</small></div>'}).join(""):'<div class="empty"><b>No completed transactions yet</b>Only transactions confirmed by both buyer and seller appear here. Listings and enquiries are not counted as trades.</div>';
+ return h+'<div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Book</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">Trade</button></div>'+(st.tt==="Order book"?bookHtml:tradeHtml)+'<p class="fine">Source: TradeMate marketplace database. '+(st.tt==="Trades"?"Only confirmed completed transactions are shown.":"Book contains published listings, not completed sales.")+' '+(internalTradeCache.updated?"Updated "+fmtT(new Date(internalTradeCache.updated).toISOString()):"Awaiting sync")+'</p>';
+}
+
+var internalTradeCache={kind:"",data:[],loading:false,error:"",updated:null};
+function loadInternalTrades(kind){
+ if(internalTradeCache.kind===kind&&(internalTradeCache.loading||internalTradeCache.error||internalTradeCache.updated&&Date.now()-internalTradeCache.updated<15000))return;
+ internalTradeCache.kind=kind;internalTradeCache.loading=true;internalTradeCache.error="";
+ api("GET","/market/trades?type="+encodeURIComponent(kind)+"&limit=100").then(function(r){
+  if(internalTradeCache.kind!==kind)return;
+  internalTradeCache.data=r.data||[];internalTradeCache.updated=Date.now();internalTradeCache.loading=false;internalTradeCache.error="";
+  if(st.tab==="Trade")softDraw();
+ }).catch(function(e){if(internalTradeCache.kind!==kind)return;internalTradeCache.loading=false;internalTradeCache.error=e.message||"Could not load marketplace trades.";if(st.tab==="Trade")softDraw()});
 }
 var p2pCache={key:"",book:[],trades:[],loading:false,error:"",updated:null};
 function loadP2P(){
@@ -1309,7 +1328,7 @@ function applyUser(u){if(!u)return;var m=st.me,same=m.id===u.id;
  loadOrg();loadMine();loadEnquiries();save()}
 function resetSession(){st.deals=[];st.org=null;st.mine=[];st.cart=[];st.favs=[];st.me={name:"",nick:"Member",av:0,uid:"",lvl:1,country:"Nigeria"};
  keepTp(function(){for(var i=items.length-1;i>=0;i--)if(items[i].own)items.splice(i,1)});ads=ads.filter(function(a){return !a.own});try{localStorage.removeItem(KEY)}catch(e){}}
-var _lo=act;act=function(n,a,el){if(n==="p2pretry"){p2pCache.updated=null;p2pCache.error="";p2pCache.key="";loadP2P();return}if(n==="logout"&&CONNECTED){api("POST","/auth/logout").catch(function(){});resetSession()}_lo(n,a,el)};
+var _lo=act;act=function(n,a,el){if(n==="markettraderetry"){internalTradeCache.updated=null;internalTradeCache.error="";internalTradeCache.kind="";loadInternalTrades(items[st.tp].m==="Services"?"service":"product");return}if(n==="p2pretry"){p2pCache.updated=null;p2pCache.error="";p2pCache.key="";loadP2P();return}if(n==="logout"&&CONNECTED){api("POST","/auth/logout").catch(function(){});resetSession()}_lo(n,a,el)};
 /* ---- marketplace: public listings from the database ---- */
 function mapListing(l,i){var m=l.listing_type==="service"?"Services":"Products",c=l.currency_code,d=[["Type",m==="Services"?"Service":"Product"],["Country",esc(CNAME[l.country_code]||l.country_code)]];
  if(l.category_name)d.unshift(["Category",esc(l.category_name)]);if(l.quantity_available!=null)d.push(["Available",String(l.quantity_available)]);
