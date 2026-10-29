@@ -8,6 +8,7 @@ const MIGRATIONS = [
   '003_auth_rate_limits.sql',
   '002_enquiry_messages.sql',
   '004_listing_moderation.sql',
+  '002_p2p_market_records.sql',
 ];
 
 async function main() {
