@@ -731,7 +731,7 @@ function ensureCryptoFeed(it){
    if(d.e==="trade"&&Number(d.p)>0&&Number(d.q)>0){
     marketFeed.trades.unshift({id:d.t,p:Number(d.p),q:Number(d.q),time:Number(d.T||d.E),side:d.m?"SELL":"BUY"});
     marketFeed.trades=marketFeed.trades.slice(0,40);
-    var itNow=byName(String(d.s||"").replace(/([A-Z]+)$/,"/$1"));
+    var pairName=items.filter(function(x){return x.m==="Crypto"&&x.n.replace("/","")===String(d.s||"")})[0];var itNow=pairName;
     if(itNow)itNow.p=Number(d.p);
    }
    marketFeed.last=Date.now();scheduleMarketDraw();
