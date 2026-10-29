@@ -9,6 +9,7 @@ const MIGRATIONS = [
   '002_enquiry_messages.sql',
   '004_listing_moderation.sql',
   '002_p2p_market_records.sql',
+  '005_marketplace_transactions.sql',
 ];
 
 async function main() {
