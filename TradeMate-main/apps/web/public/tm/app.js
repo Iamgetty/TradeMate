@@ -742,41 +742,23 @@ function ensureCryptoFeed(it){
 }
 function scheduleMarketDraw(){if(marketFeed.drawTimer)return;marketFeed.drawTimer=setTimeout(function(){marketFeed.drawTimer=null;if(st.tab==="Trade")softDraw()},350)}
 function trade(){
- var it=items[st.tp],cr=it.m==="Crypto",fxm=it.m==="Forex";
- var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose product"><span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span><b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?"BINANCE · SPOT":fxm?"FOREX · INDICATIVE":"TRADEMATE")+'</span></div>';
- if(cr){
-  ensureCryptoFeed(it);
-  var dp=it.p<1?6:it.p<20?4:2,stamp=marketFeed.last?new Date(marketFeed.last).toLocaleTimeString():"—";
-  var head='<div class="tpx"><b data-px="'+esc(it.n)+'">'+px(it)+'</b><span>USDT</span></div><div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Order book</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">Trades</button></div>';
-  if(marketFeed.status!=="live"&&!marketFeed.bids.length&&!marketFeed.trades.length)return h+head+'<div class="empty"><b>'+(marketFeed.status==="connecting"?"Connecting to Binance…":"Live market feed unavailable")+'</b>'+(marketFeed.status==="connecting"?"Waiting for genuine exchange data.":"No sample records are shown. Try again shortly or choose another pair.")+'</div><p class="fine">Source: Binance Spot public market stream. Last update: '+stamp+'.</p>';
-  var body="";
-  if(st.tt==="Order book"){
-   var bids=marketFeed.bids,asks=marketFeed.asks,rows="";
-   for(var k=0;k<Math.max(bids.length,asks.length);k++){
-    var bid=bids[k],ask=asks[k];
-    rows+='<div class="cell b"><i class="d" style="width:'+ (bid?Math.min(100,Math.max(3,bid.q/(bids[0]?bids[0].q:bid.q)*100)) :0)+'%"></i><span>'+(bid?fx2(bid.q,6):"—")+'</span><span>'+(bid?fx2(bid.p,dp):"—")+'</span></div><div class="cell a"><i class="d" style="width:'+(ask?Math.min(100,Math.max(3,ask.q/(asks[0]?asks[0].q:ask.q)*100)):0)+'%"></i><span>'+(ask?fx2(ask.p,dp):"—")+'</span><span>'+(ask?fx2(ask.q,6):"—")+'</span></div>';
-   }
-   body='<div class="bk"><div class="h"><span>Amount ('+esc(it.n.split("/")[0])+')</span><span>Bid price (USDT)</span></div><div class="h r"><span>Ask price (USDT)</span><span>Amount ('+esc(it.n.split("/")[0])+')</span></div>'+(rows||'<div class="empty">Waiting for order-book levels…</div>')+'</div>';
-  }else{
-   var trades=marketFeed.trades;
-   body='<div class="tr h"><span>Time</span><span>Price (USDT)</span><span>Amount ('+esc(it.n.split("/")[0])+')</span></div>'+(trades.length?trades.map(function(t){return '<div class="tr"><span>'+new Date(t.time).toLocaleTimeString()+'</span><span class="'+(t.side==="BUY"?"up":"dn")+'">'+fx2(t.p,dp)+' <small>'+t.side+'</small></span><span>'+fx2(t.q,6)+'</span></div>'}).join(""):'<div class="empty">Waiting for executed trades…</div>');
-  }
-  return h+head+body+'<p class="fine">Live public Binance Spot order-book depth and executed trades. This is external exchange activity, not trades executed by TradeMate. Updated: '+stamp+'.</p>';
- }
- if(fxm){
-  return h+'<div class="empty"><b>Live FX market feed not connected yet</b>Forex is an over-the-counter market. TradeMate will show provider-sourced bid/ask quotes when the live FX feed is integrated. No synthetic spread or invented trade records are displayed.</div>';
- }
- var kind=it.m==="Services"?"service":"product";
- loadInternalTrades(kind);
- var marketItems=items.filter(function(x){return x.srv&&x.m===it.m});
- var bookHtml=marketItems.length?marketItems.map(function(x){return '<div class="ad"><div class="who"><b>'+esc(x.n)+'</b><small>Published listing · '+esc(x.seller||"TradeMate seller")+'</small></div><div class="pr">'+esc(x.p)+'</div><div class="kv">'+esc(x.desc||"")+'</div></div>'}).join(""):'<div class="empty"><b>No published '+esc(it.m.toLowerCase())+' yet</b>Approved TradeMate listings will appear in Book when available.</div>';
- var tradeRows=internalTradeCache.data;
- var tradeHtml=internalTradeCache.loading?'<div class="empty"><b>Loading completed transactions…</b>Checking the TradeMate transaction ledger.</div>':
- internalTradeCache.error?'<div class="empty"><b>Trade records unavailable</b>'+esc(internalTradeCache.error)+'<button class="btn sm" data-act="markettraderetry">Retry</button></div>':
- tradeRows.length?tradeRows.map(function(x){return '<div class="ad"><div class="who"><b>'+esc(x.side)+' · '+esc(x.listing_title)+'</b><small>Completed · '+fmtT(x.completed_at)+'</small></div><div class="pr">'+esc(x.currency_code)+' '+(Number(x.total_minor_units)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+'</div><div class="kv">Quantity<b>'+esc(String(x.quantity))+'</b><br>Unit price<b>'+esc(x.currency_code)+' '+(Number(x.unit_price_minor_units)/100).toLocaleString()+'</b></div><small>Reference '+esc(x.transaction_reference)+'</small></div>'}).join(""):'<div class="empty"><b>No completed transactions yet</b>Only transactions confirmed by both buyer and seller appear here. Listings and enquiries are not counted as trades.</div>';
- return h+'<div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Book</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">Trade</button></div>'+(st.tt==="Order book"?bookHtml:tradeHtml)+'<p class="fine">Source: TradeMate marketplace database. '+(st.tt==="Trades"?"Only confirmed completed transactions are shown.":"Book contains published listings, not completed sales.")+' '+(internalTradeCache.updated?"Updated "+fmtT(new Date(internalTradeCache.updated).toISOString()):"Awaiting sync")+'</p>';
+ loadGlobalActivity(st.tt==="Trades"?"trades":"book");
+ var view=st.tt==="Trades"?"trades":"book",data=globalActivityCache[view]||[];
+ var filters=[["all","All markets"],["products","Products"],["services","Services"],["p2p","P2P"]];
+ var filtered=data.filter(function(x){return globalActivityCache.market==="all"||String(x.market||"").toLowerCase()===globalActivityCache.market});
+ var rows=filtered.map(function(x){var n=Number(x.price);return '<div class="ad"><div class="who"><b>'+esc(x.side||"")+' · '+esc(x.instrument||"")+'</b><small>'+esc(x.market||"")+' · '+esc(x.source||"")+' · '+fmtT(x.occurred_at)+'</small></div><div class="pr">'+esc((x.currency||"")+' '+(Number.isFinite(n)?n.toLocaleString():"—"))+'</div><div class="kv">Quantity<b>'+esc(String(x.quantity==null?"—":x.quantity))+'</b><br>Reference<b>'+esc(x.reference||"—")+'</b></div></div>'}).join("");
+ var state=globalActivityCache.loading?'<div class="empty"><b>Loading market activity…</b>Retrieving genuine listings and completed transactions.</div>':globalActivityCache.error?'<div class="empty"><b>Market activity unavailable</b>'+esc(globalActivityCache.error)+'<button class="btn sm" data-act="marketactivityretry">Retry</button></div>':rows||'<div class="empty"><b>No '+(view==="book"?"open listings or orders":"completed trades")+' found</b>No sample activity is displayed.</div>';
+ return '<div class="thd"><b>Global market activity</b><span class="live"><i></i>TRADEMATE DATA</span></div><div class="seg"><button class="'+(view==="book"?"on":"")+'" data-tt="Order book">Book</button><button class="'+(view==="trades"?"on":"")+'" data-tt="Trades">Trade</button></div><div class="bsw"><div class="bsp">'+filters.map(function(x){return '<button class="'+(globalActivityCache.market===x[0]?"on":"")+'" data-marketfilter="'+x[0]+'">'+x[1]+'</button>'}).join("")+'</div></div>'+state+'<p class="fine">Book: published listings and open P2P orders. Trade: completed marketplace and P2P transactions only. External Forex, NFT and exchange-wide feeds are not connected. Updated: '+(globalActivityCache.updated?fmtT(new Date(globalActivityCache.updated).toISOString()):"Awaiting sync")+'.</p>';
 }
-
+var globalActivityCache={book:[],trades:[],loading:false,error:"",updated:null,market:"all"};
+function loadGlobalActivity(view,force){
+ if(!force&&globalActivityCache.loading)return;
+ if(!force&&globalActivityCache.updated&&Date.now()-globalActivityCache.updated<12000)return;
+ globalActivityCache.loading=true;globalActivityCache.error="";
+ Promise.all(["book","trades"].map(function(v){return api("GET","/market/trades/activity?view="+v+"&market=all&limit=100")}))
+ .then(function(r){globalActivityCache.book=r[0].data||[];globalActivityCache.trades=r[1].data||[];globalActivityCache.updated=Date.now();globalActivityCache.loading=false;globalActivityCache.error="";if(st.tab==="Trade")softDraw()})
+ .catch(function(e){globalActivityCache.loading=false;globalActivityCache.error=e.message||"Could not load global market activity.";if(st.tab==="Trade")softDraw()});
+}
 var internalTradeCache={kind:"",data:[],loading:false,error:"",updated:null};
 function loadInternalTrades(kind){
  if(internalTradeCache.kind===kind&&(internalTradeCache.loading||internalTradeCache.error||internalTradeCache.updated&&Date.now()-internalTradeCache.updated<15000))return;
@@ -799,9 +781,9 @@ function loadP2P(){
 function p2p(){
  loadP2P();
  var want=st.side==="Buy"?"sell":"buy",SYM={NGN:"₦",USD:"$",EUR:"€",GBP:"£",GHS:"₵",KES:"KSh"};
- var rows=st.p2pTab==="Trades"?p2pCache.trades:p2pCache.book.filter(function(x){return x.side===want});
+ var rows=p2pCache.book.filter(function(x){return x.side===want});
  var amount=Number(st.amt);
- if(st.p2pTab==="Book"&&amount>0)rows=rows.filter(function(x){return Number(x.min_fiat_amount)<=amount&&amount<=Number(x.max_fiat_amount)});
+ if(amount>0)rows=rows.filter(function(x){return Number(x.min_fiat_amount)<=amount&&amount<=Number(x.max_fiat_amount)});
  var fmtMoney=function(n){return (SYM[st.fiat]||st.fiat+" ")+fx2(Number(n)||0,2)};
  var content=p2pCache.loading?'<div class="empty"><b>Loading TradeMate P2P records…</b>Fetching current orders and completed transactions from the TradeMate database.</div>':
  p2pCache.error?'<div class="empty"><b>P2P records unavailable</b>'+esc(p2pCache.error)+'<button class="btn sm" data-act="p2pretry">Retry</button></div>':
@@ -812,15 +794,7 @@ function p2p(){
  }).join("");
  return '<div class="ptabs"><button class="t" data-pg="orders">Orders</button><button class="t on">P2P</button><button class="t" data-pg="myads">My ads</button><select class="cur" id="fiat" aria-label="Fiat currency">'+["NGN","USD","EUR","GBP","GHS","KES"].map(function(x){return '<option'+(x===st.fiat?" selected":"")+'>'+x+'</option>'}).join("")+'</select></div>'+
  '<div class="notice">'+ic("horn","width:18px;height:18px")+'<div class="mq"><div class="mq-t"><span>Trade only through verified TradeMate flows. Never share passwords or payment credentials.</span></div></div></div>'+
- '<div class="seg"><button class="'+((st.p2pTab||"Book")==="Book"?"on":"")+'" data-p2ptab="Book">Book</button><button class="'+(st.p2pTab==="Trades"?"on":"")+'" data-p2ptab="Trades">Trade</button></div>'+
- '<div class="bsw"><div class="bsp">'+["Buy","Sell"].map(function(x){return '<button class="'+(st.side===x?"on":"")+'" data-side="'+x+'">'+x+'</button>'}).join("")+'</div></div>'+
- '<div class="filt"><label><select id="coin" aria-label="Asset">'+["USDT","BTC","ETH"].map(function(x){return '<option'+(x===st.coin?" selected":"")+'>'+x+'</option>'}).join("")+'</select></label><label><input id="amt" inputmode="decimal" placeholder="Fiat amount" value="'+esc(st.amt)+'"></label><button class="fi" data-act="resetf" aria-label="Reset filters">'+ic("fun","width:19px;height:19px")+'</button></div>'+
- content+'<p class="fine">Source: TradeMate database · '+(p2pCache.updated?"Updated "+fmtT(new Date(p2pCache.updated).toISOString()):"Awaiting first successful sync")+'. Completed BUY and SELL rows refer to the two sides of each completed transaction, not separate transactions.</p>';
-}
-function portfolio(){
- var v=st.hide?"******":"—";
- return '<div class="cw"><div><b>Connect wallet</b><small>Link a Web3 wallet to pay and receive</small></div><button class="btn sm" data-pg="connect">Connect</button></div>'+
- '<div class="wtabs">'+["Overview","Funding","P2P","Fiat"].map(function(t){return '<button class="'+(st.wt===t?"on":"")+'" data-wt="'+t+'">'+t+'</button>'}).join("")+'</div>'+
+ '</div>'+
  '<div class="wval"><small>Total Value <button data-act="eye" aria-label="Show or hide balance">'+ic("eye")+'</button></small><b>'+v+'</b><span>'+(st.hide?"≈ ******":"Balance data is not connected yet.")+'</span></div>'+
  '<div class="acts"><button class="btn" data-pg="deposit">Deposit</button><button class="btn o" data-pg="withdraw">Withdraw</button><button class="btn o" data-pg="transfer">Transfer</button></div>'+
  '<div class="pf">Assets '+ic("pie","color:var(--mut)")+'</div>'+
@@ -857,6 +831,7 @@ document.addEventListener("click",function(e){var t=e.target;
  c=t.closest("[data-hm]");if(c){st.hm=c.dataset.hm;draw();return}
  c=t.closest("[data-mm]");if(c){st.mm=c.dataset.mm;st.q="";draw();return}
  c=t.closest("[data-tt]");if(c){st.tt=c.dataset.tt;draw();return}
+ c=t.closest("[data-marketfilter]");if(c){globalActivityCache.market=c.dataset.marketfilter;draw();return}
  c=t.closest("[data-side]");if(c){st.side=c.dataset.side;draw();return}
  c=t.closest("[data-p2ptab]");if(c){st.p2pTab=c.dataset.p2ptab;draw();return}
  c=t.closest("[data-wt]");if(c){st.wt=c.dataset.wt;draw();return}
@@ -1329,7 +1304,7 @@ function applyUser(u){if(!u)return;var m=st.me,same=m.id===u.id;
  loadOrg();loadMine();loadEnquiries();save()}
 function resetSession(){st.deals=[];st.org=null;st.mine=[];st.cart=[];st.favs=[];st.me={name:"",nick:"Member",av:0,uid:"",lvl:1,country:"Nigeria"};
  keepTp(function(){for(var i=items.length-1;i>=0;i--)if(items[i].own)items.splice(i,1)});ads=ads.filter(function(a){return !a.own});try{localStorage.removeItem(KEY)}catch(e){}}
-var _lo=act;act=function(n,a,el){if(n==="markettraderetry"){internalTradeCache.updated=null;internalTradeCache.error="";internalTradeCache.kind="";loadInternalTrades(items[st.tp].m==="Services"?"service":"product");return}if(n==="p2pretry"){p2pCache.updated=null;p2pCache.error="";p2pCache.key="";loadP2P();return}if(n==="logout"&&CONNECTED){api("POST","/auth/logout").catch(function(){});resetSession()}_lo(n,a,el)};
+var _lo=act;act=function(n,a,el){if(n==="marketactivityretry"){globalActivityCache.updated=null;loadGlobalActivity(st.tt==="Trades"?"trades":"book",true);return}if(n==="markettraderetry"){internalTradeCache.updated=null;internalTradeCache.error="";internalTradeCache.kind="";loadInternalTrades(items[st.tp].m==="Services"?"service":"product");return}if(n==="p2pretry"){p2pCache.updated=null;p2pCache.error="";p2pCache.key="";loadP2P();return}if(n==="logout"&&CONNECTED){api("POST","/auth/logout").catch(function(){});resetSession()}_lo(n,a,el)};
 /* ---- marketplace: public listings from the database ---- */
 function mapListing(l,i){var m=l.listing_type==="service"?"Services":"Products",c=l.currency_code,d=[["Type",m==="Services"?"Service":"Product"],["Country",esc(CNAME[l.country_code]||l.country_code)]];
  if(l.category_name)d.unshift(["Category",esc(l.category_name)]);if(l.quantity_available!=null)d.push(["Available",String(l.quantity_available)]);
