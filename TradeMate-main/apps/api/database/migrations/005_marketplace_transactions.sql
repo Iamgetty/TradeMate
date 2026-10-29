@@ -34,11 +34,11 @@ CREATE INDEX IF NOT EXISTS marketplace_transactions_seller_idx
 CREATE OR REPLACE FUNCTION trademate_set_marketplace_transaction_completion()
 RETURNS TRIGGER AS $$
 BEGIN
-  IF NEW.status IN ('cancelled', 'disputed') THEN
-    NEW.completed_at := NULL;
-  ELSIF NEW.buyer_confirmed_at IS NOT NULL AND NEW.seller_confirmed_at IS NOT NULL THEN
+  IF NEW.buyer_confirmed_at IS NOT NULL AND NEW.seller_confirmed_at IS NOT NULL THEN
     NEW.status := 'completed';
     NEW.completed_at := COALESCE(NEW.completed_at, now());
+  ELSIF NEW.status IN ('cancelled', 'disputed') THEN
+    NEW.completed_at := NULL;
   ELSE
     NEW.status := 'awaiting_confirmation';
     NEW.completed_at := NULL;
