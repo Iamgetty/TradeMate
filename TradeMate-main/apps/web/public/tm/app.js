@@ -857,7 +857,8 @@ document.addEventListener("click",function(e){var t=e.target;
  c=t.closest("[data-hm]");if(c){st.hm=c.dataset.hm;draw();return}
  c=t.closest("[data-mm]");if(c){st.mm=c.dataset.mm;st.q="";draw();return}
  c=t.closest("[data-tt]");if(c){st.tt=c.dataset.tt;draw();return}
- c=t.closest("[data-side]");if(c){st.side=c.dataset.side;draw();return}\n c=t.closest("[data-p2ptab]");if(c){st.p2pTab=c.dataset.p2ptab;draw();return}
+ c=t.closest("[data-side]");if(c){st.side=c.dataset.side;draw();return}
+ c=t.closest("[data-p2ptab]");if(c){st.p2pTab=c.dataset.p2ptab;draw();return}
  c=t.closest("[data-wt]");if(c){st.wt=c.dataset.wt;draw();return}
  c=t.closest("[data-pc]");if(c){var fn=PC[c.dataset.pc];if(fn)fn(c.dataset.arg,c);return}});
 document.addEventListener("keydown",function(e){if((e.key==="Enter"||e.key===" ")&&e.target.getAttribute&&e.target.getAttribute("role")==="button"){e.preventDefault();e.target.click()}});
