@@ -709,19 +709,65 @@ function markets(){
  var list=st.mm==="NFTs"?NFTLIVE:items.filter(function(i){return i.m===st.mm&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)});
  return '<div class="top"><label class="srch">'+ic("search")+'<input id="mq" value="'+esc(st.q)+'" placeholder="Search '+st.mm+'" aria-label="Search this market"></label></div>'+(st.mm==="NFTs"?'<div style="margin:12px 0"><label style="display:block;font-size:12px;color:var(--mut);margin-bottom:6px">NFT COLLECTION</label><select id="nftcollection" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--text)">'+[['azuki','Azuki'],['bored ape yacht club','Bored Ape Yacht Club'],['pudgy penguins','Pudgy Penguins'],['cryptopunks','CryptoPunks'],['doodles','Doodles'],['clone x','Clone X'],['art','Art NFTs']].map(function(o){return '<option value="'+esc(o[0])+'"'+(NFTCOLLECTION===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select></div>':'')+'<div class="mgrid">'+ORD.map(function(t){var n=items.filter(function(i){return i.m===t}).length;return '<button class="mcard'+(st.mm===t?" on":"")+'" data-mm="'+t+'" style="--ac:'+MC[t]+'">'+ic(MI[t])+t.replace("Real Estate","Estate")+'<small>'+n+'</small></button>'}).join("")+'</div>'+
  (st.mm==="NFTs"?(NFTLOADING?'<div class="empty"><b>Loading live OpenSea NFTs…</b>Searching '+esc(st.q||"Azuki")+' on Ethereum.</div>':list.length?'<div class="live" style="margin:18px 0 10px"><i></i>LIVE NFT DATA · ETHEREUM</div><div class="thead"><span>NFT / COLLECTION</span><span>Price</span><span>Status</span></div>'+list.map(function(i){return '<div class="row" style="cursor:default"><span class="nm"><span class="coin" style="overflow:hidden">'+(i.image?'<img src="'+esc(i.image)+'" alt="" style="width:100%;height:100%;object-fit:cover">':ic("image"))+'</span><span><b>'+esc(i.n)+'</b><small>'+esc(i.collection||"OpenSea collection")+(i.tokenId?" · #"+esc(i.tokenId):"")+'</small></span></span><span class="p">'+(typeof i.p==="number"?fx2(i.p,4)+" "+esc(i.currency||"ETH"):"Not listed")+'</span><span class="badge">OpenSea ↗</span></a>'}).join(""):'<div class="empty"><b>'+(NFTERROR||"No live NFT results")+'</b>Try another NFT or collection name.</div>'):(list.length?'<div class="thead"><span>Name</span><span>Price</span><span>24h</span></div>'+list.map(rowH).join(""):'<div class="empty"><b>'+(st.q?"No matches":"No "+st.mm+" listings yet")+'</b>'+(st.q?"Try a different search.":"Listings published by TradeMate users will appear here.")+'</div>'))}
-function seed(n){var x=n*9301+49297;return (x%233280)/233280}
+var marketFeed={symbol:"",socket:null,status:"idle",bids:[],asks:[],trades:[],last:0,drawTimer:null};
+function stopMarketFeed(){if(marketFeed.socket){try{marketFeed.socket.close()}catch(e){}marketFeed.socket=null}marketFeed.symbol="";marketFeed.status="idle";marketFeed.bids=[];marketFeed.asks=[];marketFeed.trades=[]}
+function ensureCryptoFeed(it){
+ var symbol=String(it.n||"").replace("/","").toLowerCase();
+ if(!/^[a-z0-9]{5,20}$/.test(symbol)){stopMarketFeed();marketFeed.status="unavailable";return}
+ if(marketFeed.symbol===symbol&&marketFeed.socket&&[WebSocket.OPEN,WebSocket.CONNECTING].includes(marketFeed.socket.readyState))return;
+ stopMarketFeed();marketFeed.symbol=symbol;marketFeed.status="connecting";
+ var ws;
+ try{ws=new WebSocket("wss://data-stream.binance.vision/stream?streams="+symbol+"@depth20@100ms/"+symbol+"@trade")}catch(e){marketFeed.status="unavailable";return}
+ marketFeed.socket=ws;
+ ws.onopen=function(){if(marketFeed.socket!==ws)return;marketFeed.status="live";scheduleMarketDraw()};
+ ws.onmessage=function(ev){
+  if(marketFeed.socket!==ws)return;
+  try{
+   var msg=JSON.parse(ev.data),d=msg.data||msg;
+   if(d.bids&&d.asks){
+    marketFeed.bids=d.bids.slice(0,20).map(function(x){return {p:Number(x[0]),q:Number(x[1])}}).filter(function(x){return x.p>0&&x.q>0}).sort(function(a,b){return b.p-a.p});
+    marketFeed.asks=d.asks.slice(0,20).map(function(x){return {p:Number(x[0]),q:Number(x[1])}}).filter(function(x){return x.p>0&&x.q>0}).sort(function(a,b){return a.p-b.p});
+   }
+   if(d.e==="trade"&&Number(d.p)>0&&Number(d.q)>0){
+    marketFeed.trades.unshift({id:d.t,p:Number(d.p),q:Number(d.q),time:Number(d.T||d.E),side:d.m?"SELL":"BUY"});
+    marketFeed.trades=marketFeed.trades.slice(0,40);
+    var itNow=byName(String(d.s||"").replace(/([A-Z]+)$/,"/$1"));
+    if(itNow)itNow.p=Number(d.p);
+   }
+   marketFeed.last=Date.now();scheduleMarketDraw();
+  }catch(e){}
+ };
+ ws.onerror=function(){if(marketFeed.socket===ws){marketFeed.status="unavailable";scheduleMarketDraw()}};
+ ws.onclose=function(){if(marketFeed.socket===ws){marketFeed.status="disconnected";scheduleMarketDraw()}};
+}
+function scheduleMarketDraw(){if(marketFeed.drawTimer)return;marketFeed.drawTimer=setTimeout(function(){marketFeed.drawTimer=null;if(st.tab==="Trade")softDraw()},350)}
 function trade(){
- var it=items[st.tp],cr=it.m==="Crypto",fxm=it.m==="Forex",opts=ORD.map(function(m){var g=items.filter(function(i){return i.m===m});return g.length?'<optgroup label="'+m+'">'+g.map(function(i){return '<option value="'+items.indexOf(i)+'"'+(i===it?" selected":"")+'>'+esc(i.n)+'</option>'}).join("")+'</optgroup>':""}).join("");
- var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose product"><span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span><b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+(cr||fxm?"REFERENCE · LIVE":it.m.toUpperCase())+'</span></div>';
- if(!cr&&!fxm)return h+'<div class="empty"><b>No transactions for this item yet</b>TradeMate shows this item’s own buy and sell activity here once it exists. Market data is never substituted for it.<br><br><button class="btn sm" data-open="'+esc(it.n)+'">View details</button></div>';
- var b=it.p,dp=b<1?6:b<20?4:2,tpx='<div class="tpx"><b data-px="'+esc(it.n)+'">'+px(it)+'</b><span>'+(cr?"USDT":it.n.split("/")[1])+'</span>'+(val(it)?'<small class="valn">'+val(it)+'</small>':'')+'</div>';
- if(fxm){var sp=b*0.0009;return h+tpx+'<div class="rb"><div><small>BID</small><b>'+fmt(b-sp/2,b<20?4:2)+'</b></div><div><small>ASK</small><b>'+fmt(b+sp/2,b<20?4:2)+'</b></div><div><small>SPREAD</small><b>'+fmt(sp,b<20?4:2)+'</b></div></div><div class="card"><h3>Reference rate</h3><p>Rates are for information only. Exchange offers from TradeMate users live in the Forex marketplace.</p><div style="display:flex;gap:10px"><button class="btn sm" data-f="Create order" data-pre="Forex">Post an exchange offer</button><button class="btn sm o" data-tab="P2P">Browse offers</button></div></div><p class="fine">Reference market rates. TradeMate does not execute currency trades.</p>'}
- h+=tpx+'<div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Order book</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">Trades</button></div>';
- var body="";
- if(st.tt==="Order book"){var rows="";for(var k=0;k<20;k++){var a1=seed(k+st.tp)*.9+.05,a2=seed(k+7+st.tp)*.9+.05;rows+='<div class="cell b"><i class="d" style="width:'+Math.round(30+k*4+a1*20)+'%"></i><span>'+fx2(a1*4,6)+'</span><span>'+fx2(b-(k+1)*b*.00012,dp)+'</span></div><div class="cell a"><i class="d" style="width:'+Math.round(25+k*4+a2*20)+'%"></i><span>'+fx2(b+(k+1)*b*.00012,dp)+'</span><span>'+fx2(a2*4,6)+'</span></div>'}
-  body='<div class="depthbar"><i class="up">B</i><span class="up">53%</span><div class="bar"><span style="flex:53;background:#0e4b34"></span><span style="flex:47;background:#5a1f29"></span></div><span class="dn">47%</span><i class="dn">S</i></div><div class="bk"><div class="h"><span>Amount ('+it.n.split("/")[0]+')</span><span>Price (USDT)</span></div><div class="h r"><span>Price (USDT)</span><span>Amount ('+it.n.split("/")[0]+')</span></div>'+rows+'</div>'}
- else{var t='<div class="tr h"><span>Time</span><span>Price (USDT)</span><span>Amount ('+it.n.split("/")[0]+')</span></div>';for(var j=0;j<18;j++){var s=seed(j+3)>.45;t+='<div class="tr"><span>02:41:'+String(59-j*2).padStart(2,"0")+'</span><span class="'+(s?"up":"dn")+'">'+fx2(b+(s?1:-1)*j*b*.00004,dp)+'</span><span>'+fx2(.004+seed(j)*.06,6)+'</span></div>'}body=t}
- return h+body+'<p class="fine">Reference market prices from public data. TradeMate does not trade crypto.</p>'}
+ var it=items[st.tp],cr=it.m==="Crypto",fxm=it.m==="Forex";
+ var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose product"><span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span><b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?"BINANCE · SPOT":fxm?"FOREX · INDICATIVE":"TRADEMATE")+'</span></div>';
+ if(cr){
+  ensureCryptoFeed(it);
+  var dp=it.p<1?6:it.p<20?4:2,stamp=marketFeed.last?new Date(marketFeed.last).toLocaleTimeString():"—";
+  var head='<div class="tpx"><b data-px="'+esc(it.n)+'">'+px(it)+'</b><span>USDT</span></div><div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Order book</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">Trades</button></div>';
+  if(marketFeed.status!=="live"&&!marketFeed.bids.length&&!marketFeed.trades.length)return h+head+'<div class="empty"><b>'+(marketFeed.status==="connecting"?"Connecting to Binance…":"Live market feed unavailable")+'</b>'+(marketFeed.status==="connecting"?"Waiting for genuine exchange data.":"No sample records are shown. Try again shortly or choose another pair.")+'</div><p class="fine">Source: Binance Spot public market stream. Last update: '+stamp+'.</p>';
+  var body="";
+  if(st.tt==="Order book"){
+   var bids=marketFeed.bids,asks=marketFeed.asks,rows="";
+   for(var k=0;k<Math.max(bids.length,asks.length);k++){
+    var bid=bids[k],ask=asks[k];
+    rows+='<div class="cell b"><i class="d" style="width:'+ (bid?Math.min(100,Math.max(3,bid.q/(bids[0]?bids[0].q:bid.q)*100)) :0)+'%"></i><span>'+(bid?fx2(bid.q,6):"—")+'</span><span>'+(bid?fx2(bid.p,dp):"—")+'</span></div><div class="cell a"><i class="d" style="width:'+(ask?Math.min(100,Math.max(3,ask.q/(asks[0]?asks[0].q:ask.q)*100)):0)+'%"></i><span>'+(ask?fx2(ask.p,dp):"—")+'</span><span>'+(ask?fx2(ask.q,6):"—")+'</span></div>';
+   }
+   body='<div class="bk"><div class="h"><span>Amount ('+esc(it.n.split("/")[0])+')</span><span>Bid price (USDT)</span></div><div class="h r"><span>Ask price (USDT)</span><span>Amount ('+esc(it.n.split("/")[0])+')</span></div>'+(rows||'<div class="empty">Waiting for order-book levels…</div>')+'</div>';
+  }else{
+   var trades=marketFeed.trades;
+   body='<div class="tr h"><span>Time</span><span>Price (USDT)</span><span>Amount ('+esc(it.n.split("/")[0])+')</span></div>'+(trades.length?trades.map(function(t){return '<div class="tr"><span>'+new Date(t.time).toLocaleTimeString()+'</span><span class="'+(t.side==="BUY"?"up":"dn")+'">'+fx2(t.p,dp)+' <small>'+t.side+'</small></span><span>'+fx2(t.q,6)+'</span></div>'}).join(""):'<div class="empty">Waiting for executed trades…</div>');
+  }
+  return h+head+body+'<p class="fine">Live public Binance Spot order-book depth and executed trades. This is external exchange activity, not trades executed by TradeMate. Updated: '+stamp+'.</p>';
+ }
+ if(fxm){
+  return h+'<div class="empty"><b>Live FX market feed not connected yet</b>Forex is an over-the-counter market. TradeMate will show provider-sourced bid/ask quotes when the live FX feed is integrated. No synthetic spread or invented trade records are displayed.</div>';
+ }
+ return h+'<div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Order book</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">Trades</button></div><div class="empty"><b>No TradeMate records yet</b>Real offers and completed transactions from this marketplace will appear here as users trade. No sample activity is displayed.</div>';
+}
 function p2p(){
  var want=st.side==="Buy"?"sell":"buy",amt=parseFloat(st.amt);
  var r=ads.filter(function(a){return a.s===want&&a.c===st.coin&&a.f===st.fiat&&(st.pay==="All payment methods"||a.pm===st.pay)&&(!(amt>0)||(a.min<=amt&&amt<=a.max))}).sort(function(a,b){return st.side==="Buy"?a.pr-b.pr:b.pr-a.pr});
