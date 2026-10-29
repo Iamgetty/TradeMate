@@ -1,0 +1,31 @@
+name: TradeMate Database Migration
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    name: Run database migrations
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download TradeMate code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install API dependencies
+        working-directory: apps/api
+        run: npm install --no-audit --no-fund
+
+      - name: Run database migrations
+        working-directory: apps/api
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run db:migrate

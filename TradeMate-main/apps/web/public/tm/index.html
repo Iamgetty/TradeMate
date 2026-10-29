@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en" style="background:#050505">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050505">
+<title>TradeMate — The Open Market</title>
+<style>html,body{background:#050505;margin:0}</style>
+<style id="tmboot">body>*:not(#lp){visibility:hidden}</style>
+<script>window.tmReveal=function(){var s=document.getElementById("tmboot");if(s)s.remove()};setTimeout(window.tmReveal,6000);</script>
+</head>
+<body>
+<noscript style="color:#fff;font:16px sans-serif;padding:24px;display:block">TradeMate needs JavaScript to run.</noscript>
+<!-- Same-origin API: /api is proxied to the NestJS service by apps/web/app/api/[...path]/route.ts -->
+<script>window.TM_CONFIG={api:"/api"};</script>
+<script defer src="/tm/app.js?v=3"></script>
+</body>
+</html>
