@@ -34,8 +34,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: TradeMate-main/apps/api/package-lock.json
 
       - name: Verify database secret is configured
         run: |
@@ -46,7 +44,7 @@ jobs:
 
       - name: Install API dependencies
         working-directory: TradeMate-main/apps/api
-        run: npm ci
+        run: npm install
 
       - name: Run database migrations
         working-directory: TradeMate-main/apps/api
