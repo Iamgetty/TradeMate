@@ -52,9 +52,10 @@ export async function GET(request: Request) {
       .map((entry: any) => {
         const nft = entry.nft;
         const collection = nft.collection || {};
-        const price = nft.price || nft.best_listing_price || null;
-        const rawAmount = price?.value ?? price?.amount ?? null;
-        const decimals = Number(price?.decimals ?? 0);
+        const price = nft.price || nft.best_listing_price || nft.best_listing || null;
+        const currentPrice = price?.current || price?.price || price;
+        const rawAmount = currentPrice?.value ?? currentPrice?.amount ?? currentPrice?.current_value ?? null;
+        const decimals = Number(currentPrice?.decimals ?? price?.decimals ?? 0);
         const parsedAmount = rawAmount !== null && Number.isFinite(Number(rawAmount))
           ? Number(rawAmount) / (10 ** decimals)
           : null;
@@ -67,7 +68,7 @@ export async function GET(request: Request) {
           contract: nft.contract || null,
           tokenId: nft.identifier || nft.token_id || null,
           price: parsedAmount,
-          currency: price?.currency || null,
+          currency: currentPrice?.currency || price?.currency || null,
           marketplace: 'OpenSea',
           marketplaceUrl: nft.opensea_url || null,
           tokenUrl: nft.opensea_url || null
