@@ -768,17 +768,36 @@ function trade(){
  }
  return h+'<div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Order book</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">Trades</button></div><div class="empty"><b>No TradeMate records yet</b>Real offers and completed transactions from this marketplace will appear here as users trade. No sample activity is displayed.</div>';
 }
+var p2pCache={key:"",book:[],trades:[],loading:false,error:"",updated:null};
+function loadP2P(){
+ var key=st.coin+"/"+st.fiat;
+ if(p2pCache.key===key&&(p2pCache.loading||p2pCache.updated&&Date.now()-p2pCache.updated<15000))return;
+ p2pCache.key=key;p2pCache.loading=true;p2pCache.error="";
+ Promise.all([api("GET","/p2p/book?asset="+encodeURIComponent(st.coin)+"&fiat="+encodeURIComponent(st.fiat)+"&limit=100"),api("GET","/p2p/trades?asset="+encodeURIComponent(st.coin)+"&fiat="+encodeURIComponent(st.fiat)+"&limit=100")])
+ .then(function(x){if(p2pCache.key!==key)return;p2pCache.book=x[0].data||[];p2pCache.trades=x[1].data||[];p2pCache.updated=Date.now();p2pCache.loading=false;p2pCache.error="";if(st.tab==="P2P")softDraw()})
+ .catch(function(e){if(p2pCache.key!==key)return;p2pCache.loading=false;p2pCache.error=e.message||"Could not load P2P records.";if(st.tab==="P2P")softDraw()});
+}
 function p2p(){
- var want=st.side==="Buy"?"sell":"buy",amt=parseFloat(st.amt);
- var r=ads.filter(function(a){return a.s===want&&a.c===st.coin&&a.f===st.fiat&&(st.pay==="All payment methods"||a.pm===st.pay)&&(!(amt>0)||(a.min<=amt&&amt<=a.max))}).sort(function(a,b){return st.side==="Buy"?a.pr-b.pr:b.pr-a.pr});
- var cnt=(st.amt?1:0)+(st.pay!=="All payment methods"?1:0),SYM={NGN:"₦",USD:"$",EUR:"€",GBP:"£",GHS:"₵",KES:"KSh"};
- return '<div class="ptabs"><button class="t" data-pg="orders">Orders</button><button class="t on">P2P</button><button class="t" data-pg="myads">My ads</button><select class="cur" id="fiat" aria-label="Fiat currency">'+["NGN","USD","EUR","GBP","GHS","KES"].map(function(f){return '<option'+(f===st.fiat?" selected":"")+'>'+f+'</option>'}).join("")+'</select></div>'+
- '<div class="banner" style="margin:8px 0 0;border-radius:0;min-height:74px;padding:12px 16px"><h3 style="margin-top:4px;font-size:15px">Your promotion could appear here</h3><div class="orb" style="transform:scale(.7);transform-origin:right center;top:-4px"><img src="'+LOGO+'" alt=""></div></div>'+
- '<div class="notice">'+ic("horn","width:18px;height:18px")+'<div class="mq"><div class="mq-t"><span>Beware of impersonators and scammers. Do not share personal contact details outside TradeMate chat.</span><span aria-hidden="true">Beware of impersonators and scammers. Do not share personal contact details outside TradeMate chat.</span></div></div></div>'+
- '<div class="bsw"><div class="bsp">'+["Buy","Sell"].map(function(s){return '<button class="'+(st.side===s?"on":"")+'" data-side="'+s+'">'+s+'</button>'}).join("")+'</div></div>'+
- '<div class="filt"><label><select id="coin" aria-label="Coin">'+["USDT","BTC","ETH"].map(function(c){return '<option'+(c===st.coin?" selected":"")+'>'+c+'</option>'}).join("")+'</select><i class="tri"></i></label><label><input id="amt" inputmode="decimal" placeholder="Amount" value="'+esc(st.amt)+'"><i class="tri"></i></label><label class="pay"><select id="pay" aria-label="Payment method">'+["All payment methods","Bank transfer","Opay","Mobile money"].map(function(p){return '<option'+(p===st.pay?" selected":"")+'>'+p+'</option>'}).join("")+'</select></label><button class="fi" data-act="resetf" aria-label="Reset filters">'+ic("fun","width:19px;height:19px")+(cnt?'<i>'+cnt+'</i>':'')+'</button></div>'+
- (r.length?r.map(function(a){return '<div class="ad"><div class="who"><b><span class="av">'+a.n.charAt(0)+'</span>'+a.n+'</b><small>New · 0 Orders</small></div><div class="pr"><small>'+(SYM[st.fiat]||"")+'</small>'+fx2(a.pr,2)+'</div><div class="kv">Limits<b>'+fx2(a.min,2)+' - '+fx2(a.max,2)+' '+st.fiat+'</b><br>Quantity<b>'+fmt(a.q,4)+' '+a.c+'</b><br><span class="pm">'+a.pm+'</span></div><button class="btn sm '+(st.side==="Sell"?"sell":"buy")+'" data-pg="p2porder" data-arg="'+ads.indexOf(a)+'">'+st.side+'</button></div>'}).join(""):'<div class="empty"><b>No '+want+' offers for '+st.coin+'/'+st.fiat+' yet</b>Only real advertisements from TradeMate users are listed.</div>')+
- '<p class="fine">Offers are advertisements only. No funds are held in escrow and orders are not enabled yet.</p>'}
+ loadP2P();
+ var want=st.side==="Buy"?"sell":"buy",SYM={NGN:"₦",USD:"$",EUR:"€",GBP:"£",GHS:"₵",KES:"KSh"};
+ var rows=st.p2pTab==="Trades"?p2pCache.trades:p2pCache.book.filter(function(x){return x.side===want});
+ var amount=Number(st.amt);
+ if(st.p2pTab==="Book"&&amount>0)rows=rows.filter(function(x){return Number(x.min_fiat_amount)<=amount&&amount<=Number(x.max_fiat_amount)});
+ var fmtMoney=function(n){return (SYM[st.fiat]||st.fiat+" ")+fx2(Number(n)||0,2)};
+ var content=p2pCache.loading?'<div class="empty"><b>Loading TradeMate P2P records…</b>Fetching current orders and completed transactions from the TradeMate database.</div>':
+ p2pCache.error?'<div class="empty"><b>P2P records unavailable</b>'+esc(p2pCache.error)+'<button class="btn sm" data-act="p2pretry">Retry</button></div>':
+ !rows.length?'<div class="empty"><b>No '+(st.p2pTab==="Trades"?"completed trades":"open "+want+" orders")+' for '+esc(st.coin)+'/'+esc(st.fiat)+'</b>Only genuine records stored in TradeMate are shown here. No sample activity is displayed.</div>':
+ rows.map(function(x){
+  if(st.p2pTab==="Trades")return '<div class="ad"><div class="who"><b>'+x.side+' · '+esc(x.asset_code)+'/'+esc(x.fiat_code)+'</b><small>Completed · '+fmtT(x.completed_at)+'</small></div><div class="pr"><small>'+(SYM[x.fiat_code]||"")+'</small>'+fx2(Number(x.price),2)+'</div><div class="kv">Quantity<b>'+fx2(Number(x.quantity),6)+' '+esc(x.asset_code)+'</b><br>Total<b>'+fmtMoney(x.fiat_total)+'</b></div></div>';
+  return '<div class="ad"><div class="who"><b>'+x.side.toUpperCase()+' · '+esc(x.asset_code)+'/'+esc(x.fiat_code)+'</b><small>Open order · '+fmtT(x.created_at)+'</small></div><div class="pr"><small>'+(SYM[x.fiat_code]||"")+'</small>'+fx2(Number(x.price),2)+'</div><div class="kv">Limits<b>'+fmtMoney(x.min_fiat_amount)+' – '+fmtMoney(x.max_fiat_amount)+'</b><br>Available<b>'+fx2(Number(x.quantity),6)+' '+esc(x.asset_code)+'</b></div></div>';
+ }).join("");
+ return '<div class="ptabs"><button class="t" data-pg="orders">Orders</button><button class="t on">P2P</button><button class="t" data-pg="myads">My ads</button><select class="cur" id="fiat" aria-label="Fiat currency">'+["NGN","USD","EUR","GBP","GHS","KES"].map(function(x){return '<option'+(x===st.fiat?" selected":"")+'>'+x+'</option>'}).join("")+'</select></div>'+
+ '<div class="notice">'+ic("horn","width:18px;height:18px")+'<div class="mq"><div class="mq-t"><span>Trade only through verified TradeMate flows. Never share passwords or payment credentials.</span></div></div></div>'+
+ '<div class="seg"><button class="'+((st.p2pTab||"Book")==="Book"?"on":"")+'" data-p2ptab="Book">Book</button><button class="'+(st.p2pTab==="Trades"?"on":"")+'" data-p2ptab="Trades">Trade</button></div>'+
+ '<div class="bsw"><div class="bsp">'+["Buy","Sell"].map(function(x){return '<button class="'+(st.side===x?"on":"")+'" data-side="'+x+'">'+x+'</button>'}).join("")+'</div></div>'+
+ '<div class="filt"><label><select id="coin" aria-label="Asset">'+["USDT","BTC","ETH"].map(function(x){return '<option'+(x===st.coin?" selected":"")+'>'+x+'</option>'}).join("")+'</select></label><label><input id="amt" inputmode="decimal" placeholder="Fiat amount" value="'+esc(st.amt)+'"></label><button class="fi" data-act="resetf" aria-label="Reset filters">'+ic("fun","width:19px;height:19px")+'</button></div>'+
+ content+'<p class="fine">Source: TradeMate database · '+(p2pCache.updated?"Updated "+fmtT(new Date(p2pCache.updated).toISOString()):"Awaiting first successful sync")+'. Completed BUY and SELL rows refer to the two sides of each completed transaction, not separate transactions.</p>';
+}
 function portfolio(){
  var v=st.hide?"******":"—";
  return '<div class="cw"><div><b>Connect wallet</b><small>Link a Web3 wallet to pay and receive</small></div><button class="btn sm" data-pg="connect">Connect</button></div>'+
@@ -819,7 +838,7 @@ document.addEventListener("click",function(e){var t=e.target;
  c=t.closest("[data-hm]");if(c){st.hm=c.dataset.hm;draw();return}
  c=t.closest("[data-mm]");if(c){st.mm=c.dataset.mm;st.q="";draw();return}
  c=t.closest("[data-tt]");if(c){st.tt=c.dataset.tt;draw();return}
- c=t.closest("[data-side]");if(c){st.side=c.dataset.side;draw();return}
+ c=t.closest("[data-side]");if(c){st.side=c.dataset.side;draw();return}\n c=t.closest("[data-p2ptab]");if(c){st.p2pTab=c.dataset.p2ptab;draw();return}
  c=t.closest("[data-wt]");if(c){st.wt=c.dataset.wt;draw();return}
  c=t.closest("[data-pc]");if(c){var fn=PC[c.dataset.pc];if(fn)fn(c.dataset.arg,c);return}});
 document.addEventListener("keydown",function(e){if((e.key==="Enter"||e.key===" ")&&e.target.getAttribute&&e.target.getAttribute("role")==="button"){e.preventDefault();e.target.click()}});
@@ -1290,7 +1309,7 @@ function applyUser(u){if(!u)return;var m=st.me,same=m.id===u.id;
  loadOrg();loadMine();loadEnquiries();save()}
 function resetSession(){st.deals=[];st.org=null;st.mine=[];st.cart=[];st.favs=[];st.me={name:"",nick:"Member",av:0,uid:"",lvl:1,country:"Nigeria"};
  keepTp(function(){for(var i=items.length-1;i>=0;i--)if(items[i].own)items.splice(i,1)});ads=ads.filter(function(a){return !a.own});try{localStorage.removeItem(KEY)}catch(e){}}
-var _lo=act;act=function(n,a,el){if(n==="logout"&&CONNECTED){api("POST","/auth/logout").catch(function(){});resetSession()}_lo(n,a,el)};
+var _lo=act;act=function(n,a,el){if(n==="p2pretry"){p2pCache.updated=null;loadP2P();return}if(n==="logout"&&CONNECTED){api("POST","/auth/logout").catch(function(){});resetSession()}_lo(n,a,el)};
 /* ---- marketplace: public listings from the database ---- */
 function mapListing(l,i){var m=l.listing_type==="service"?"Services":"Products",c=l.currency_code,d=[["Type",m==="Services"?"Service":"Product"],["Country",esc(CNAME[l.country_code]||l.country_code)]];
  if(l.category_name)d.unshift(["Category",esc(l.category_name)]);if(l.quantity_available!=null)d.push(["Available",String(l.quantity_available)]);
