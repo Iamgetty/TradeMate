@@ -2,10 +2,16 @@
 const nextConfig = {
   output: 'standalone',
   async rewrites() {
-    return [
-      { source: '/app', destination: '/tm/index.html' },
-      { source: '/app/', destination: '/tm/index.html' },
-    ];
+    return {
+      beforeFiles: [
+        { source: '/', destination: '/tm/index.html' },
+      ],
+      afterFiles: [
+        { source: '/app', destination: '/tm/index.html' },
+        { source: '/app/', destination: '/tm/index.html' },
+      ],
+      fallback: [],
+    };
   },
 };
 export default nextConfig;
