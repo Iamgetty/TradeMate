@@ -694,6 +694,55 @@ class EnquiriesController {
 }
 
 
+
+@Controller('p2p')
+class P2PMarketController {
+  private filters(asset?: string, fiat?: string, limit?: string) {
+    const assetCode = (asset || 'USDT').trim().toUpperCase();
+    const fiatCode = (fiat || 'NGN').trim().toUpperCase();
+    const pageSize = limit === undefined ? 50 : Number(limit);
+    if (!/^[A-Z0-9]{2,16}$/.test(assetCode)) throw new BadRequestException('Invalid asset code.');
+    if (!/^[A-Z]{3}$/.test(fiatCode)) throw new BadRequestException('Invalid fiat currency code.');
+    if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) throw new BadRequestException('limit must be between 1 and 100.');
+    return { assetCode, fiatCode, pageSize };
+  }
+
+  @Get('book')
+  async book(@Query('asset') asset?: string, @Query('fiat') fiat?: string, @Query('side') side?: string, @Query('limit') limit?: string) {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const { assetCode, fiatCode, pageSize } = this.filters(asset, fiat, limit);
+    if (side && !['buy', 'sell'].includes(side.toLowerCase())) throw new BadRequestException('side must be buy or sell.');
+    const values: unknown[] = [assetCode, fiatCode];
+    let sideClause = '';
+    if (side) { values.push(side.toLowerCase()); sideClause = ' AND side = $3'; }
+    values.push(pageSize);
+    const result = await databasePool.query(
+      `SELECT id, side, asset_code, fiat_code, price::text, quantity::text,
+              min_fiat_amount::text, max_fiat_amount::text, created_at, updated_at
+       FROM p2p_public_book WHERE asset_code = $1 AND fiat_code = $2${sideClause}
+       ORDER BY CASE WHEN side = 'buy' THEN price END DESC,
+                CASE WHEN side = 'sell' THEN price END ASC, created_at DESC
+       LIMIT ${values.length}`, values,
+    );
+    return { source: 'TradeMate P2P orders', as_of: new Date().toISOString(), data: result.rows };
+  }
+
+  @Get('trades')
+  async trades(@Query('asset') asset?: string, @Query('fiat') fiat?: string, @Query('limit') limit?: string) {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const { assetCode, fiatCode, pageSize } = this.filters(asset, fiat, limit);
+    const result = await databasePool.query(
+      `SELECT trade_reference, side, asset_code, fiat_code, price::text, quantity::text,
+              fiat_total::text, completed_at
+       FROM p2p_public_completed_trades
+       WHERE asset_code = $1 AND fiat_code = $2
+       ORDER BY completed_at DESC, trade_reference, side
+       LIMIT $3`, [assetCode, fiatCode, pageSize],
+    );
+    return { source: 'TradeMate completed P2P ledger', as_of: new Date().toISOString(), data: result.rows };
+  }
+}
+
 const reviewerKeyId = (key: string) => createHash('sha256').update(key).digest('hex').slice(0, 12);
 
 @Controller('moderation')
@@ -826,7 +875,7 @@ class ModerationController {
   }
 }
 
-@Module({ controllers: [HealthController, AuthController, OrganizationsController, PublicListingsController, EnquiriesController, ModerationController] })
+@Module({ controllers: [HealthController, AuthController, OrganizationsController, PublicListingsController, P2PMarketController, EnquiriesController, ModerationController] })
 export class AppModule implements OnModuleDestroy {
   async onModuleDestroy() {
     if (databasePool) await databasePool.end();
