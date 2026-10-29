@@ -771,7 +771,7 @@ function trade(){
 var p2pCache={key:"",book:[],trades:[],loading:false,error:"",updated:null};
 function loadP2P(){
  var key=st.coin+"/"+st.fiat;
- if(p2pCache.key===key&&(p2pCache.loading||p2pCache.updated&&Date.now()-p2pCache.updated<15000))return;
+ if(p2pCache.key===key&&(p2pCache.loading||p2pCache.error||p2pCache.updated&&Date.now()-p2pCache.updated<15000))return;
  p2pCache.key=key;p2pCache.loading=true;p2pCache.error="";
  Promise.all([api("GET","/p2p/book?asset="+encodeURIComponent(st.coin)+"&fiat="+encodeURIComponent(st.fiat)+"&limit=100"),api("GET","/p2p/trades?asset="+encodeURIComponent(st.coin)+"&fiat="+encodeURIComponent(st.fiat)+"&limit=100")])
  .then(function(x){if(p2pCache.key!==key)return;p2pCache.book=x[0].data||[];p2pCache.trades=x[1].data||[];p2pCache.updated=Date.now();p2pCache.loading=false;p2pCache.error="";if(st.tab==="P2P")softDraw()})
@@ -1309,7 +1309,7 @@ function applyUser(u){if(!u)return;var m=st.me,same=m.id===u.id;
  loadOrg();loadMine();loadEnquiries();save()}
 function resetSession(){st.deals=[];st.org=null;st.mine=[];st.cart=[];st.favs=[];st.me={name:"",nick:"Member",av:0,uid:"",lvl:1,country:"Nigeria"};
  keepTp(function(){for(var i=items.length-1;i>=0;i--)if(items[i].own)items.splice(i,1)});ads=ads.filter(function(a){return !a.own});try{localStorage.removeItem(KEY)}catch(e){}}
-var _lo=act;act=function(n,a,el){if(n==="p2pretry"){p2pCache.updated=null;loadP2P();return}if(n==="logout"&&CONNECTED){api("POST","/auth/logout").catch(function(){});resetSession()}_lo(n,a,el)};
+var _lo=act;act=function(n,a,el){if(n==="p2pretry"){p2pCache.updated=null;p2pCache.error="";p2pCache.key="";loadP2P();return}if(n==="logout"&&CONNECTED){api("POST","/auth/logout").catch(function(){});resetSession()}_lo(n,a,el)};
 /* ---- marketplace: public listings from the database ---- */
 function mapListing(l,i){var m=l.listing_type==="service"?"Services":"Products",c=l.currency_code,d=[["Type",m==="Services"?"Service":"Product"],["Country",esc(CNAME[l.country_code]||l.country_code)]];
  if(l.category_name)d.unshift(["Category",esc(l.category_name)]);if(l.quantity_available!=null)d.push(["Available",String(l.quantity_available)]);
