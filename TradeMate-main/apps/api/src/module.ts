@@ -29,7 +29,7 @@ const passwordMatches = async (password: string, encoded: string) => {
   } catch { return false; }
 };
 const tokenDigest = (token: string) => createHash('sha256').update(token).digest('hex');
-const cookieOptions = () => ({ httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax', path: '/', maxAge: SESSION_DAYS * 24 * 60 * 60 * 1000 });
+const cookieOptions = () => ({ httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/', maxAge: SESSION_DAYS * 24 * 60 * 60 * 1000 });
 const sessionTokenFrom = (request: Request) => {
   const cookie = request.headers.cookie?.split(';').map((part) => part.trim()).find((part) => part.startsWith(SESSION_COOKIE + '='));
   return cookie ? decodeURIComponent(cookie.slice(SESSION_COOKIE.length + 1)) : '';
@@ -130,7 +130,7 @@ class AuthController {
   async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
     const token = sessionTokenFrom(request);
     if (databasePool && token) await databasePool.query('DELETE FROM user_sessions WHERE token_hash = $1', [tokenDigest(token)]);
-    response.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax', path: '/' });
+    response.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' });
     return { success: true };
   }
 }
