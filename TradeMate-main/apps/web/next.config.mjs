@@ -5,6 +5,7 @@ const nextConfig = {
     return {
       beforeFiles: [
         { source: '/', destination: '/tm/index.html' },
+        { source: '/auth', destination: '/tm/index.html' },
       ],
       afterFiles: [
         { source: '/app', destination: '/tm/index.html' },
