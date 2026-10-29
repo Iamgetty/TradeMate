@@ -53,8 +53,8 @@ FROM p2p_orders
 WHERE status IN ('open','partially_filled') AND remaining_quantity > 0;
 
 CREATE OR REPLACE VIEW p2p_public_completed_trades AS
-SELECT id AS trade_reference, asset_code, fiat_code, price, quantity, fiat_total, completed_at,
-       CASE WHEN buyer_user_id IS NOT NULL THEN 'BUY' END AS buy_side,
-       CASE WHEN seller_user_id IS NOT NULL THEN 'SELL' END AS sell_side
-FROM p2p_trades
-WHERE status = 'completed' AND completed_at IS NOT NULL;
+SELECT id AS trade_reference, 'BUY'::text AS side, asset_code, fiat_code, price, quantity, fiat_total, completed_at
+FROM p2p_trades WHERE status = 'completed' AND completed_at IS NOT NULL
+UNION ALL
+SELECT id AS trade_reference, 'SELL'::text AS side, asset_code, fiat_code, price, quantity, fiat_total, completed_at
+FROM p2p_trades WHERE status = 'completed' AND completed_at IS NOT NULL;
