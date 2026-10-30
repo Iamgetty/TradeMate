@@ -890,7 +890,7 @@ function fxQuotePanel(pair){
  var instrument=pair.replace("/","_"),q=fxFeedQuotes[instrument],state=fxFeedStatus.state||"connecting";
  var age=q&&q.time?Date.now()-Date.parse(q.time):Infinity;
  if(!q||age>30000){
-  var msg=state==="not_configured"?"OANDA credentials have not been added to the exchange-feed service yet.":state==="error"?"OANDA feed error: "+(fxFeedStatus.error||"connection failed"):"Waiting for account-authorized OANDA prices…";
+  var msg=state==="not_configured"?"OANDA credentials have not been added to the exchange-feed service yet.":state==="error"?"OANDA feed error: "+(fxFeedStatus.error||"connection failed"):state==="live"&&!q?"This pair is not available in the connected OANDA account.":q?"The last quote is stale; waiting for a fresh OANDA update.":"Waiting for account-authorized OANDA prices…";
   return '<section class="fx-selected"><small>LIVE FX · OANDA</small><b>'+esc(pair)+'</b><span>'+esc(msg)+'</span></section>';
  }
  var dp=pair.indexOf("JPY")>=0?3:5;
