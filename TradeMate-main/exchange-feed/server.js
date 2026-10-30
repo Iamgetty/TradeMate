@@ -51,7 +51,7 @@ function getBook(exchange, market, symbol) {
   const k = `${exchange}|${market}|${symbol}`;
   let b = books.get(k);
   if (!b) {
-    b = { exchange, market, symbol, ...splitSymbol(symbol), bids: new Map(), asks: new Map(), ts: 0, last: null };
+    b = { exchange, market, symbol, ...splitSymbol(symbol), bids: new Map(), asks: new Map(), ts: 0, last: null, synced: false };
     books.set(k, b);
   }
   return b;
@@ -137,6 +137,7 @@ function binance(market, host, symbols) {
       const b = getBook('binance', market, symbol);
       replaceSide(b.bids, d.bids || d.b || []);   // spot uses bids/asks, futures uses b/a
       replaceSide(b.asks, d.asks || d.a || []);
+      b.synced = true; // Binance depth20 messages are complete partial-book snapshots
       touch(b);
     } else if (type === 'aggTrade') {
       addTrade('binance', market, symbol, { id: String(d.a), price: +d.p, qty: +d.q, side: d.m ? 'sell' : 'buy', ts: d.T });
@@ -161,8 +162,16 @@ function bybit(market, symbols) {
       if (msg.topic.startsWith('orderbook.')) {
         const d = msg.data;
         const b = getBook('bybit', market, d.s);
-        if (msg.type === 'snapshot') { replaceSide(b.bids, d.b || []); replaceSide(b.asks, d.a || []); }
-        else { applySide(b.bids, d.b || []); applySide(b.asks, d.a || []); }
+        if (msg.type === 'snapshot') {
+          replaceSide(b.bids, d.b || []);
+          replaceSide(b.asks, d.a || []);
+          b.synced = true;
+        } else {
+          // Never expose a partial Bybit book before its initial snapshot.
+          if (!b.synced) return;
+          applySide(b.bids, d.b || []);
+          applySide(b.asks, d.a || []);
+        }
         touch(b);
       } else if (msg.topic.startsWith('publicTrade.')) {
         for (const t of msg.data) {
@@ -192,10 +201,19 @@ function coinbase(products) {
       if (msg.channel === 'l2_data') {
         for (const e of msg.events || []) {
           const b = getBook('coinbase', 'spot', e.product_id);
-          if (e.type === 'snapshot') { b.bids.clear(); b.asks.clear(); }
+          if (e.type === 'snapshot') {
+            b.bids.clear();
+            b.asks.clear();
+            b.synced = true;
+          } else if (!b.synced) {
+            // Ignore level2 updates until Coinbase has supplied a full snapshot.
+            continue;
+          }
           for (const u of e.updates || []) {
+            if (u.side !== 'bid' && u.side !== 'offer') continue;
             const map = u.side === 'bid' ? b.bids : b.asks;
-            const p = +u.price_level, q = +u.new_quantity;
+            const p = Number(u.price_level), q = Number(u.new_quantity);
+            if (!Number.isFinite(p) || p <= 0 || !Number.isFinite(q) || q < 0) continue;
             if (q === 0) map.delete(p); else map.set(p, q);
           }
           touch(b);
