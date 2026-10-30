@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import TradeMateRuntime from './TradeMateRuntime';
 
 export default function TradeMateAppRoute() {
-  redirect('/tm/index.html');
+  return <TradeMateRuntime />;
 }
