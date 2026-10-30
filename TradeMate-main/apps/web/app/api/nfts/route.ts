@@ -154,7 +154,7 @@ export async function GET(request: Request) {
     }
   }
 
-  if (!collection || !/^[a-z0-9-]{2,80}$/.test(collection)) {
+  if (requestedCollection === 'art' || !collection || !/^[a-z0-9-]{2,80}$/.test(collection)) {
     return NextResponse.json({
       configured: true, items: [], next: null,
       message: 'Choose a named OpenSea collection to load listings, offers, sales, or activity.'
