@@ -709,17 +709,20 @@ function markets(){
  var list=st.mm==="NFTs"?NFTLIVE:items.filter(function(i){return i.m===st.mm&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)});
  return '<div class="top"><label class="srch">'+ic("search")+'<input id="mq" value="'+esc(st.q)+'" placeholder="Search '+st.mm+'" aria-label="Search this market"></label></div>'+(st.mm==="NFTs"?'<div style="margin:12px 0"><label style="display:block;font-size:12px;color:var(--mut);margin-bottom:6px">NFT COLLECTION</label><select id="nftcollection" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--text)">'+[['azuki','Azuki'],['bored ape yacht club','Bored Ape Yacht Club'],['pudgy penguins','Pudgy Penguins'],['cryptopunks','CryptoPunks'],['doodles','Doodles'],['clone x','Clone X'],['art','Art NFTs']].map(function(o){return '<option value="'+esc(o[0])+'"'+(NFTCOLLECTION===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select></div>':'')+'<div class="mgrid">'+ORD.map(function(t){var n=items.filter(function(i){return i.m===t}).length;return '<button class="mcard'+(st.mm===t?" on":"")+'" data-mm="'+t+'" style="--ac:'+MC[t]+'">'+ic(MI[t])+t.replace("Real Estate","Estate")+'<small>'+n+'</small></button>'}).join("")+'</div>'+
  (st.mm==="NFTs"?(NFTLOADING?'<div class="empty"><b>Loading live OpenSea NFTs…</b>Searching '+esc(st.q||"Azuki")+' on Ethereum.</div>':list.length?'<div class="live" style="margin:18px 0 10px"><i></i>LIVE NFT DATA · ETHEREUM</div><div class="thead"><span>NFT / COLLECTION</span><span>Price</span><span>Status</span></div>'+list.map(function(i){return '<div class="row" style="cursor:default"><span class="nm"><span class="coin" style="overflow:hidden">'+(i.image?'<img src="'+esc(i.image)+'" alt="" style="width:100%;height:100%;object-fit:cover">':ic("image"))+'</span><span><b>'+esc(i.n)+'</b><small>'+esc(i.collection||"OpenSea collection")+(i.tokenId?" · #"+esc(i.tokenId):"")+'</small></span></span><span class="p">'+(typeof i.p==="number"?fx2(i.p,4)+" "+esc(i.currency||"ETH"):"Not listed")+'</span><span class="badge">OpenSea ↗</span></a>'}).join(""):'<div class="empty"><b>'+(NFTERROR||"No live NFT results")+'</b>Try another NFT or collection name.</div>'):(list.length?'<div class="thead"><span>Name</span><span>Price</span><span>24h</span></div>'+list.map(rowH).join(""):'<div class="empty"><b>'+(st.q?"No matches":"No "+st.mm+" listings yet")+'</b>'+(st.q?"Try a different search.":"Listings published by TradeMate users will appear here.")+'</div>'))}
-var marketFeed={symbol:"",socket:null,status:"idle",bids:[],asks:[],trades:[],last:0,drawTimer:null};
-function stopMarketFeed(){if(marketFeed.socket){try{marketFeed.socket.close()}catch(e){}marketFeed.socket=null}marketFeed.symbol="";marketFeed.status="idle";marketFeed.bids=[];marketFeed.asks=[];marketFeed.trades=[]}
-function ensureCryptoFeed(it){
- var symbol=String(it.n||"").replace("/","").toLowerCase();
- if(!/^[a-z0-9]{5,20}$/.test(symbol)){stopMarketFeed();marketFeed.status="unavailable";return}
- if(marketFeed.symbol===symbol&&marketFeed.socket&&[WebSocket.OPEN,WebSocket.CONNECTING].includes(marketFeed.socket.readyState))return;
- stopMarketFeed();marketFeed.symbol=symbol;marketFeed.status="connecting";
- var ws;
- try{ws=new WebSocket("wss://data-stream.binance.vision/stream?streams="+symbol+"@depth20@100ms/"+symbol+"@trade")}catch(e){marketFeed.status="unavailable";return}
+var marketFeed={symbol:"",socket:null,status:"idle",bids:[],asks:[],trades:[],last:0,drawTimer:null,retryTimer:null,timeoutTimer:null,attempt:0};
+var marketFeedHosts=["wss://stream.binance.com:443","wss://data-stream.binance.vision"];
+function clearMarketFeedTimers(){if(marketFeed.retryTimer){clearTimeout(marketFeed.retryTimer);marketFeed.retryTimer=null}if(marketFeed.timeoutTimer){clearTimeout(marketFeed.timeoutTimer);marketFeed.timeoutTimer=null}}
+function stopMarketFeed(){clearMarketFeedTimers();if(marketFeed.socket){var old=marketFeed.socket;marketFeed.socket=null;try{old.onclose=null;old.onerror=null;old.close()}catch(e){}}marketFeed.symbol="";marketFeed.status="idle";marketFeed.bids=[];marketFeed.asks=[];marketFeed.trades=[];marketFeed.attempt=0}
+function retryMarketFeed(symbol){if(marketFeed.symbol!==symbol)return;clearMarketFeedTimers();marketFeed.status="reconnecting";scheduleMarketDraw();marketFeed.retryTimer=setTimeout(function(){if(marketFeed.symbol===symbol)openMarketFeed(symbol)},1800)}
+function openMarketFeed(symbol){
+ if(marketFeed.symbol!==symbol)return;
+ clearMarketFeedTimers();
+ var host=marketFeedHosts[marketFeed.attempt%marketFeedHosts.length],url=host+"/stream?streams="+symbol+"@depth20@100ms/"+symbol+"@trade";
+ marketFeed.status=marketFeed.attempt?"reconnecting":"connecting";scheduleMarketDraw();
+ var ws;try{ws=new WebSocket(url)}catch(e){marketFeed.attempt++;if(marketFeed.attempt<marketFeedHosts.length){openMarketFeed(symbol)}else retryMarketFeed(symbol);return}
  marketFeed.socket=ws;
- ws.onopen=function(){if(marketFeed.socket!==ws)return;marketFeed.status="live";scheduleMarketDraw()};
+ marketFeed.timeoutTimer=setTimeout(function(){if(marketFeed.socket!==ws)return;try{ws.close()}catch(e){}if(marketFeed.socket===ws){marketFeed.socket=null;marketFeed.attempt++;if(marketFeed.attempt<marketFeedHosts.length)openMarketFeed(symbol);else{marketFeed.attempt=0;retryMarketFeed(symbol)}}},8000);
+ ws.onopen=function(){if(marketFeed.socket!==ws)return;clearMarketFeedTimers();marketFeed.attempt=0;marketFeed.status="live";scheduleMarketDraw()};
  ws.onmessage=function(ev){
   if(marketFeed.socket!==ws)return;
   try{
@@ -731,14 +734,21 @@ function ensureCryptoFeed(it){
    if(d.e==="trade"&&Number(d.p)>0&&Number(d.q)>0){
     marketFeed.trades.unshift({id:d.t,p:Number(d.p),q:Number(d.q),time:Number(d.T||d.E),side:d.m?"SELL":"BUY"});
     marketFeed.trades=marketFeed.trades.slice(0,40);
-    var pairName=items.filter(function(x){return x.m==="Crypto"&&x.n.replace("/","")===String(d.s||"")})[0];var itNow=pairName;
-    if(itNow)itNow.p=Number(d.p);
+    var pairName=items.filter(function(x){return x.m==="Crypto"&&x.n.replace("/","")===String(d.s||"")})[0];
+    if(pairName)pairName.p=Number(d.p);
    }
-   marketFeed.last=Date.now();scheduleMarketDraw();
+   marketFeed.last=Date.now();marketFeed.status="live";scheduleMarketDraw();
   }catch(e){}
  };
- ws.onerror=function(){if(marketFeed.socket===ws){marketFeed.status="unavailable";scheduleMarketDraw()}};
- ws.onclose=function(){if(marketFeed.socket===ws){marketFeed.status="disconnected";scheduleMarketDraw()}};
+ ws.onerror=function(){if(marketFeed.socket!==ws)return;marketFeed.status="unavailable";scheduleMarketDraw();try{ws.close()}catch(e){}};
+ ws.onclose=function(){if(marketFeed.socket!==ws)return;marketFeed.socket=null;marketFeed.attempt++;if(marketFeed.attempt<marketFeedHosts.length)openMarketFeed(symbol);else{marketFeed.attempt=0;retryMarketFeed(symbol)}};
+}
+function ensureCryptoFeed(it){
+ var symbol=String(it.n||"").replace("/","").toLowerCase();
+ if(!/^[a-z0-9]{5,20}$/.test(symbol)){stopMarketFeed();marketFeed.status="unavailable";return}
+ if(marketFeed.symbol===symbol&&marketFeed.socket&&[WebSocket.OPEN,WebSocket.CONNECTING].includes(marketFeed.socket.readyState))return;
+ if(marketFeed.symbol===symbol&&marketFeed.retryTimer)return;
+ stopMarketFeed();marketFeed.symbol=symbol;marketFeed.status="connecting";openMarketFeed(symbol);
 }
 function scheduleMarketDraw(){if(marketFeed.drawTimer)return;marketFeed.drawTimer=setTimeout(function(){marketFeed.drawTimer=null;if(st.tab==="Trade")softDraw()},350)}
 function trade(){
@@ -748,7 +758,7 @@ function trade(){
   ensureCryptoFeed(it);
   var dp=it.p<1?6:it.p<20?4:2,stamp=marketFeed.last?new Date(marketFeed.last).toLocaleTimeString():"—";
   var head='<div class="tpx"><b data-px="'+esc(it.n)+'">'+px(it)+'</b><span>USDT</span></div><div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Book</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">Trades</button></div>';
-  if(marketFeed.status!=="live"&&!marketFeed.bids.length&&!marketFeed.trades.length)return h+head+'<div class="empty"><b>'+(marketFeed.status==="connecting"?"Connecting to Binance…":"Live market feed unavailable")+'</b>'+(marketFeed.status==="connecting"?"Waiting for genuine exchange data.":"No sample records are shown. Try again shortly or choose another pair.")+'</div><p class="fine">Source: Binance Spot public market stream. Last update: '+stamp+'.</p>';
+  if(marketFeed.status!=="live"&&!marketFeed.bids.length&&!marketFeed.trades.length)return h+head+'<div class="empty"><b>'+((marketFeed.status==="connecting"?"Connecting to Binance…":marketFeed.status==="reconnecting"?"Reconnecting to Binance…":"Live market feed unavailable"))+'</b>'+((marketFeed.status==="connecting"||marketFeed.status==="reconnecting"?"Waiting for genuine exchange data.":"No sample records are shown. Try again shortly or choose another pair."))+'</div><p class="fine">Source: Binance Spot public market stream. Last update: '+stamp+'.</p>';
   var body="";
   if(st.tt==="Order book"){
    var bids=marketFeed.bids,asks=marketFeed.asks,rows="";
