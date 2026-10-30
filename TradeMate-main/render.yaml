@@ -4,7 +4,7 @@ services:
     name: trademate-api
     runtime: node
     plan: free
-    rootDir: apps/api
+    rootDir: TradeMate-main/apps/api
     buildCommand: npm install --include=dev && npm run build
     startCommand: npm run db:migrate && npm run start:prod
     healthCheckPath: /api/health
@@ -18,7 +18,7 @@ services:
     name: trademate-web
     runtime: node
     plan: free
-    rootDir: apps/web
+    rootDir: TradeMate-main/apps/web
     buildCommand: npm install && npm run build
     startCommand: npm run start
     autoDeployTrigger: commit
