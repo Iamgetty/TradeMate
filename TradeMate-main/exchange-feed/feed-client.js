@@ -86,6 +86,8 @@
         booksCombined: fresh.length,
         feedsLive: msg.feeds.live,
         feedsTotal: msg.feeds.total,
+        fxQuotes: msg.fxQuotes || [],
+        fxStatus: msg.fxStatus || { state: 'unavailable', provider: 'OANDA' },
         ts: msg.ts,
       });
     }

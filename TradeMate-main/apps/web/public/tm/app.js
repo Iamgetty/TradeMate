@@ -440,25 +440,25 @@ var TM_CSS=[
 ".so-t{display:flex;align-items:center;gap:12px;padding:12px 18px;border-top:1px solid #ffffff0d;animation:soI .6s both}.so-t .coin{width:36px;height:36px}.so-t div{flex:1;min-width:0}.so-t b{display:block;font-size:14px}.so-t small{color:#7f9a92;font-size:11px;font-weight:600}.so-t strong{font:800 14.5px 'Bricolage Grotesque',sans-serif;text-align:right;display:block}",
 ".so-bot{display:flex;justify-content:space-between;margin:26px 2px 0;font:500 9.5px 'DM Mono',monospace;letter-spacing:.16em;color:#5f7770}",
 "@media(prefers-reduced-motion:reduce){#out *{animation:none!important}}",
-".fx-universe{margin:14px;padding:15px;border:1px solid #263642;border-radius:20px;background:linear-gradient(155deg,#101c25,#0a1016)}"
-".fx-universe-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:14px}"
-".fx-universe-head small,.fx-selected small{font:700 9px DM Mono,monospace;letter-spacing:.16em;color:#65d9c5}"
-".fx-universe-head h3{font-size:19px;margin:5px 0}"
-".fx-universe-head p{font-size:11px;color:var(--mut);margin:0}"
-".fx-count{flex:none;width:48px;height:48px;border-radius:14px;display:grid;place-content:center;text-align:center;background:#17352f;color:#7ce2c8;font:800 17px DM Mono,monospace}"
-".fx-count small{font-size:8px}"
-".fx-tabs{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}"
-".fx-tabs button{flex:none;padding:8px 10px;border:1px solid #2a3945;border-radius:10px;background:#111b23;color:#9aabba;font-size:10px;font-weight:800;white-space:nowrap}"
-".fx-tabs button.on{background:#173a35;border-color:#398d7c;color:#9cf0d9}"
-".fx-group-title{display:flex;justify-content:space-between;padding:10px 2px 8px}.fx-group-title span{font:700 8px DM Mono,monospace;color:#7f909e}"
-".fx-asset-list{display:grid;gap:6px}"
-".fx-asset{width:100%;display:flex;align-items:center;gap:11px;text-align:left;padding:9px;border:1px solid #22313d;border-radius:13px;background:#0e171f}"
-".fx-asset.selected{border-color:#4a9b87;background:#14251f}"
-".fx-asset-logo{width:37px;height:37px;flex:none;border-radius:11px;display:grid;place-items:center;overflow:hidden;background:#f1f4f6;color:#15202a;font-weight:900;font-size:11px}"
-".fx-asset-logo img{width:25px;height:25px;object-fit:contain}.fx-fallback{width:100%;height:100%;display:grid;place-items:center;font:800 10px DM Mono,monospace;color:#15202a}"
-".fx-asset-copy{flex:1;min-width:0;display:grid;gap:3px}.fx-asset-copy b{font-size:12px}.fx-asset-copy small{font-size:10px;color:#8fa0ae}"
-".fx-asset-arrow{font:700 8px DM Mono,monospace;color:#8b9ba8}.fx-asset.selected .fx-asset-arrow{color:#82e4c9}"
-".fx-selected{display:grid;gap:5px;margin-top:10px;padding:12px;border-radius:12px;background:#14251f;border:1px solid #326b5c}.fx-selected b{font-size:12px}.fx-selected span,.fx-disclaimer{font-size:10px;line-height:1.5;color:#a7b6b1}"
+".fx-universe{margin:14px;padding:15px;border:1px solid #263642;border-radius:20px;background:linear-gradient(155deg,#101c25,#0a1016)}",
+".fx-universe-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:14px}",
+".fx-universe-head small,.fx-selected small{font:700 9px DM Mono,monospace;letter-spacing:.16em;color:#65d9c5}",
+".fx-universe-head h3{font-size:19px;margin:5px 0}",
+".fx-universe-head p{font-size:11px;color:var(--mut);margin:0}",
+".fx-count{flex:none;width:48px;height:48px;border-radius:14px;display:grid;place-content:center;text-align:center;background:#17352f;color:#7ce2c8;font:800 17px DM Mono,monospace}",
+".fx-count small{font-size:8px}",
+".fx-tabs{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}",
+".fx-tabs button{flex:none;padding:8px 10px;border:1px solid #2a3945;border-radius:10px;background:#111b23;color:#9aabba;font-size:10px;font-weight:800;white-space:nowrap}",
+".fx-tabs button.on{background:#173a35;border-color:#398d7c;color:#9cf0d9}",
+".fx-group-title{display:flex;justify-content:space-between;padding:10px 2px 8px}.fx-group-title span{font:700 8px DM Mono,monospace;color:#7f909e}",
+".fx-asset-list{display:grid;gap:6px}",
+".fx-asset{width:100%;display:flex;align-items:center;gap:11px;text-align:left;padding:9px;border:1px solid #22313d;border-radius:13px;background:#0e171f}",
+".fx-asset.selected{border-color:#4a9b87;background:#14251f}",
+".fx-asset-logo{width:37px;height:37px;flex:none;border-radius:11px;display:grid;place-items:center;overflow:hidden;background:#f1f4f6;color:#15202a;font-weight:900;font-size:11px}",
+".fx-asset-logo img{width:25px;height:25px;object-fit:contain}.fx-fallback{width:100%;height:100%;display:grid;place-items:center;font:800 10px DM Mono,monospace;color:#15202a}",
+".fx-asset-copy{flex:1;min-width:0;display:grid;gap:3px}.fx-asset-copy b{font-size:12px}.fx-asset-copy small{font-size:10px;color:#8fa0ae}",
+".fx-asset-arrow{font:700 8px DM Mono,monospace;color:#8b9ba8}.fx-asset.selected .fx-asset-arrow{color:#82e4c9}",
+".fx-selected{display:grid;gap:5px;margin-top:10px;padding:12px;border-radius:12px;background:#14251f;border:1px solid #326b5c}.fx-selected b{font-size:12px}.fx-selected span,.fx-disclaimer{font-size:10px;line-height:1.5;color:#a7b6b1}",
 ".fx-disclaimer{color:#778793;margin:12px 2px 2px}.fx-universe+.fine{margin:9px 16px 0}",
 "/* trade page: moderate text sizes */",
 ".thd .sel b{font-size:13px}.thd .live{font-size:9.5px}.tpx b{font-size:19px}.tpx span{font-size:11.5px}.tpx .valn{font-size:11px}",
@@ -466,7 +466,7 @@ var TM_CSS=[
 ".tpx~.depthbar{font-size:11px}.tpx~.depthbar i{width:18px;height:18px;font-size:10px}",
 ".tpx~.bk{font-size:11px}.tpx~.bk .h{font-size:10px;white-space:nowrap}.tpx~.bk .cell{height:24px}",
 ".tpx~.tr{font-size:11px;padding:7px 16px}.tpx~.tr.h{font-size:10px}",
-".tpx~.rb b{font-size:15px}"
+".tpx~.rb b{font-size:15px}",
 ].join("\n");
 var st=d.createElement("style");st.textContent=TM_CSS;h.appendChild(st);
 var TM_TPL=[
@@ -867,6 +867,37 @@ var FX_ASSET_GROUPS={
  ]
 };
 var FX_ASSET_GROUP_NAMES=Object.keys(FX_ASSET_GROUPS);
+// OANDA quotes are OTC account pricing, not exchange executions.
+var fxFeedSocket=null,fxFeedQuotes={},fxFeedStatus={state:"connecting",provider:"OANDA"};
+function ensureFXFeed(){
+ if(fxFeedSocket)return;
+ try{
+  fxFeedSocket=createFeedClient({
+   url:"wss://exchange-feed.onrender.com",base:"EUR",quote:"USD",markets:["spot"],
+   onStatus:function(connected){if(!connected&&fxFeedStatus.state==="live")fxFeedStatus.state="reconnecting";scheduleMarketDraw()},
+   onUpdate:function(data){
+    fxFeedQuotes={};
+    (data.fxQuotes||[]).forEach(function(q){fxFeedQuotes[q.instrument]=q});
+    fxFeedStatus=data.fxStatus||{state:"unavailable",provider:"OANDA"};
+    scheduleMarketDraw();
+   }
+  });
+ }catch(e){fxFeedStatus={state:"unavailable",provider:"OANDA",error:e.message||"Feed unavailable"}}
+}
+function fxQuotePanel(pair){
+ if(!/^[A-Z]{3}\/[A-Z]{3}$/.test(pair||""))return "";
+ ensureFXFeed();
+ var instrument=pair.replace("/","_"),q=fxFeedQuotes[instrument],state=fxFeedStatus.state||"connecting";
+ var age=q&&q.time?Date.now()-Date.parse(q.time):Infinity;
+ if(!q||age>30000){
+  var msg=state==="not_configured"?"OANDA credentials have not been added to the exchange-feed service yet.":state==="error"?"OANDA feed error: "+(fxFeedStatus.error||"connection failed"):state==="live"&&!q?"This pair is not available in the connected OANDA account.":q?"The last quote is stale; waiting for a fresh OANDA update.":"Waiting for account-authorized OANDA prices…";
+  return '<section class="fx-selected"><small>LIVE FX · OANDA</small><b>'+esc(pair)+'</b><span>'+esc(msg)+'</span></section>';
+ }
+ var dp=pair.indexOf("JPY")>=0?3:5;
+ var bidRows=(q.bids||[]).slice(0,3).map(function(x){return fx2(x.price,dp)+" · "+Number(x.liquidity).toLocaleString()}).join("<br>");
+ var askRows=(q.asks||[]).slice(0,3).map(function(x){return fx2(x.price,dp)+" · "+Number(x.liquidity).toLocaleString()}).join("<br>");
+ return '<section class="fx-selected"><small>OANDA ACCOUNT PRICING · '+(q.tradeable?"TRADEABLE":"NOT TRADEABLE")+'</small><b>'+esc(pair)+' <span class="up">'+fx2(q.bid,dp)+'</span> / <span class="dn">'+fx2(q.ask,dp)+'</span></b><span>Spread '+(q.spread==null?"—":fx2(q.spread,dp))+' · Mid '+(q.mid==null?"—":fx2(q.mid,dp))+' · Updated '+new Date(q.time).toLocaleTimeString()+'</span><div class="fx-tabs"><span>BID · PRICE / LIQUIDITY</span><span>ASK · PRICE / LIQUIDITY</span></div><div class="fx-asset-list"><div class="fx-asset"><span class="fx-asset-copy"><b>'+bidRows+'</b></span></div><div class="fx-asset"><span class="fx-asset-copy"><b>'+askRows+'</b></span></div></div></section>';
+}
 function fxAssetCard(x,group){
  var logo=x.d?'<img src="https://www.google.com/s2/favicons?domain='+esc(x.d)+'&sz=128" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\'"><span class="fx-fallback" style="display:none">'+esc(x.m)+'</span>':
  '<span class="fx-fallback">'+esc(x.g||x.m)+'</span>';
@@ -882,7 +913,8 @@ function fxAssetMarket(){
 }
 function trade(){
  var it=items[st.tp],cr=it.m==="Crypto",fxm=it.m==="Forex";
- var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose product"><span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span><b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?"FOREX · INDICATIVE":"TRADEMATE")+'</span></div>';
+ if(fxm)ensureFXFeed();
+ var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose product"><span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span><b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?(fxFeedStatus.state==="live"?"OANDA LIVE":("OANDA "+String(fxFeedStatus.state||"CONNECTING").toUpperCase())):"TRADEMATE")+'</span></div>';
  if(cr){
   ensureMultiFeeds(it);
   var dp=it.p<1?6:it.p<20?4:2,stamp=tmStatus();
@@ -897,7 +929,7 @@ function trade(){
   return h+head+body+'<p class="fine">Live public exchange order-book depth and executed trades. Book keeps each exchange separate; Trades shows the shared, venue-labelled execution tape. '+stamp+'.</p>';
  }
  if(fxm){
-  return h+fxAssetMarket()+'<p class="fine">Currency pairs and these global instruments are shown in the Forex & Global Markets workspace. Forex remains OTC; quotes and yields will only be shown when connected to their respective licensed data sources.</p>';
+  return h+fxQuotePanel(it.n)+fxAssetMarket()+'<p class="fine">OANDA provides account-specific OTC bid/ask prices and available liquidity levels. These are not centralized exchange books or executed trades. The other global instruments remain unavailable until their respective licensed data sources are connected.</p>';
  }
  var kind=it.m==="Services"?"service":"product";
  loadInternalTrades(kind);
