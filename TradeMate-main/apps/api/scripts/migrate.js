@@ -12,6 +12,7 @@ const MIGRATIONS = [
   '005_marketplace_transactions.sql',
   '006_p2p_order_lifecycle.sql',
   '007_public_trade_integrity.sql',
+  '008_p2p_dispute_resolution.sql',
 ];
 
 async function main() {
