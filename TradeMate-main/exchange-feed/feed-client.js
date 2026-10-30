@@ -1,7 +1,6 @@
 // feed-client.js: no UI, no styling. Paste into your app (or load with <script>).
-// It connects to the feed backend, combines the order books of every live
-// exchange into ONE aggregated book (same-price quantities added together),
-// and calls onUpdate once per second with plain data for YOUR own screens.
+// It connects to the feed backend and exposes each exchange/market order book
+// independently, plus a shared venue-labelled execution tape.
 //
 // const feed = createFeedClient({
 //   url: 'wss://your-feed.onrender.com',
@@ -18,7 +17,7 @@
       base: 'BTC',
       quote: 'USDT',
       markets: ['spot'],        // add 'futures' (Binance) and 'linear' (Bybit) to include futures books
-      mixUsdQuotes: true,       // treat USD, USDT, USDC as one quote so Coinbase USD books combine
+      mixUsdQuotes: true,       // include USD-like venues, but preserve each book's quote label
       levels: 12,               // rows per side
       tick: 0,                  // price grouping step, e.g. 0.5; 0 = exact prices
       maxTrades: 50,
