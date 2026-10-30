@@ -5,8 +5,8 @@ const API_BASE = API_BASE_RAW.endsWith('/') ? API_BASE_RAW.slice(0, -1) : API_BA
 
 export const runtime = 'nodejs';
 
-async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
-  const { path } = await context.params;
+async function proxy(request: NextRequest, context: { params: { path: string[] } }) {
+  const { path } = context.params;
   const destination = `${API_BASE}/api/${path.map(encodeURIComponent).join('/')}${request.nextUrl.search}`;
   const headers = new Headers();
   const contentType = request.headers.get('content-type');
