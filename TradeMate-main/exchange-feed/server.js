@@ -57,6 +57,15 @@ function getBook(exchange, market, symbol) {
   return b;
 }
 const touch = (b) => { b.ts = Date.now(); };
+function resetBooks(exchange, market) {
+  for (const b of books.values()) {
+    if (b.exchange !== exchange || b.market !== market) continue;
+    b.bids.clear();
+    b.asks.clear();
+    b.ts = 0;
+    b.synced = false;
+  }
+}
 function validLevel(price, size) {
   return Number.isFinite(price) && price > 0 && Number.isFinite(size) && size >= 0;
 }
@@ -152,6 +161,8 @@ function bybit(market, symbols) {
     `bybit-${market}`,
     `wss://stream.bybit.com/v5/public/${market}`,
     (ws) => {
+      // A reconnect starts a new order-book session; require fresh snapshots.
+      resetBooks('bybit', market);
       const args = symbols.flatMap((s) => [`orderbook.50.${s}`, `publicTrade.${s}`]);
       for (let i = 0; i < args.length; i += 10) {   // Bybit spot allows max 10 topics per request
         ws.send(JSON.stringify({ op: 'subscribe', args: args.slice(i, i + 10) }));
@@ -193,6 +204,8 @@ function coinbase(products) {
     'coinbase',
     'wss://advanced-trade-ws.coinbase.com',
     (ws) => {
+      // Do not carry a previous Coinbase book across a new socket session.
+      resetBooks('coinbase', 'spot');
       for (const channel of ['level2', 'market_trades']) {
         ws.send(JSON.stringify({ type: 'subscribe', product_ids: products, channel }));
       }
