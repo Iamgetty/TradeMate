@@ -87,9 +87,11 @@ function connect(name, url, onOpen, onMessage, opts = {}) {
     ws.on('message', (raw) => {
       try {
         const message = JSON.parse(raw);
-        feedLastMessage.set(name, Date.now());
-        feedStatus.set(name, true);
         onMessage(message);
+        if (opts.isMarketData && opts.isMarketData(message)) {
+          feedLastMessage.set(name, Date.now());
+          feedStatus.set(name, true);
+        }
       } catch (e) { console.error(`[${name}] parse error:`, e.message); }
     });
     ws.on('error', (e) => console.error(`[${name}] error:`, e.message));
@@ -123,7 +125,7 @@ function binance(market, host, symbols) {
     } else if (type === 'aggTrade') {
       addTrade('binance', market, symbol, { id: String(d.a), price: +d.p, qty: +d.q, side: d.m ? 'sell' : 'buy', ts: d.T });
     }
-  });
+  }, { isMarketData: (msg) => !!(msg && msg.stream && msg.data && (msg.data.e === 'depthUpdate' || msg.data.e === 'aggTrade')) });
 }
 
 // ---- Bybit V5: orderbook.50 (snapshot + deltas) + publicTrade --------------
@@ -152,7 +154,10 @@ function bybit(market, symbols) {
         }
       }
     },
-    { ping: JSON.stringify({ op: 'ping' }) }
+    {
+      ping: JSON.stringify({ op: 'ping' }),
+      isMarketData: (msg) => !!(msg && typeof msg.topic === 'string' && (msg.topic.startsWith('orderbook.') || msg.topic.startsWith('publicTrade.'))),
+    }
   );
 }
 
@@ -186,7 +191,8 @@ function coinbase(products) {
           });
         }
       }
-    }
+    },
+    { isMarketData: (msg) => !!(msg && (msg.channel === 'l2_data' || msg.channel === 'market_trades')) }
   );
 }
 
