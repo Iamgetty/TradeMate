@@ -1220,19 +1220,7 @@ var _a3=act;act=function(n,a,el){
 document.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target.id==="dm"){var t=st.stack[st.stack.length-1];if(t&&t.id==="deal")dmAdd(t.a,e.target.value)}});
 
 st.prefs.twofa=true;st.prefs.alerts=true;
-var lastScroll=0;document.addEventListener("scroll",function(){lastScroll=Date.now()},{passive:true,capture:true});
-function scrolling(){return Date.now()-lastScroll<1200}
-setInterval(function(){
- if(scrolling()||document.hidden)return;
- items.forEach(function(i){if(i.m!=="Crypto"&&i.m!=="Forex")return;var o=i.p,amp=0;i.p=o*(1+(Math.random()-.5)*amp);i.c+=(i.p-o)/o*100;
-  document.querySelectorAll('[data-px="'+i.n+'"]').forEach(function(e){e.textContent=px(i)})});
- var it=items[st.tp];
- if(st.tab==="Trade"&&it.m==="Crypto"&&!st.stack.length){var b=it.p,dp=b<1?6:b<20?4:2,cs=document.querySelectorAll(".bk .cell");
-  if(cs.length){for(var k=0;k<20;k++){cs[k*2].children[2].textContent=fx2(b-(k+1)*b*.00012,dp);cs[k*2+1].children[1].textContent=fx2(b+(k+1)*b*.00012,dp)}
-   for(var n=0;n<3;n++){var q=Math.floor(Math.random()*20),x=Math.random()*.9+.05,y=Math.random()*.9+.05;cs[q*2].children[1].textContent=fx2(x*4,6);cs[q*2].children[0].style.width=Math.round(30+q*4+x*20)+"%";cs[q*2+1].children[2].textContent=fx2(y*4,6);cs[q*2+1].children[0].style.width=Math.round(25+q*4+y*20)+"%"}}
-  var rows=document.querySelectorAll(".tr:not(.h)");if(rows.length){for(var r=rows.length-1;r>0;r--){for(var c=0;c<3;c++)rows[r].children[c].textContent=rows[r-1].children[c].textContent;rows[r].children[1].className=rows[r-1].children[1].className}
-   var s2=Math.random()>.5;rows[0].children[0].textContent=new Date().toTimeString().slice(0,8);rows[0].children[1].textContent=fx2(b,dp);rows[0].children[1].className=s2?"up":"dn";rows[0].children[2].textContent=fx2(.004+Math.random()*.06,6)}}
-},2200);
+/* Synthetic market-book and trade-tape animation removed: Trade must show exchange executions only. */
 (function(){var c=$("bg"),x=c.getContext("2d"),N=40,P=[],W,H,rm=matchMedia("(prefers-reduced-motion:reduce)").matches;
  function sz(){W=c.width=innerWidth;H=c.height=innerHeight}sz();addEventListener("resize",function(){if(Math.abs(innerWidth-W)>40)sz()});
  for(var i=0;i<N;i++)P.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.2,vy:(Math.random()-.5)*.2});
