@@ -158,6 +158,6 @@ export default function MyOffersPage() {
       </div>}
       <Link className="account-secondary-link" href="/account">← Back to your space</Link>
     </section>
-    <footer className="footer3"><Link className="wordmark" href="/"><span className="logo-glyph">T<span>↗</span></span><span>TradeMate</span></Link><span>TRADE SMART. TRADE DIRECT.</span><Link href="/#top">BACK TO MARKET ↑</Link></footer>
+    <footer className="footer3"><Link className="wordmark" href="/"><span className="logo-glyph">T<span>↗</span></span><span>TradeMate</span></Link><span>TRADE SMART. TRADE DIRECT.</span><Link href="/app">BACK TO MARKET ↑</Link></footer>
   </main>;
 }
