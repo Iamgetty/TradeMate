@@ -15,6 +15,7 @@ declare global {
  */
 export default function TradeMateRuntime() {
   const [notice, setNotice] = useState('');
+  const [booted, setBooted] = useState(false);
 
   useEffect(() => {
     if (window.__tradeMateBooted) return;
@@ -27,6 +28,7 @@ export default function TradeMateRuntime() {
     app.src = '/tm/app.js?v=9';
     app.async = false;
     app.dataset.trademateApp = 'true';
+    app.onload = () => setBooted(true);
     app.onerror = () => {
       window.__tradeMateBooted = false;
       setNotice('TradeMate could not load its main interface script. Please reload the page.');
@@ -75,13 +77,29 @@ export default function TradeMateRuntime() {
 
   }, []);
 
-  return notice ? (
-    <div role="status" style={{
-      position: 'fixed', zIndex: 10000, left: 12, right: 12, bottom: 12,
-      padding: '10px 14px', border: '1px solid #73552b', borderRadius: 10,
-      background: '#21190e', color: '#ffd28a', font: '12px system-ui',
-    }}>
-      {notice}
-    </div>
-  ) : null;
+  return (
+    <>
+      {!booted && (
+        <div role="status" aria-live="polite" style={{
+          position: 'fixed', zIndex: 10000, inset: 0, display: 'grid',
+          placeContent: 'center', gap: 10, padding: 24, textAlign: 'center',
+          background: '#05070a', color: '#f5f7fa', font: '14px system-ui',
+        }}>
+          <strong style={{ fontSize: 18 }}>Opening TradeMate…</strong>
+          <span style={{ color: '#9aa8b8', maxWidth: 320, lineHeight: 1.5 }}>
+            {notice || 'Loading your markets and workspace.'}
+          </span>
+        </div>
+      )}
+      {booted && notice && (
+        <div role="status" style={{
+          position: 'fixed', zIndex: 10000, left: 12, right: 12, bottom: 12,
+          padding: '10px 14px', border: '1px solid #73552b', borderRadius: 10,
+          background: '#21190e', color: '#ffd28a', font: '12px system-ui',
+        }}>
+          {notice}
+        </div>
+      )}
+    </>
+  );
 }
