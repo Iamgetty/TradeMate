@@ -833,6 +833,10 @@ function loadP2P(){
  .then(function(x){if(p2pCache.key!==key)return;p2pCache.book=x[0].data||[];p2pCache.trades=x[1].data||[];p2pCache.updated=Date.now();p2pCache.loading=false;p2pCache.error="";if(st.tab==="P2P")softDraw()})
  .catch(function(e){if(p2pCache.key!==key)return;p2pCache.loading=false;p2pCache.error=e.message||"Could not load P2P records.";if(st.tab==="P2P")softDraw()});
 }
+var p2pPrivate={ads:[],orders:[],loading:false,error:"",updated:0};
+function loadP2PPrivate(force){if(!CONNECTED||!st.me.id)return Promise.resolve();if(!force&&p2pPrivate.updated&&Date.now()-p2pPrivate.updated<12000)return Promise.resolve();if(p2pPrivate.loading)return Promise.resolve();p2pPrivate.loading=true;p2pPrivate.error="";return Promise.all([api("GET","/p2p/my-ads"),api("GET","/p2p/my-orders")]).then(function(x){p2pPrivate.ads=x[0].data||[];p2pPrivate.orders=x[1].data||[];p2pPrivate.updated=Date.now();p2pPrivate.loading=false;if(st.tab==="P2P")softDraw()}).catch(function(e){p2pPrivate.loading=false;p2pPrivate.error=e.message||"Could not load your P2P records."})}
+function publishP2P(f){var side=/^Sell/.test(f.side)?"sell":"buy",coin=String(f.coin||"").trim().toUpperCase(),fiat=String(f.fiat||"").trim().toUpperCase(),price=Number(f.price),quantity=Number(f.amt),min=Number(f.min),max=Number(f.max);if(!CONNECTED)return Promise.reject(new Error("Sign in and connect to TradeMate before publishing a P2P offer."));if(!(price>0&&quantity>0&&min>=0&&max>=min&&max>0))return Promise.reject(new Error("Check your P2P price, total quantity and order limits."));var methods=(f.methods||[]).map(function(x){return x==="Other"?(f.othm||""):x}).filter(Boolean);if(f.othm&&methods.indexOf(f.othm)<0)methods.push(f.othm);return api("POST","/p2p/ads",{side:side,asset:coin,fiat:fiat,price:price,quantity:quantity,minFiatAmount:min,maxFiatAmount:max,paymentMethods:methods}).then(function(r){p2pPrivate.updated=0;p2pCache.updated=0;return loadP2PPrivate(true).then(function(){return r})})}
+function p2pMoney(n,fiat){var symbols={NGN:"₦",USD:"$",EUR:"€",GBP:"£",GHS:"₵",KES:"KSh"};return (symbols[fiat]||fiat+" ")+fx2(Number(n)||0,2)}
 function p2p(){
  loadP2P();
  var want=st.side==="Buy"?"sell":"buy",SYM={NGN:"₦",USD:"$",EUR:"€",GBP:"£",GHS:"₵",KES:"KSh"};
@@ -1433,8 +1437,9 @@ function publishLocal(id,f){var t=id.slice(2),rows=rowsOf(id).map(function(r){re
  if(t==="Forex")it={n:f.fa+"/"+f.fb,m:"Forex",p:+f.rate,c:null,k:"$",h:99,own:true,seller:esc(who),det:rows};
  else it={n:f.title,m:t,p:sy+" "+fmt(+f.price,2)+(PER[f.per]||""),c:null,k:t.charAt(0),h:99,own:true,seller:esc(who),desc:f.desc||"",det:rows};
  keepTp(function(){addItem(it)})}
-var _wc=wzCfg;wzCfg=function(id){var c=_wc(id);if(CONNECTED&&id!=="kyc"){if(SRV[id.slice(2)]){c.doneT="Offer submitted";c.doneS="Your offer is in review. It appears in the market once TradeMate approves it. Track it under Business accounts."}else{c.doneT="Saved on this device";c.doneS="This market is not open to the public yet, so your listing is saved on this device only."}}return c};
+var _wc=wzCfg;wzCfg=function(id){var c=_wc(id);if(CONNECTED&&id!=="kyc"){if(id==="P2P"){c.doneT="Advertisement published";c.doneS="Your offer is saved in TradeMate. Find it under My ads."}else if(SRV[id.slice(2)]){c.doneT="Offer submitted";c.doneS="Your offer is in review. It appears in the market once TradeMate approves it. Track it under Business accounts."}else{c.doneT="Saved on this device";c.doneS="This market is not open to the public yet, so your listing is saved on this device only."}}return c};
 var _wn=PC.wnext;PC.wnext=function(){var w=st.cw;if(!w){_wn();return}var fin=w.step===wzCfg(w.id).steps.length-1,f=Object.assign({},st.fv);
+ if(fin&&CONNECTED&&w.id==="P2P"){if(w.busy)return;w.busy=true;toast("Publishing P2P offer…");publishP2P(f).then(function(){w.busy=false;w.done=true;wzCfg("P2P").doneT="Advertisement published";wzCfg("P2P").doneS="Your offer is saved in TradeMate. Find it under My ads.";drawPage()}).catch(function(e){w.busy=false;fail(e)});return}
  if(fin&&w.id==="kyc"&&CONNECTED){toast("Identity verification is not open yet.");return}
  if(fin&&CONNECTED&&SRV[w.id.slice(2)]){if(w.busy)return;w.busy=true;toast("Submitting…");
   publishServer(w,f).then(function(){w.busy=false;w.done=true;loadMine();drawPage()}).catch(function(e){w.busy=false;fail(e);if(e.noorg)pg("subacct")});return}
