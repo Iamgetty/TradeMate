@@ -865,7 +865,10 @@ function p2p(){
  '<div class="notice">'+ic("horn","width:18px;height:18px")+'<div class="mq"><div class="mq-t"><span>Trade only through verified TradeMate flows. Never share passwords or payment credentials.</span></div></div></div>'+
  '<div class="bsw"><div class="bsp">'+["Buy","Sell"].map(function(x){return '<button class="'+(st.side===x?"on":"")+'" data-side="'+x+'">'+x+'</button>'}).join("")+'</div></div>'+
  '<div class="filt"><label><select id="coin" aria-label="Asset">'+["USDT","BTC","ETH"].map(function(x){return '<option'+(x===st.coin?" selected":"")+'>'+x+'</option>'}).join("")+'</select></label><label><input id="amt" inputmode="decimal" placeholder="Fiat amount" value="'+esc(st.amt)+'"></label><button class="fi" data-act="resetf" aria-label="Reset filters">'+ic("fun","width:19px;height:19px")+'</button></div>'+
- content+'<p class="fine">Source: TradeMate database · '+(p2pCache.updated?"Updated "+fmtT(new Date(p2pCache.updated).toISOString()):"Awaiting first successful sync")+'. Completed transactions are shown in Trade > Trade.</p>';
+ content+
+ '<div class="sec">RECENT COMPLETED P2P TRADES</div>'+
+ (p2pCache.trades.length?p2pCache.trades.slice(0,12).map(function(x){return '<div class="ad"><div class="who"><b>'+esc(x.side)+' · '+esc(x.asset_code)+'/'+esc(x.fiat_code)+'</b><small>Completed · '+fmtT(x.completed_at)+'</small></div><div class="pr">'+p2pMoney(x.fiat_total,x.fiat_code)+'</div><div class="kv">Price<b>'+p2pMoney(x.price,x.fiat_code)+' / '+esc(x.asset_code)+'</b><br>Quantity<b>'+fx2(Number(x.quantity),6)+' '+esc(x.asset_code)+'</b></div></div>'}).join(""):'<div class="empty"><b>No completed P2P trades yet</b>Only orders confirmed by the seller after payment is marked sent appear here.</div>')+
+ '<p class="fine">Source: TradeMate database · '+(p2pCache.updated?"Updated "+fmtT(new Date(p2pCache.updated).toISOString()):"Awaiting first successful sync")+'. Only live offers and confirmed completed trades are displayed.</p>';
 }
 function portfolio(){
  var v=st.hide?"******":"—";
