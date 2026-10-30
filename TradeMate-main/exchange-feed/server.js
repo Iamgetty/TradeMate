@@ -196,7 +196,7 @@ coinbase(CFG.coinbase);
 const OANDA_WANTED = [
   'EUR_USD', 'GBP_USD', 'USD_JPY', 'USD_CHF', 'AUD_USD', 'USD_CAD', 'NZD_USD',
   'EUR_GBP', 'EUR_JPY', 'GBP_JPY', 'EUR_CHF', 'AUD_JPY', 'GBP_CHF', 'EUR_AUD',
-  'EUR_CAD', 'AUD_CAD', 'AUD_NZD', 'USD_ZAR',
+  'EUR_CAD', 'AUD_CAD', 'AUD_NZD', 'USD_ZAR', 'USD_NGN', 'EUR_NGN', 'GBP_NGN', 'USD_GHS', 'USD_KES',
 ];
 const fxQuotes = new Map();
 const fxStatus = { state: process.env.OANDA_ACCOUNT_ID && process.env.OANDA_API_TOKEN ? 'connecting' : 'not_configured', provider: 'OANDA', environment: process.env.OANDA_ENVIRONMENT === 'live' ? 'live' : 'practice', error: null, instruments: 0, updatedAt: null };
