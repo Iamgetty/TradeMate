@@ -643,7 +643,7 @@ var MC={Services:"#2dd4bf",Products:"#ffb02e","Real Estate":"#60a5fa",NFTs:"#a78
 var MI={Services:"brief",Products:"box","Real Estate":"estate",NFTs:"nft",Software:"code",Businesses:"build",Forex:"fx",Crypto:"crypto"};
 var items=[
 {n:"BTC/USDT",m:"Crypto",p:null,c:null,k:"₿"},{n:"ETH/USDT",m:"Crypto",p:null,c:null,k:"Ξ"},{n:"SOL/USDT",m:"Crypto",p:null,c:null,k:"◎"},{n:"BNB/USDT",m:"Crypto",p:null,c:null,k:"B"},{n:"XRP/USDT",m:"Crypto",p:null,c:null,k:"X"},{n:"DOGE/USDT",m:"Crypto",p:null,c:null,k:"D"},{n:"USDC/USDT",m:"Crypto",p:null,c:null,k:"$"},{n:"ADA/USDT",m:"Crypto",p:null,c:null,k:"A"},{n:"TRX/USDT",m:"Crypto",p:null,c:null,k:"T"},{n:"TON/USDT",m:"Crypto",p:null,c:null,k:"T"},{n:"AVAX/USDT",m:"Crypto",p:null,c:null,k:"A"},{n:"DOT/USDT",m:"Crypto",p:null,c:null,k:"D"},{n:"LINK/USDT",m:"Crypto",p:null,c:null,k:"L"},{n:"POL/USDT",m:"Crypto",p:null,c:null,k:"P"},{n:"LTC/USDT",m:"Crypto",p:null,c:null,k:"L"},{n:"BCH/USDT",m:"Crypto",p:null,c:null,k:"B"},{n:"XLM/USDT",m:"Crypto",p:null,c:null,k:"X"},{n:"ATOM/USDT",m:"Crypto",p:null,c:null,k:"A"},{n:"NEAR/USDT",m:"Crypto",p:null,c:null,k:"N"},{n:"UNI/USDT",m:"Crypto",p:null,c:null,k:"U"},{n:"SHIB/USDT",m:"Crypto",p:null,c:null,k:"S"},{n:"DAI/USDT",m:"Crypto",p:null,c:null,k:"D"},{n:"ETC/USDT",m:"Crypto",p:null,c:null,k:"E"},
-{n:"EUR/USD",m:"Forex",p:null,c:null,k:"€"},{n:"GBP/USD",m:"Forex",p:null,c:null,k:"£"},{n:"USD/JPY",m:"Forex",p:null,c:null,k:"$"},{n:"USD/CHF",m:"Forex",p:null,c:null,k:"$"},{n:"AUD/USD",m:"Forex",p:null,c:null,k:"A$"},{n:"USD/CAD",m:"Forex",p:null,c:null,k:"$"},{n:"NZD/USD",m:"Forex",p:null,c:null,k:"NZ$"},{n:"EUR/GBP",m:"Forex",p:null,c:null,k:"€"},{n:"EUR/JPY",m:"Forex",p:null,c:null,k:"€"},{n:"GBP/JPY",m:"Forex",p:null,c:null,k:"£"},{n:"EUR/CHF",m:"Forex",p:null,c:null,k:"€"},{n:"AUD/JPY",m:"Forex",p:null,c:null,k:"A$"},{n:"GBP/CHF",m:"Forex",p:null,c:null,k:"£"},{n:"EUR/AUD",m:"Forex",p:null,c:null,k:"€"},{n:"EUR/CAD",m:"Forex",p:null,c:null,k:"€"},{n:"AUD/CAD",m:"Forex",p:null,c:null,k:"A$"},{n:"AUD/NZD",m:"Forex",p:null,c:null,k:"A$"},{n:"USD/NGN",m:"Forex",p:null,c:null,k:"$"},{n:"EUR/NGN",m:"Forex",p:null,c:null,k:"€"},{n:"GBP/NGN",m:"Forex",p:null,c:null,k:"£"},{n:"USD/GHS",m:"Forex",p:null,c:null,k:"$"},{n:"USD/KES",m:"Forex",p:null,c:null,k:"$"},{n:"USD/ZAR",m:"Forex",p:null,c:null,k:"$"}
+{n:"EUR/USD",m:"Forex",p:null,c:null,k:"€"},{n:"GBP/USD",m:"Forex",p:null,c:null,k:"£"},{n:"USD/JPY",m:"Forex",p:null,c:null,k:"$"},{n:"USD/CHF",m:"Forex",p:null,c:null,k:"$"},{n:"AUD/USD",m:"Forex",p:null,c:null,k:"A$"},{n:"USD/CAD",m:"Forex",p:null,c:null,k:"$"},{n:"NZD/USD",m:"Forex",p:null,c:null,k:"NZ$"},{n:"EUR/GBP",m:"Forex",p:null,c:null,k:"€"},{n:"EUR/JPY",m:"Forex",p:null,c:null,k:"€"},{n:"GBP/JPY",m:"Forex",p:null,c:null,k:"£"},{n:"EUR/CHF",m:"Forex",p:null,c:null,k:"€"},{n:"AUD/JPY",m:"Forex",p:null,c:null,k:"A$"},{n:"GBP/CHF",m:"Forex",p:null,c:null,k:"£"},{n:"EUR/AUD",m:"Forex",p:null,c:null,k:"€"},{n:"EUR/CAD",m:"Forex",p:null,c:null,k:"€"},{n:"AUD/CAD",m:"Forex",p:null,c:null,k:"A$"},{n:"AUD/NZD",m:"Forex",p:null,c:null,k:"A$"},{n:"USD/NGN",m:"Forex",p:null,c:null,k:"$"},{n:"EUR/NGN",m:"Forex",p:null,c:null,k:"€"},{n:"GBP/NGN",m:"Forex",p:null,c:null,k:"£"},{n:"USD/GHS",m:"Forex",p:null,c:null,k:"$"},{n:"USD/KES",m:"Forex",p:null,c:null,k:"$"},{n:"USD/ZAR",m:"Forex",p:null,c:null,k:"$"},{n:"OpenSea NFTs",m:"NFTs",p:null,c:null,k:"NFT"}
 ]
 items.forEach(function(i){i.col=MC[i.m]});items.sort(function(a,b){return ORD.indexOf(a.m)-ORD.indexOf(b.m)});
 var HUE={"Create order":"#ffb02e","Orders & bids":"#ffb02e",Rewards:"#ffb02e",Referral:"#ff7a59",Deposit:"#2dd4bf",P2P:"#8b7bff",Earn:"#a3e635",Promotions:"#f472b6",Announcements:"#38bdf8",More:"#94a3b8",Card:"#c084fc",Settings:"#94a3b8","Help Center":"#38bdf8","Feedback Hub":"#fb923c",Learn:"#34d399","Affiliate Programs":"#f472b6"};
@@ -710,25 +710,48 @@ function home(){
  '<div class="banner"><span class="chip">FEATURED</span><h3>Your promotion could appear here</h3><p>Reserved for listings and announcements.</p><div class="orb"><img src="'+LOGO+'" alt=""></div><button class="btn sm cta" data-pg="promos">Advertise</button></div>'+
  '<div class="tabs">'+["Favorites","Hot","Gainers","Losers","New"].map(function(t){return '<button class="'+(st.ht===t?"on":"")+'" data-ht="'+t+'">'+t+'</button>'}).join("")+'</div>'+
  (fv?'<div style="height:10px"></div>':'<div class="sub">'+["All"].concat(ORD).map(function(t){return '<button class="'+(hm===t?"on":"")+'" data-hm="'+t+'">'+t+'</button>'}).join("")+'</div>')+body}
-var NFTLIVE=[],NFTLOADING=false,NFTQUERY="",NFTERROR="",NFTTIMER=null,NFTREQ=0,NFTCOLLECTION="azuki";
+var NFTLIVE=[],NFTLOADING=false,NFTQUERY="",NFTERROR="",NFTTIMER=null,NFTREQ=0,NFTCOLLECTION="azuki",NFTVIEW="search",NFTUPDATED=0,NFTNEXT=null;
 function loadLiveNFTs(query){
  var term=(query||NFTCOLLECTION||"azuki").trim()||"azuki";
- if(NFTQUERY===term&&(NFTLOADING||NFTLIVE.length))return;
+ var key=NFTVIEW==="search"?"search:"+term:NFTVIEW+":"+NFTCOLLECTION;
+ if(NFTQUERY===key&&(NFTLOADING||NFTUPDATED&&Date.now()-NFTUPDATED<15000))return;
  if(NFTTIMER)clearTimeout(NFTTIMER);
  NFTTIMER=setTimeout(function(){
-  var req=++NFTREQ;NFTQUERY=term;NFTLOADING=true;NFTERROR="";
-  fetch("/api/nfts?search="+encodeURIComponent(term)+"&chain=ethereum&limit=24",{cache:"no-store"})
+  var req=++NFTREQ;NFTQUERY=key;NFTLOADING=true;NFTERROR="";
+  var params=new URLSearchParams({limit:"24",chain:"ethereum",view:NFTVIEW});
+  if(NFTVIEW==="search")params.set("search",term);else params.set("collection",NFTCOLLECTION);
+  fetch("/api/nfts?"+params.toString(),{cache:"no-store"})
    .then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.message||"OpenSea request failed.");return d})})
-   .then(function(d){if(req!==NFTREQ)return;NFTLIVE=(d.items||[]).map(function(n){return {n:n.name,m:"NFTs",p:typeof n.price==="number"?n.price:"Not listed",c:null,k:"NFT",h:0,col:MC.NFTs||"#8b7bff",image:n.image,collection:n.collection,contract:n.contract,tokenId:n.tokenId,currency:n.currency,marketplaceUrl:n.marketplaceUrl}});NFTERROR=d.message||""})
-   .catch(function(e){if(req!==NFTREQ)return;NFTLIVE=[];NFTERROR=e.message||"Could not load OpenSea results.";})
-   .finally(function(){if(req!==NFTREQ)return;NFTLOADING=false;if(st.tab==="Markets"&&st.mm==="NFTs")softDraw()});
- },250);
+   .then(function(d){
+    if(req!==NFTREQ)return;
+    NFTLIVE=(d.items||[]).map(function(n){return {n:n.name||"NFT",m:"NFTs",p:typeof n.price==="number"?n.price:null,c:null,k:"NFT",h:0,col:MC.NFTs||"#8b7bff",image:n.image,collection:n.collection,contract:n.contract,tokenId:n.tokenId,currency:n.currency,marketplaceUrl:n.marketplaceUrl,status:n.status,eventType:n.eventType,time:n.time,maker:n.maker,taker:n.taker,transaction:n.transaction,remainingQuantity:n.remainingQuantity}});
+    NFTERROR=d.message||"";NFTNEXT=d.next||null;NFTUPDATED=Date.now();
+   })
+   .catch(function(e){if(req!==NFTREQ)return;NFTLIVE=[];NFTERROR=e.message||"Could not load OpenSea results.";NFTNEXT=null;})
+   .finally(function(){if(req!==NFTREQ)return;NFTLOADING=false;if((st.tab==="Markets"&&st.mm==="NFTs")||(st.tab==="Trade"&&items[st.tp]&&items[st.tp].m==="NFTs"))softDraw()});
+ },200);
 }
+setInterval(function(){if(((st.tab==="Markets"&&st.mm==="NFTs")||(st.tab==="Trade"&&items[st.tp]&&items[st.tp].m==="NFTs"))&&!NFTLOADING){NFTQUERY="";loadLiveNFTs(st.q||NFTCOLLECTION)}},30000);
 function markets(){
  if(st.mm==="NFTs")loadLiveNFTs(st.q||NFTCOLLECTION);
  var list=st.mm==="NFTs"?NFTLIVE:items.filter(function(i){return i.m===st.mm&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)});
- return '<div class="top"><label class="srch">'+ic("search")+'<input id="mq" value="'+esc(st.q)+'" placeholder="Search '+st.mm+'" aria-label="Search this market"></label></div>'+(st.mm==="NFTs"?'<div style="margin:12px 0"><label style="display:block;font-size:12px;color:var(--mut);margin-bottom:6px">NFT COLLECTION</label><select id="nftcollection" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--text)">'+[['azuki','Azuki'],['bored ape yacht club','Bored Ape Yacht Club'],['pudgy penguins','Pudgy Penguins'],['cryptopunks','CryptoPunks'],['doodles','Doodles'],['clone x','Clone X'],['art','Art NFTs']].map(function(o){return '<option value="'+esc(o[0])+'"'+(NFTCOLLECTION===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select></div>':'')+'<div class="mgrid">'+ORD.map(function(t){var n=items.filter(function(i){return i.m===t}).length;return '<button class="mcard'+(st.mm===t?" on":"")+'" data-mm="'+t+'" style="--ac:'+MC[t]+'">'+ic(MI[t])+t.replace("Real Estate","Estate")+'<small>'+n+'</small></button>'}).join("")+'</div>'+
- (st.mm==="NFTs"?(NFTLOADING?'<div class="empty"><b>Loading live OpenSea NFTs…</b>Searching '+esc(st.q||"Azuki")+' on Ethereum.</div>':list.length?'<div class="live" style="margin:18px 0 10px"><i></i>LIVE NFT DATA · ETHEREUM</div><div class="thead"><span>NFT / COLLECTION</span><span>Price</span><span>Status</span></div>'+list.map(function(i){return '<div class="row" style="cursor:default"><span class="nm"><span class="coin" style="overflow:hidden">'+(i.image?'<img src="'+esc(i.image)+'" alt="" style="width:100%;height:100%;object-fit:cover">':ic("image"))+'</span><span><b>'+esc(i.n)+'</b><small>'+esc(i.collection||"OpenSea collection")+(i.tokenId?" · #"+esc(i.tokenId):"")+'</small></span></span><span class="p">'+(typeof i.p==="number"?fx2(i.p,4)+" "+esc(i.currency||"ETH"):"Not listed")+'</span><span class="badge">OpenSea ↗</span></a>'}).join(""):'<div class="empty"><b>'+(NFTERROR||"No live NFT results")+'</b>Try another NFT or collection name.</div>'):(list.length?'<div class="thead"><span>Name</span><span>Price</span><span>24h</span></div>'+list.map(rowH).join(""):'<div class="empty"><b>'+(st.q?"No matches":"No "+st.mm+" listings yet")+'</b>'+(st.q?"Try a different search.":"Listings published by TradeMate users will appear here.")+'</div>'))}
+ var searchBox=st.mm==="NFTs"&&NFTVIEW!=="search"?'<div class="top"><div style="color:var(--mut);font-size:12px;font-weight:700">LIVE OPENSEA COLLECTION DATA · '+esc(NFTCOLLECTION.toUpperCase())+'</div></div>':'<div class="top"><label class="srch">'+ic("search")+'<input id="mq" value="'+esc(st.q)+'" placeholder="Search '+st.mm+'" aria-label="Search this market"></label></div>';
+ var nftControls=st.mm==="NFTs"?'<div style="margin:12px 0"><label style="display:block;font-size:12px;color:var(--mut);margin-bottom:6px">NFT COLLECTION</label><select id="nftcollection" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--text)">'+[['azuki','Azuki'],['bored ape yacht club','Bored Ape Yacht Club'],['pudgy penguins','Pudgy Penguins'],['cryptopunks','CryptoPunks'],['doodles','Doodles'],['clone x','Clone X'],['art','Art NFTs']].map(function(o){return '<option value="'+esc(o[0])+'"'+(NFTCOLLECTION===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select><div class="sub" style="padding-left:0;gap:6px">'+[['search','Discover'],['listings','Listings'],['offers','Offers'],['sales','Sales'],['events','Activity']].map(function(v){return '<button class="'+(NFTVIEW===v[0]?'on':'')+'" data-act="nftview" data-arg="'+v[0]+'">'+v[1]+'</button>'}).join('')+'</div></div>':'';
+ var marketGrid='<div class="mgrid">'+ORD.map(function(t){var n=items.filter(function(i){return i.m===t}).length;return '<button class="mcard'+(st.mm===t?" on":"")+'" data-mm="'+t+'" style="--ac:'+MC[t]+'">'+ic(MI[t])+t.replace("Real Estate","Estate")+'<small>'+n+'</small></button>'}).join("")+'</div>';
+ if(st.mm==="NFTs"){
+  var rows=list.map(function(i){
+   var detail=[i.eventType||i.status||"OpenSea",i.time?new Date(i.time).toLocaleString():"",i.maker?"From "+i.maker.slice(0,8)+"…":""].filter(Boolean).join(" · ");
+   var price=typeof i.p==="number"?fx2(i.p,4)+" "+esc(i.currency||"ETH"):"Price unavailable";
+   var body='<span class="nm"><span class="coin" style="overflow:hidden">'+(i.image?'<img src="'+esc(i.image)+'" alt="" style="width:100%;height:100%;object-fit:cover">':ic("image"))+'</span><span><b>'+esc(i.n)+'</b><small>'+esc(i.collection||"OpenSea collection")+(i.tokenId?" · #"+esc(i.tokenId):"")+'<br>'+esc(detail)+'</small></span></span><span class="p">'+price+'</span><span class="badge">'+esc(i.status||"OpenSea")+'</span>';
+   return i.marketplaceUrl?'<a class="row" href="'+esc(i.marketplaceUrl)+'" target="_blank" rel="noopener noreferrer">'+body+'</a>':'<div class="row" style="cursor:default">'+body+'</div>';
+  }).join("");
+  var header=NFTVIEW==="search"?"NFT / COLLECTION":"NFT / COLLECTION";
+  var content=NFTLOADING?'<div class="empty"><b>Loading OpenSea '+esc(NFTVIEW)+'…</b>Fetching current provider data for '+esc(NFTCOLLECTION)+'.</div>':list.length?'<div class="live" style="margin:18px 0 10px"><i></i>OPENSea · '+esc(NFTVIEW.toUpperCase())+' · REFRESHES EVERY 30 SECONDS</div><div class="thead"><span>'+header+'</span><span>Price</span><span>Status</span></div>'+rows:'<div class="empty"><b>'+(NFTERROR||"No live NFT results")+'</b>Try another collection or view.</div>';
+  return searchBox+nftControls+marketGrid+content+(NFTUPDATED?'<p class="fine">Last provider update '+new Date(NFTUPDATED).toLocaleTimeString()+'. Prices and availability may change between refreshes.</p>':'');
+ }
+ return searchBox+marketGrid+(list.length?'<div class="thead"><span>Name</span><span>Price</span><span>24h</span></div>'+list.map(rowH).join(""):'<div class="empty"><b>'+(st.q?"No matches":"No "+st.mm+" listings yet")+'</b>'+(st.q?"Try a different search.":"Listings published by TradeMate users will appear here.")+'</div>');
+}
+
 var marketFeed={symbol:"",socket:null,futuresBookSocket:null,futuresTradeSocket:null,status:"idle",provider:"binance",quote:"USDT",bids:[],asks:[],trades:[],last:0,drawTimer:null,retryTimer:null,timeoutTimer:null,recoveryTimer:null,attempt:0};
 var marketFeedHosts=["wss://stream.binance.com:443","wss://data-stream.binance.vision"];
 function clearMarketFeedTimers(){["retryTimer","timeoutTimer","recoveryTimer"].forEach(function(k){if(marketFeed[k]){clearTimeout(marketFeed[k]);marketFeed[k]=null}})}
@@ -912,9 +935,10 @@ function fxAssetMarket(){
  return '<section class="fx-universe"><div class="fx-universe-head"><div><small>GLOBAL MARKETS</small><h3>Beyond currency pairs</h3><p>Explore major benchmarks, raw materials, listed companies and sovereign debt.</p></div><span class="fx-count">40<br><small>MARKETS</small></span></div><div class="fx-tabs">'+tabs+'</div><div class="fx-group-title"><b>'+esc(st.fxcat)+'</b><span>TOP 10 · CURATED</span></div><div class="fx-asset-list">'+cards+'</div>'+(selected?'<div class="fx-selected"><small>SELECTED INSTRUMENT</small><b>'+esc(selected.n)+' · '+esc(selected.t)+'</b><span>Live pricing will appear when the relevant market-data provider is connected. No indicative or fabricated prices are shown here.</span></div>':'')+'<p class="fx-disclaimer">Rankings and benchmark selection are curated, not a real-time performance ranking. Company marks use issuer-domain favicons; index marks identify their index operators; commodity symbols and sovereign flags are identifiers, not corporate logos.</p></section>';
 }
 function trade(){
- var it=items[st.tp],cr=it.m==="Crypto",fxm=it.m==="Forex";
+ var it=items[st.tp],cr=it.m==="Crypto",fxm=it.m==="Forex",nftm=it.m==="NFTs";
  if(fxm)ensureFXFeed();
- var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose product"><span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span><b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?(fxFeedStatus.state==="live"?"OANDA LIVE":("OANDA "+String(fxFeedStatus.state||"CONNECTING").toUpperCase())):"TRADEMATE")+'</span></div>';
+ if(nftm)loadLiveNFTs(st.q||NFTCOLLECTION);
+ var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose product"><span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span><b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?(fxFeedStatus.state==="live"?"OANDA LIVE":("OANDA "+String(fxFeedStatus.state||"CONNECTING").toUpperCase())):nftm?"OPENSEA":"TRADEMATE")+'</span></div>';
  if(cr){
   ensureMultiFeeds(it);
   var dp=it.p<1?6:it.p<20?4:2,stamp=tmStatus();
@@ -927,6 +951,20 @@ function trade(){
    body='<div class="tr h"><span>Exchange / time</span><span>Price / quote</span><span>Amount ('+esc(it.n.split("/")[0])+')</span></div>'+(trades.length?trades.map(function(x){return '<div class="tr"><span>'+esc(x.venue.toUpperCase()+' · '+x.market.toUpperCase())+'<br><small>'+new Date(x.time).toLocaleTimeString()+'</small></span><span class="'+(x.side==="BUY"?"up":"dn")+'">'+fx2(x.p,dp)+' '+esc(x.quote||'')+' <small>'+x.side+'</small></span><span>'+fx2(x.q,6)+'</span></div>'}).join(""):'<div class="empty">Waiting for executed trades from connected exchanges…</div>');
   }
   return h+head+body+'<p class="fine">Live public exchange order-book depth and executed trades. Book keeps each exchange separate; Trades shows the shared, venue-labelled execution tape. '+stamp+'.</p>';
+ }
+ if(nftm){
+  var views=[["search","Discover"],["listings","Listings"],["offers","Offers"],["sales","Sales"],["events","Activity"]];
+  var tabs='<div class="sub">'+views.map(function(v){return '<button class="'+(NFTVIEW===v[0]?'on':'')+'" data-act="nftview" data-arg="'+v[0]+'">'+v[1]+'</button>'}).join("")+'</div>';
+  var collections=[["azuki","Azuki"],["bored ape yacht club","Bored Ape Yacht Club"],["pudgy penguins","Pudgy Penguins"],["cryptopunks","CryptoPunks"],["doodles","Doodles"],["clone x","Clone X"],["art","Art NFTs"]];
+  var choose='<div style="padding:8px 16px"><label style="display:block;color:var(--mut);font-size:10px;margin-bottom:6px">OPENSEA COLLECTION</label><select id="nftcollection" style="width:100%;padding:11px;border-radius:11px;background:var(--s2);border:1px solid var(--line)">'+collections.map(function(v){return '<option value="'+esc(v[0])+'"'+(NFTCOLLECTION===v[0]?' selected':'')+'>'+esc(v[1])+'</option>'}).join("")+'</select></div>';
+  var rows=NFTLIVE.map(function(n){
+   var meta=[n.eventType||n.status||"OpenSea",n.time?new Date(n.time).toLocaleString():"",n.maker?"From "+n.maker.slice(0,8)+"…":""].filter(Boolean).join(" · ");
+   var price=typeof n.p==="number"?fx2(n.p,4)+" "+esc(n.currency||"ETH"):"Price unavailable";
+   var card='<div class="ad"><div class="who"><b>'+esc(n.n)+'</b><small>'+esc(n.collection||"OpenSea collection")+(n.tokenId?" · #"+esc(n.tokenId):"")+'</small></div><div class="pr">'+price+'</div><div class="kv">'+esc(meta)+'</div></div>';
+   return n.marketplaceUrl?'<a href="'+esc(n.marketplaceUrl)+'" target="_blank" rel="noopener noreferrer">'+card+'</a>':card;
+  }).join("");
+  var content=NFTLOADING?'<div class="empty"><b>Loading OpenSea '+esc(NFTVIEW)+'…</b>Fetching provider data for '+esc(NFTCOLLECTION)+'.</div>':rows||'<div class="empty"><b>'+(NFTERROR||"No live NFT data returned")+'</b>Only provider-returned listings, offers and sales are shown.</div>';
+  return h+tabs+choose+content+'<p class="fine">OpenSea provider data · refreshes automatically every 30 seconds while this view is open. Listings and offers are orders; only sale events are completed transactions. NFT execution is not enabled in TradeMate.</p>';
  }
  if(fxm){
   return h+fxQuotePanel(it.n)+fxAssetMarket()+'<p class="fine">OANDA provides account-specific OTC bid/ask prices and available liquidity levels. These are not centralized exchange books or executed trades. The other global instruments remain unavailable until their respective licensed data sources are connected.</p>';
@@ -1088,7 +1126,7 @@ function act(n,a,el){var m={
  promo:function(){st.open["p"+a]=!st.open["p"+a];toast(st.open["p"+a]?"Joined promotion":"Left promotion");drawPage()},
  advsend:function(){if(!(st.fv.advt||"").trim()){toast("Add a campaign title");return}toast("Request sent. We will contact you");back()},
  share:function(){var t="Join me on TradeMate: "+a;if(navigator.share){navigator.share({text:t}).catch(function(){})}else{copyText(t,function(){toast("Invite message copied")},function(){toast("Could not copy the invite message")})}},
- fxcat:function(){st.fxcat=a;st.fxSelected=(FX_ASSET_GROUPS[a]&&FX_ASSET_GROUPS[a][0]||{}).t||"";draw()},fxasset:function(){st.fxSelected=a;draw()},wsub:function(){toast(a)}};
+ fxcat:function(){st.fxcat=a;st.fxSelected=(FX_ASSET_GROUPS[a]&&FX_ASSET_GROUPS[a][0]||{}).t||"";draw()},fxasset:function(){st.fxSelected=a;draw()},nftview:function(){NFTVIEW=a;NFTQUERY="";NFTLIVE=[];NFTUPDATED=0;loadLiveNFTs(st.q||NFTCOLLECTION);draw()},wsub:function(){toast(a)}};
  if(m[n])m[n]()}
 /* ----- more / search ----- */
 PG.more=function(){return hdr("All services")+FG.map(function(g){return '<div class="sec">'+g[0]+'</div><div class="grid" style="padding-top:4px">'+g[1].map(function(o){return '<button class="opt" data-f="'+o[0]+'" style="--h:'+HUE[o[0]]+'"><span class="tile'+(o[0]==="Create order"?" hl":"")+'">'+ic(o[1])+'</span>'+o[0]+'</button>'}).join("")+'</div>'}).join("")};
