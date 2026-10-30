@@ -870,7 +870,7 @@ class P2PMarketController {
     values.push(pageSize);
     const result = await databasePool.query(
       `SELECT id, side, asset_code, fiat_code, price::text, quantity::text,
-              min_fiat_amount::text, max_fiat_amount::text, created_at, updated_at
+              min_fiat_amount::text, max_fiat_amount::text, created_at, updated_at, payment_methods
        FROM p2p_public_book WHERE asset_code = $1 AND fiat_code = $2${sideClause}
        ORDER BY CASE WHEN side = 'buy' THEN price END DESC,
                 CASE WHEN side = 'sell' THEN price END ASC, created_at DESC
