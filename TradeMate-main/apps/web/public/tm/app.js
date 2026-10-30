@@ -728,10 +728,10 @@ function loadLiveNFTs(query){
     NFTERROR=d.message||"";NFTNEXT=d.next||null;NFTUPDATED=Date.now();
    })
    .catch(function(e){if(req!==NFTREQ)return;NFTLIVE=[];NFTERROR=e.message||"Could not load OpenSea results.";NFTNEXT=null;})
-   .finally(function(){if(req!==NFTREQ)return;NFTLOADING=false;if(st.tab==="Markets"&&st.mm==="NFTs")softDraw()});
+   .finally(function(){if(req!==NFTREQ)return;NFTLOADING=false;if((st.tab==="Markets"&&st.mm==="NFTs")||(st.tab==="Trade"&&items[st.tp]&&items[st.tp].m==="NFTs"))softDraw()});
  },200);
 }
-setInterval(function(){if(st.tab==="Markets"&&st.mm==="NFTs"&&!NFTLOADING){NFTQUERY="";loadLiveNFTs(st.q||NFTCOLLECTION)}},30000);
+setInterval(function(){if(((st.tab==="Markets"&&st.mm==="NFTs")||(st.tab==="Trade"&&items[st.tp]&&items[st.tp].m==="NFTs"))&&!NFTLOADING){NFTQUERY="";loadLiveNFTs(st.q||NFTCOLLECTION)}},30000);
 function markets(){
  if(st.mm==="NFTs")loadLiveNFTs(st.q||NFTCOLLECTION);
  var list=st.mm==="NFTs"?NFTLIVE:items.filter(function(i){return i.m===st.mm&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)});
