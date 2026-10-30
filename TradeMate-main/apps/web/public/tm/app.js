@@ -1220,6 +1220,8 @@ var _a3=act;act=function(n,a,el){
 document.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target.id==="dm"){var t=st.stack[st.stack.length-1];if(t&&t.id==="deal")dmAdd(t.a,e.target.value)}});
 
 st.prefs.twofa=true;st.prefs.alerts=true;
+var lastScroll=0;document.addEventListener("scroll",function(){lastScroll=Date.now()},{passive:true,capture:true});
+function scrolling(){return Date.now()-lastScroll<1200}
 /* Synthetic market-book and trade-tape animation removed: Trade must show exchange executions only. */
 (function(){var c=$("bg"),x=c.getContext("2d"),N=40,P=[],W,H,rm=matchMedia("(prefers-reduced-motion:reduce)").matches;
  function sz(){W=c.width=innerWidth;H=c.height=innerHeight}sz();addEventListener("resize",function(){if(Math.abs(innerWidth-W)>40)sz()});
