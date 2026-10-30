@@ -15,6 +15,15 @@ services:
       - key: WEB_ORIGIN
         value: https://trademate-web.onrender.com
   - type: web
+    name: exchange-feed
+    runtime: node
+    plan: free
+    rootDir: TradeMate-main/exchange-feed
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+  - type: web
     name: trademate-web
     runtime: node
     plan: free
