@@ -630,7 +630,7 @@ var HUE={"Create order":"#ffb02e","Orders & bids":"#ffb02e",Rewards:"#ffb02e",Re
 var HOMEF=function(){var r=FH.filter(function(o){return o[0]!=="P2P"});return st.mode==="Seller"?r.slice(0,1).concat([["Orders & bids","box"]],r.slice(1)):[["My orders","box"],["Cart","cart"]].concat(r.slice(1))};
 var FH=[["Create order","plus"],["Rewards","gift"],["Referral","users"],["Deposit","download"],["P2P","swap"],["Earn","earn"],["Promotions","tag"],["More","more"]];
 var FG=[["MARKETPLACE",[["Create order","plus"],["Orders & bids","box"],["P2P","swap"],["Deposit","download"]]],["EARN & GROW",[["Rewards","gift"],["Referral","users"],["Earn","earn"],["Affiliate Programs","affiliate"],["Promotions","tag"]]],["MONEY & ACCOUNT",[["Card","card"],["Settings","settings"]]],["SUPPORT & LEARN",[["Help Center","help"],["Feedback Hub","feedback"],["Learn","learn"],["Announcements","horn"]]]];
-var st={tab:"Home",ht:"Favorites",hm:"All",mm:"Services",tp:0,tt:"Order book",side:"Buy",coin:"USDT",fiat:"NGN",pay:"All payment methods",amt:"",hide:true,wt:"Overview",q:"",
+var st={tab:"Home",ht:"Favorites",hm:"All",mm:"Services",tp:0,tt:"Order book",fxcat:"Stock Market Indices",fxSelected:"SPX",side:"Buy",coin:"USDT",fiat:"NGN",pay:"All payment methods",amt:"",hide:true,wt:"Overview",q:"",
  favs:[],
  stack:[],fv:{},cw:null,tickets:[],nt:"All",uc:"My info",sq:"",recent:["P2P","Create order","Rewards","Help Center"],joinedAff:false,mode:"Buyer",
  me:{name:"",nick:"Member",av:0,uid:"",lvl:1,country:"Nigeria"},prefs:{orders:true,p2p:true,promos:false,news:true,cur:"NGN",market:"Services"},
@@ -791,6 +791,75 @@ function tmBooks(it,dp){
   return '<div class="sec">'+esc(f.venue.toUpperCase())+' · '+esc(f.market.toUpperCase())+' · '+esc(f.quote||it.n.split("/")[1]||"")+' ORDER BOOK</div><div class="bk"><div class="h"><span>Bid size ('+esc(it.n.split("/")[0])+')</span><span>Bid price ('+esc(f.quote||it.n.split("/")[1]||"")+')</span></div><div class="h r"><span>Ask price ('+esc(f.quote||it.n.split("/")[1]||"")+')</span><span>Ask size ('+esc(it.n.split("/")[0])+')</span></div>'+(rows||'<div class="empty">No current depth from this feed.</div>')+'</div>';
  }).join("")+'<p class="fine">'+feeds.length+' independent exchange books. Prices and quantities are never combined across venues.</p>';
 }
+
+/* ---------- global FX-adjacent market instruments ---------- */
+/* Logos are sourced from each issuer/index operator's own domain favicon.
+   Commodities use neutral asset glyphs (physical commodities have no single issuer logo);
+   sovereign bonds use the issuer flag rather than a fabricated bond logo. */
+var FX_ASSET_GROUPS={
+ "Stock Market Indices":[
+  {n:"S&P 500",t:"SPX",r:"United States",d:"spglobal.com",m:"S&P"},
+  {n:"Nasdaq 100",t:"NDX",r:"United States",d:"nasdaq.com",m:"N"},
+  {n:"Dow Jones Industrial Average",t:"DJI",r:"United States",d:"spglobal.com",m:"DJ"},
+  {n:"Russell 2000",t:"RUT",r:"United States",d:"ftserussell.com",m:"R2K"},
+  {n:"FTSE 100",t:"UKX",r:"United Kingdom",d:"lseg.com",m:"FTSE"},
+  {n:"DAX 40",t:"DAX",r:"Germany",d:"deutsche-boerse.com",m:"DAX"},
+  {n:"CAC 40",t:"PX1",r:"France",d:"euronext.com",m:"CAC"},
+  {n:"EURO STOXX 50",t:"SX5E",r:"Eurozone",d:"stoxx.com",m:"50"},
+  {n:"Nikkei 225",t:"N225",r:"Japan",d:"nikkei.com",m:"日"},
+  {n:"Hang Seng Index",t:"HSI",r:"Hong Kong",d:"hsi.com.hk",m:"恒"}
+ ],
+ "Commodities":[
+  {n:"Gold",t:"XAU/USD",r:"Precious metal",g:"🥇",m:"Au"},
+  {n:"Silver",t:"XAG/USD",r:"Precious metal",g:"🥈",m:"Ag"},
+  {n:"Brent Crude Oil",t:"BRENT",r:"Energy",g:"🛢️",m:"Br"},
+  {n:"WTI Crude Oil",t:"WTI",r:"Energy",g:"🛢️",m:"WTI"},
+  {n:"Natural Gas",t:"NATGAS",r:"Energy",g:"🔥",m:"NG"},
+  {n:"Copper",t:"COPPER",r:"Industrial metal",g:"🟠",m:"Cu"},
+  {n:"Platinum",t:"XPT/USD",r:"Precious metal",g:"⚪",m:"Pt"},
+  {n:"Palladium",t:"XPD/USD",r:"Precious metal",g:"⚙️",m:"Pd"},
+  {n:"Wheat",t:"WHEAT",r:"Agriculture",g:"🌾",m:"W"},
+  {n:"Corn",t:"CORN",r:"Agriculture",g:"🌽",m:"C"}
+ ],
+ "Individual Shares / Equities":[
+  {n:"NVIDIA",t:"NVDA",r:"United States",d:"nvidia.com",m:"NV"},
+  {n:"Apple",t:"AAPL",r:"United States",d:"apple.com",m:"A"},
+  {n:"Alphabet",t:"GOOGL",r:"United States",d:"abc.xyz",m:"G"},
+  {n:"Microsoft",t:"MSFT",r:"United States",d:"microsoft.com",m:"M"},
+  {n:"Amazon",t:"AMZN",r:"United States",d:"amazon.com",m:"a"},
+  {n:"TSMC",t:"TSM",r:"Taiwan",d:"tsmc.com",m:"TS"},
+  {n:"Meta Platforms",t:"META",r:"United States",d:"about.meta.com",m:"∞"},
+  {n:"Broadcom",t:"AVGO",r:"United States",d:"broadcom.com",m:"B"},
+  {n:"Saudi Aramco",t:"2222.SR",r:"Saudi Arabia",d:"aramco.com",m:"Ar"},
+  {n:"Tesla",t:"TSLA",r:"United States",d:"tesla.com",m:"T"}
+ ],
+ "Bonds & Treasuries":[
+  {n:"US Treasury 2-Year",t:"US02Y",r:"United States",g:"🇺🇸",m:"2Y"},
+  {n:"US Treasury 5-Year",t:"US05Y",r:"United States",g:"🇺🇸",m:"5Y"},
+  {n:"US Treasury 10-Year",t:"US10Y",r:"United States",g:"🇺🇸",m:"10Y"},
+  {n:"US Treasury 30-Year",t:"US30Y",r:"United States",g:"🇺🇸",m:"30Y"},
+  {n:"UK Gilt 10-Year",t:"UK10Y",r:"United Kingdom",g:"🇬🇧",m:"10Y"},
+  {n:"German Bund 10-Year",t:"DE10Y",r:"Germany",g:"🇩🇪",m:"10Y"},
+  {n:"Japan JGB 10-Year",t:"JP10Y",r:"Japan",g:"🇯🇵",m:"10Y"},
+  {n:"China Government Bond 10-Year",t:"CN10Y",r:"China",g:"🇨🇳",m:"10Y"},
+  {n:"France OAT 10-Year",t:"FR10Y",r:"France",g:"🇫🇷",m:"10Y"},
+  {n:"Nigeria FGN Bond 10-Year",t:"NG10Y",r:"Nigeria",g:"🇳🇬",m:"10Y"}
+ ]
+};
+var FX_ASSET_GROUP_NAMES=Object.keys(FX_ASSET_GROUPS);
+function fxAssetCard(x,group){
+ var logo=x.d?'<img src="https://www.google.com/s2/favicons?domain='+esc(x.d)+'&sz=128" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\'"><span class="fx-fallback" style="display:none">'+esc(x.m)+'</span>':
+ '<span class="fx-fallback">'+esc(x.g||x.m)+'</span>';
+ var selected=st.fxSelected===x.t;
+ return '<button class="fx-asset'+(selected?' selected':'')+'" data-act="fxasset" data-arg="'+esc(x.t)+'" aria-pressed="'+selected+'"><span class="fx-asset-logo">'+logo+'</span><span class="fx-asset-copy"><b>'+esc(x.n)+'</b><small>'+esc(x.t)+' · '+esc(x.r)+'</small></span><span class="fx-asset-arrow">'+(selected?'SELECTED':'VIEW')+'</span></button>';
+}
+function fxAssetMarket(){
+ var group=FX_ASSET_GROUPS[st.fxcat]||FX_ASSET_GROUPS[FX_ASSET_GROUP_NAMES[0]];
+ var tabs=FX_ASSET_GROUP_NAMES.map(function(n){return '<button class="'+(st.fxcat===n?'on':'')+'" data-act="fxcat" data-arg="'+esc(n)+'">'+esc(n)+'</button>'}).join("");
+ var cards=group.map(function(x){return fxAssetCard(x,st.fxcat)}).join("");
+ var selected=group.filter(function(x){return x.t===st.fxSelected})[0];
+ return '<section class="fx-universe"><div class="fx-universe-head"><div><small>GLOBAL MARKETS</small><h3>Beyond currency pairs</h3><p>Explore major benchmarks, raw materials, listed companies and sovereign debt.</p></div><span class="fx-count">40<br><small>MARKETS</small></span></div><div class="fx-tabs">'+tabs+'</div><div class="fx-group-title"><b>'+esc(st.fxcat)+'</b><span>TOP 10 · CURATED</span></div><div class="fx-asset-list">'+cards+'</div>'+(selected?'<div class="fx-selected"><small>SELECTED INSTRUMENT</small><b>'+esc(selected.n)+' · '+esc(selected.t)+'</b><span>Live pricing will appear when the relevant market-data provider is connected. No indicative or fabricated prices are shown here.</span></div>':'')+'<p class="fx-disclaimer">Rankings and benchmark selection are curated, not a real-time performance ranking. Company marks use issuer-domain favicons; index marks identify their index operators; commodity symbols and sovereign flags are identifiers, not corporate logos.</p></section>';
+}
 function trade(){
  var it=items[st.tp],cr=it.m==="Crypto",fxm=it.m==="Forex";
  var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose product"><span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span><b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?"FOREX · INDICATIVE":"TRADEMATE")+'</span></div>';
@@ -808,7 +877,7 @@ function trade(){
   return h+head+body+'<p class="fine">Live public exchange order-book depth and executed trades. Book keeps each exchange separate; Trades shows the shared, venue-labelled execution tape. '+stamp+'.</p>';
  }
  if(fxm){
-  return h+'<div class="empty"><b>Live FX market feed not connected yet</b>Forex is an over-the-counter market. TradeMate will show provider-sourced bid/ask quotes when the live FX feed is integrated. No synthetic spread or invented trade records are displayed.</div>';
+  return h+fxAssetMarket()+'<p class="fine">Currency pairs and these global instruments are shown in the Forex & Global Markets workspace. Forex remains OTC; quotes and yields will only be shown when connected to their respective licensed data sources.</p>';
  }
  var kind=it.m==="Services"?"service":"product";
  loadInternalTrades(kind);
@@ -967,7 +1036,7 @@ function act(n,a,el){var m={
  promo:function(){st.open["p"+a]=!st.open["p"+a];toast(st.open["p"+a]?"Joined promotion":"Left promotion");drawPage()},
  advsend:function(){if(!(st.fv.advt||"").trim()){toast("Add a campaign title");return}toast("Request sent. We will contact you");back()},
  share:function(){var t="Join me on TradeMate: "+a;if(navigator.share){navigator.share({text:t}).catch(function(){})}else{copyText(t,function(){toast("Invite message copied")},function(){toast("Could not copy the invite message")})}},
- wsub:function(){toast(a)}};
+ fxcat:function(){st.fxcat=a;st.fxSelected=(FX_ASSET_GROUPS[a]&&FX_ASSET_GROUPS[a][0]||{}).t||"";draw()},fxasset:function(){st.fxSelected=a;draw()},wsub:function(){toast(a)}};
  if(m[n])m[n]()}
 /* ----- more / search ----- */
 PG.more=function(){return hdr("All services")+FG.map(function(g){return '<div class="sec">'+g[0]+'</div><div class="grid" style="padding-top:4px">'+g[1].map(function(o){return '<button class="opt" data-f="'+o[0]+'" style="--h:'+HUE[o[0]]+'"><span class="tile'+(o[0]==="Create order"?" hl":"")+'">'+ic(o[1])+'</span>'+o[0]+'</button>'}).join("")+'</div>'}).join("")};
