@@ -893,6 +893,99 @@ class P2PMarketController {
     );
     return { source: 'TradeMate completed P2P ledger', as_of: new Date().toISOString(), data: result.rows };
   }
+  private async authenticatedUser(request: Request): Promise<string> {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to continue.');
+    const result = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() LIMIT 1", [tokenDigest(token)]);
+    if (!result.rowCount) throw new UnauthorizedException('Your session has expired.');
+    return result.rows[0].id as string;
+  }
+
+  @Post('ads')
+  async createAd(@Req() request: Request, @Body() body: any) {
+    const userId = await this.authenticatedUser(request);
+    const side = String(body?.side || '').toLowerCase(), asset = String(body?.asset || '').trim().toUpperCase(), fiat = String(body?.fiat || '').trim().toUpperCase();
+    const price = Number(body?.price), quantity = Number(body?.quantity), min = Number(body?.minFiatAmount ?? 0), max = Number(body?.maxFiatAmount ?? price * quantity);
+    const methods = Array.isArray(body?.paymentMethods) ? body.paymentMethods.map((v: unknown) => String(v).trim()).filter(Boolean) : [];
+    if (!['buy','sell'].includes(side) || !/^[A-Z0-9]{2,16}$/.test(asset) || !/^[A-Z]{3}$/.test(fiat)) throw new BadRequestException('Choose a valid side, asset and fiat currency.');
+    if (!(price > 0) || !(quantity > 0) || !Number.isFinite(price * quantity) || min < 0 || max < min || max <= 0 || max > price * quantity + 0.01) throw new BadRequestException('Enter valid price, quantity and fiat limits.');
+    if (methods.length > 10 || methods.some((v: string) => v.length > 60)) throw new BadRequestException('Invalid payment methods.');
+    const result = await databasePool!.query('INSERT INTO p2p_orders (user_id,side,asset_code,fiat_code,price,quantity,remaining_quantity,min_fiat_amount,max_fiat_amount,payment_methods) VALUES ($1,$2,$3,$4,$5,$6,$6,$7,$8,$9::jsonb) RETURNING id,side,asset_code,fiat_code,price::text,quantity::text,remaining_quantity::text,min_fiat_amount::text,max_fiat_amount::text,payment_methods,status,created_at', [userId,side,asset,fiat,String(price),String(quantity),String(min),String(max),JSON.stringify(methods)]);
+    return { ad: result.rows[0] };
+  }
+
+  @Get('my-ads')
+  async myAds(@Req() request: Request) {
+    const userId = await this.authenticatedUser(request);
+    const result = await databasePool!.query('SELECT id,side,asset_code,fiat_code,price::text,quantity::text,remaining_quantity::text,min_fiat_amount::text,max_fiat_amount::text,payment_methods,status,created_at,updated_at FROM p2p_orders WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100',[userId]);
+    return { data: result.rows };
+  }
+
+  @Delete('ads/:id')
+  async cancelAd(@Param('id') id: string, @Req() request: Request) {
+    const userId = await this.authenticatedUser(request);
+    const result = await databasePool!.query("UPDATE p2p_orders SET status='cancelled',updated_at=now() WHERE id=$1 AND user_id=$2 AND status IN ('open','partially_filled') RETURNING id",[id,userId]);
+    if (!result.rowCount) throw new NotFoundException('Open advertisement not found.');
+    return { message: 'Advertisement cancelled.' };
+  }
+
+  @Post('orders')
+  async placeOrder(@Req() request: Request, @Body() body: any) {
+    const userId = await this.authenticatedUser(request), adId = String(body?.adId || ''), fiatAmount = Number(body?.fiatAmount);
+    if (!/^[0-9a-f-]{36}$/i.test(adId) || !(fiatAmount > 0) || !Number.isFinite(fiatAmount)) throw new BadRequestException('Choose an offer and enter a valid fiat amount.');
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const locked = await client.query('SELECT id,user_id,side,asset_code,fiat_code,price,remaining_quantity,min_fiat_amount,max_fiat_amount,status FROM p2p_orders WHERE id=$1 FOR UPDATE',[adId]);
+      if (!locked.rowCount) throw new NotFoundException('Advertisement not found.');
+      const ad = locked.rows[0];
+      if (ad.user_id === userId) throw new BadRequestException('You cannot order from your own advertisement.');
+      if (!['open','partially_filled'].includes(ad.status)) throw new ConflictException('Advertisement is no longer available.');
+      if (fiatAmount < Number(ad.min_fiat_amount) || fiatAmount > Number(ad.max_fiat_amount)) throw new BadRequestException('Amount is outside the advertisement limits.');
+      const qty = fiatAmount / Number(ad.price);
+      if (qty <= 0 || qty > Number(ad.remaining_quantity)) throw new ConflictException('Insufficient quantity remains.');
+      const buyer = ad.side === 'sell' ? userId : ad.user_id, seller = ad.side === 'sell' ? ad.user_id : userId;
+      const trade = await client.query("INSERT INTO p2p_trades (order_id,buyer_user_id,seller_user_id,asset_code,fiat_code,price,quantity,fiat_total,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending') RETURNING id,order_id,asset_code,fiat_code,price::text,quantity::text,fiat_total::text,status,created_at",[adId,buyer,seller,ad.asset_code,ad.fiat_code,ad.price,qty.toFixed(12),fiatAmount.toFixed(2)]);
+      const remaining = Math.max(0,Number(ad.remaining_quantity)-qty);
+      await client.query("UPDATE p2p_orders SET remaining_quantity=$1,status=CASE WHEN $1<=0 THEN 'filled' ELSE 'partially_filled' END,updated_at=now() WHERE id=$2",[remaining.toFixed(12),adId]);
+      await client.query('COMMIT');
+      return { order: trade.rows[0], message: 'Order created. TradeMate does not hold funds or provide escrow.' };
+    } catch (error) { await client.query('ROLLBACK').catch(()=>undefined); throw error; } finally { client.release(); }
+  }
+
+  @Get('my-orders')
+  async myOrders(@Req() request: Request) {
+    const userId = await this.authenticatedUser(request);
+    const result = await databasePool!.query('SELECT id,order_id,buyer_user_id,seller_user_id,asset_code,fiat_code,price::text,quantity::text,fiat_total::text,status,buyer_payment_sent_at,seller_payment_confirmed_at,payment_reference,dispute_reason,created_at,updated_at FROM p2p_trades WHERE buyer_user_id=$1 OR seller_user_id=$1 ORDER BY created_at DESC LIMIT 100',[userId]);
+    return { data: result.rows };
+  }
+
+  @Post('orders/:id/payment-sent')
+  async paymentSent(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+    const userId = await this.authenticatedUser(request), ref = typeof body?.reference === 'string' ? body.reference.trim() : '';
+    if (ref.length > 160) throw new BadRequestException('Reference is too long.');
+    const result = await databasePool!.query("UPDATE p2p_trades SET buyer_payment_sent_at=now(),payment_reference=NULLIF($1,''),updated_at=now() WHERE id=$2 AND buyer_user_id=$3 AND status='pending' AND buyer_payment_sent_at IS NULL RETURNING id,status,buyer_payment_sent_at",[ref,id,userId]);
+    if (!result.rowCount) throw new ConflictException('Order cannot be marked as paid.');
+    return { order: result.rows[0], message: 'Seller confirmation is still required.' };
+  }
+
+  @Post('orders/:id/confirm-receipt')
+  async confirmReceipt(@Param('id') id: string, @Req() request: Request) {
+    const userId = await this.authenticatedUser(request);
+    const result = await databasePool!.query("UPDATE p2p_trades SET seller_payment_confirmed_at=now(),status='completed',completed_at=now(),updated_at=now() WHERE id=$1 AND seller_user_id=$2 AND status='pending' AND buyer_payment_sent_at IS NOT NULL AND seller_payment_confirmed_at IS NULL RETURNING id,status,completed_at",[id,userId]);
+    if (!result.rowCount) throw new ConflictException('Buyer must first mark payment sent; order must still be pending.');
+    return { order: result.rows[0] };
+  }
+
+  @Post('orders/:id/dispute')
+  async dispute(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+    const userId = await this.authenticatedUser(request), reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
+    if (reason.length < 5 || reason.length > 1000) throw new BadRequestException('Dispute reason must be 5 to 1,000 characters.');
+    const result = await databasePool!.query("UPDATE p2p_trades SET status='disputed',dispute_reason=$1,updated_at=now() WHERE id=$2 AND (buyer_user_id=$3 OR seller_user_id=$3) AND status='pending' RETURNING id,status,dispute_reason",[reason,id,userId]);
+    if (!result.rowCount) throw new ConflictException('Only your pending orders can be disputed.');
+    return { order: result.rows[0] };
+  }
 }
 
 const reviewerKeyId = (key: string) => createHash('sha256').update(key).digest('hex').slice(0, 12);
