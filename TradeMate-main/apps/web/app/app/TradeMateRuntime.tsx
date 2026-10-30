@@ -18,7 +18,12 @@ export default function TradeMateRuntime() {
   const [booted, setBooted] = useState(false);
 
   useEffect(() => {
-    if (window.__tradeMateBooted) return;
+    if (window.__tradeMateBooted) {
+      const existingApp = document.querySelector<HTMLScriptElement>('script[data-trademate-app]');
+      if (existingApp?.dataset.loaded === 'true') setBooted(true);
+      else if (existingApp) existingApp.addEventListener('load', () => setBooted(true), { once: true });
+      return;
+    }
     window.__tradeMateBooted = true;
     window.TM_CONFIG = { api: '/api' };
 
@@ -28,7 +33,10 @@ export default function TradeMateRuntime() {
     app.src = '/tm/app.js?v=9';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onload = () => setBooted(true);
+    app.onload = () => {
+      app.dataset.loaded = 'true';
+      setBooted(true);
+    };
     app.onerror = () => {
       window.__tradeMateBooted = false;
       setNotice('TradeMate could not load its main interface script. Please reload the page.');
