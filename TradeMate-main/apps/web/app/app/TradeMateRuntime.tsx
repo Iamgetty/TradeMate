@@ -66,12 +66,13 @@ export default function TradeMateRuntime() {
 
     document.body.appendChild(feed);
 
-    return () => {
-      if (feedFallbackTimer) window.clearTimeout(feedFallbackTimer);
-      window.removeEventListener('error', handleRuntimeError);
-      // Keep scripts and app DOM alive during React Strict Mode replay:
-      // the legacy runtime owns its navigation and WebSocket lifecycle.
-    };
+    // Intentionally do not cancel the fallback timer or remove the startup
+    // error listener during effect cleanup. React Strict Mode replays effects;
+    // the global boot guard prevents the second setup from creating another
+    // timer. Cancelling this one here can leave the page blank forever if the
+    // feed helper stalls before firing load/error. The legacy app owns its
+    // lifetime and remains mounted outside React.
+
   }, []);
 
   return notice ? (
