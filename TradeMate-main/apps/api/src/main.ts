@@ -1,10 +1,12 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './module';
+import { attachMarketFeed } from './market-feed';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  attachMarketFeed(app.getHttpServer());
   app.setGlobalPrefix('api');
 
   // Keep the deployed TradeMate web origin allowed even if a Render env
