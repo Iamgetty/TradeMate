@@ -897,7 +897,7 @@ class P2PMarketController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to continue.');
-    const result = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() LIMIT 1", [tokenDigest(token)]);
+    const result = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status = 'active' LIMIT 1", [tokenDigest(token)]);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired.');
     return result.rows[0].id as string;
   }
@@ -933,7 +933,7 @@ class P2PMarketController {
   @Post('orders')
   async placeOrder(@Req() request: Request, @Body() body: any) {
     const userId = await this.authenticatedUser(request), adId = String(body?.adId || ''), fiatAmount = Number(body?.fiatAmount);
-    if (!/^[0-9a-f-]{36}$/i.test(adId) || !(fiatAmount > 0) || !Number.isFinite(fiatAmount)) throw new BadRequestException('Choose an offer and enter a valid fiat amount.');
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(adId) || !(fiatAmount > 0) || !Number.isFinite(fiatAmount)) throw new BadRequestException('Choose an offer and enter a valid fiat amount.');
     const client = await databasePool!.connect();
     try {
       await client.query('BEGIN');
