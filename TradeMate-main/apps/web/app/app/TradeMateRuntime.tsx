@@ -22,7 +22,7 @@ export default function TradeMateRuntime() {
     window.TM_CONFIG = { api: '/api' };
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=7';
+    app.src = '/tm/app.js?v=8';
     app.async = false;
 
     const loadApp = () => {
