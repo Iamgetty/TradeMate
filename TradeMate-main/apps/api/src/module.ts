@@ -957,7 +957,7 @@ class P2PMarketController {
   @Get('my-orders')
   async myOrders(@Req() request: Request) {
     const userId = await this.authenticatedUser(request);
-    const result = await databasePool!.query('SELECT id,order_id,buyer_user_id,seller_user_id,asset_code,fiat_code,price::text,quantity::text,fiat_total::text,status,buyer_payment_sent_at,seller_payment_confirmed_at,payment_reference,dispute_reason,created_at,updated_at FROM p2p_trades WHERE buyer_user_id=$1 OR seller_user_id=$1 ORDER BY created_at DESC LIMIT 100',[userId]);
+    const result = await databasePool!.query('SELECT id,order_id,buyer_user_id,seller_user_id,asset_code,fiat_code,price::text,quantity::text,fiat_total::text,status,buyer_payment_sent_at,seller_payment_confirmed_at,payment_reference,dispute_reason,dispute_resolution,dispute_resolved_at,created_at,updated_at FROM p2p_trades WHERE buyer_user_id=$1 OR seller_user_id=$1 ORDER BY created_at DESC LIMIT 100',[userId]);
     return { data: result.rows };
   }
 
@@ -1144,6 +1144,78 @@ class ModerationController {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;
     } finally { client.release(); }
+  }
+
+  @Get('p2p-disputes')
+  async p2pDisputeQueue(@Req() request: Request) {
+    this.authorize(request);
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const result = await databasePool.query(
+      `SELECT t.id, t.order_id, t.asset_code, t.fiat_code, t.price::text, t.quantity::text,
+              t.fiat_total::text, t.payment_reference, t.dispute_reason, t.created_at, t.updated_at,
+              buyer.email AS buyer_email, buyer.display_name AS buyer_name,
+              seller.email AS seller_email, seller.display_name AS seller_name
+       FROM p2p_trades t
+       JOIN users buyer ON buyer.id = t.buyer_user_id
+       JOIN users seller ON seller.id = t.seller_user_id
+       WHERE t.status = 'disputed'
+       ORDER BY t.updated_at ASC
+       LIMIT 100`,
+    );
+    return { data: result.rows };
+  }
+
+  @Post('p2p-disputes/:id/resolve')
+  async resolveP2PDispute(
+    @Param('id') id: string,
+    @Req() request: Request,
+    @Body() body: { decision?: string; note?: string },
+  ) {
+    const keyId = this.authorize(request);
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      throw new BadRequestException('id must be a valid P2P order UUID.');
+    }
+    if (!['completed', 'cancelled'].includes(body?.decision || '')) {
+      throw new BadRequestException('decision must be completed or cancelled.');
+    }
+    const note = typeof body?.note === 'string' ? body.note.trim() : '';
+    if (note.length < 5 || note.length > 1000) {
+      throw new BadRequestException('Resolution note must be 5 to 1,000 characters.');
+    }
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const updated = await client.query(
+        `UPDATE p2p_trades
+         SET status = $1,
+             completed_at = CASE WHEN $1 = 'completed' THEN COALESCE(completed_at, now()) ELSE NULL END,
+             dispute_resolution = $2,
+             dispute_resolved_at = now(),
+             dispute_reviewer_key_id = $3,
+             updated_at = now()
+         WHERE id = $4 AND status = 'disputed'
+         RETURNING id, status, dispute_resolution, dispute_resolved_at, completed_at`,
+        [body.decision, note, keyId, id],
+      );
+      if (!updated.rowCount) {
+        const existing = await client.query('SELECT status FROM p2p_trades WHERE id = $1', [id]);
+        if (!existing.rowCount) throw new NotFoundException('P2P order not found.');
+        throw new ConflictException('Only open P2P disputes can be resolved.');
+      }
+      await client.query('COMMIT');
+      return {
+        order: updated.rows[0],
+        message: body.decision === 'completed'
+          ? 'Dispute closed and trade marked completed after moderator review.'
+          : 'Dispute closed as cancelled. TradeMate does not hold or return funds; participants must settle any refund directly.',
+      };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
 
