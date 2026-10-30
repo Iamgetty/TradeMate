@@ -1,7 +1,6 @@
 // feed-client.js: no UI, no styling. Paste into your app (or load with <script>).
-// It connects to the feed backend, combines the order books of every live
-// exchange into ONE aggregated book (same-price quantities added together),
-// and calls onUpdate once per second with plain data for YOUR own screens.
+// It connects to the feed backend and exposes each exchange/market order book
+// independently, plus a shared venue-labelled execution tape.
 //
 // const feed = createFeedClient({
 //   url: 'wss://your-feed.onrender.com',
@@ -18,7 +17,7 @@
       base: 'BTC',
       quote: 'USDT',
       markets: ['spot'],        // add 'futures' (Binance) and 'linear' (Bybit) to include futures books
-      mixUsdQuotes: true,       // treat USD, USDT, USDC as one quote so Coinbase USD books combine
+      mixUsdQuotes: true,       // include USD-like venues, but preserve each book's quote label
       levels: 12,               // rows per side
       tick: 0,                  // price grouping step, e.g. 0.5; 0 = exact prices
       maxTrades: 50,
@@ -58,22 +57,34 @@
       const asks = aggregate(fresh.flatMap((b) => b.asks || []), 'ask');
 
       const incoming = msg.trades.filter(matches).reverse()
-        .map((t) => ({ exchange: t.exchange, market: t.market, ts: t.ts, price: t.price, qty: t.qty, side: t.side }));
+        .map((t) => ({ exchange: t.exchange, market: t.market, quote: t.quote, ts: t.ts, price: t.price, qty: t.qty, side: t.side }));
       trades = incoming.concat(trades).slice(0, o.maxTrades);   // newest first
 
       const bestBid = bids.length ? bids[0].price : null;
       const bestAsk = asks.length ? asks[0].price : null;
       const mid = bestBid != null && bestAsk != null ? (bestBid + bestAsk) / 2 : null;
+      // Preserve each venue/market book as its own independent book. The
+      // aggregate fields remain for compatibility, but TradeMate renders books[].
+      const books = fresh.map((b) => ({
+        exchange: b.exchange,
+        market: b.market,
+        symbol: b.symbol,
+        quote: b.quote,
+        bids: (b.bids || []).map(([price, size]) => ({ price: +price, size: +size })),
+        asks: (b.asks || []).map(([price, size]) => ({ price: +price, size: +size })),
+        stale: !!b.stale,
+      }));
 
       o.onUpdate({
         symbol: `${o.base}/${o.quote}`,
-        bids, asks,                                   // [{ price, size, total }] best first
+        books,
+        bids, asks,
         bestBid, bestAsk, mid,
         spread: bestBid != null && bestAsk != null ? bestAsk - bestBid : null,
         last: trades.length ? trades[0].price : mid,
-        trades,                                       // [{ exchange, market, ts, price, qty, side }] newest first
-        booksCombined: fresh.length,                  // "N exchange books combined"
-        feedsLive: msg.feeds.live,                    // "N/M FEEDS LIVE"
+        trades,
+        booksCombined: fresh.length,
+        feedsLive: msg.feeds.live,
         feedsTotal: msg.feeds.total,
         ts: msg.ts,
       });
