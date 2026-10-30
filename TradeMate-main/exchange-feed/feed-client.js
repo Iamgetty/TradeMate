@@ -64,16 +64,27 @@
       const bestBid = bids.length ? bids[0].price : null;
       const bestAsk = asks.length ? asks[0].price : null;
       const mid = bestBid != null && bestAsk != null ? (bestBid + bestAsk) / 2 : null;
+      // Preserve each venue/market book as its own independent book. The
+      // aggregate fields remain for compatibility, but TradeMate renders books[].
+      const books = fresh.map((b) => ({
+        exchange: b.exchange,
+        market: b.market,
+        symbol: b.symbol,
+        bids: (b.bids || []).map(([price, size]) => ({ price: +price, size: +size })),
+        asks: (b.asks || []).map(([price, size]) => ({ price: +price, size: +size })),
+        stale: !!b.stale,
+      }));
 
       o.onUpdate({
         symbol: `${o.base}/${o.quote}`,
-        bids, asks,                                   // [{ price, size, total }] best first
+        books,
+        bids, asks,
         bestBid, bestAsk, mid,
         spread: bestBid != null && bestAsk != null ? bestAsk - bestBid : null,
         last: trades.length ? trades[0].price : mid,
-        trades,                                       // [{ exchange, market, ts, price, qty, side }] newest first
-        booksCombined: fresh.length,                  // "N exchange books combined"
-        feedsLive: msg.feeds.live,                    // "N/M FEEDS LIVE"
+        trades,
+        booksCombined: fresh.length,
+        feedsLive: msg.feeds.live,
         feedsTotal: msg.feeds.total,
         ts: msg.ts,
       });
