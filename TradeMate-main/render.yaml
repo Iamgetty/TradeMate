@@ -25,3 +25,12 @@ services:
     envVars:
       - key: NEXT_PUBLIC_API_URL
         value: https://trademate-api-toip.onrender.com
+  - type: web
+    name: exchange-feed
+    runtime: node
+    plan: free
+    rootDir: TradeMate-main/exchange-feed
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeployTrigger: commit
