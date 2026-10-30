@@ -746,23 +746,23 @@ function tmConnectCentral(symbol){
    },
    onUpdate:function(d){
     if(tmFeedSymbol!==symbol)return;
-    var key="TradeMate:aggregated";
     tmFeeds={};
-    tmFeeds[key]={
-     venue:"TradeMate",market:"aggregated",
-     status:d.feedsLive>0?"live":"connecting",
-     bids:(d.bids||[]).map(function(x){return {p:+x.price,q:+x.size}}),
-     asks:(d.asks||[]).map(function(x){return {p:+x.price,q:+x.size}}),
-     trades:(d.trades||[]).map(function(x){return {
-      id:x.id||x.ts+":"+x.price,
-      p:+x.price,q:+x.qty,time:+x.ts,
-      side:String(x.side).toLowerCase()==="buy"?"BUY":"SELL",
-      venue:x.exchange,market:x.market
-     }}),
-     bookAt:d.booksCombined?d.ts:0,tradeAt:d.trades&&d.trades.length?d.ts:0,
-     sockets:[]
-    };
-    tmFeedStatusCount={live:d.feedsLive||0,total:d.feedsTotal||0,books:d.booksCombined||0};
+    (d.books||[]).forEach(function(b){
+     var key=tmKey(b.exchange,b.market);
+     tmFeeds[key]={
+      venue:b.exchange,market:b.market,status:b.stale?"stale":"live",
+      bids:(b.bids||[]).map(function(x){return {p:+x.price,q:+x.size}}),
+      asks:(b.asks||[]).map(function(x){return {p:+x.price,q:+x.size}}),
+      trades:[],bookAt:b.stale?0:d.ts,tradeAt:0,sockets:[]
+     };
+    });
+    (d.trades||[]).forEach(function(x){
+     var key=tmKey(x.exchange,x.market),f=tmFeeds[key];
+     if(!f)f=tmFeeds[key]={venue:x.exchange,market:x.market,status:"live",bids:[],asks:[],trades:[],bookAt:0,tradeAt:0,sockets:[]};
+     f.trades.push({id:x.id||x.ts+":"+x.price,p:+x.price,q:+x.qty,time:+x.ts,side:String(x.side).toLowerCase()==="buy"?"BUY":"SELL",venue:x.exchange,market:x.market});
+     f.tradeAt=d.ts;
+    });
+    tmFeedStatusCount={live:d.feedsLive||0,total:d.feedsTotal||0,books:(d.books||[]).filter(function(b){return !b.stale&&(b.bids.length||b.asks.length)}).length};
     scheduleMarketDraw();
    }
   });
@@ -774,7 +774,18 @@ function tmConnectCentral(symbol){
 function ensureMultiFeeds(it){var symbol=String(it.n||"").replace(/[^a-z0-9]/gi,"").toUpperCase();if(!/^[A-Z0-9]{5,24}$/.test(symbol))return;if(tmFeedSymbol===symbol&&tmMarketSocket)return;tmStopFeeds();tmFeedSymbol=symbol;tmFeeds={central:{venue:"TradeMate",market:"aggregated",status:"connecting",bids:[],asks:[],trades:[],bookAt:0,tradeAt:0,sockets:[]}};tmConnectCentral(symbol)}
 function tmTape(){var a=[];Object.keys(tmFeeds).forEach(function(k){a=a.concat(tmFeeds[k].trades||[])});return a.sort(function(x,y){return y.time-x.time}).slice(0,80)}
 function tmStatus(){return tmFeedStatusCount.total?tmFeedStatusCount.live+"/"+tmFeedStatusCount.total+" FEEDS LIVE":"CONNECTING TO EXCHANGES"}
-function tmBooks(it,dp){if(!document.getElementById("tm-book-standby-style")){var stl=document.createElement("style");stl.id="tm-book-standby-style";stl.textContent="@keyframes tmBookPulse{0%,100%{opacity:.25;transform:scaleY(.65)}50%{opacity:1;transform:scaleY(1)}}.tm-book-standby{grid-column:1/-1;min-height:190px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--mut);text-align:center}.tm-book-standby .bars{display:flex;align-items:center;gap:6px;height:30px}.tm-book-standby i{display:block;width:5px;border-radius:8px;background:var(--am);animation:tmBookPulse .8s ease-in-out infinite}.tm-book-standby i:nth-child(1){height:12px;animation-delay:0s}.tm-book-standby i:nth-child(2){height:22px;animation-delay:.12s}.tm-book-standby i:nth-child(3){height:30px;animation-delay:.24s}.tm-book-standby i:nth-child(4){height:18px;animation-delay:.36s}.tm-book-standby i:nth-child(5){height:25px;animation-delay:.48s}.tm-book-standby small{font-size:12px}";document.head.appendChild(stl)}var bids={},asks={},sources=0;Object.keys(tmFeeds).forEach(function(k){var f=tmFeeds[k];if(f.bookAt&&(f.bids.length||f.asks.length))sources++;f.bids.forEach(function(x){var p=Number(x.p),q=Number(x.q);if(p>0&&q>0){var key=p.toFixed(dp);bids[key]=(bids[key]||0)+q}});f.asks.forEach(function(x){var p=Number(x.p),q=Number(x.q);if(p>0&&q>0){var key=p.toFixed(dp);asks[key]=(asks[key]||0)+q}})});var bb=Object.keys(bids).map(function(p){return {p:+p,q:bids[p]}}).sort(function(a,b){return b.p-a.p}).slice(0,20),aa=Object.keys(asks).map(function(p){return {p:+p,q:asks[p]}}).sort(function(a,b){return a.p-b.p}).slice(0,20),rows="";for(var i=0;i<Math.max(bb.length,aa.length);i++){var b=bb[i],a=aa[i];rows+='<div class="cell b"><i class="d" style="width:'+(b?Math.min(100,Math.max(3,b.q/(bb[0]?bb[0].q:b.q)*100)):0)+'%"></i><span>'+(b?fx2(b.q,6):"—")+'</span><span>'+(b?fx2(b.p,dp):"—")+'</span></div><div class="cell a"><i class="d" style="width:'+(a?Math.min(100,Math.max(3,a.q/(aa[0]?aa[0].q:a.q)*100)):0)+'%"></i><span>'+(a?fx2(a.p,dp):"—")+'</span><span>'+(a?fx2(a.q,6):"—")+'</span></div>'}return '<div class="bk"><div class="h"><span>Total bid size ('+esc(it.n.split("/")[0])+')</span><span>Bid price (USDT)</span></div><div class="h r"><span>Ask price (USDT)</span><span>Total ask size ('+esc(it.n.split("/")[0])+')</span></div>'+(rows||'<div class="tm-book-standby"><div class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><b>Market feed on standby</b><small>Syncing live order-book depth from connected exchanges</small></div>')+'</div><p class="fine">'+sources+' exchange books combined into one aggregated order book. Quantities at matching prices are added together.</p>'}
+function tmBooks(it,dp){
+ var feeds=Object.keys(tmFeeds).map(function(k){return tmFeeds[k]}).filter(function(f){return f.bookAt&&(f.bids.length||f.asks.length)});
+ if(!feeds.length)return '<div class="empty"><b>Market books are connecting</b>Waiting for independent order-book snapshots from Binance, Bybit and Coinbase.</div><p class="fine">'+tmStatus()+'</p>';
+ return feeds.map(function(f){
+  var bb=f.bids.slice().sort(function(a,b){return b.p-a.p}).slice(0,20),aa=f.asks.slice().sort(function(a,b){return a.p-b.p}).slice(0,20),maxB=bb.reduce(function(m,x){return Math.max(m,x.q)},0),maxA=aa.reduce(function(m,x){return Math.max(m,x.q)},0),rows="";
+  for(var i=0;i<Math.max(bb.length,aa.length);i++){
+   var b=bb[i],a=aa[i];
+   rows+='<div class="cell b"><i class="d" style="width:'+(b&&maxB?Math.min(100,Math.max(3,b.q/maxB*100)):0)+'%"></i><span>'+(b?fx2(b.q,6):"—")+'</span><span>'+(b?fx2(b.p,dp):"—")+'</span></div><div class="cell a"><i class="d" style="width:'+(a&&maxA?Math.min(100,Math.max(3,a.q/maxA*100)):0)+'%"></i><span>'+(a?fx2(a.p,dp):"—")+'</span><span>'+(a?fx2(a.q,6):"—")+'</span></div>';
+  }
+  return '<div class="sec">'+esc(f.venue.toUpperCase())+' · '+esc(f.market.toUpperCase())+' ORDER BOOK</div><div class="bk"><div class="h"><span>Bid size ('+esc(it.n.split("/")[0])+')</span><span>Bid price</span></div><div class="h r"><span>Ask price</span><span>Ask size ('+esc(it.n.split("/")[0])+')</span></div>'+(rows||'<div class="empty">No current depth from this feed.</div>')+'</div>';
+ }).join("")+'<p class="fine">'+feeds.length+' independent exchange books. Prices and quantities are never combined across venues.</p>';
+}
 function trade(){
  var it=items[st.tp],cr=it.m==="Crypto",fxm=it.m==="Forex";
  var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose product"><span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span><b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?"FOREX · INDICATIVE":"TRADEMATE")+'</span></div>';
@@ -789,7 +800,7 @@ function trade(){
    var trades=tmTape();
    body='<div class="tr h"><span>Exchange / time</span><span>Price (USDT)</span><span>Amount ('+esc(it.n.split("/")[0])+')</span></div>'+(trades.length?trades.map(function(x){return '<div class="tr"><span>'+esc(x.venue.toUpperCase()+' · '+x.market.toUpperCase())+'<br><small>'+new Date(x.time).toLocaleTimeString()+'</small></span><span class="'+(x.side==="BUY"?"up":"dn")+'">'+fx2(x.p,dp)+' <small>'+x.side+'</small></span><span>'+fx2(x.q,6)+'</span></div>'}).join(""):'<div class="empty">Waiting for executed trades from connected exchanges…</div>');
   }
-  return h+head+body+'<p class="fine">Live public exchange order-book depth and executed trades. The Book combines matching price levels across connected exchanges; Trades shows the shared live execution tape. '+stamp+'.</p>';
+  return h+head+body+'<p class="fine">Live public exchange order-book depth and executed trades. Book keeps each exchange separate; Trades shows the shared, venue-labelled execution tape. '+stamp+'.</p>';
  }
  if(fxm){
   return h+'<div class="empty"><b>Live FX market feed not connected yet</b>Forex is an over-the-counter market. TradeMate will show provider-sourced bid/ask quotes when the live FX feed is integrated. No synthetic spread or invented trade records are displayed.</div>';
