@@ -782,7 +782,7 @@ function loadGlobalActivity(view,force){
  if(!force&&globalActivityCache.loading)return;
  if(!force&&globalActivityCache.updated&&Date.now()-globalActivityCache.updated<12000)return;
  globalActivityCache.loading=true;globalActivityCache.error="";
- Promise.all(["book","trades"].map(function(v){return api("GET","/market/trades/activity?view="+v+"&market=all&limit=100")}))
+ Promise.all(["book","trades"].map(function(v){return api("GET","/market/trades/activity?view="+v+"&market="+encodeURIComponent(globalActivityCache.market||"all")+"&limit=100")}))
  .then(function(r){globalActivityCache.book=r[0].data||[];globalActivityCache.trades=r[1].data||[];globalActivityCache.updated=Date.now();globalActivityCache.loading=false;globalActivityCache.error="";if(st.tab==="Trade")softDraw()})
  .catch(function(e){globalActivityCache.loading=false;globalActivityCache.error=e.message||"Could not load global market activity.";if(st.tab==="Trade")softDraw()});
 }
@@ -1330,8 +1330,12 @@ st.tp=items.findIndex(function(i){return i.n==="BTC/USDT"});
 /* ---- real data only: no invented sellers, replies or order books ---- */
 sellerOf=function(it){return it.seller||"TradeMate member"};
 detsOf=function(it){return it.det||[]};
-var _tr=trade;trade=function(){var s=_tr(),it=items[st.tp],k=s.indexOf('<div class="seg">');
- if(it&&it.m==="Crypto"&&k>0)s=s.slice(0,k)+'<div class="rb"><div><small>PRICE</small><b>'+px(it)+'</b></div><div><small>24H</small><b class="'+(it.c>=0?"up":"dn")+'">'+(it.c>=0?"+":"")+it.c.toFixed(2)+'%</b></div><div><small>MCAP</small><b>'+(it.cap?money(it.cap):"—")+'</b></div></div><p class="fine">Reference price from public data. TradeMate does not trade crypto, so no order book is shown.</p>';return s};
+var _tr=trade;trade=function(){var s=_tr(),it=items[st.tp],note='<p class="fine">Reference price from public data. TradeMate does not trade crypto, so no order book is shown.</p>',k=s.indexOf(note);
+if(it&&it.m==="Crypto"&&k>0){loadGlobalActivity(st.tt==="Trades"?"trades":"book");var rows=st.tt==="Trades"?globalActivityCache.trades:globalActivityCache.book;
+var body=globalActivityCache.loading?'<div class="empty">Loading marketplace activity…</div>':globalActivityCache.error?'<div class="empty"><b>Marketplace activity unavailable</b>'+esc(globalActivityCache.error)+'<button class="btn sm" data-act="marketactivityretry">Retry</button></div>':!rows.length?'<div class="empty"><b>No '+(st.tt==="Trades"?"completed trades":"open orders")+' yet</b>Only genuine TradeMate marketplace and P2P records appear here.</div>':rows.map(function(x){return '<div class="ad"><div class="who"><b>'+esc(x.instrument||"—")+' · '+esc(x.side||"") + '</b><small>'+esc(x.market||"Marketplace")+' · '+(st.tt==="Trades"?"Completed":"Open")+' · '+fmtT(x.occurred_at)+'</small></div><div class="pr">'+esc(x.currency||"")+' '+(Number(x.price)||0).toLocaleString(undefined,{maximumFractionDigits:2})+'</div><div class="kv">Quantity<b>'+esc(String(x.quantity==null?"—":x.quantity))+'</b><br>Source<b>'+esc(x.source||"TradeMate")+'</b></div></div>'}).join("");
+var tabs='<div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Book</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">Trade</button></div>';
+var activity=tabs+body+'<p class="fine">TradeMate marketplace and P2P activity · '+(globalActivityCache.updated?"Updated "+fmtT(new Date(globalActivityCache.updated).toISOString()):"Awaiting sync")+'</p>';
+var rb='<div class="rb"><div><small>PRICE</small><b>'+px(it)+'</b></div><div><small>24H</small><b class="'+(it.c>=0?"up":"dn")+'">'+(it.c>=0?"+":"")+it.c.toFixed(2)+'%</b></div><div><small>MCAP</small><b>'+(it.cap?money(it.cap):"—")+'</b></div></div>';s=s.slice(0,k)+rb+activity+s.slice(k+note.length);}return s};
 /* ---- session ---- */
 function applyUser(u){if(!u)return;var m=st.me,same=m.id===u.id;
  st.me={id:u.id,email:u.email,name:u.display_name,nick:same&&m.nick?m.nick:u.display_name,av:same?m.av:0,photo:same?m.photo:null,uid:String(u.id).replace(/-/g,"").slice(0,9).toUpperCase(),lvl:1,country:CNAME[u.country_code]||m.country||"Nigeria"};
