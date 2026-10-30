@@ -742,14 +742,41 @@ function ensureCryptoFeed(it){
 }
 function scheduleMarketDraw(){if(marketFeed.drawTimer)return;marketFeed.drawTimer=setTimeout(function(){marketFeed.drawTimer=null;if(st.tab==="Trade")softDraw()},350)}
 function trade(){
- loadGlobalActivity(st.tt==="Trades"?"trades":"book");
- var view=st.tt==="Trades"?"trades":"book",data=globalActivityCache[view]||[];
- var filters=[["all","All markets"],["products","Products"],["services","Services"],["p2p","P2P"]];
- var filtered=data.filter(function(x){return globalActivityCache.market==="all"||String(x.market||"").toLowerCase()===globalActivityCache.market});
- var rows=filtered.map(function(x){var n=Number(x.price);return '<div class="ad"><div class="who"><b>'+esc(x.side||"")+' · '+esc(x.instrument||"")+'</b><small>'+esc(x.market||"")+' · '+esc(x.source||"")+' · '+fmtT(x.occurred_at)+'</small></div><div class="pr">'+esc((x.currency||"")+' '+(Number.isFinite(n)?n.toLocaleString():"—"))+'</div><div class="kv">Quantity<b>'+esc(String(x.quantity==null?"—":x.quantity))+'</b><br>Reference<b>'+esc(x.reference||"—")+'</b></div></div>'}).join("");
- var state=globalActivityCache.loading?'<div class="empty"><b>Loading market activity…</b>Retrieving genuine listings and completed transactions.</div>':globalActivityCache.error?'<div class="empty"><b>Market activity unavailable</b>'+esc(globalActivityCache.error)+'<button class="btn sm" data-act="marketactivityretry">Retry</button></div>':rows||'<div class="empty"><b>No '+(view==="book"?"open listings or orders":"completed trades")+' found</b>No sample activity is displayed.</div>';
- return '<div class="thd"><b>Global market activity</b><span class="live"><i></i>TRADEMATE DATA</span></div><div class="seg"><button class="'+(view==="book"?"on":"")+'" data-tt="Order book">Book</button><button class="'+(view==="trades"?"on":"")+'" data-tt="Trades">Trade</button></div><div class="bsw"><div class="bsp">'+filters.map(function(x){return '<button class="'+(globalActivityCache.market===x[0]?"on":"")+'" data-marketfilter="'+x[0]+'">'+x[1]+'</button>'}).join("")+'</div></div>'+state+'<p class="fine">Book: published listings and open P2P orders. Trade: completed marketplace and P2P transactions only. External Forex, NFT and exchange-wide feeds are not connected. Updated: '+(globalActivityCache.updated?fmtT(new Date(globalActivityCache.updated).toISOString()):"Awaiting sync")+'.</p>';
+ var it=items[st.tp],cr=it.m==="Crypto",fxm=it.m==="Forex";
+ var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose product"><span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span><b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?"BINANCE · SPOT":fxm?"FOREX · INDICATIVE":"TRADEMATE")+'</span></div>';
+ if(cr){
+  ensureCryptoFeed(it);
+  var dp=it.p<1?6:it.p<20?4:2,stamp=marketFeed.last?new Date(marketFeed.last).toLocaleTimeString():"—";
+  var head='<div class="tpx"><b data-px="'+esc(it.n)+'">'+px(it)+'</b><span>USDT</span></div><div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Book</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">Trades</button></div>';
+  if(marketFeed.status!=="live"&&!marketFeed.bids.length&&!marketFeed.trades.length)return h+head+'<div class="empty"><b>'+(marketFeed.status==="connecting"?"Connecting to Binance…":"Live market feed unavailable")+'</b>'+(marketFeed.status==="connecting"?"Waiting for genuine exchange data.":"No sample records are shown. Try again shortly or choose another pair.")+'</div><p class="fine">Source: Binance Spot public market stream. Last update: '+stamp+'.</p>';
+  var body="";
+  if(st.tt==="Order book"){
+   var bids=marketFeed.bids,asks=marketFeed.asks,rows="";
+   for(var k=0;k<Math.max(bids.length,asks.length);k++){
+    var bid=bids[k],ask=asks[k];
+    rows+='<div class="cell b"><i class="d" style="width:'+ (bid?Math.min(100,Math.max(3,bid.q/(bids[0]?bids[0].q:bid.q)*100)) :0)+'%"></i><span>'+(bid?fx2(bid.q,6):"—")+'</span><span>'+(bid?fx2(bid.p,dp):"—")+'</span></div><div class="cell a"><i class="d" style="width:'+(ask?Math.min(100,Math.max(3,ask.q/(asks[0]?asks[0].q:ask.q)*100)):0)+'%"></i><span>'+(ask?fx2(ask.p,dp):"—")+'</span><span>'+(ask?fx2(ask.q,6):"—")+'</span></div>';
+   }
+   body='<div class="bk"><div class="h"><span>Amount ('+esc(it.n.split("/")[0])+')</span><span>Bid price (USDT)</span></div><div class="h r"><span>Ask price (USDT)</span><span>Amount ('+esc(it.n.split("/")[0])+')</span></div>'+(rows||'<div class="empty">Waiting for order-book levels…</div>')+'</div>';
+  }else{
+   var trades=marketFeed.trades;
+   body='<div class="tr h"><span>Time</span><span>Price (USDT)</span><span>Amount ('+esc(it.n.split("/")[0])+')</span></div>'+(trades.length?trades.map(function(t){return '<div class="tr"><span>'+new Date(t.time).toLocaleTimeString()+'</span><span class="'+(t.side==="BUY"?"up":"dn")+'">'+fx2(t.p,dp)+' <small>'+t.side+'</small></span><span>'+fx2(t.q,6)+'</span></div>'}).join(""):'<div class="empty">Waiting for executed trades…</div>');
+  }
+  return h+head+body+'<p class="fine">Live public Binance Spot order-book depth and executed trades. This is external exchange activity, not trades executed by TradeMate. Updated: '+stamp+'.</p>';
+ }
+ if(fxm){
+  return h+'<div class="empty"><b>Live FX market feed not connected yet</b>Forex is an over-the-counter market. TradeMate will show provider-sourced bid/ask quotes when the live FX feed is integrated. No synthetic spread or invented trade records are displayed.</div>';
+ }
+ var kind=it.m==="Services"?"service":"product";
+ loadInternalTrades(kind);
+ var marketItems=items.filter(function(x){return x.srv&&x.m===it.m});
+ var bookHtml=marketItems.length?marketItems.map(function(x){return '<div class="ad"><div class="who"><b>'+esc(x.n)+'</b><small>Published listing · '+esc(x.seller||"TradeMate seller")+'</small></div><div class="pr">'+esc(x.p)+'</div><div class="kv">'+esc(x.desc||"")+'</div></div>'}).join(""):'<div class="empty"><b>No published '+esc(it.m.toLowerCase())+' yet</b>Approved TradeMate listings will appear in Book when available.</div>';
+ var tradeRows=internalTradeCache.data;
+ var tradeHtml=internalTradeCache.loading?'<div class="empty"><b>Loading completed transactions…</b>Checking the TradeMate transaction ledger.</div>':
+ internalTradeCache.error?'<div class="empty"><b>Trade records unavailable</b>'+esc(internalTradeCache.error)+'<button class="btn sm" data-act="markettraderetry">Retry</button></div>':
+ tradeRows.length?tradeRows.map(function(x){return '<div class="ad"><div class="who"><b>'+esc(x.side)+' · '+esc(x.listing_title)+'</b><small>Completed · '+fmtT(x.completed_at)+'</small></div><div class="pr">'+esc(x.currency_code)+' '+(Number(x.total_minor_units)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+'</div><div class="kv">Quantity<b>'+esc(String(x.quantity))+'</b><br>Unit price<b>'+esc(x.currency_code)+' '+(Number(x.unit_price_minor_units)/100).toLocaleString()+'</b></div><small>Reference '+esc(x.transaction_reference)+'</small></div>'}).join(""):'<div class="empty"><b>No completed transactions yet</b>Only transactions confirmed by both buyer and seller appear here. Listings and enquiries are not counted as trades.</div>';
+ return h+'<div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Book</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">Trade</button></div>'+(st.tt==="Order book"?bookHtml:tradeHtml)+'<p class="fine">Source: TradeMate marketplace database. '+(st.tt==="Trades"?"Only confirmed completed transactions are shown.":"Book contains published listings, not completed sales.")+' '+(internalTradeCache.updated?"Updated "+fmtT(new Date(internalTradeCache.updated).toISOString()):"Awaiting sync")+'</p>';
 }
+
 var globalActivityCache={book:[],trades:[],loading:false,error:"",updated:null,market:"all"};
 function loadGlobalActivity(view,force){
  if(!force&&globalActivityCache.loading)return;
