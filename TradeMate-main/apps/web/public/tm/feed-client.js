@@ -27,6 +27,8 @@
     }, opts);
 
     let ws, attempt = 0, closed = false, trades = [];
+    const seenTradeIds = new Set();
+    const tradeKey = (t) => [t.exchange, t.market, t.symbol, t.ts, t.price, t.qty, t.side].join('|');
 
     const quoteOk = (q) => o.mixUsdQuotes && USD_LIKE.includes(o.quote)
       ? USD_LIKE.includes(q)
@@ -57,9 +59,23 @@
       const bids = aggregate(fresh.flatMap((b) => b.bids || []), 'bid');
       const asks = aggregate(fresh.flatMap((b) => b.asks || []), 'ask');
 
-      const incoming = msg.trades.filter(matches).reverse()
-        .map((t) => ({ exchange: t.exchange, market: t.market, ts: t.ts, price: t.price, qty: t.qty, side: t.side }));
-      trades = incoming.concat(trades).slice(0, o.maxTrades);   // newest first
+      // The server sends only trades received since its previous one-second
+      // snapshot. Still deduplicate by execution identity so reconnects or
+      // repeated packets cannot print the same execution twice.
+      const incoming = (Array.isArray(msg.trades) ? msg.trades : []).filter(matches).reverse()
+        .map((t) => ({ exchange: t.exchange, market: t.market, symbol: t.symbol, ts: t.ts, price: t.price, qty: t.qty, side: t.side }));
+      const unseen = [];
+      for (const t of incoming) {
+        const id = tradeKey(t);
+        if (seenTradeIds.has(id)) continue;
+        seenTradeIds.add(id);
+        unseen.push(t);
+      }
+      trades = unseen.concat(trades).slice(0, o.maxTrades);
+      while (seenTradeIds.size > o.maxTrades * 20) {
+        const oldest = seenTradeIds.values().next().value;
+        seenTradeIds.delete(oldest);
+      }
 
       const bestBid = bids.length ? bids[0].price : null;
       const bestAsk = asks.length ? asks[0].price : null;
@@ -97,7 +113,7 @@
 
     return {
       close() { closed = true; ws.close(); },
-      setSymbol(base, quote) { o.base = base; o.quote = quote; trades = []; watch(); },   // call when the user switches pair
+      setSymbol(base, quote) { o.base = base; o.quote = quote; trades = []; seenTradeIds.clear(); watch(); },   // call when the user switches pair
     };
   }
 
