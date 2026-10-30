@@ -797,7 +797,7 @@ function trade(){
  if(cr){
   ensureMultiFeeds(it);
   var dp=it.p<1?6:it.p<20?4:2,stamp=tmStatus();
-  var head='<div class="tpx"><b data-px="'+esc(it.n)+'">'+px(it)+'</b><span>USDT</span></div><div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Book</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">Trades</button></div>';
+  var head='<div class="tpx"><b data-px="'+esc(it.n)+'">'+px(it)+'</b><span>'+esc(it.n.split("/")[1]||"")+'</span></div><div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Book</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">Trades</button></div>';
   var body="";
   if(st.tt==="Order book"){
    body=tmBooks(it,dp);
