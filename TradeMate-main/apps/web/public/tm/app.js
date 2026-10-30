@@ -750,7 +750,7 @@ function tmConnectCentral(symbol){
     (d.books||[]).forEach(function(b){
      var key=tmKey(b.exchange,b.market);
      tmFeeds[key]={
-      venue:b.exchange,market:b.market,status:b.stale?"stale":"live",
+      venue:b.exchange,market:b.market,quote:b.quote,status:b.stale?"stale":"live",
       bids:(b.bids||[]).map(function(x){return {p:+x.price,q:+x.size}}),
       asks:(b.asks||[]).map(function(x){return {p:+x.price,q:+x.size}}),
       trades:[],bookAt:b.stale?0:d.ts,tradeAt:0,sockets:[]
@@ -758,8 +758,8 @@ function tmConnectCentral(symbol){
     });
     (d.trades||[]).forEach(function(x){
      var key=tmKey(x.exchange,x.market),f=tmFeeds[key];
-     if(!f)f=tmFeeds[key]={venue:x.exchange,market:x.market,status:"live",bids:[],asks:[],trades:[],bookAt:0,tradeAt:0,sockets:[]};
-     f.trades.push({id:x.id||x.ts+":"+x.price,p:+x.price,q:+x.qty,time:+x.ts,side:String(x.side).toLowerCase()==="buy"?"BUY":"SELL",venue:x.exchange,market:x.market});
+     if(!f)f=tmFeeds[key]={venue:x.exchange,market:x.market,quote:x.quote,status:"live",bids:[],asks:[],trades:[],bookAt:0,tradeAt:0,sockets:[]};
+     f.trades.push({id:x.id||x.ts+":"+x.price,p:+x.price,q:+x.qty,time:+x.ts,side:String(x.side).toLowerCase()==="buy"?"BUY":"SELL",venue:x.exchange,market:x.market,quote:x.quote});
      f.tradeAt=d.ts;
     });
     tmFeedStatusCount={live:d.feedsLive||0,total:d.feedsTotal||0,books:(d.books||[]).filter(function(b){return !b.stale&&(b.bids.length||b.asks.length)}).length};
@@ -783,7 +783,7 @@ function tmBooks(it,dp){
    var b=bb[i],a=aa[i];
    rows+='<div class="cell b"><i class="d" style="width:'+(b&&maxB?Math.min(100,Math.max(3,b.q/maxB*100)):0)+'%"></i><span>'+(b?fx2(b.q,6):"—")+'</span><span>'+(b?fx2(b.p,dp):"—")+'</span></div><div class="cell a"><i class="d" style="width:'+(a&&maxA?Math.min(100,Math.max(3,a.q/maxA*100)):0)+'%"></i><span>'+(a?fx2(a.p,dp):"—")+'</span><span>'+(a?fx2(a.q,6):"—")+'</span></div>';
   }
-  return '<div class="sec">'+esc(f.venue.toUpperCase())+' · '+esc(f.market.toUpperCase())+' ORDER BOOK</div><div class="bk"><div class="h"><span>Bid size ('+esc(it.n.split("/")[0])+')</span><span>Bid price</span></div><div class="h r"><span>Ask price</span><span>Ask size ('+esc(it.n.split("/")[0])+')</span></div>'+(rows||'<div class="empty">No current depth from this feed.</div>')+'</div>';
+  return '<div class="sec">'+esc(f.venue.toUpperCase())+' · '+esc(f.market.toUpperCase())+' · '+esc(f.quote||it.n.split("/")[1]||"")+' ORDER BOOK</div><div class="bk"><div class="h"><span>Bid size ('+esc(it.n.split("/")[0])+')</span><span>Bid price ('+esc(f.quote||it.n.split("/")[1]||"")+')</span></div><div class="h r"><span>Ask price ('+esc(f.quote||it.n.split("/")[1]||"")+')</span><span>Ask size ('+esc(it.n.split("/")[0])+')</span></div>'+(rows||'<div class="empty">No current depth from this feed.</div>')+'</div>';
  }).join("")+'<p class="fine">'+feeds.length+' independent exchange books. Prices and quantities are never combined across venues.</p>';
 }
 function trade(){
@@ -798,7 +798,7 @@ function trade(){
    body=tmBooks(it,dp);
   }else{
    var trades=tmTape();
-   body='<div class="tr h"><span>Exchange / time</span><span>Price (USDT)</span><span>Amount ('+esc(it.n.split("/")[0])+')</span></div>'+(trades.length?trades.map(function(x){return '<div class="tr"><span>'+esc(x.venue.toUpperCase()+' · '+x.market.toUpperCase())+'<br><small>'+new Date(x.time).toLocaleTimeString()+'</small></span><span class="'+(x.side==="BUY"?"up":"dn")+'">'+fx2(x.p,dp)+' <small>'+x.side+'</small></span><span>'+fx2(x.q,6)+'</span></div>'}).join(""):'<div class="empty">Waiting for executed trades from connected exchanges…</div>');
+   body='<div class="tr h"><span>Exchange / time</span><span>Price / quote</span><span>Amount ('+esc(it.n.split("/")[0])+')</span></div>'+(trades.length?trades.map(function(x){return '<div class="tr"><span>'+esc(x.venue.toUpperCase()+' · '+x.market.toUpperCase())+'<br><small>'+new Date(x.time).toLocaleTimeString()+'</small></span><span class="'+(x.side==="BUY"?"up":"dn")+'">'+fx2(x.p,dp)+' '+esc(x.quote||'')+' <small>'+x.side+'</small></span><span>'+fx2(x.q,6)+'</span></div>'}).join(""):'<div class="empty">Waiting for executed trades from connected exchanges…</div>');
   }
   return h+head+body+'<p class="fine">Live public exchange order-book depth and executed trades. Book keeps each exchange separate; Trades shows the shared, venue-labelled execution tape. '+stamp+'.</p>';
  }
