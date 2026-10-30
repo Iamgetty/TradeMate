@@ -746,6 +746,11 @@ function tmConnectCentral(symbol){
    },
    onUpdate:function(d){
     if(tmFeedSymbol!==symbol)return;
+    var selected=items[st.tp],selectedQuote=selected&&String(selected.n||"").split("/")[1];
+    if(selected&&selectedQuote){
+     var latest=(d.trades||[]).filter(function(t){return t.quote===selectedQuote}).sort(function(a,b){return Number(b.ts)-Number(a.ts)})[0];
+     if(latest&&Number(latest.price)>0)selected.p=Number(latest.price);
+    }
     tmFeeds={};
     (d.books||[]).forEach(function(b){
      var key=tmKey(b.exchange,b.market);
