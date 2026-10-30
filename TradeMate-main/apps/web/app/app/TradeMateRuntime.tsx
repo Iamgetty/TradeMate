@@ -10,41 +10,55 @@ declare global {
 }
 
 /**
- * Next.js route boundary for the existing TradeMate runtime.
- * The legacy runtime is intentionally retained during the incremental React
- * migration so the live product UI and its existing workflows are not lost.
+ * Temporary Next.js boundary while individual legacy screens are migrated
+ * into React. It keeps the existing product UI running without replacing it.
  */
 export default function TradeMateRuntime() {
-  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     if (window.__tradeMateBooted) return;
     window.__tradeMateBooted = true;
     window.TM_CONFIG = { api: '/api' };
 
-    const feed = document.createElement('script');
-    feed.src = '/tm/feed-client.js';
-    feed.async = false;
-
     const app = document.createElement('script');
     app.src = '/tm/app.js?v=7';
     app.async = false;
 
-    feed.onerror = () => setError('TradeMate market feed client could not be loaded. Please refresh.');
-    app.onerror = () => setError('TradeMate application could not be loaded. Please refresh.');
+    const loadApp = () => {
+      if (!document.querySelector('script[data-trademate-app]')) {
+        app.dataset.trademateApp = 'true';
+        app.onerror = () => {
+          window.__tradeMateBooted = false;
+          setNotice('TradeMate could not load. Please refresh the page.');
+        };
+        document.body.appendChild(app);
+      }
+    };
 
-    feed.onload = () => document.body.appendChild(app);
+    const feed = document.createElement('script');
+    feed.src = '/tm/feed-client.js';
+    feed.async = false;
+    feed.onload = loadApp;
+    feed.onerror = () => {
+      setNotice('Live exchange feed client did not load. The app will still open, but live Book and Trades may be unavailable.');
+      loadApp();
+    };
     document.body.appendChild(feed);
 
     return () => {
-      // The runtime owns its generated DOM and long-lived market connections.
-      // Do not tear it down during React strict-mode effect replay.
+      // Do not remove the scripts or app DOM during React Strict Mode replay:
+      // the existing runtime owns its navigation and WebSocket lifecycle.
     };
   }, []);
 
-  return error ? (
-    <main role="alert" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, background: '#05070a', color: '#f5f7fa', fontFamily: 'system-ui' }}>
-      {error}
-    </main>
+  return notice ? (
+    <div role="status" style={{
+      position: 'fixed', zIndex: 10000, left: 12, right: 12, bottom: 12,
+      padding: '10px 14px', border: '1px solid #73552b', borderRadius: 10,
+      background: '#21190e', color: '#ffd28a', font: '12px system-ui',
+    }}>
+      {notice}
+    </div>
   ) : null;
 }
