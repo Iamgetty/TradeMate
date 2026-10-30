@@ -51,7 +51,7 @@ function getBook(exchange, market, symbol) {
   const k = `${exchange}|${market}|${symbol}`;
   let b = books.get(k);
   if (!b) {
-    b = { exchange, market, symbol, ...splitSymbol(symbol), bids: new Map(), asks: new Map(), ts: 0, last: null, synced: false };
+    b = { exchange, market, symbol, ...splitSymbol(symbol), bids: new Map(), asks: new Map(), ts: 0, last: null, synced: false, lastUpdateId: 0 };
     books.set(k, b);
   }
   return b;
@@ -64,6 +64,7 @@ function resetBooks(exchange, market) {
     b.asks.clear();
     b.ts = 0;
     b.synced = false;
+    b.lastUpdateId = 0;
   }
 }
 function validLevel(price, size) {
@@ -173,15 +174,19 @@ function bybit(market, symbols) {
       if (msg.topic.startsWith('orderbook.')) {
         const d = msg.data;
         const b = getBook('bybit', market, d.s);
-        if (msg.type === 'snapshot') {
+        if (msg.type === 'snapshot' || Number(d.u) === 1) {
           replaceSide(b.bids, d.b || []);
           replaceSide(b.asks, d.a || []);
           b.synced = true;
+          b.lastUpdateId = Number(d.u) || 0;
         } else {
           // Never expose a partial Bybit book before its initial snapshot.
           if (!b.synced) return;
+          const updateId = Number(d.u);
+          if (!Number.isFinite(updateId) || updateId <= b.lastUpdateId) return;
           applySide(b.bids, d.b || []);
           applySide(b.asks, d.a || []);
+          b.lastUpdateId = updateId;
         }
         touch(b);
       } else if (msg.topic.startsWith('publicTrade.')) {
@@ -318,6 +323,11 @@ setInterval(() => {
         books: list.map(({ bids, asks, ...slim }) => (key && slim.base === key ? { ...slim, bids, asks } : slim)),
         trades: key ? trades.filter((t) => t.base === key) : [],
       }));
+    }
+    // A slow client must not accumulate an unbounded queue of stale snapshots.
+    if (c.bufferedAmount > 1024 * 1024) {
+      c.terminate();
+      continue;
     }
     c.send(cache.get(key));
   }
