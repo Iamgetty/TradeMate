@@ -723,14 +723,57 @@ function openMarketFeed(symbol){if(marketFeed.symbol!==symbol)return;clearMarket
 function ensureCryptoFeed(it){var symbol=String(it.n||"").replace("/","").toLowerCase();if(!/^[a-z0-9]{5,20}$/.test(symbol)){stopMarketFeed();marketFeed.status="unavailable";return}if(marketFeed.symbol===symbol&&marketFeed.socket&&[WebSocket.OPEN,WebSocket.CONNECTING].includes(marketFeed.socket.readyState))return;if(marketFeed.symbol===symbol&&(marketFeed.retryTimer||marketFeed.recoveryTimer))return;stopMarketFeed();marketFeed.symbol=symbol;marketFeed.status="connecting";openMarketFeed(symbol)}
 function scheduleMarketDraw(){if(marketFeed.drawTimer)return;marketFeed.drawTimer=setTimeout(function(){marketFeed.drawTimer=null;if(st.tab==="Trade")softDraw()},350)}
 /* Independent public feeds: exchange books stay separate; executions share a labelled tape. */
-var tmFeeds={},tmFeedSymbol="",tmMarketSocket=null,tmMarketReconnect=null;
+var tmFeeds={},tmFeedSymbol="",tmMarketSocket=null,tmMarketReconnect=null,tmFeedStatusCount={live:0,total:0,books:0};
 function tmKey(v,m){return v+":"+m}
-function tmStopFeeds(){if(tmMarketReconnect){clearTimeout(tmMarketReconnect);tmMarketReconnect=null}if(tmMarketSocket){tmMarketSocket.onclose=null;tmMarketSocket.onerror=null;try{tmMarketSocket.close()}catch(e){}tmMarketSocket=null}tmFeeds={};tmFeedSymbol=""}
+function tmStopFeeds(){if(tmMarketReconnect){clearTimeout(tmMarketReconnect);tmMarketReconnect=null}if(tmMarketSocket){try{tmMarketSocket.close()}catch(e){}tmMarketSocket=null}tmFeeds={};tmFeedSymbol="";tmFeedStatusCount={live:0,total:0,books:0}}
 function tmApplySnapshot(message){if(!message||message.type!=="snapshot")return;var next={};(message.books||[]).forEach(function(b){var key=tmKey(b.venue,b.market);next[key]={venue:b.venue,market:b.market,status:b.status||"connecting",bids:(b.bids||[]).map(function(x){return {p:+x.p,q:+x.q}}),asks:(b.asks||[]).map(function(x){return {p:+x.p,q:+x.q}}),trades:[],bookAt:+b.bookAt||0,tradeAt:+b.tradeAt||0,sockets:[]}});(message.trades||[]).forEach(function(t){var key=tmKey(t.venue,t.market),feed=next[key];if(!feed){feed=next[key]={venue:t.venue,market:t.market,status:"live",bids:[],asks:[],trades:[],bookAt:0,tradeAt:0,sockets:[]}}feed.trades.push({id:t.id,p:+t.price,q:+t.quantity,time:+t.time,side:t.side==="sell"?"SELL":"BUY",venue:t.venue,market:t.market})});tmFeeds=next;scheduleMarketDraw()}
-function tmConnectCentral(symbol){var api="wss://trademate-api-toip.onrender.com/api/market-feed";try{tmMarketSocket=new WebSocket(api)}catch(e){Object.keys(tmFeeds).forEach(function(k){tmFeeds[k].status="unavailable"});scheduleMarketDraw();return}var ws=tmMarketSocket;ws.onopen=function(){if(tmMarketSocket!==ws)return;ws.send(JSON.stringify({type:"subscribe",symbol:symbol.toUpperCase()}))};ws.onmessage=function(ev){if(tmMarketSocket!==ws)return;try{var data=JSON.parse(ev.data);if(data.type==="snapshot")tmApplySnapshot(data);else if(data.type==="error"){tmFeeds={};scheduleMarketDraw()}}catch(e){}};ws.onerror=function(){try{ws.close()}catch(e){}};ws.onclose=function(){if(tmMarketSocket!==ws||tmFeedSymbol!==symbol)return;tmMarketSocket=null;Object.keys(tmFeeds).forEach(function(k){tmFeeds[k].status="reconnecting"});scheduleMarketDraw();tmMarketReconnect=setTimeout(function(){if(tmFeedSymbol===symbol)tmConnectCentral(symbol)},2500)}}
+function tmConnectCentral(symbol){
+ var pair=items[st.tp]&&items[st.tp].n||"BTC/USDT";
+ var parts=pair.split("/"),base=parts[0]||"BTC",quote=parts[1]||"USDT";
+ try{
+  tmMarketSocket=createFeedClient({
+   url:"wss://exchange-feed.onrender.com",
+   base:base,
+   quote:quote,
+   markets:["spot","futures","linear"],
+   mixUsdQuotes:true,
+   levels:20,
+   maxTrades:80,
+   onStatus:function(connected){
+    if(tmFeedSymbol!==symbol)return;
+    if(!connected)Object.keys(tmFeeds).forEach(function(k){tmFeeds[k].status="reconnecting"});
+    scheduleMarketDraw();
+   },
+   onUpdate:function(d){
+    if(tmFeedSymbol!==symbol)return;
+    var key="TradeMate:aggregated";
+    tmFeeds={};
+    tmFeeds[key]={
+     venue:"TradeMate",market:"aggregated",
+     status:d.feedsLive>0?"live":"connecting",
+     bids:(d.bids||[]).map(function(x){return {p:+x.price,q:+x.size}}),
+     asks:(d.asks||[]).map(function(x){return {p:+x.price,q:+x.size}}),
+     trades:(d.trades||[]).map(function(x){return {
+      id:x.id||x.ts+":"+x.price,
+      p:+x.price,q:+x.qty,time:+x.ts,
+      side:String(x.side).toLowerCase()==="buy"?"BUY":"SELL",
+      venue:x.exchange,market:x.market
+     }}),
+     bookAt:d.booksCombined?d.ts:0,tradeAt:d.trades&&d.trades.length?d.ts:0,
+     sockets:[]
+    };
+    tmFeedStatusCount={live:d.feedsLive||0,total:d.feedsTotal||0,books:d.booksCombined||0};
+    scheduleMarketDraw();
+   }
+  });
+ }catch(e){
+  tmFeeds={central:{venue:"TradeMate",market:"aggregated",status:"unavailable",bids:[],asks:[],trades:[],bookAt:0,tradeAt:0,sockets:[]}};
+  scheduleMarketDraw();
+ }
+}
 function ensureMultiFeeds(it){var symbol=String(it.n||"").replace(/[^a-z0-9]/gi,"").toUpperCase();if(!/^[A-Z0-9]{5,24}$/.test(symbol))return;if(tmFeedSymbol===symbol&&tmMarketSocket&&(tmMarketSocket.readyState===WebSocket.OPEN||tmMarketSocket.readyState===WebSocket.CONNECTING))return;tmStopFeeds();tmFeedSymbol=symbol;tmFeeds={central:{venue:"TradeMate",market:"aggregated",status:"connecting",bids:[],asks:[],trades:[],bookAt:0,tradeAt:0,sockets:[]}};tmConnectCentral(symbol)}
 function tmTape(){var a=[];Object.keys(tmFeeds).forEach(function(k){a=a.concat(tmFeeds[k].trades||[])});return a.sort(function(x,y){return y.time-x.time}).slice(0,80)}
-function tmStatus(){var keys=Object.keys(tmFeeds),n=keys.filter(function(k){return tmFeeds[k].status==="live"}).length;return n+"/"+keys.length+" FEEDS LIVE"}
+function tmStatus(){return tmFeedStatusCount.live+"/"+tmFeedStatusCount.total+" FEEDS LIVE"}
 function tmBooks(it,dp){var bids={},asks={},sources=0;Object.keys(tmFeeds).forEach(function(k){var f=tmFeeds[k];if(f.bookAt&&(f.bids.length||f.asks.length))sources++;f.bids.forEach(function(x){var p=Number(x.p),q=Number(x.q);if(p>0&&q>0){var key=p.toFixed(dp);bids[key]=(bids[key]||0)+q}});f.asks.forEach(function(x){var p=Number(x.p),q=Number(x.q);if(p>0&&q>0){var key=p.toFixed(dp);asks[key]=(asks[key]||0)+q}})});var bb=Object.keys(bids).map(function(p){return {p:+p,q:bids[p]}}).sort(function(a,b){return b.p-a.p}).slice(0,20),aa=Object.keys(asks).map(function(p){return {p:+p,q:asks[p]}}).sort(function(a,b){return a.p-b.p}).slice(0,20),rows="";for(var i=0;i<Math.max(bb.length,aa.length);i++){var b=bb[i],a=aa[i];rows+='<div class="cell b"><i class="d" style="width:'+(b?Math.min(100,Math.max(3,b.q/(bb[0]?bb[0].q:b.q)*100)):0)+'%"></i><span>'+(b?fx2(b.q,6):"—")+'</span><span>'+(b?fx2(b.p,dp):"—")+'</span></div><div class="cell a"><i class="d" style="width:'+(a?Math.min(100,Math.max(3,a.q/(aa[0]?aa[0].q:a.q)*100)):0)+'%"></i><span>'+(a?fx2(a.p,dp):"—")+'</span><span>'+(a?fx2(a.q,6):"—")+'</span></div>'}return '<div class="bk"><div class="h"><span>Total bid size ('+esc(it.n.split("/")[0])+')</span><span>Bid price (USDT)</span></div><div class="h r"><span>Ask price (USDT)</span><span>Total ask size ('+esc(it.n.split("/")[0])+')</span></div>'+(rows||'<div class="empty">Waiting for live order-book data…</div>')+'</div><p class="fine">'+sources+' exchange books combined into one aggregated order book. Quantities at matching prices are added together.</p>'}
 function trade(){
  var it=items[st.tp],cr=it.m==="Crypto",fxm=it.m==="Forex";
