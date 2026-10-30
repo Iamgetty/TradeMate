@@ -57,17 +57,33 @@ function getBook(exchange, market, symbol) {
   return b;
 }
 const touch = (b) => { b.ts = Date.now(); };
+function validLevel(price, size) {
+  return Number.isFinite(price) && price > 0 && Number.isFinite(size) && size >= 0;
+}
 function replaceSide(map, levels) {
   map.clear();
-  for (const [p, s] of levels) if (+s > 0) map.set(+p, +s);
+  for (const [rawPrice, rawSize] of levels) {
+    const price = Number(rawPrice), size = Number(rawSize);
+    if (validLevel(price, size) && size > 0) map.set(price, size);
+  }
 }
 function applySide(map, levels) {
-  for (const [p, s] of levels) { if (+s === 0) map.delete(+p); else map.set(+p, +s); }
+  for (const [rawPrice, rawSize] of levels) {
+    const price = Number(rawPrice), size = Number(rawSize);
+    if (!validLevel(price, size)) continue;
+    if (size === 0) map.delete(price);
+    else map.set(price, size);
+  }
 }
 function addTrade(exchange, market, symbol, t) {
-  pendingTrades.push({ exchange, market, symbol, ...splitSymbol(symbol), ...t });
+  const price = Number(t.price), qty = Number(t.qty), ts = Number(t.ts);
+  const side = String(t.side || '').toLowerCase();
+  if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(qty) || qty <= 0 ||
+      !Number.isFinite(ts) || (side !== 'buy' && side !== 'sell')) return;
+  const trade = { ...t, price, qty, ts, side };
+  pendingTrades.push({ exchange, market, symbol, ...splitSymbol(symbol), ...trade });
   if (pendingTrades.length > 500) pendingTrades.shift();
-  getBook(exchange, market, symbol).last = t.price;
+  getBook(exchange, market, symbol).last = price;
 }
 
 // ---- Resilient WebSocket helper (auto-reconnect with backoff) --------------
