@@ -115,7 +115,7 @@ function binance(market, host, symbols) {
       replaceSide(b.asks, d.asks || d.a || []);
       touch(b);
     } else if (type === 'aggTrade') {
-      addTrade('binance', market, symbol, { price: +d.p, qty: +d.q, side: d.m ? 'sell' : 'buy', ts: d.T });
+      addTrade('binance', market, symbol, { id: String(d.a), price: +d.p, qty: +d.q, side: d.m ? 'sell' : 'buy', ts: d.T });
     }
   });
 }
@@ -142,7 +142,7 @@ function bybit(market, symbols) {
         touch(b);
       } else if (msg.topic.startsWith('publicTrade.')) {
         for (const t of msg.data) {
-          addTrade('bybit', market, t.s, { price: +t.p, qty: +t.v, side: t.S.toLowerCase(), ts: t.T });
+          addTrade('bybit', market, t.s, { id: String(t.i), price: +t.p, qty: +t.v, side: t.S.toLowerCase(), ts: t.T });
         }
       }
     },
@@ -176,7 +176,7 @@ function coinbase(products) {
       } else if (msg.channel === 'market_trades') {
         for (const e of msg.events || []) for (const t of e.trades || []) {
           addTrade('coinbase', 'spot', t.product_id, {
-            price: +t.price, qty: +t.size, side: String(t.side).toLowerCase(), ts: Date.parse(t.time),
+            id: String(t.trade_id), price: +t.price, qty: +t.size, side: String(t.side).toLowerCase(), ts: Date.parse(t.time),
           });
         }
       }
