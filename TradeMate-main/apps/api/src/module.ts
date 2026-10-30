@@ -710,6 +710,53 @@ class MarketplaceTradesController {
     return session.rows[0].id as string;
   }
 
+  @Get('activity')
+  async activity(@Query('view') view?: string, @Query('market') market?: string, @Query('limit') limitValue?: string) {
+    if (!databasePool) return { source: 'TradeMate marketplace', as_of: new Date().toISOString(), data: [], message: 'Marketplace database is not configured.' };
+    if (!view || !['book', 'trades'].includes(view)) throw new BadRequestException('view must be book or trades.');
+    const limit = limitValue === undefined ? 100 : Number(limitValue);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new BadRequestException('limit must be between 1 and 100.');
+    const category = (market || 'all').toLowerCase();
+    if (!['all', 'products', 'services', 'p2p'].includes(category)) throw new BadRequestException('market must be all, products, services, or p2p.');
+    if (view === 'book') {
+      const values: unknown[] = [limit];
+      const listingFilter = category === 'products' ? " AND l.listing_type = 'product'" : category === 'services' ? " AND l.listing_type = 'service'" : category === 'p2p' ? ' AND 1=0' : '';
+      const p2pFilter = category === 'p2p' || category === 'all' ? '' : ' AND 1=0';
+      const result = await databasePool.query(
+        `SELECT * FROM (
+          SELECT l.id::text AS reference, l.title AS instrument, UPPER(l.listing_type) AS side,
+                 l.price_minor_units::text AS price, l.currency_code AS currency,
+                 l.quantity_available::text AS quantity, l.created_at AS occurred_at,
+                 'TradeMate marketplace'::text AS source, CASE WHEN l.listing_type='service' THEN 'Services' ELSE 'Products' END AS market
+          FROM listings l JOIN organizations o ON o.id=l.seller_organization_id
+          WHERE l.status='published' AND o.status='active'${listingFilter}
+          UNION ALL
+          SELECT b.id::text, b.asset_code || '/' || b.fiat_code, UPPER(b.side),
+                 b.price::text, b.fiat_code, b.quantity::text, b.created_at,
+                 'TradeMate P2P'::text, 'P2P'::text
+          FROM p2p_public_book b WHERE TRUE${p2pFilter}
+        ) activity ORDER BY occurred_at DESC LIMIT $1`, values);
+      return { view, source: 'TradeMate published listings and open P2P orders', as_of: new Date().toISOString(), data: result.rows };
+    }
+    const values: unknown[] = [limit];
+    const listingFilter = category === 'products' ? " AND listing_type='product'" : category === 'services' ? " AND listing_type='service'" : category === 'p2p' ? ' AND 1=0' : '';
+    const p2pFilter = category === 'p2p' || category === 'all' ? '' : ' AND 1=0';
+    const result = await databasePool.query(
+      `SELECT * FROM (
+        SELECT transaction_reference::text AS reference, listing_title AS instrument, side,
+               total_minor_units::text AS price, currency_code AS currency, quantity::text AS quantity,
+               completed_at AS occurred_at, 'TradeMate marketplace'::text AS source,
+               CASE WHEN listing_type='service' THEN 'Services' ELSE 'Products' END AS market
+        FROM marketplace_public_completed_trades WHERE TRUE${listingFilter}
+        UNION ALL
+        SELECT trade_reference::text, asset_code || '/' || fiat_code, side,
+               fiat_total::text, fiat_code, quantity::text, completed_at,
+               'TradeMate P2P'::text, 'P2P'::text
+        FROM p2p_public_completed_trades WHERE TRUE${p2pFilter}
+      ) activity ORDER BY occurred_at DESC LIMIT $1`, values);
+    return { view, source: 'TradeMate confirmed marketplace and completed P2P transactions', as_of: new Date().toISOString(), data: result.rows };
+  }
+
   @Get()
   async completed(@Query('type') type?: string, @Query('currency') currency?: string, @Query('limit') limitValue?: string) {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
