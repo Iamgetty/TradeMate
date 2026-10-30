@@ -231,7 +231,7 @@ async function runOandaPricing() {
       url.searchParams.set('instruments', instruments.join(','));
       const response = await fetch(url, { headers });
       if (!response.ok || !response.body) throw new Error(`OANDA pricing stream failed (${response.status})`);
-      fxStatus.state = 'live';
+      fxStatus.state = 'connected';
       fxStatus.error = null;
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -251,6 +251,7 @@ async function runOandaPricing() {
           const asks = (msg.asks || []).map((x) => ({ price: +x.price, liquidity: +x.liquidity })).filter((x) => x.price > 0 && x.liquidity > 0);
           const bid = bids.length ? bids[0].price : null;
           const ask = asks.length ? asks[0].price : null;
+          fxStatus.state = 'live';
           fxQuotes.set(msg.instrument, {
             instrument: msg.instrument, base: msg.instrument.split('_')[0], quote: msg.instrument.split('_')[1],
             bid, ask, spread: bid != null && ask != null ? ask - bid : null,
