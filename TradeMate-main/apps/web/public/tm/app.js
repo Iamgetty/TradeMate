@@ -867,6 +867,37 @@ var FX_ASSET_GROUPS={
  ]
 };
 var FX_ASSET_GROUP_NAMES=Object.keys(FX_ASSET_GROUPS);
+// OANDA quotes are OTC account pricing, not exchange executions.
+var fxFeedSocket=null,fxFeedQuotes={},fxFeedStatus={state:"connecting",provider:"OANDA"};
+function ensureFXFeed(){
+ if(fxFeedSocket)return;
+ try{
+  fxFeedSocket=createFeedClient({
+   url:"wss://exchange-feed.onrender.com",base:"EUR",quote:"USD",markets:["spot"],
+   onStatus:function(connected){if(!connected&&fxFeedStatus.state==="live")fxFeedStatus.state="reconnecting";scheduleMarketDraw()},
+   onUpdate:function(data){
+    fxFeedQuotes={};
+    (data.fxQuotes||[]).forEach(function(q){fxFeedQuotes[q.instrument]=q});
+    fxFeedStatus=data.fxStatus||{state:"unavailable",provider:"OANDA"};
+    scheduleMarketDraw();
+   }
+  });
+ }catch(e){fxFeedStatus={state:"unavailable",provider:"OANDA",error:e.message||"Feed unavailable"}}
+}
+function fxQuotePanel(pair){
+ if(!/^[A-Z]{3}\/[A-Z]{3}$/.test(pair||""))return "";
+ ensureFXFeed();
+ var instrument=pair.replace("/","_"),q=fxFeedQuotes[instrument],state=fxFeedStatus.state||"connecting";
+ var age=q&&q.time?Date.now()-Date.parse(q.time):Infinity;
+ if(!q||age>30000){
+  var msg=state==="not_configured"?"OANDA credentials have not been added to the exchange-feed service yet.":state==="error"?"OANDA feed error: "+(fxFeedStatus.error||"connection failed"):"Waiting for account-authorized OANDA prices…";
+  return '<section class="fx-selected"><small>LIVE FX · OANDA</small><b>'+esc(pair)+'</b><span>'+esc(msg)+'</span></section>';
+ }
+ var dp=pair.indexOf("JPY")>=0?3:5;
+ var bidRows=(q.bids||[]).slice(0,3).map(function(x){return fx2(x.price,dp)+" · "+Number(x.liquidity).toLocaleString()}).join("<br>");
+ var askRows=(q.asks||[]).slice(0,3).map(function(x){return fx2(x.price,dp)+" · "+Number(x.liquidity).toLocaleString()}).join("<br>");
+ return '<section class="fx-selected"><small>OANDA ACCOUNT PRICING · '+(q.tradeable?"TRADEABLE":"NOT TRADEABLE")+'</small><b>'+esc(pair)+' <span class="up">'+fx2(q.bid,dp)+'</span> / <span class="dn">'+fx2(q.ask,dp)+'</span></b><span>Spread '+(q.spread==null?"—":fx2(q.spread,dp))+' · Mid '+(q.mid==null?"—":fx2(q.mid,dp))+' · Updated '+new Date(q.time).toLocaleTimeString()+'</span><div class="fx-tabs"><span>BID · PRICE / LIQUIDITY</span><span>ASK · PRICE / LIQUIDITY</span></div><div class="fx-asset-list"><div class="fx-asset"><span class="fx-asset-copy"><b>'+bidRows+'</b></span></div><div class="fx-asset"><span class="fx-asset-copy"><b>'+askRows+'</b></span></div></div></section>';
+}
 function fxAssetCard(x,group){
  var logo=x.d?'<img src="https://www.google.com/s2/favicons?domain='+esc(x.d)+'&sz=128" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'grid\'"><span class="fx-fallback" style="display:none">'+esc(x.m)+'</span>':
  '<span class="fx-fallback">'+esc(x.g||x.m)+'</span>';
@@ -882,7 +913,8 @@ function fxAssetMarket(){
 }
 function trade(){
  var it=items[st.tp],cr=it.m==="Crypto",fxm=it.m==="Forex";
- var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose product"><span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span><b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?"FOREX · INDICATIVE":"TRADEMATE")+'</span></div>';
+ if(fxm)ensureFXFeed();
+ var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose product"><span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span><b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?(fxFeedStatus.state==="live"?"OANDA LIVE":("OANDA "+String(fxFeedStatus.state||"CONNECTING").toUpperCase())):"TRADEMATE")+'</span></div>';
  if(cr){
   ensureMultiFeeds(it);
   var dp=it.p<1?6:it.p<20?4:2,stamp=tmStatus();
@@ -897,7 +929,7 @@ function trade(){
   return h+head+body+'<p class="fine">Live public exchange order-book depth and executed trades. Book keeps each exchange separate; Trades shows the shared, venue-labelled execution tape. '+stamp+'.</p>';
  }
  if(fxm){
-  return h+fxAssetMarket()+'<p class="fine">Currency pairs and these global instruments are shown in the Forex & Global Markets workspace. Forex remains OTC; quotes and yields will only be shown when connected to their respective licensed data sources.</p>';
+  return h+fxQuotePanel(it.n)+fxAssetMarket()+'<p class="fine">OANDA provides account-specific OTC bid/ask prices and available liquidity levels. These are not centralized exchange books or executed trades. The other global instruments remain unavailable until their respective licensed data sources are connected.</p>';
  }
  var kind=it.m==="Services"?"service":"product";
  loadInternalTrades(kind);
