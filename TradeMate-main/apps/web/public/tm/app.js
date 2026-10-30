@@ -618,12 +618,56 @@ var $=function(i){return document.getElementById(i)};
 function esc(x){return String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;")}
 function fmt(n,d){return Number(n).toLocaleString(undefined,{maximumFractionDigits:d==null?8:d})}
 function fx2(n,d){return Number(n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d})}
-var ORD=["Services","Products","Real Estate","NFTs","Software","Businesses","Forex","Crypto"];
-var MC={Services:"#2dd4bf",Products:"#ffb02e","Real Estate":"#60a5fa",NFTs:"#a78bfa",Software:"#818cf8",Businesses:"#fb7185",Forex:"#22d3ee",Crypto:"#94a3b8"};
-var MI={Services:"brief",Products:"box","Real Estate":"estate",NFTs:"nft",Software:"code",Businesses:"build",Forex:"fx",Crypto:"crypto"};
+var ORD=["Services","Products","Real Estate","NFTs","Software","Businesses","Forex","Stock Indices","Commodities","Equities","Bonds & Treasuries","Crypto"];
+var MC={Services:"#2dd4bf",Products:"#ffb02e","Real Estate":"#60a5fa",NFTs:"#a78bfa",Software:"#818cf8",Businesses:"#fb7185",Forex:"#22d3ee","Stock Indices":"#60a5fa",Commodities:"#f59e0b",Equities:"#34d399","Bonds & Treasuries":"#a78bfa",Crypto:"#94a3b8"};
+var MI={Services:"brief",Products:"box","Real Estate":"estate",NFTs:"nft",Software:"code",Businesses:"build",Forex:"fx","Stock Indices":"chart",Commodities:"layers",Equities:"brief","Bonds & Treasuries":"landmark",Crypto:"crypto"};
 var items=[
 {n:"BTC/USDT",m:"Crypto",p:null,c:null,k:"₿"},{n:"ETH/USDT",m:"Crypto",p:null,c:null,k:"Ξ"},{n:"SOL/USDT",m:"Crypto",p:null,c:null,k:"◎"},{n:"BNB/USDT",m:"Crypto",p:null,c:null,k:"B"},{n:"XRP/USDT",m:"Crypto",p:null,c:null,k:"X"},{n:"DOGE/USDT",m:"Crypto",p:null,c:null,k:"D"},{n:"USDC/USDT",m:"Crypto",p:null,c:null,k:"$"},{n:"ADA/USDT",m:"Crypto",p:null,c:null,k:"A"},{n:"TRX/USDT",m:"Crypto",p:null,c:null,k:"T"},{n:"TON/USDT",m:"Crypto",p:null,c:null,k:"T"},{n:"AVAX/USDT",m:"Crypto",p:null,c:null,k:"A"},{n:"DOT/USDT",m:"Crypto",p:null,c:null,k:"D"},{n:"LINK/USDT",m:"Crypto",p:null,c:null,k:"L"},{n:"POL/USDT",m:"Crypto",p:null,c:null,k:"P"},{n:"LTC/USDT",m:"Crypto",p:null,c:null,k:"L"},{n:"BCH/USDT",m:"Crypto",p:null,c:null,k:"B"},{n:"XLM/USDT",m:"Crypto",p:null,c:null,k:"X"},{n:"ATOM/USDT",m:"Crypto",p:null,c:null,k:"A"},{n:"NEAR/USDT",m:"Crypto",p:null,c:null,k:"N"},{n:"UNI/USDT",m:"Crypto",p:null,c:null,k:"U"},{n:"SHIB/USDT",m:"Crypto",p:null,c:null,k:"S"},{n:"DAI/USDT",m:"Crypto",p:null,c:null,k:"D"},{n:"ETC/USDT",m:"Crypto",p:null,c:null,k:"E"},
-{n:"EUR/USD",m:"Forex",p:null,c:null,k:"€"},{n:"GBP/USD",m:"Forex",p:null,c:null,k:"£"},{n:"USD/JPY",m:"Forex",p:null,c:null,k:"$"},{n:"USD/CHF",m:"Forex",p:null,c:null,k:"$"},{n:"AUD/USD",m:"Forex",p:null,c:null,k:"A$"},{n:"USD/CAD",m:"Forex",p:null,c:null,k:"$"},{n:"NZD/USD",m:"Forex",p:null,c:null,k:"NZ$"},{n:"EUR/GBP",m:"Forex",p:null,c:null,k:"€"},{n:"EUR/JPY",m:"Forex",p:null,c:null,k:"€"},{n:"GBP/JPY",m:"Forex",p:null,c:null,k:"£"},{n:"EUR/CHF",m:"Forex",p:null,c:null,k:"€"},{n:"AUD/JPY",m:"Forex",p:null,c:null,k:"A$"},{n:"GBP/CHF",m:"Forex",p:null,c:null,k:"£"},{n:"EUR/AUD",m:"Forex",p:null,c:null,k:"€"},{n:"EUR/CAD",m:"Forex",p:null,c:null,k:"€"},{n:"AUD/CAD",m:"Forex",p:null,c:null,k:"A$"},{n:"AUD/NZD",m:"Forex",p:null,c:null,k:"A$"},{n:"USD/NGN",m:"Forex",p:null,c:null,k:"$"},{n:"EUR/NGN",m:"Forex",p:null,c:null,k:"€"},{n:"GBP/NGN",m:"Forex",p:null,c:null,k:"£"},{n:"USD/GHS",m:"Forex",p:null,c:null,k:"$"},{n:"USD/KES",m:"Forex",p:null,c:null,k:"$"},{n:"USD/ZAR",m:"Forex",p:null,c:null,k:"$"}
+{n:"EUR/USD",m:"Forex",p:null,c:null,k:"€"},{n:"GBP/USD",m:"Forex",p:null,c:null,k:"£"},{n:"USD/JPY",m:"Forex",p:null,c:null,k:"$"},{n:"USD/CHF",m:"Forex",p:null,c:null,k:"$"},{n:"AUD/USD",m:"Forex",p:null,c:null,k:"A$"},{n:"USD/CAD",m:"Forex",p:null,c:null,k:"$"},{n:"NZD/USD",m:"Forex",p:null,c:null,k:"NZ$"},{n:"EUR/GBP",m:"Forex",p:null,c:null,k:"€"},{n:"EUR/JPY",m:"Forex",p:null,c:null,k:"€"},{n:"GBP/JPY",m:"Forex",p:null,c:null,k:"£"},{n:"EUR/CHF",m:"Forex",p:null,c:null,k:"€"},{n:"AUD/JPY",m:"Forex",p:null,c:null,k:"A$"},{n:"GBP/CHF",m:"Forex",p:null,c:null,k:"£"},{n:"EUR/AUD",m:"Forex",p:null,c:null,k:"€"},{n:"EUR/CAD",m:"Forex",p:null,c:null,k:"€"},{n:"AUD/CAD",m:"Forex",p:null,c:null,k:"A$"},{n:"AUD/NZD",m:"Forex",p:null,c:null,k:"A$"},{n:"USD/NGN",m:"Forex",p:null,c:null,k:"$"},{n:"EUR/NGN",m:"Forex",p:null,c:null,k:"€"},{n:"GBP/NGN",m:"Forex",p:null,c:null,k:"£"},{n:"USD/GHS",m:"Forex",p:null,c:null,k:"$"},{n:"USD/KES",m:"Forex",p:null,c:null,k:"$"},{n:"USD/ZAR",m:"Forex",p:null,c:null,k:"$"},
+// Major global stock-market indices
+{n:"S&P 500",m:"Stock Indices",p:null,c:null,k:"US",providerSymbol:"^GSPC"},
+{n:"Dow Jones",m:"Stock Indices",p:null,c:null,k:"US",providerSymbol:"^DJI"},
+{n:"Nasdaq Composite",m:"Stock Indices",p:null,c:null,k:"US",providerSymbol:"^IXIC"},
+{n:"FTSE 100",m:"Stock Indices",p:null,c:null,k:"UK",providerSymbol:"^FTSE"},
+{n:"DAX 40",m:"Stock Indices",p:null,c:null,k:"DE",providerSymbol:"^GDAXI"},
+{n:"CAC 40",m:"Stock Indices",p:null,c:null,k:"FR",providerSymbol:"^FCHI"},
+{n:"Nikkei 225",m:"Stock Indices",p:null,c:null,k:"JP",providerSymbol:"^N225"},
+{n:"Hang Seng",m:"Stock Indices",p:null,c:null,k:"HK",providerSymbol:"^HSI"},
+{n:"Euro Stoxx 50",m:"Stock Indices",p:null,c:null,k:"EU",providerSymbol:"^STOXX50E"},
+{n:"Nifty 50",m:"Stock Indices",p:null,c:null,k:"IN",providerSymbol:"^NSEI"},
+// Major globally traded commodities and futures benchmarks
+{n:"Gold",m:"Commodities",p:null,c:null,k:"Au",providerSymbol:"GC=F",unit:"USD / troy oz"},
+{n:"Silver",m:"Commodities",p:null,c:null,k:"Ag",providerSymbol:"SI=F",unit:"USD / troy oz"},
+{n:"WTI Crude Oil",m:"Commodities",p:null,c:null,k:"CL",providerSymbol:"CL=F",unit:"USD / barrel"},
+{n:"Brent Crude Oil",m:"Commodities",p:null,c:null,k:"BZ",providerSymbol:"BZ=F",unit:"USD / barrel"},
+{n:"Natural Gas",m:"Commodities",p:null,c:null,k:"NG",providerSymbol:"NG=F",unit:"USD / MMBtu"},
+{n:"Copper",m:"Commodities",p:null,c:null,k:"Cu",providerSymbol:"HG=F",unit:"USD / lb"},
+{n:"Wheat",m:"Commodities",p:null,c:null,k:"W",providerSymbol:"ZW=F",unit:"USD / bushel"},
+{n:"Corn",m:"Commodities",p:null,c:null,k:"C",providerSymbol:"ZC=F",unit:"USD / bushel"},
+{n:"Soybeans",m:"Commodities",p:null,c:null,k:"S",providerSymbol:"ZS=F",unit:"USD / bushel"},
+{n:"Coffee",m:"Commodities",p:null,c:null,k:"KC",providerSymbol:"KC=F",unit:"USD / lb"},
+// Large-cap global equities
+{n:"Apple",m:"Equities",p:null,c:null,k:"A",providerSymbol:"AAPL"},
+{n:"Microsoft",m:"Equities",p:null,c:null,k:"M",providerSymbol:"MSFT"},
+{n:"NVIDIA",m:"Equities",p:null,c:null,k:"N",providerSymbol:"NVDA"},
+{n:"Amazon",m:"Equities",p:null,c:null,k:"A",providerSymbol:"AMZN"},
+{n:"Alphabet",m:"Equities",p:null,c:null,k:"G",providerSymbol:"GOOGL"},
+{n:"Meta Platforms",m:"Equities",p:null,c:null,k:"M",providerSymbol:"META"},
+{n:"Tesla",m:"Equities",p:null,c:null,k:"T",providerSymbol:"TSLA"},
+{n:"Berkshire Hathaway B",m:"Equities",p:null,c:null,k:"B",providerSymbol:"BRK-B"},
+{n:"JPMorgan Chase",m:"Equities",p:null,c:null,k:"J",providerSymbol:"JPM"},
+{n:"Broadcom",m:"Equities",p:null,c:null,k:"B",providerSymbol:"AVGO"},
+// US Treasury benchmark yields and liquid government-bond benchmarks
+{n:"13-Week US Treasury",m:"Bonds & Treasuries",p:null,c:null,k:"13W",providerSymbol:"^IRX",unit:"Yield %"},
+{n:"5-Year US Treasury",m:"Bonds & Treasuries",p:null,c:null,k:"5Y",providerSymbol:"^FVX",unit:"Yield %"},
+{n:"10-Year US Treasury",m:"Bonds & Treasuries",p:null,c:null,k:"10Y",providerSymbol:"^TNX",unit:"Yield %"},
+{n:"30-Year US Treasury",m:"Bonds & Treasuries",p:null,c:null,k:"30Y",providerSymbol:"^TYX",unit:"Yield %"},
+{n:"20+ Year Treasury ETF",m:"Bonds & Treasuries",p:null,c:null,k:"TLT",providerSymbol:"TLT",unit:"USD / share"},
+{n:"7-10 Year Treasury ETF",m:"Bonds & Treasuries",p:null,c:null,k:"IEF",providerSymbol:"IEF",unit:"USD / share"},
+{n:"1-3 Year Treasury ETF",m:"Bonds & Treasuries",p:null,c:null,k:"SHY",providerSymbol:"SHY",unit:"USD / share"},
+{n:"US Treasury Bond ETF",m:"Bonds & Treasuries",p:null,c:null,k:"GOVT",providerSymbol:"GOVT",unit:"USD / share"},
+{n:"US TIPS ETF",m:"Bonds & Treasuries",p:null,c:null,k:"TIP",providerSymbol:"TIP",unit:"USD / share"},
+{n:"Intermediate Treasury ETF",m:"Bonds & Treasuries",p:null,c:null,k:"VGIT",providerSymbol:"VGIT",unit:"USD / share"}
 ]
 items.forEach(function(i){i.col=MC[i.m]});items.sort(function(a,b){return ORD.indexOf(a.m)-ORD.indexOf(b.m)});
 var HUE={"Create order":"#ffb02e","Orders & bids":"#ffb02e",Rewards:"#ffb02e",Referral:"#ff7a59",Deposit:"#2dd4bf",P2P:"#8b7bff",Earn:"#a3e635",Promotions:"#f472b6",Announcements:"#38bdf8",More:"#94a3b8",Card:"#c084fc",Settings:"#94a3b8","Help Center":"#38bdf8","Feedback Hub":"#fb923c",Learn:"#34d399","Affiliate Programs":"#f472b6"};
