@@ -198,8 +198,18 @@ const feedsInfo = () => ({
 });
 
 const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ ok: true, feeds: feedsInfo(), books: books.size }));
+  if (req.method !== 'GET' || req.url !== '/health') {
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: false, error: 'Not found' }));
+  }
+  res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+  res.end(JSON.stringify({
+    ok: true,
+    service: 'exchange-feed',
+    feeds: feedsInfo(),
+    books: books.size,
+    freshBooks: [...books.values()].filter((b) => b.ts && Date.now() - b.ts <= STALE_MS).length,
+  }));
 });
 const wss = new WebSocket.Server({ server });
 
