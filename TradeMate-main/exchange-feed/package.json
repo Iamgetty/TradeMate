@@ -1,0 +1,9 @@
+{
+  "name": "exchange-feed",
+  "version": "1.0.0",
+  "description": "Live Binance, Bybit and Coinbase feed with 1-second UI updates",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "ws": "^8.18.0" }
+}
