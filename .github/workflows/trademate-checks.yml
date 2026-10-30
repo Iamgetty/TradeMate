@@ -1,0 +1,55 @@
+name: TradeMate checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'TradeMate-main/apps/web/public/tm/**'
+      - 'TradeMate-main/exchange-feed/**'
+      - 'TradeMate-main/apps/api/**'
+      - 'TradeMate-main/apps/web/**'
+      - '.github/workflows/trademate-checks.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  javascript-syntax:
+    name: Check browser and feed JavaScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --check TradeMate-main/apps/web/public/tm/app.js
+      - run: node --check TradeMate-main/exchange-feed/feed-client.js
+      - run: node --check TradeMate-main/exchange-feed/server.js
+
+  api-build:
+    name: Build API
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: TradeMate-main/apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --include=dev
+      - run: npm run build
+
+  web-build:
+    name: Build web app
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: TradeMate-main/apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run build
