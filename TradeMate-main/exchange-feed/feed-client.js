@@ -58,7 +58,7 @@
       const asks = aggregate(fresh.flatMap((b) => b.asks || []), 'ask');
 
       const incoming = msg.trades.filter(matches).reverse()
-        .map((t) => ({ exchange: t.exchange, market: t.market, ts: t.ts, price: t.price, qty: t.qty, side: t.side }));
+        .map((t) => ({ exchange: t.exchange, market: t.market, quote: t.quote, ts: t.ts, price: t.price, qty: t.qty, side: t.side }));
       trades = incoming.concat(trades).slice(0, o.maxTrades);   // newest first
 
       const bestBid = bids.length ? bids[0].price : null;
@@ -70,6 +70,7 @@
         exchange: b.exchange,
         market: b.market,
         symbol: b.symbol,
+        quote: b.quote,
         bids: (b.bids || []).map(([price, size]) => ({ price: +price, size: +size })),
         asks: (b.asks || []).map(([price, size]) => ({ price: +price, size: +size })),
         stale: !!b.stale,
