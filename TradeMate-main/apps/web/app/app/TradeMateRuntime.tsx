@@ -10,8 +10,8 @@ declare global {
 }
 
 /**
- * Temporary Next.js boundary while individual legacy screens are migrated
- * into React. It keeps the existing product UI running without replacing it.
+ * Loads the existing legacy TradeMate UI without making the exchange-feed
+ * client a hard dependency for the page to render.
  */
 export default function TradeMateRuntime() {
   const [notice, setNotice] = useState('');
@@ -21,34 +21,56 @@ export default function TradeMateRuntime() {
     window.__tradeMateBooted = true;
     window.TM_CONFIG = { api: '/api' };
 
+    let feedFallbackTimer: number | undefined;
+
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=8';
+    app.src = '/tm/app.js?v=9';
     app.async = false;
+    app.dataset.trademateApp = 'true';
+    app.onerror = () => {
+      window.__tradeMateBooted = false;
+      setNotice('TradeMate could not load its main interface script. Please reload the page.');
+    };
 
     const loadApp = () => {
+      if (feedFallbackTimer) window.clearTimeout(feedFallbackTimer);
       if (!document.querySelector('script[data-trademate-app]')) {
-        app.dataset.trademateApp = 'true';
-        app.onerror = () => {
-          window.__tradeMateBooted = false;
-          setNotice('TradeMate could not load. Please refresh the page.');
-        };
         document.body.appendChild(app);
       }
     };
 
+    // A runtime exception in the legacy bundle used to leave the route
+    // completely blank. Surface the failure instead of silently showing white.
+    const handleRuntimeError = (event: ErrorEvent) => {
+      if (event.filename && event.filename.includes('/tm/app.js')) {
+        setNotice('TradeMate encountered an error while starting. Reload the page; if it continues, the startup error has been captured for diagnosis.');
+      }
+    };
+    window.addEventListener('error', handleRuntimeError);
+
     const feed = document.createElement('script');
-    feed.src = '/tm/feed-client.js';
+    feed.src = '/tm/feed-client.js?v=2';
     feed.async = false;
     feed.onload = loadApp;
     feed.onerror = () => {
-      setNotice('Live exchange feed client did not load. The app will still open, but live Book and Trades may be unavailable.');
+      setNotice('The live exchange-feed helper did not load. TradeMate is opening without that helper; live Book and Trades may be temporarily unavailable.');
       loadApp();
     };
+
+    // Do not let a slow or stalled feed asset prevent the whole app from
+    // rendering. The app has its own error handling around feed connections.
+    feedFallbackTimer = window.setTimeout(() => {
+      setNotice('The live exchange-feed helper is taking too long. Opening TradeMate while it continues to load.');
+      loadApp();
+    }, 4000);
+
     document.body.appendChild(feed);
 
     return () => {
-      // Do not remove the scripts or app DOM during React Strict Mode replay:
-      // the existing runtime owns its navigation and WebSocket lifecycle.
+      if (feedFallbackTimer) window.clearTimeout(feedFallbackTimer);
+      window.removeEventListener('error', handleRuntimeError);
+      // Keep scripts and app DOM alive during React Strict Mode replay:
+      // the legacy runtime owns its navigation and WebSocket lifecycle.
     };
   }, []);
 
