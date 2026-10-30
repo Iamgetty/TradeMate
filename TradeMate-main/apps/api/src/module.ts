@@ -978,12 +978,39 @@ class P2PMarketController {
     return { order: result.rows[0] };
   }
 
+  @Post('orders/:id/cancel')
+  async cancelOrder(@Param('id') id: string, @Req() request: Request) {
+    const userId = await this.authenticatedUser(request);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('id must be a valid order UUID.');
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const locked = await client.query("SELECT id,order_id,buyer_user_id,status,buyer_payment_sent_at,quantity::text FROM p2p_trades WHERE id=$1 FOR UPDATE",[id]);
+      if (!locked.rowCount) throw new NotFoundException('P2P order not found.');
+      const trade = locked.rows[0];
+      if (trade.buyer_user_id !== userId) throw new ForbiddenException('Only the buyer can cancel this unpaid order.');
+      if (trade.status !== 'pending' || trade.buyer_payment_sent_at) throw new ConflictException('An order cannot be cancelled after payment is marked sent or a dispute is opened.');
+      const ad = await client.query('SELECT id,quantity::numeric AS quantity,remaining_quantity::numeric AS remaining_quantity,status FROM p2p_orders WHERE id=$1 FOR UPDATE',[trade.order_id]);
+      if (!ad.rowCount) throw new NotFoundException('Original advertisement not found.');
+      const restored = Number(ad.rows[0].remaining_quantity) + Number(trade.quantity);
+      const total = Number(ad.rows[0].quantity);
+      if (!Number.isFinite(restored) || restored > total + 1e-9) throw new ConflictException('Reserved quantity could not be safely restored.');
+      await client.query("UPDATE p2p_orders SET remaining_quantity=$1,status=CASE WHEN status IN ('cancelled','expired') THEN status WHEN $1 >= quantity THEN 'open' ELSE 'partially_filled' END,updated_at=now() WHERE id=$2",[restored.toFixed(12),trade.order_id]);
+      const cancelled = await client.query("UPDATE p2p_trades SET status='cancelled',cancelled_by=$1,updated_at=now() WHERE id=$2 AND status='pending' AND buyer_payment_sent_at IS NULL RETURNING id,status,updated_at",[userId,id]);
+      if (!cancelled.rowCount) throw new ConflictException('Order state changed; refresh and try again.');
+      await client.query('COMMIT');
+      return { order: cancelled.rows[0], message: 'Order cancelled. The reserved advertisement quantity was restored where the offer remains active.' };
+    } catch (error) { await client.query('ROLLBACK').catch(()=>undefined); throw error; }
+    finally { client.release(); }
+  }
+
   @Post('orders/:id/dispute')
   async dispute(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
     const userId = await this.authenticatedUser(request), reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('id must be a valid order UUID.');
     if (reason.length < 5 || reason.length > 1000) throw new BadRequestException('Dispute reason must be 5 to 1,000 characters.');
-    const result = await databasePool!.query("UPDATE p2p_trades SET status='disputed',dispute_reason=$1,updated_at=now() WHERE id=$2 AND (buyer_user_id=$3 OR seller_user_id=$3) AND status='pending' RETURNING id,status,dispute_reason",[reason,id,userId]);
-    if (!result.rowCount) throw new ConflictException('Only your pending orders can be disputed.');
+    const result = await databasePool!.query("UPDATE p2p_trades SET status='disputed',dispute_reason=$1,updated_at=now() WHERE id=$2 AND (buyer_user_id=$3 OR seller_user_id=$3) AND status='pending' AND buyer_payment_sent_at IS NOT NULL RETURNING id,status,dispute_reason",[reason,id,userId]);
+    if (!result.rowCount) throw new ConflictException('A dispute can only be opened by a participant after the buyer marks payment sent.');
     return { order: result.rows[0] };
   }
 }
