@@ -818,23 +818,21 @@ function loadP2P(){
 function p2p(){
  loadP2P();
  var want=st.side==="Buy"?"sell":"buy",SYM={NGN:"₦",USD:"$",EUR:"€",GBP:"£",GHS:"₵",KES:"KSh"};
- var rows=st.p2pTab==="Trades"?p2pCache.trades:p2pCache.book.filter(function(x){return x.side===want});
+ var rows=p2pCache.book.filter(function(x){return x.side===want});
  var amount=Number(st.amt);
- if(st.p2pTab==="Book"&&amount>0)rows=rows.filter(function(x){return Number(x.min_fiat_amount)<=amount&&amount<=Number(x.max_fiat_amount)});
+ if(amount>0)rows=rows.filter(function(x){return Number(x.min_fiat_amount)<=amount&&amount<=Number(x.max_fiat_amount)});
  var fmtMoney=function(n){return (SYM[st.fiat]||st.fiat+" ")+fx2(Number(n)||0,2)};
- var content=p2pCache.loading?'<div class="empty"><b>Loading TradeMate P2P records…</b>Fetching current orders and completed transactions from the TradeMate database.</div>':
+ var content=p2pCache.loading?'<div class="empty"><b>Loading TradeMate P2P records…</b>Fetching current open orders from the TradeMate database.</div>':
  p2pCache.error?'<div class="empty"><b>P2P records unavailable</b>'+esc(p2pCache.error)+'<button class="btn sm" data-act="p2pretry">Retry</button></div>':
- !rows.length?'<div class="empty"><b>No '+(st.p2pTab==="Trades"?"completed trades":"open "+want+" orders")+' for '+esc(st.coin)+'/'+esc(st.fiat)+'</b>Only genuine records stored in TradeMate are shown here. No sample activity is displayed.</div>':
+ !rows.length?'<div class="empty"><b>No open '+want+' orders for '+esc(st.coin)+'/'+esc(st.fiat)+'</b>Only genuine records stored in TradeMate are shown here. No sample activity is displayed.</div>':
  rows.map(function(x){
-  if(st.p2pTab==="Trades")return '<div class="ad"><div class="who"><b>'+x.side+' · '+esc(x.asset_code)+'/'+esc(x.fiat_code)+'</b><small>Completed · '+fmtT(x.completed_at)+'</small></div><div class="pr"><small>'+(SYM[x.fiat_code]||"")+'</small>'+fx2(Number(x.price),2)+'</div><div class="kv">Quantity<b>'+fx2(Number(x.quantity),6)+' '+esc(x.asset_code)+'</b><br>Total<b>'+fmtMoney(x.fiat_total)+'</b></div></div>';
   return '<div class="ad"><div class="who"><b>'+x.side.toUpperCase()+' · '+esc(x.asset_code)+'/'+esc(x.fiat_code)+'</b><small>Open order · '+fmtT(x.created_at)+'</small></div><div class="pr"><small>'+(SYM[x.fiat_code]||"")+'</small>'+fx2(Number(x.price),2)+'</div><div class="kv">Limits<b>'+fmtMoney(x.min_fiat_amount)+' – '+fmtMoney(x.max_fiat_amount)+'</b><br>Available<b>'+fx2(Number(x.quantity),6)+' '+esc(x.asset_code)+'</b></div></div>';
  }).join("");
  return '<div class="ptabs"><button class="t" data-pg="orders">Orders</button><button class="t on">P2P</button><button class="t" data-pg="myads">My ads</button><select class="cur" id="fiat" aria-label="Fiat currency">'+["NGN","USD","EUR","GBP","GHS","KES"].map(function(x){return '<option'+(x===st.fiat?" selected":"")+'>'+x+'</option>'}).join("")+'</select></div>'+
  '<div class="notice">'+ic("horn","width:18px;height:18px")+'<div class="mq"><div class="mq-t"><span>Trade only through verified TradeMate flows. Never share passwords or payment credentials.</span></div></div></div>'+
- '<div class="seg"><button class="'+((st.p2pTab||"Book")==="Book"?"on":"")+'" data-p2ptab="Book">Book</button><button class="'+(st.p2pTab==="Trades"?"on":"")+'" data-p2ptab="Trades">Trade</button></div>'+
  '<div class="bsw"><div class="bsp">'+["Buy","Sell"].map(function(x){return '<button class="'+(st.side===x?"on":"")+'" data-side="'+x+'">'+x+'</button>'}).join("")+'</div></div>'+
  '<div class="filt"><label><select id="coin" aria-label="Asset">'+["USDT","BTC","ETH"].map(function(x){return '<option'+(x===st.coin?" selected":"")+'>'+x+'</option>'}).join("")+'</select></label><label><input id="amt" inputmode="decimal" placeholder="Fiat amount" value="'+esc(st.amt)+'"></label><button class="fi" data-act="resetf" aria-label="Reset filters">'+ic("fun","width:19px;height:19px")+'</button></div>'+
- content+'<p class="fine">Source: TradeMate database · '+(p2pCache.updated?"Updated "+fmtT(new Date(p2pCache.updated).toISOString()):"Awaiting first successful sync")+'. Completed BUY and SELL rows refer to the two sides of each completed transaction, not separate transactions.</p>';
+ content+'<p class="fine">Source: TradeMate database · '+(p2pCache.updated?"Updated "+fmtT(new Date(p2pCache.updated).toISOString()):"Awaiting first successful sync")+'. Completed transactions are shown in Trade > Trade.</p>';
 }
 function portfolio(){
  var v=st.hide?"******":"—";
@@ -878,7 +876,7 @@ document.addEventListener("click",function(e){var t=e.target;
  c=t.closest("[data-tt]");if(c){st.tt=c.dataset.tt;draw();return}
  c=t.closest("[data-marketfilter]");if(c){globalActivityCache.market=c.dataset.marketfilter;draw();return}
  c=t.closest("[data-side]");if(c){st.side=c.dataset.side;draw();return}
- c=t.closest("[data-p2ptab]");if(c){st.p2pTab=c.dataset.p2ptab;draw();return}
+ 
  c=t.closest("[data-wt]");if(c){st.wt=c.dataset.wt;draw();return}
  c=t.closest("[data-pc]");if(c){var fn=PC[c.dataset.pc];if(fn)fn(c.dataset.arg,c);return}});
 document.addEventListener("keydown",function(e){if((e.key==="Enter"||e.key===" ")&&e.target.getAttribute&&e.target.getAttribute("role")==="button"){e.preventDefault();e.target.click()}});
