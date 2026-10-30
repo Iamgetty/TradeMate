@@ -746,7 +746,7 @@ function trade(){
    var trades=tmTape();
    body='<div class="tr h"><span>Exchange / time</span><span>Price (USDT)</span><span>Amount ('+esc(it.n.split("/")[0])+')</span></div>'+(trades.length?trades.map(function(x){return '<div class="tr"><span>'+esc(x.venue.toUpperCase()+' · '+x.market.toUpperCase())+'<br><small>'+new Date(x.time).toLocaleTimeString()+'</small></span><span class="'+(x.side==="BUY"?"up":"dn")+'">'+fx2(x.p,dp)+' <small>'+x.side+'</small></span><span>'+fx2(x.q,6)+'</span></div>'}).join(""):'<div class="empty">Waiting for executed trades from connected exchanges…</div>');
   }
-  return h+head+body+'<p class="fine">Live public exchange order-book depth and executed trades. Books remain exchange-specific; the trade tape is source-labelled. '+stamp+'.</p>';
+  return h+head+body+'<p class="fine">Live public exchange order-book depth and executed trades. The Book combines matching price levels across connected exchanges; Trades shows the shared live execution tape. '+stamp+'.</p>';
  }
  if(fxm){
   return h+'<div class="empty"><b>Live FX market feed not connected yet</b>Forex is an over-the-counter market. TradeMate will show provider-sourced bid/ask quotes when the live FX feed is integrated. No synthetic spread or invented trade records are displayed.</div>';
