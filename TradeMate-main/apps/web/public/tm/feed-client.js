@@ -56,6 +56,17 @@
       return rows.map(([price, size]) => ({ price, size, total: (running += size) }));
     }
 
+    function clearMarketData() {
+      trades = [];
+      seenTradeIds.clear();
+      o.onUpdate({
+        symbol: `${o.base}/${o.quote}`,
+        bids: [], asks: [], bestBid: null, bestAsk: null, mid: null, spread: null,
+        last: null, trades: [], booksCombined: 0,
+        feedsLive: 0, feedsTotal: 0, ts: Date.now(),
+      });
+    }
+
     function handle(msg) {
       // Ignore malformed snapshots instead of letting one bad packet stop feed updates.
       if (!msg || !Array.isArray(msg.books) || !msg.feeds || typeof msg.feeds !== 'object') return;
@@ -115,6 +126,7 @@
       ws.onopen = () => { attempt = 0; watch(); o.onStatus(true); };
       ws.onmessage = (ev) => { try { handle(JSON.parse(ev.data)); } catch (e) { console.error('feed parse error', e); } };
       ws.onclose = () => {
+        clearMarketData();
         o.onStatus(false);
         if (!closed) setTimeout(open, Math.min(15000, 1000 * 2 ** attempt++));
       };
@@ -123,7 +135,12 @@
 
     return {
       close() { closed = true; if (ws) ws.close(); },
-      setSymbol(base, quote) { o.base = base; o.quote = quote; trades = []; seenTradeIds.clear(); watch(); },   // call when the user switches pair
+      setSymbol(base, quote) {
+        if (o.base === base && o.quote === quote) return;
+        o.base = base; o.quote = quote;
+        clearMarketData();
+        watch();
+      },   // call when the user switches pair
     };
   }
 
