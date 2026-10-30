@@ -247,13 +247,27 @@ wss.on('connection', (ws) => {
   });
 });
 
-const top = (map, desc) =>
-  [...map.entries()].sort((a, b) => (desc ? b[0] - a[0] : a[0] - b[0])).slice(0, DEPTH);
+// Keep only the best N levels while scanning; avoid sorting an entire exchange book.
+function top(map, desc, limit = DEPTH) {
+  const out = [];
+  for (const entry of map) {
+    let i = 0;
+    while (i < out.length && (desc ? out[i][0] >= entry[0] : out[i][0] <= entry[0])) i++;
+    if (i >= limit) continue;
+    out.splice(i, 0, entry);
+    if (out.length > limit) out.pop();
+  }
+  return out;
+}
 
 setInterval(() => {
   const now = Date.now();
+  const watchedBases = new Set([...wss.clients]
+    .filter((client) => client.readyState === WebSocket.OPEN && client.watch)
+    .map((client) => client.watch));
   const list = [...books.values()].filter((b) => b.ts).map((b) => {
-    const bids = top(b.bids, true), asks = top(b.asks, false);
+    const depth = watchedBases.has(b.base) ? DEPTH : 1;
+    const bids = top(b.bids, true, depth), asks = top(b.asks, false, depth);
     return {
       exchange: b.exchange, market: b.market, symbol: b.symbol, base: b.base, quote: b.quote,
       bid: bids.length ? bids[0][0] : null, ask: asks.length ? asks[0][0] : null,
