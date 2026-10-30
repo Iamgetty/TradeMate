@@ -42,7 +42,9 @@ function splitSymbol(sym) {
 
 // ---- State ------------------------------------------------------------------
 const books = new Map();        // "exchange|market|symbol" -> { bids: Map, asks: Map, ... }
-const feedStatus = new Map();   // connection name -> true/false
+const feedStatus = new Map();   // connection name -> recently receiving messages
+const feedLastMessage = new Map();
+const FEED_IDLE_MS = 30000; // a connected but silent socket is not counted as live
 let pendingTrades = [];
 
 function getBook(exchange, market, symbol) {
@@ -77,14 +79,18 @@ function connect(name, url, onOpen, onMessage, opts = {}) {
     let pingTimer;
     ws.on('open', () => {
       attempt = 0;
-      feedStatus.set(name, true);
-      console.log(`[${name}] connected`);
+      feedStatus.set(name, false); // count as live only after messages arrive
+      console.log(`[${name}] connected; awaiting market data`);
       onOpen(ws);
       if (opts.ping) pingTimer = setInterval(() => ws.readyState === 1 && ws.send(opts.ping), 20000);
     });
     ws.on('message', (raw) => {
-      try { onMessage(JSON.parse(raw)); }
-      catch (e) { console.error(`[${name}] parse error:`, e.message); }
+      try {
+        const message = JSON.parse(raw);
+        feedLastMessage.set(name, Date.now());
+        feedStatus.set(name, true);
+        onMessage(message);
+      } catch (e) { console.error(`[${name}] parse error:`, e.message); }
     });
     ws.on('error', (e) => console.error(`[${name}] error:`, e.message));
     ws.on('close', () => {
@@ -191,11 +197,14 @@ bybit('linear', CFG.bybitLinear);
 coinbase(CFG.coinbase);
 
 // ---- Server for your app ----------------------------------------------------
-const feedsInfo = () => ({
-  live: [...feedStatus.values()].filter(Boolean).length,
-  total: feedStatus.size,
-  status: Object.fromEntries(feedStatus),
-});
+const feedsInfo = () => {
+  const now = Date.now();
+  const status = Object.fromEntries([...feedStatus].map(([name, connected]) => {
+    const active = connected && now - (feedLastMessage.get(name) || 0) <= FEED_IDLE_MS;
+    return [name, active];
+  }));
+  return { live: Object.values(status).filter(Boolean).length, total: feedStatus.size, status };
+};
 
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'application/json' });
