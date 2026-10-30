@@ -57,7 +57,9 @@
     }
 
     function handle(msg) {
-      const fresh = msg.books.filter((b) => matches(b) && !b.stale);
+      // Ignore malformed snapshots instead of letting one bad packet stop feed updates.
+      if (!msg || !Array.isArray(msg.books) || !msg.feeds || typeof msg.feeds !== 'object') return;
+      const fresh = msg.books.filter((b) => b && matches(b) && !b.stale);
       const bids = aggregate(fresh.flatMap((b) => b.bids || []), 'bid');
       const asks = aggregate(fresh.flatMap((b) => b.asks || []), 'ask');
 
@@ -91,8 +93,8 @@
         last: trades.length ? trades[0].price : mid,
         trades,                                       // [{ exchange, market, ts, price, qty, side }] newest first
         booksCombined: fresh.length,                  // "N exchange books combined"
-        feedsLive: msg.feeds.live,                    // "N/M FEEDS LIVE"
-        feedsTotal: msg.feeds.total,
+        feedsLive: Number.isFinite(msg.feeds.live) ? msg.feeds.live : 0, // "N/M FEEDS LIVE"
+        feedsTotal: Number.isFinite(msg.feeds.total) ? msg.feeds.total : 0,
         ts: msg.ts,
       });
     }
@@ -103,7 +105,13 @@
     }
 
     function open() {
-      ws = new WebSocket(o.url);
+      try {
+        ws = new WebSocket(o.url);
+      } catch (e) {
+        o.onStatus(false);
+        if (!closed) setTimeout(open, Math.min(15000, 1000 * 2 ** attempt++));
+        return;
+      }
       ws.onopen = () => { attempt = 0; watch(); o.onStatus(true); };
       ws.onmessage = (ev) => { try { handle(JSON.parse(ev.data)); } catch (e) { console.error('feed parse error', e); } };
       ws.onclose = () => {
@@ -114,7 +122,7 @@
     open();
 
     return {
-      close() { closed = true; ws.close(); },
+      close() { closed = true; if (ws) ws.close(); },
       setSymbol(base, quote) { o.base = base; o.quote = quote; trades = []; seenTradeIds.clear(); watch(); },   // call when the user switches pair
     };
   }
