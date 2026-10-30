@@ -183,8 +183,7 @@ function attachMarketFeed(server: Server) {
       let message: any;
       try { message = JSON.parse(raw.toString()); } catch { return; }
       if (message.type !== 'subscribe' || !validSymbol(message.symbol)) {
-        send({ client, symbol: '', feeds: new Map(), trades: [], timer: setInterval(() => undefined, 60000), closed: false } as Session,
-          { type: 'error', message: 'Choose a supported market symbol.' });
+        if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify({ type: 'error', message: 'Choose a supported market symbol.' }));
         return;
       }
       if (session) stopSession(session);
