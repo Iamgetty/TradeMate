@@ -758,7 +758,7 @@ function trade(){
   ensureCryptoFeed(it);
   var dp=it.p<1?6:it.p<20?4:2,stamp=marketFeed.last?new Date(marketFeed.last).toLocaleTimeString():"—";
   var head='<div class="tpx"><b data-px="'+esc(it.n)+'">'+px(it)+'</b><span>USDT</span></div><div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Book</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">Trades</button></div>';
-  if(marketFeed.status!=="live"&&!marketFeed.bids.length&&!marketFeed.trades.length)return h+head+'<div class="empty"><b>'+((marketFeed.status==="connecting"?"Connecting to Binance…":marketFeed.status==="reconnecting"?"Reconnecting to Binance…":"Live market feed unavailable"))+'</b>'+((marketFeed.status==="connecting"||marketFeed.status==="reconnecting"?"Waiting for genuine exchange data.":"No sample records are shown. Try again shortly or choose another pair."))+'</div><p class="fine">Source: Binance Spot public market stream. Last update: '+stamp+'.</p>';
+  if(marketFeed.status!=="live"&&!marketFeed.bids.length&&!marketFeed.trades.length)return h+head+'<div class="empty"><b>'+((marketFeed.status==="connecting"?"Connecting to Binance…":marketFeed.status==="reconnecting"?"Reconnecting to Binance…":"Live market feed unavailable"))+'</b>'+((marketFeed.status==="connecting"||marketFeed.status==="reconnecting"?"Waiting for genuine exchange data.":"No sample records are shown. Try again shortly or choose another pair."))+'</div><p class="fine">Source: Binance Spot public market stream. Last update: '+stamp+'.</p>'+'<p class="fine">Reference price from public data. TradeMate does not trade crypto, so no order book is shown.</p>';
   var body="";
   if(st.tt==="Order book"){
    var bids=marketFeed.bids,asks=marketFeed.asks,rows="";
@@ -771,7 +771,7 @@ function trade(){
    var trades=marketFeed.trades;
    body='<div class="tr h"><span>Time</span><span>Price (USDT)</span><span>Amount ('+esc(it.n.split("/")[0])+')</span></div>'+(trades.length?trades.map(function(t){return '<div class="tr"><span>'+new Date(t.time).toLocaleTimeString()+'</span><span class="'+(t.side==="BUY"?"up":"dn")+'">'+fx2(t.p,dp)+' <small>'+t.side+'</small></span><span>'+fx2(t.q,6)+'</span></div>'}).join(""):'<div class="empty">Waiting for executed trades…</div>');
   }
-  return h+head+body+'<p class="fine">Live public Binance Spot order-book depth and executed trades. This is external exchange activity, not trades executed by TradeMate. Updated: '+stamp+'.</p>';
+  return h+head+body+'<p class="fine">Live public Binance Spot order-book depth and executed trades. This is external exchange activity, not trades executed by TradeMate. Updated: '+stamp+'.</p>'+'<p class="fine">Reference price from public data. TradeMate does not trade crypto, so no order book is shown.</p>';
  }
  if(fxm){
   return h+'<div class="empty"><b>Live FX market feed not connected yet</b>Forex is an over-the-counter market. TradeMate will show provider-sourced bid/ask quotes when the live FX feed is integrated. No synthetic spread or invented trade records are displayed.</div>';
