@@ -28,7 +28,9 @@
 
     let ws, attempt = 0, closed = false, trades = [];
     const seenTradeIds = new Set();
-    const tradeKey = (t) => [t.exchange, t.market, t.symbol, t.ts, t.price, t.qty, t.side].join('|');
+    const tradeKey = (t) => t.id != null && t.id !== ''
+      ? [t.exchange, t.market, t.symbol, t.id].join('|')
+      : [t.exchange, t.market, t.symbol, t.ts, t.price, t.qty, t.side].join('|');
 
     const quoteOk = (q) => o.mixUsdQuotes && USD_LIKE.includes(o.quote)
       ? USD_LIKE.includes(q)
@@ -63,7 +65,7 @@
       // snapshot. Still deduplicate by execution identity so reconnects or
       // repeated packets cannot print the same execution twice.
       const incoming = (Array.isArray(msg.trades) ? msg.trades : []).filter(matches).reverse()
-        .map((t) => ({ exchange: t.exchange, market: t.market, symbol: t.symbol, ts: t.ts, price: t.price, qty: t.qty, side: t.side }));
+        .map((t) => ({ id: t.id, exchange: t.exchange, market: t.market, symbol: t.symbol, ts: t.ts, price: t.price, qty: t.qty, side: t.side }));
       const unseen = [];
       for (const t of incoming) {
         const id = tradeKey(t);
