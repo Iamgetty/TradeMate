@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#05070a">
+  <title>TradeMate</title>
+  <style>
+    html,body{margin:0;width:100%;height:100%;min-height:100%;background:#05070a;color:#f5f7fa;font:14px system-ui,sans-serif}
+    #tm-boot-status{position:fixed;inset:0;display:grid;place-content:center;gap:10px;text-align:center;padding:24px;color:#aab6c5}
+    #tm-boot-status strong{color:#f5f7fa;font-size:18px}
+    #tm-boot-status small{max-width:320px;line-height:1.5}
+    #tm-boot-status[hidden]{display:none}
+  </style>
+</head>
+<body>
+  <div id="tm-boot-status" role="status" aria-live="polite">
+    <strong>Opening TradeMate…</strong>
+    <small>Loading your markets and workspace.</small>
+  </div>
+  <script>
+    (function () {
+      var failed = false;
+      var status = document.getElementById('tm-boot-status');
+      function showFailure(message) {
+        failed = true;
+        status.hidden = false;
+        status.innerHTML = '<strong>TradeMate could not finish starting</strong><small>' +
+          message + ' Please refresh this page. Your account data has not been changed.</small>';
+      }
+      window.addEventListener('error', function (event) {
+        if (event.filename && event.filename.indexOf('/tm/app.js') !== -1) {
+          showFailure('The main interface reported a startup error.');
+        }
+      });
+      window.addEventListener('unhandledrejection', function () {
+        // A rejected background request must not prevent the interface rendering.
+      });
+      window.__tmShowBootFailure = showFailure;
+      window.__tmFinishBoot = function () {
+        if (failed) return;
+        var landing = document.getElementById('lp');
+        if (document.getElementById('app') && document.getElementById('nav') &&
+            landing && landing.shadowRoot && landing.shadowRoot.childNodes.length) {
+          status.hidden = true;
+        } else {
+          showFailure('The interface assets loaded, but the workspace did not finish rendering.');
+        }
+      };
+    })();
+  </script>
+  <script src="/tm/feed-client.js?v=2"></script>
+  <script src="/tm/app.js?v=10" onload="window.__tmFinishBoot && window.__tmFinishBoot()" onerror="window.__tmShowBootFailure && window.__tmShowBootFailure('The main interface file could not be downloaded.')"></script>
+</body>
+</html>
