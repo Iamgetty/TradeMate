@@ -2,9 +2,13 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './module';
 import { attachMarketFeed } from './market-feed';
+import { json } from 'express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  // Feed attachments are base64-encoded in JSON; cap the request size while
+  // allowing four small attachments plus post metadata.
+  app.use(json({ limit: '24mb' }));
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
   attachMarketFeed(app.getHttpServer());
   app.setGlobalPrefix('api');
