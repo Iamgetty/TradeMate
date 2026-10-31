@@ -1049,9 +1049,11 @@ class CommunityFeedController {
       : type === 'Announcements' || type === 'announcement' ? 'announcement' : null;
     const limit = Math.min(50, Math.max(1, Number.parseInt(rawLimit || '30', 10) || 30));
     const result = await databasePool.query(
-      `SELECT p.id, p.post_type, p.body, p.pinned, p.created_at,
+      `SELECT p.id, p.post_type, p.title, p.body, p.pinned, p.created_at,
               COALESCE(u.display_name, 'TradeMate Team') AS author_name,
-              (SELECT count(*)::int FROM feed_comments c WHERE c.post_id = p.id AND c.status = 'published') AS comment_count
+              (SELECT count(*)::int FROM feed_comments c WHERE c.post_id = p.id AND c.status = 'published') AS comment_count,
+              COALESCE((SELECT json_agg(json_build_object('id', a.id, 'file_name', a.file_name, 'content_type', a.content_type, 'byte_size', a.byte_size) ORDER BY a.created_at)
+                        FROM feed_attachments a WHERE a.post_id = p.id), '[]'::json) AS attachments
        FROM feed_posts p LEFT JOIN users u ON u.id = p.author_user_id
        WHERE p.status = 'published' AND ($1::text IS NULL OR p.post_type = $1)
        ORDER BY p.pinned DESC, p.created_at DESC LIMIT $2`,
@@ -1061,22 +1063,67 @@ class CommunityFeedController {
   }
 
   @Post('posts')
-  async createPost(@Req() request: Request, @Body() body: { type?: string; body?: string }) {
+  async createPost(@Req() request: Request, @Body() body: { type?: string; title?: string; body?: string; attachments?: Array<{ name?: string; type?: string; data?: string }> }) {
     const userId = await this.currentUser(request);
+    const title = typeof body?.title === 'string' ? body.title.trim() : '';
     const content = typeof body?.body === 'string' ? body.body.trim() : '';
+    if (title.length < 1 || title.length > 140) throw new BadRequestException('Post titles must be between 1 and 140 characters.');
     if (content.length < 1 || content.length > 5000) throw new BadRequestException('Posts must be between 1 and 5,000 characters.');
     const type = body?.type === 'feedback' ? 'feedback' : body?.type === 'post' ? 'post' : null;
     if (!type) throw new BadRequestException('Choose post or feedback. Announcements are published by moderators.');
+    const files = Array.isArray(body?.attachments) ? body.attachments : [];
+    if (files.length > 4) throw new BadRequestException('Attach up to 4 files per post.');
+    const allowed = new Set(['image/jpeg','image/png','image/webp','image/gif','application/pdf','audio/webm','audio/ogg','audio/mp4','audio/mpeg','audio/wav']);
+    const prepared = files.map((file) => {
+      const name = typeof file?.name === 'string' ? file.name.trim().slice(0, 180) : '';
+      const mime = typeof file?.type === 'string' ? file.type.toLowerCase() : '';
+      const encoded = typeof file?.data === 'string' ? file.data.replace(/^data:[^,]*;base64,/, '') : '';
+      if (!name || !allowed.has(mime) || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) throw new BadRequestException('One of the attachments is invalid or unsupported.');
+      const bytes = Buffer.from(encoded, 'base64');
+      if (!bytes.length || bytes.length > 5 * 1024 * 1024) throw new BadRequestException('Each attachment must be 5 MB or smaller.');
+      return { name, mime, bytes };
+    });
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        `INSERT INTO feed_posts (author_user_id, post_type, title, body) VALUES ($1, $2, $3, $4)
+         RETURNING id, post_type, title, body, pinned, created_at`,
+        [userId, type, title, content],
+      );
+      for (const file of prepared) await client.query(
+        'INSERT INTO feed_attachments (post_id, file_name, content_type, byte_size, content) VALUES ($1, $2, $3, $4, $5)',
+        [result.rows[0].id, file.name, file.mime, file.bytes.length, file.bytes],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'feed.post.created', 'feed_post', $2, $3::jsonb)",
+        [userId, result.rows[0].id, JSON.stringify({ post_type: type, attachment_count: prepared.length })],
+      );
+      await client.query('COMMIT');
+      return { post: { ...result.rows[0], author_name: 'You', comment_count: 0, attachments: prepared.map((f) => ({ file_name: f.name, content_type: f.mime, byte_size: f.bytes.length })) } };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
+  }
+
+  @Get('posts/:id/attachments/:attachmentId')
+  async attachment(@Param('id') id: string, @Param('attachmentId') attachmentId: string, @Res() response: Response) {
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuid.test(id) || !uuid.test(attachmentId)) throw new BadRequestException('Invalid attachment id.');
     const result = await databasePool!.query(
-      `INSERT INTO feed_posts (author_user_id, post_type, body) VALUES ($1, $2, $3)
-       RETURNING id, post_type, body, pinned, created_at`,
-      [userId, type, content],
+      `SELECT a.file_name, a.content_type, a.content, a.byte_size
+       FROM feed_attachments a JOIN feed_posts p ON p.id = a.post_id
+       WHERE a.id = $1 AND a.post_id = $2 AND p.status = 'published' LIMIT 1`,
+      [attachmentId, id],
     );
-    await databasePool!.query(
-      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'feed.post.created', 'feed_post', $2, $3::jsonb)",
-      [userId, result.rows[0].id, JSON.stringify({ post_type: type })],
-    );
-    return { post: { ...result.rows[0], author_name: 'You', comment_count: 0 } };
+    if (!result.rowCount) throw new NotFoundException('Attachment not found.');
+    const file = result.rows[0];
+    response.setHeader('Content-Type', file.content_type);
+    response.setHeader('Content-Length', String(file.byte_size));
+    response.setHeader('Content-Disposition', 'inline; filename="' + String(file.file_name).replace(/[\\"\\r\\n]/g, '_') + '"');
+    response.setHeader('Cache-Control', 'public, max-age=3600');
+    response.send(file.content);
   }
 
   @Get('posts/:id/comments')
