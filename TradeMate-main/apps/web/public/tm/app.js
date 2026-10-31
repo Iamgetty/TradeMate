@@ -957,7 +957,7 @@ function loadFeed(force){
 var feedDraftFiles=[],feedRecorder=null,feedRecordStream=null,feedRecordChunks=[];
 function closeFeedComposer(){
  var modal=document.getElementById('feedComposer');if(modal)modal.remove();
- if(feedRecorder&&feedRecorder.state==='recording')feedRecorder.stop();
+ if(feedRecorder&&feedRecorder.state==='recording'){feedRecorder.onstop=null;feedRecorder.stop();}
  if(feedRecordStream){feedRecordStream.getTracks().forEach(function(t){t.stop()});feedRecordStream=null}
  feedRecorder=null;feedRecordChunks=[];
 }
