@@ -761,7 +761,7 @@ function loadMarketQuotes(market,list){
  MARKET_QUOTE_STATE.key=key;MARKET_QUOTE_STATE.loading=true;
  fetch(TMCFG.api+"/market/quotes?symbols="+encodeURIComponent(rows.map(function(i){return i.providerSymbol}).join(",")),{credentials:"include",cache:"no-store"})
  .then(function(r){if(!r.ok)throw new Error("Market quote service unavailable");return r.json()})
- .then(function(d){(d.quotes||[]).forEach(function(q){MARKET_QUOTES[q.symbol]=q;var it=rows.filter(function(x){return x.providerSymbol===q.symbol})[0];if(it&&q.status!=="unavailable"&&typeof q.price==="number"){it.p=q.price;it.c=typeof q.changePercent==="number"?q.changePercent:null;it.quoteTime=q.marketTime;it.quoteStatus=q.status;it.quoteCurrency=q.currency}});MARKET_QUOTE_STATE.last=Date.now();MARKET_QUOTE_STATE.error="";})
+ .then(function(d){(d.quotes||[]).forEach(function(q){MARKET_QUOTES[q.symbol]=q;var it=rows.filter(function(x){return x.providerSymbol===q.symbol})[0];if(it){it.quoteStatus=q.status;it.quoteTime=q.marketTime;it.quoteCurrency=q.currency;if(q.status!=="unavailable"&&typeof q.price==="number"){it.p=q.price;it.c=typeof q.changePercent==="number"?q.changePercent:null}}});MARKET_QUOTE_STATE.last=Date.now();MARKET_QUOTE_STATE.error="";})
  .catch(function(){MARKET_QUOTE_STATE.error="Market quotes are temporarily unavailable."})
  .finally(function(){MARKET_QUOTE_STATE.loading=false;if(st.tab==="Markets"&&st.mm===market)softDraw()});
 }
