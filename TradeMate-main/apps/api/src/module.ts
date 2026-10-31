@@ -1046,18 +1046,6 @@ class MarketplaceContractsController {
 
 @Controller('market/trades')
 class MarketplaceTradesController {
-  private async userId(request: Request): Promise<string> {
-    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
-    const token = sessionTokenFrom(request);
-    if (!token) throw new UnauthorizedException('Please sign in to continue.');
-    const session = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
-    if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
-    return session.rows[0].id as string;
-  }
-
   @Get('activity')
   async activity(@Query('view') view?: string, @Query('market') market?: string, @Query('limit') limitValue?: string) {
     if (!databasePool) return { source: 'TradeMate marketplace', as_of: new Date().toISOString(), data: [], message: 'Marketplace database is not configured.' };
@@ -1128,71 +1116,6 @@ class MarketplaceTradesController {
     return { source: 'TradeMate confirmed marketplace transactions', as_of: new Date().toISOString(), data: result.rows };
   }
 
-  @Post()
-  async create(@Req() request: Request, @Body() body: { listingId?: string; quantity?: number }) {
-    const buyerId = await this.userId(request);
-    const listingId = typeof body?.listingId === 'string' ? body.listingId.trim() : '';
-    const quantity = Number(body?.quantity);
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(listingId)) throw new BadRequestException('listingId must be a valid listing UUID.');
-    if (!Number.isSafeInteger(quantity) || quantity < 1) throw new BadRequestException('quantity must be a positive whole number.');
-    const client = await databasePool!.connect();
-    try {
-      await client.query('BEGIN');
-      const listing = await client.query(
-        `SELECT l.id, l.seller_organization_id, l.price_minor_units, l.currency_code, l.quantity_available
-         FROM listings l JOIN organizations o ON o.id = l.seller_organization_id
-         WHERE l.id = $1 AND l.status = 'published' AND o.status = 'active'
-         FOR UPDATE OF l`, [listingId],
-      );
-      if (!listing.rowCount) throw new NotFoundException('Published listing not found.');
-      const item = listing.rows[0];
-      const seller = await client.query('SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2', [item.seller_organization_id, buyerId]);
-      if (seller.rowCount) throw new BadRequestException('You cannot buy from your own business space.');
-      if (item.quantity_available !== null && BigInt(item.quantity_available) < BigInt(quantity)) throw new ConflictException('The requested quantity is not available.');
-      const total = (BigInt(item.price_minor_units) * BigInt(quantity)).toString();
-      const created = await client.query(
-        `INSERT INTO marketplace_transactions
-         (listing_id, buyer_user_id, seller_organization_id, quantity, unit_price_minor_units, total_minor_units, currency_code)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)
-         RETURNING id, listing_id, quantity, unit_price_minor_units::text, total_minor_units::text, currency_code, status, created_at`,
-        [listingId, buyerId, item.seller_organization_id, quantity, item.price_minor_units, total, item.currency_code],
-      );
-      await client.query('COMMIT');
-      return { transaction: created.rows[0], message: 'Transaction request created. It will appear in Trade only after both sides confirm fulfilment.' };
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally { client.release(); }
-  }
-
-  @Post(':id/confirm')
-  async confirm(@Param('id') id: string, @Req() request: Request) {
-    const userId = await this.userId(request);
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('id must be a valid transaction UUID.');
-    const client = await databasePool!.connect();
-    try {
-      await client.query('BEGIN');
-      const current = await client.query(
-        `SELECT t.id, t.buyer_user_id, t.seller_organization_id, t.status,
-                EXISTS (SELECT 1 FROM organization_members om WHERE om.organization_id = t.seller_organization_id AND om.user_id = $2) AS is_seller
-         FROM marketplace_transactions t WHERE t.id = $1 FOR UPDATE`, [id, userId],
-      );
-      if (!current.rowCount) throw new NotFoundException('Transaction not found.');
-      const tx = current.rows[0];
-      if (tx.status !== 'awaiting_confirmation') throw new ConflictException('This transaction is no longer awaiting confirmation.');
-      if (tx.buyer_user_id !== userId && !tx.is_seller) throw new NotFoundException('Transaction not found.');
-      const field = tx.buyer_user_id === userId ? 'buyer_confirmed_at' : 'seller_confirmed_at';
-      const updated = await client.query(
-        `UPDATE marketplace_transactions SET ${field} = COALESCE(${field}, now()) WHERE id = $1
-         RETURNING id, status, buyer_confirmed_at, seller_confirmed_at, completed_at`, [id],
-      );
-      await client.query('COMMIT');
-      return { transaction: updated.rows[0], message: updated.rows[0].status === 'completed' ? 'Both sides confirmed. This transaction is now recorded as completed.' : 'Confirmation recorded. The other side must also confirm before this appears in Trade.' };
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally { client.release(); }
-  }
 }
 
 @Controller('p2p')
