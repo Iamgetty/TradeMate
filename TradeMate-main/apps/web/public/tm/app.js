@@ -681,7 +681,7 @@ var st={theme:"dark",tab:"Home",ht:"Favorites",hm:"All",mm:"Services",fxGroup:"C
  me:{name:"",nick:"Member",av:0,uid:"",lvl:1,country:"Nigeria"},prefs:{orders:true,p2p:true,promos:false,news:true,cur:"NGN",market:"Services"},
  notifs:[],
  open:{}};
-st.tp=items.findIndex(function(i){return i.n==="BTC/USDT"});try{var savedTheme=localStorage.getItem("tm_theme");if(savedTheme==="light"||savedTheme==="dark")st.theme=savedTheme;document.documentElement.setAttribute("data-theme",st.theme)}catch(e){}
+st.tp=items.findIndex(function(i){return i.n==="BTC/USDT"});try{var savedTheme=localStorage.getItem("tm_theme");if(savedTheme==="light"||savedTheme==="dark")st.theme=savedTheme;document.documentElement.setAttribute("data-theme",st.theme);document.documentElement.style.background=st.theme==="light"?"#f4f6f8":"#050505";var initialThemeColor=document.querySelector("meta[name=theme-color]");if(initialThemeColor)initialThemeColor.content=st.theme==="light"?"#f4f6f8":"#050505"}catch(e){}
 var ads=[];
 function toast(t){var e=document.createElement("div");e.className="toast";e.textContent=t;document.body.appendChild(e);setTimeout(function(){e.remove()},2600)}
 function byName(n){return items.filter(function(i){return i.n===n})[0]}
@@ -1090,7 +1090,7 @@ function act(n,a,el){var m={
  resetf:function(){st.amt="";st.pay="All payment methods";draw()},eye:function(){st.hide=!st.hide;draw()},
  copy:function(){copyText(a,function(){toast("Copied")},function(){toast("Could not copy. Press and hold to select it.")})},
  avatar:function(){st.me.av=+a;st.me.photo=null;draw()},rmphoto:function(){st.me.photo=null;toast("Photo removed");draw()},faq:function(){st.open[a]=!st.open[a];drawPage()},
- pref:function(){st.prefs[a]=!st.prefs[a];drawPage()},mode:function(){st.mode=st.mode==="Buyer"?"Seller":"Buyer";save();toast((st.mode==="Seller"?"Alpha":"Clients")+" mode on");draw();if(st.stack.length&&st.stack[st.stack.length-1].id==="more")drawPage()},theme:function(){st.theme=a==="light"?"light":"dark";document.documentElement.setAttribute("data-theme",st.theme);try{localStorage.setItem("tm_theme",st.theme)}catch(e){}save();drawPage()},
+ pref:function(){st.prefs[a]=!st.prefs[a];drawPage()},mode:function(){st.mode=st.mode==="Buyer"?"Seller":"Buyer";save();toast((st.mode==="Seller"?"Alpha":"Clients")+" mode on");draw();if(st.stack.length&&st.stack[st.stack.length-1].id==="more")drawPage()},theme:function(){st.theme=a==="light"?"light":"dark";document.documentElement.setAttribute("data-theme",st.theme);document.documentElement.style.background=st.theme==="light"?"#f4f6f8":"#050505";var tc=document.querySelector("meta[name=theme-color]");if(tc)tc.content=st.theme==="light"?"#f4f6f8":"#050505";try{localStorage.setItem("tm_theme",st.theme)}catch(e){}save();drawPage()},
  uc:function(){st.uc=a||"My info";if(st.stack.length&&st.stack[st.stack.length-1].id==="uc")drawPage();else pg("uc")},suptab:function(){st.sup=a;drawPage()},nt:function(){st.nt=a;drawPage()},
  readn:function(){st.notifs.forEach(function(x){if(x.id==+a)x.u=false});draw()},readall:function(){st.notifs.forEach(function(x){x.u=false});draw();toast("All caught up")},
  joinaff:function(){st.joinedAff=true;toast("You joined the affiliate programme");drawPage()},
