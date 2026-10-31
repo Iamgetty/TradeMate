@@ -1391,7 +1391,7 @@ function scrolling(){return Date.now()-lastScroll<1200}
   if(!rm&&!document.hidden)requestAnimationFrame(f);else if(!rm)setTimeout(f,500)}
  f()})();
 /* ---- profile photo upload ---- */
-document.addEventListener("change",function(e){var t=e.target;if(t&&t.id==="nftchain"){NFTCHAIN=t.value;NFTQUERY="";NFTLIVE=[];loadLiveNFTs(st.q||NFTCOLLECTION);draw();return}if(!t||t.id!=="photoin")return;var f=t.files&&t.files[0];if(!f)return;
+document.addEventListener("click",function(e){var c=e.target.closest("[data-nft-chain]");if(c){NFTCHAIN=c.dataset.nftChain;NFTQUERY="";NFTLIVE=[];loadLiveNFTs(st.q||NFTCOLLECTION);draw();return}if(e.target.closest("[data-nft-explore]")){var g=document.querySelector(".nft-section-head");if(g)g.scrollIntoView({behavior:"smooth",block:"start"})}});document.addEventListener("change",function(e){var t=e.target;if(t&&t.id==="nftsort"){var g=document.querySelector(".nft-grid");if(g){var cards=Array.from(g.children);if(t.value==="price")cards.reverse().forEach(function(c){g.appendChild(c)})}return}if(t&&t.id==="nftchain"){NFTCHAIN=t.value;NFTQUERY="";NFTLIVE=[];loadLiveNFTs(st.q||NFTCOLLECTION);draw();return}if(!t||t.id!=="photoin")return;var f=t.files&&t.files[0];if(!f)return;
  if(!/^image\//.test(f.type)){toast("Please choose an image");t.value="";return}
  var fr=new FileReader();fr.onerror=function(){toast("Could not read that photo")};
  fr.onload=function(){var im=new Image();im.onerror=function(){toast("Could not open that photo")};
