@@ -1073,7 +1073,7 @@ document.addEventListener("input",function(e){var t=e.target;
  else if(t.id==="hq"){st.hq=t.value;if(PC.hres)PC.hres()}});
 /* typewriter in the search pill */
 (function(){var P=["Search services…","Search real estate…","Search NFTs…","Search P2P offers…","Search software…","Search B2B opportunities…","Search forex rates…","Search crypto prices…"],i=0,j=0,del=false,wait=0;
- setInterval(function(){var e=$("ph");if(!e)return;if(wait>0){wait--;return}var s=P[i];if(!del){j++;e.textContent=s.slice(0,j);if(j>=s.length){del=true;wait=18}}else{j--;e.textContent=s.slice(0,j);if(j<=0){del=false;i=(i+1)%P.length}}},70)})();
+ setInterval(function(){if(document.hidden||$("#land").classList.contains("hide"))return;var e=$("ph");if(!e)return;if(wait>0){wait--;return}var s=P[i];if(!del){j++;e.textContent=s.slice(0,j);if(j>=s.length){del=true;wait=18}}else{j--;e.textContent=s.slice(0,j);if(j<=0){del=false;i=(i+1)%P.length}}},70)})();
 
 var _dp=drawPage;drawPage=function(){_dp();var t=st.stack[st.stack.length-1];document.documentElement.style.overflow=t?"hidden":"";document.body.style.overflow=t?"hidden":"";if(t&&t.id==="search"){if(!st._sf){var s=$("sq");if(s){s.focus();st._sf=1}}}else st._sf=0};
 function hdr(t,o){o=o||{};return '<header class="ph"><button class="bk2" data-back aria-label="Back">'+ic("left")+'</button><h2>'+t+'</h2>'+(o.right||'<button class="rt" data-closeall aria-label="Close">'+ic("close")+'</button>')+'</header>'}
