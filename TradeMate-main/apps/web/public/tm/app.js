@@ -952,7 +952,33 @@ var TABS=[["Home","home"],["Markets","mkts"],["Trade","trade"],["Feed","feedback
 function loadFeed(force){
  if(!CONNECTED){st.feedError='Sign in to view the community Feed.';return}
  if(st.feedLoading||(!force&&st.feedLoaded))return;st.feedLoading=true;st.feedError='';
- api('GET','/feed/posts?limit=40').then(function(d){st.feedPosts=(d.posts||[]).map(function(p){return {id:p.id,type:p.post_type==='feedback'?'Feedback':p.post_type==='announcement'?'Announcements':'Posts',author:p.author_name,body:p.body,time:fmtT(p.created_at),comments:p.comment_count||0,pinned:p.pinned}});st.feedLoaded=true}).catch(function(e){st.feedError=e.message}).finally(function(){st.feedLoading=false;if(st.tab==='Feed')draw()});
+ api('GET','/feed/posts?limit=40').then(function(d){st.feedPosts=(d.posts||[]).map(function(p){return {id:p.id,type:p.post_type==='feedback'?'Feedback':p.post_type==='announcement'?'Announcements':'Posts',author:p.author_name,title:p.title||'',body:p.body,attachments:p.attachments||[],time:fmtT(p.created_at),comments:p.comment_count||0,pinned:p.pinned}});st.feedLoaded=true}).catch(function(e){st.feedError=e.message}).finally(function(){st.feedLoading=false;if(st.tab==='Feed')draw()});
+}
+var feedDraftFiles=[],feedRecorder=null,feedRecordStream=null,feedRecordChunks=[];
+function closeFeedComposer(){
+ var modal=document.getElementById('feedComposer');if(modal)modal.remove();
+ if(feedRecorder&&feedRecorder.state==='recording')feedRecorder.stop();
+ if(feedRecordStream){feedRecordStream.getTracks().forEach(function(t){t.stop()});feedRecordStream=null}
+ feedRecorder=null;feedRecordChunks=[];
+}
+function openFeedComposer(){
+ if(!CONNECTED){toast('Sign in to publish to Feed.');return}
+ closeFeedComposer();feedDraftFiles=[];
+ var html='<div id="feedComposer" style="position:fixed;inset:0;z-index:9999;background:#0009;display:flex;align-items:flex-end;justify-content:center;padding:12px" role="dialog" aria-modal="true"><div style="background:var(--panel,#151923);color:var(--txt,#fff);border:1px solid var(--line,#333);border-radius:18px;padding:18px;width:min(100%,560px);max-height:90%;overflow:auto"><div class="top"><b>Create a Feed post</b><button class="btn sm" data-feed-close>Close</button></div><label>Post type</label><select id="feedPostType" class="field" style="width:100%;margin:6px 0 12px"><option value="post">Post</option><option value="feedback">Feedback</option></select><label>Title</label><input id="feedPostTitle" maxlength="140" placeholder="Give your post a title" style="width:100%;margin:6px 0 12px"><label>Post</label><textarea id="feedPostBody" maxlength="5000" rows="5" placeholder="What would you like to share?" style="width:100%;margin:6px 0 12px"></textarea><label>Files and voice notes (up to 4 files, 5 MB each)</label><input id="feedPostFiles" type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,audio/*" style="width:100%;margin:8px 0"><div id="feedFileList" class="fine">No attachments selected.</div><div class="sub" style="margin:12px 0"><button class="btn sm" id="feedRecordStart">Record voice note</button><button class="btn sm" id="feedRecordStop" disabled>Stop recording</button></div><p id="feedRecordStatus" class="fine">Voice recording requires microphone permission.</p><button class="btn" id="feedPostSubmit" style="width:100%">Publish post</button></div></div>';
+ document.body.insertAdjacentHTML('beforeend',html);
+}
+function renderFeedDraftFiles(){
+ var el=document.getElementById('feedFileList');if(el)el.textContent=feedDraftFiles.length?feedDraftFiles.map(function(f){return f.name+' ('+(f.size/1024/1024).toFixed(2)+' MB)'}).join(' · '):'No attachments selected.';
+}
+function addFeedDraftFile(file){
+ if(feedDraftFiles.length>=4){toast('Attach up to 4 files.');return}
+ if(file.size>5*1024*1024){toast('Each attachment must be 5 MB or smaller.');return}
+ var allowed=['image/jpeg','image/png','image/webp','image/gif','application/pdf','audio/webm','audio/ogg','audio/mp4','audio/mpeg','audio/wav'];
+ if(allowed.indexOf(file.type)<0){toast('That file type is not supported.');return}
+ feedDraftFiles.push(file);renderFeedDraftFiles();
+}
+function readFeedFile(file){
+ return new Promise(function(resolve,reject){var reader=new FileReader();reader.onload=function(){resolve({name:file.name,type:file.type,data:reader.result})};reader.onerror=reject;reader.readAsDataURL(file)});
 }
 function feed(){
  loadFeed(false);var types=['All','Posts','Feedback','Announcements'],rows=st.feedPosts||[];
@@ -985,7 +1011,27 @@ function feature(n,pre){var m={"Add contract":function(){openWiz(pre?"c:"+pre:"p
 document.addEventListener("click",function(e){var t=e.target;
  var ft=t.closest("[data-feed-type]");if(ft){st.feedType=ft.dataset.feedType;draw();return}
  var fr=t.closest("[data-act=\"feed-refresh\"]");if(fr){loadFeed(true);draw();return}
- var fp=t.closest("[data-act=\"feed-compose\"]");if(fp){if(!CONNECTED){toast("Sign in to publish to Feed.");return}var body=prompt("Write your post");if(body&&body.trim()){var type=(prompt("Post type: Posts or Feedback","Posts")||"Posts").toLowerCase().indexOf("feedback")>=0?"feedback":"post";api("POST","/feed/posts",{type:type,body:body.trim()}).then(function(){st.feedLoaded=false;loadFeed(true)}).catch(fail)}return}
+ var fp=t.closest("[data-act=\"feed-compose\"]");if(fp){openFeedComposer();return}
+ var feedClose=t.closest("[data-feed-close]");if(feedClose){closeFeedComposer();return}
+ if(t.id==="feedRecordStart"){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||typeof MediaRecorder==="undefined"){toast("Voice recording is not supported on this device/browser.");return}
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+   feedRecordStream=stream;feedRecordChunks=[];var mime=MediaRecorder.isTypeSupported("audio/webm")?"audio/webm":(MediaRecorder.isTypeSupported("audio/mp4")?"audio/mp4":"");
+   feedRecorder=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
+   feedRecorder.ondataavailable=function(ev){if(ev.data&&ev.data.size)feedRecordChunks.push(ev.data)};
+   feedRecorder.onstop=function(){var blob=new Blob(feedRecordChunks,{type:feedRecorder.mimeType||"audio/webm"});var ext=blob.type.indexOf("mp4")>=0?"m4a":"webm";addFeedDraftFile(new File([blob],"voice-note-"+Date.now()+"."+ext,{type:blob.type}));if(feedRecordStream){feedRecordStream.getTracks().forEach(function(x){x.stop()});feedRecordStream=null}var status=document.getElementById("feedRecordStatus");if(status)status.textContent="Voice note ready to publish.";var start=document.getElementById("feedRecordStart"),stop=document.getElementById("feedRecordStop");if(start)start.disabled=false;if(stop)stop.disabled=true};
+   feedRecorder.start();var status=document.getElementById("feedRecordStatus");if(status)status.textContent="Recording…";t.disabled=true;var stop=document.getElementById("feedRecordStop");if(stop)stop.disabled=false;
+  }).catch(function(){toast("Microphone permission was not granted.");});return;
+ }
+ if(t.id==="feedRecordStop"){if(feedRecorder&&feedRecorder.state==="recording")feedRecorder.stop();return}
+ if(t.id==="feedPostSubmit"){
+  var title=(document.getElementById("feedPostTitle")||{}).value||"",body=(document.getElementById("feedPostBody")||{}).value||"",type=(document.getElementById("feedPostType")||{}).value||"post";
+  if(!title.trim()||!body.trim()){toast("Add a title and post content.");return}
+  if(feedDraftFiles.length>4){toast("Attach up to 4 files.");return}
+  var submit=t;t.disabled=true;submit.textContent="Preparing post…";
+  Promise.all(feedDraftFiles.map(readFeedFile)).then(function(files){return api("POST","/feed/posts",{type:type,title:title.trim(),body:body.trim(),attachments:files})}).then(function(){closeFeedComposer();st.feedLoaded=false;loadFeed(true);toast("Your post was published.")}).catch(function(e){submit.disabled=false;submit.textContent="Publish post";fail(e)});
+  return;
+ }
  var fc=t.closest("[data-feed-comments]");if(fc){var pid=fc.dataset.feedComments;api("GET","/feed/posts/"+pid+"/comments").then(function(d){var list=(d.comments||[]).map(function(c){return c.author_name+": "+c.body}).join("\n");var answer=prompt("Comments:\n"+(list||"No comments yet.")+"\nAdd a comment:");if(answer&&answer.trim())api("POST","/feed/posts/"+pid+"/comments",{body:answer.trim()}).then(function(){st.feedLoaded=false;loadFeed(true)}).catch(fail)}).catch(fail);return}
  var frep=t.closest("[data-feed-report]");if(frep){var reason=prompt("Why are you reporting this post?");if(reason&&reason.trim())api("POST","/feed/reports",{postId:frep.dataset.feedReport,reason:reason.trim()}).then(function(){toast("Report sent to moderators.")}).catch(fail);return}
  var c=t.closest("[data-fav]");if(c){var n=c.dataset.fav,k=st.favs.indexOf(n);if(k>=0)st.favs.splice(k,1);else st.favs.push(n);draw();return}
@@ -1009,6 +1055,7 @@ document.addEventListener("click",function(e){var t=e.target;
  c=t.closest("[data-pc]");if(c){var fn=PC[c.dataset.pc];if(fn)fn(c.dataset.arg,c);return}});
 document.addEventListener("keydown",function(e){if((e.key==="Enter"||e.key===" ")&&e.target.getAttribute&&e.target.getAttribute("role")==="button"){e.preventDefault();e.target.click()}});
 document.addEventListener("change",function(e){var t=e.target;
+ if(t.id==="feedPostFiles"){Array.from(t.files||[]).forEach(addFeedDraftFile);t.value="";return}
  if(t.dataset&&t.dataset.k){st.fv[t.dataset.k]=t.value;if(t.classList.contains("so")){var o=t.parentNode.querySelector(".oth");if(o)o.style.display=/^Other/.test(t.value)?"block":"none"}return}
  if(t.dataset&&t.dataset.ck){var a=st.fv[t.dataset.ck]||(st.fv[t.dataset.ck]=[]),i=a.indexOf(t.value);if(t.checked&&i<0)a.push(t.value);if(!t.checked&&i>=0)a.splice(i,1);return}
  if(t.id==="nftcollection"){NFTCOLLECTION=t.value;st.q="";NFTQUERY="";NFTLIVE=[];loadLiveNFTs(NFTCOLLECTION);draw()}else if(t.id==="pair"){st.tp=+t.value;draw()}else if(t.id==="coin"){st.coin=t.value;draw()}else if(t.id==="pay"){st.pay=t.value;draw()}else if(t.id==="fiat"){st.fiat=t.value;draw()}else if(t.dataset&&t.dataset.pref){st.prefs[t.dataset.pref]=t.value;toast("Saved")}});
