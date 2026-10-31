@@ -10,6 +10,19 @@ This roadmap records the current product direction. It is not a claim that each 
 - Product listings and product-cart commerce are out of scope for the current build. A dedicated product marketplace may be reconsidered in a future version, subject to a deliberate product decision. It must not silently reappear in the current app.
 - Keep P2P separate from the current marketplace contract workflow.
 
+## Current implementation snapshot
+
+The following work is present on the working branch only; it has not been deployed to production.
+
+- **Product removal:** current Product category, product-cart UI and conventional marketplace transaction writes have been removed. Migration `009` converts legacy Product listing records to the explicit B2B type; historical migration files remain unchanged for reproducible database history.
+- **B2B:** API and database now use `b2b` as a distinct listing type rather than reusing `product`.
+- **Contracts:** persistent Services/B2B proposals, seller acceptance/decline, buyer cancellation, contract messages and dual fulfilment confirmation are implemented in the initial API/UI flow. No payment, escrow or e-signature is included. End-to-end QA remains.
+- **Feed:** required title, file attachments, voice-note recording, inline audio playback and image previews are implemented. Mobile-device and failure-state QA remains.
+- **Forex:** ten instruments are defined in each of the four requested groups, with a public quote route and no OANDA credentials. Live provider availability still needs verification.
+- **Buyer/Seller modes:** both have a Contracts view; enquiries remain a separate Conversations view. Permission and full workflow QA remains.
+- **Validation:** the web build, API build and clean PostgreSQL migration test have passed on tested branch commits. The latest commits must complete CI before this snapshot is treated as validated.
+- **Documents:** no litepaper or white paper source files were found in the available TradeMate repositories. The future Product consideration is recorded here and in the README; the original documents are needed before updating them.
+
 ## Pre-P2P completion
 
 1. Remove legacy Product UI, API paths and terminology; retain B2B as its own marketplace offer type.
