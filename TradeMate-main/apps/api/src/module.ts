@@ -218,7 +218,7 @@ class OrganizationsController {
     try {
       const member = await client.query('SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
       if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
-      const saved = [];
+      const saved: Array<Record<string, unknown>> = [];
       for (const file of files) {
         const fileName = typeof file.fileName === 'string' ? file.fileName.trim().slice(0, 180) : '';
         const mimeType = String(file.mimeType || '').toLowerCase();
