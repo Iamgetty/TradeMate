@@ -1050,9 +1050,9 @@ class CommunityFeedController {
     const limit = Math.min(50, Math.max(1, Number.parseInt(rawLimit || '30', 10) || 30));
     const result = await databasePool.query(
       `SELECT p.id, p.post_type, p.body, p.pinned, p.created_at,
-              u.display_name AS author_name,
+              COALESCE(u.display_name, 'TradeMate Team') AS author_name,
               (SELECT count(*)::int FROM feed_comments c WHERE c.post_id = p.id AND c.status = 'published') AS comment_count
-       FROM feed_posts p JOIN users u ON u.id = p.author_user_id
+       FROM feed_posts p LEFT JOIN users u ON u.id = p.author_user_id
        WHERE p.status = 'published' AND ($1::text IS NULL OR p.post_type = $1)
        ORDER BY p.pinned DESC, p.created_at DESC LIMIT $2`,
       [normalized, limit],
@@ -1178,12 +1178,11 @@ class CommunityFeedController {
     if (content.length < 1 || content.length > 5000) throw new BadRequestException('Announcements must be between 1 and 5,000 characters.');
     const result = await databasePool.query(
       `INSERT INTO feed_posts (author_user_id, post_type, body, pinned)
-       SELECT u.id, 'announcement', $1, true FROM users u WHERE u.status = 'active'
-       ORDER BY u.created_at ASC LIMIT 1
+       VALUES (NULL, 'announcement', $1, true)
        RETURNING id, post_type, body, pinned, created_at`,
       [content],
     );
-    if (!result.rowCount) throw new ConflictException('No active account is available to own the announcement.');
+    
     await databasePool.query(
       "INSERT INTO audit_events (event_type, entity_type, entity_id, metadata) VALUES ('feed.announcement.created', 'feed_post', $1, $2::jsonb)",
       [result.rows[0].id, JSON.stringify({ reviewer_key_id: keyId })],
