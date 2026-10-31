@@ -30,7 +30,7 @@ Offer drafts are private and are not public marketplace offers. A business space
 
 ## Development sequence
 
-1. **Pre-P2P marketplace completion:** finish the contract-first marketplace model, B2B publishing, Services, Feed, buyer/seller modes, Forex coverage, full-tab consistency and performance.
+1. **Pre-P2P marketplace completion:** finish the contract-first marketplace model, B2B publishing, Services, Feed, Clients/Alpha modes, Forex coverage, full-tab consistency and performance.
 2. **Contract lifecycle:** complete QA of proposal, counterparty review, acceptance/rejection, cancellation, contract messages and mutual fulfilment confirmation. Payment processing is separate and must not be implied as available.
 3. **Buyer–seller connection:** complete enquiries and messaging with access controls, abuse reporting and audit trails.
 4. **Trust and operations:** counterparty reputation, disputes/support workflows, monitoring, automated tests, backups and recovery procedures.
