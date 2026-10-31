@@ -64,6 +64,7 @@ export async function GET(request: Request) {
           name: nft.name || `NFT #${nft.identifier || 'unknown'}`,
           image: nft.image_url || nft.display_image_url || nft.image || null,
           collection: typeof collection === 'string' ? collection : (collection.name || collection.slug || 'OpenSea collection'),
+          collectionSlug: typeof collection === 'string' ? collection.toLowerCase().replace(/\\s+/g, '-') : (collection.slug || null),
           chainId: null,
           contract: nft.contract || null,
           tokenId: nft.identifier || nft.token_id || null,
@@ -75,9 +76,34 @@ export async function GET(request: Request) {
         };
       });
 
+    const slugs = [...new Set(items.map((item: any) => item.collectionSlug).filter(Boolean))].slice(0, 8);
+    const stats = await Promise.all(slugs.map(async (slug) => {
+      try {
+        const statsResponse = await fetch(`https://api.opensea.io/api/v2/collections/${encodeURIComponent(slug)}/stats`, {
+          headers: { 'x-api-key': apiKey, accept: 'application/json' },
+          cache: 'no-store'
+        });
+        if (!statsResponse.ok) return [slug, null] as const;
+        const payload = await statsResponse.json();
+        const day = payload?.intervals?.find((interval: any) => interval.interval === 'one_day')?.stats || payload?.one_day || {};
+        return [slug, {
+          sales24h: typeof day.sales === 'number' ? day.sales : null,
+          volume24h: typeof day.volume === 'number' ? day.volume : null
+        }] as const;
+      } catch {
+        return [slug, null] as const;
+      }
+    }));
+    const statsBySlug = new Map(stats.filter((entry) => entry[1]).map((entry) => entry as [string, { sales24h: number | null; volume24h: number | null }]));
+    const enrichedItems = items.map((item: any) => ({
+      ...item,
+      sales24h: statsBySlug.get(item.collectionSlug)?.sales24h ?? null,
+      volume24h: statsBySlug.get(item.collectionSlug)?.volume24h ?? null
+    }));
+
     return NextResponse.json({
       configured: true,
-      items,
+      items: enrichedItems,
       message: items.length ? null : 'No NFT matches were returned. Try another NFT or collection name.'
     });
   } catch {
