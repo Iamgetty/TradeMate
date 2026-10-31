@@ -28,7 +28,7 @@ Use PostgreSQL for persistent marketplace data, with version-controlled schema m
 Do not store real customer information until authentication, access controls, validation, and operational safeguards are in place.
 
 ## Current implementation boundary
-The repository currently includes a responsive Next.js web app, NestJS API, PostgreSQL-backed authentication and business-space/offer foundations, enquiries and messaging, Feed posts with attachments, and public market quote endpoints. A durable contract proposal/acceptance lifecycle is not yet implemented. Payment processing, escrow, crypto custody and wallet connection are not established as production capabilities. P2P foundations are present in the codebase but remain outside the current pre-P2P workstream.
+The repository currently includes a responsive Next.js web app, NestJS API, PostgreSQL-backed authentication and business-space/offer foundations, enquiries and messaging, Feed posts with attachments, and public market quote endpoints. The repository now includes an initial durable contract proposal/acceptance/dual-fulfilment-confirmation API and Buyer/Seller Contracts views. This foundation still requires end-to-end security and workflow QA, and does not process payments, provide escrow or constitute an e-signature. Crypto custody and wallet connection are not established as production capabilities. P2P foundations are present in the codebase but remain outside the current pre-P2P workstream.
 
 ## Security principles
 - Never commit `.env` files, API keys, or secrets.
