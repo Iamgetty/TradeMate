@@ -19,7 +19,6 @@ export default function NewOfferPage() {
   const [description, setDescription] = useState('');
   const [listingType, setListingType] = useState('service');
   const [price, setPrice] = useState('');
-  const [quantity, setQuantity] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -74,7 +73,7 @@ export default function NewOfferPage() {
           <div className="account-card"><div><strong>{money(saved.price_minor_units, saved.currency_code)}</strong><span>{saved.title}</span><small>OFFER STATUS · {saved.status.toUpperCase()}</small></div></div>
           <p className="business-footnote">This draft is private. Public publishing requires the review workflow.</p>
           <Link className="cta-primary detail-back" href="/offers">View my offers ↗</Link><Link className="account-secondary-link" href="/account">Return to your space</Link>
-          <button type="button" className="retry-btn" onClick={() => { setSaved(null); setTitle(''); setDescription(''); setPrice(''); setQuantity(''); }}>Create another draft ↻</button>
+          <button type="button" className="retry-btn" onClick={() => { setSaved(null); setTitle(''); setDescription(''); setPrice(''); }}>Create another draft ↻</button>
         </> : <>
           <h1>Put your offer <span>out there.</span></h1>
           <p className="business-intro">Start with the essentials. Prepare a Services or B2B opportunity for a contract-led conversation.</p>
