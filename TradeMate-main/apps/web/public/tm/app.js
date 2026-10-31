@@ -1485,9 +1485,9 @@ var _tr=trade;trade=function(){var s=_tr();if(items[st.tp]&&items[st.tp].m==="Cr
 /* ---- session ---- */
 function applyUser(u){if(!u)return;var m=st.me,same=m.id===u.id;
  st.me={id:u.id,email:u.email,name:u.display_name,nick:same&&m.nick?m.nick:u.display_name,av:same?m.av:0,photo:same?m.photo:null,uid:String(u.id).replace(/-/g,"").slice(0,9).toUpperCase(),lvl:1,country:CNAME[u.country_code]||m.country||"Nigeria"};
- if(!same){st.deals=[];st.org=null;st.mine=[];st.cart=[];st.favs=[];if(typeof p2pPrivate!=="undefined"){p2pPrivate.ads=[];p2pPrivate.orders=[];p2pPrivate.updated=0;p2pPrivate.error="";p2pPrivate.loading=false}}
+ if(!same){st.deals=[];st.org=null;st.mine=[];st.favs=[];if(typeof p2pPrivate!=="undefined"){p2pPrivate.ads=[];p2pPrivate.orders=[];p2pPrivate.updated=0;p2pPrivate.error="";p2pPrivate.loading=false}}
  loadOrg();loadMine();loadEnquiries();save()}
-function resetSession(){st.deals=[];st.org=null;st.mine=[];st.cart=[];st.favs=[];if(typeof p2pPrivate!=="undefined"){p2pPrivate.ads=[];p2pPrivate.orders=[];p2pPrivate.updated=0;p2pPrivate.error="";p2pPrivate.loading=false}st.me={name:"",nick:"Member",av:0,uid:"",lvl:1,country:"Nigeria"};
+function resetSession(){st.deals=[];st.org=null;st.mine=[];st.favs=[];if(typeof p2pPrivate!=="undefined"){p2pPrivate.ads=[];p2pPrivate.orders=[];p2pPrivate.updated=0;p2pPrivate.error="";p2pPrivate.loading=false}st.me={name:"",nick:"Member",av:0,uid:"",lvl:1,country:"Nigeria"};
  keepTp(function(){for(var i=items.length-1;i>=0;i--)if(items[i].own)items.splice(i,1)});ads=ads.filter(function(a){return !a.own});try{localStorage.removeItem(KEY)}catch(e){}}
 var _lo=act;act=function(n,a,el){if(n==="marketactivityretry"){globalActivityCache.updated=null;loadGlobalActivity(st.tt==="Trades"?"trades":"book",true);return}if(n==="markettraderetry"){internalTradeCache.updated=null;internalTradeCache.error="";internalTradeCache.kind="";var marketType=items[st.tp].m;if(marketType==="Services"||marketType==="B2B")loadInternalTrades(marketType==="Services"?"service":"b2b");return}if(n==="p2pretry"){p2pCache.updated=null;p2pCache.error="";p2pCache.key="";loadP2P();return}if(n==="logout"&&CONNECTED){api("POST","/auth/logout").catch(function(){});resetSession()}_lo(n,a,el)};
 /* ---- marketplace: public listings from the database ---- */
