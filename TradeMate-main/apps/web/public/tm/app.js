@@ -614,7 +614,7 @@ camera:'<path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>
 doc:'<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h5M10 13h5M10 17h5"/>',info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>'};
 function gem(z){return '<span class="gem" style="width:'+z+'px;height:'+z+'px;font-size:'+Math.round(z*.48)+'px">T</span>'}
 function ic(n,s){return '<svg viewBox="0 0 24 24"'+(s?' style="'+s+'"':'')+' aria-hidden="true">'+(I[n]||'')+'</svg>'}
-var $=function(i){return document.getElementById(i)};
+var $=function(i){i=String(i==null?"":i);if(i.charAt(0)==="#")i=i.slice(1);return document.getElementById(i)};
 function esc(x){return String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;")}
 function fmt(n,d){return Number(n).toLocaleString(undefined,{maximumFractionDigits:d==null?8:d})}
 function fx2(n,d){return Number(n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d})}
