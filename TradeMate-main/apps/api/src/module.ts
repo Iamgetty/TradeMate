@@ -769,7 +769,7 @@ class MarketplaceContractsController {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(listingId)) {
       throw new BadRequestException('listingId must be a valid offer UUID.');
     }
-    if (!/^\d{1,12}(\\.\d{1,2})?$/.test(amountText)) {
+    if (!/^\d{1,12}(\.\d{1,2})?$/.test(amountText)) {
       throw new BadRequestException('Enter a proposed contract value with up to two decimal places.');
     }
     if (scope.length < 5 || scope.length > 5000) {
