@@ -989,7 +989,7 @@ function feed(){
  if(st.feedLoading)html+='<div class="empty">Loading community posts…</div>';
  else if(st.feedError)html+='<div class="empty"><b>Feed unavailable</b>'+esc(st.feedError)+'<button class="btn sm" data-act="feed-refresh">Try again</button></div>';
  else if(!shown.length)html+='<div class="empty"><b>No posts yet</b>Be the first to share an update or feedback.</div>';
- else html+=shown.map(function(p){return '<article class="card" style="margin:10px 16px"><b>'+esc(p.author||'TradeMate member')+'</b><small>'+esc(p.type)+' · '+esc(p.time)+'</small><p style="white-space:pre-wrap">'+esc(p.body)+'</p><div class="sub"><button data-feed-comments="'+esc(p.id)+'">Comments ('+Number(p.comments||0)+')</button><button data-feed-report="'+esc(p.id)+'">Report</button></div></article>'}).join('');
+ else html+=shown.map(function(p){return '<article class="card" style="margin:10px 16px"><b>'+esc(p.author||'TradeMate member')+'</b><small>'+esc(p.type)+' · '+esc(p.time)+'</small>'+(p.title?'<h3>'+esc(p.title)+'</h3>':'')+'<p style="white-space:pre-wrap">'+esc(p.body)+'</p>'+(p.attachments||[]).map(function(a){return '<p><a target="_blank" rel="noopener" href="'+esc(TMCFG.api+'/feed/posts/'+encodeURIComponent(p.id)+'/attachments/'+encodeURIComponent(a.id))+'">'+esc(a.file_name)+'</a></p>'}).join('')+'<div class="sub"><button data-feed-comments="'+esc(p.id)+'">Comments ('+Number(p.comments||0)+')</button><button data-feed-report="'+esc(p.id)+'">Report</button></div></article>'}).join('');
  return html+'<p class="fine">Posts and comments are shared through TradeMate accounts. Announcements are published by moderators.</p>';
 }
 function draw(){
