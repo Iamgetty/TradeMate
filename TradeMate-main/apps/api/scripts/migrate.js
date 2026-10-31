@@ -11,6 +11,7 @@ const MIGRATIONS = [
   '002_p2p_market_records.sql',
   '005_marketplace_transactions.sql',
   '006_p2p_order_lifecycle.sql',
+  '007_community_feed.sql',
 ];
 
 async function main() {
