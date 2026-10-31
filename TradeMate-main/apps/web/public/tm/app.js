@@ -1456,7 +1456,7 @@ var _a8=act;act=function(n,a,el){
 /* Without TM_CONFIG the app runs in local mode (data stays on this device).                       */
 var TMCFG=window.TM_CONFIG||{},CONNECTED=!!TMCFG.api,KEY="tm.live.v2";
 /* Prevent the authenticated shell from flashing before cookie-session validation. */
-var AUTH_GATE_STYLE=null;if(CONNECTED){AUTH_GATE_STYLE=d.createElement("style");AUTH_GATE_STYLE.id="tm-auth-gate";AUTH_GATE_STYLE.textContent="#app,#nav,#pg{visibility:hidden!important}";h.appendChild(AUTH_GATE_STYLE)}
+var AUTH_GATE_STYLE=null;if(CONNECTED){AUTH_GATE_STYLE=document.createElement("style");AUTH_GATE_STYLE.id="tm-auth-gate";AUTH_GATE_STYLE.textContent="#app,#nav,#pg{visibility:hidden!important}";document.head.appendChild(AUTH_GATE_STYLE)}
 function releaseAuthGate(){if(AUTH_GATE_STYLE){AUTH_GATE_STYLE.remove();AUTH_GATE_STYLE=null}}
 var CSYM={NGN:"₦",USD:"$",EUR:"€",GBP:"£",GHS:"₵",KES:"KSh"},PER={"Per month":" /mo","Per year":" /yr","Per night":" /night"};
 var ISO={"Nigeria":"NG","Ghana":"GH","Kenya":"KE","South Africa":"ZA","Uganda":"UG","Tanzania":"TZ","Rwanda":"RW","Ethiopia":"ET","Egypt":"EG","Morocco":"MA","Senegal":"SN","Côte d’Ivoire":"CI","Cameroon":"CM","Zambia":"ZM","Zimbabwe":"ZW","United States":"US","Canada":"CA","United Kingdom":"GB","Ireland":"IE","Germany":"DE","France":"FR","Spain":"ES","Italy":"IT","Netherlands":"NL","Portugal":"PT","Turkey":"TR","United Arab Emirates":"AE","Saudi Arabia":"SA","Qatar":"QA","India":"IN","Pakistan":"PK","Bangladesh":"BD","China":"CN","Japan":"JP","South Korea":"KR","Singapore":"SG","Malaysia":"MY","Indonesia":"ID","Philippines":"PH","Thailand":"TH","Vietnam":"VN","Australia":"AU","New Zealand":"NZ","Brazil":"BR","Mexico":"MX","Argentina":"AR","Colombia":"CO","Chile":"CL"},CNAME={};
