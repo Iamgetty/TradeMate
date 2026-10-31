@@ -33,7 +33,7 @@ window.addEventListener("unhandledrejection",function(e){
 setTimeout(function(){
  var app=document.getElementById("app"),lp=document.getElementById("lp");
  var nav=document.getElementById("nav"),sc=lp&&lp.shadowRoot&&lp.shadowRoot.querySelector(".sc");
- if(!app||!app.querySelector(".view")||!nav||!nav.innerHTML.trim()){window.tmBootFail("The app shell did not finish rendering. Check that /tm/app.js?v=11 loaded and completed startup.");return}
+ if(!app||!app.querySelector(".view")||!nav||!nav.innerHTML.trim()){window.tmBootFail("The app shell did not finish rendering. Check that /tm/app.js?v=12 loaded and completed startup.");return}
  if(lp&&(!sc||!sc.textContent.trim()||sc.getBoundingClientRect().width===0||sc.getBoundingClientRect().height===0)){lp.style.display="none";}
  window.tmReveal();
 },4500);
@@ -44,6 +44,6 @@ setTimeout(function(){
 <!-- Same-origin API: /api is proxied to the NestJS service by apps/web/app/api/[...path]/route.ts -->
 <script>window.TM_CONFIG={api:"/api"};</script>
 <script defer src="/tm/feed-client.js?v=2"></script>
-<script defer src="/tm/app.js?v=11"></script>
+<script defer src="/tm/app.js?v=12"></script>
 </body>
 </html>
