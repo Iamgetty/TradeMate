@@ -1,7 +1,7 @@
 -- Shared community Feed: persistent posts, replies, reports and moderation.
 CREATE TABLE IF NOT EXISTS feed_posts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  author_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  author_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
   post_type TEXT NOT NULL CHECK (post_type IN ('post', 'feedback', 'announcement')),
   body TEXT NOT NULL CHECK (char_length(body) BETWEEN 1 AND 5000),
   status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'hidden', 'removed')),
