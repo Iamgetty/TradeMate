@@ -16,22 +16,27 @@ window.tmBootFail=function(message){
  panel.style.cssText="position:fixed;z-index:2147483647;inset:0;overflow:auto;background:#050505;color:#fff;padding:28px 20px;font:14px/1.5 system-ui";
  var title=document.createElement("h2");title.textContent="TradeMate could not start";title.style.cssText="font-size:20px;margin:0 0 12px";
  var detail=document.createElement("pre");detail.textContent=String(message||"The app did not finish initializing.").slice(0,1600);detail.style.cssText="white-space:pre-wrap;overflow-wrap:anywhere;color:#e2b8b8;background:#1b1111;border:1px solid #663b3b;border-radius:12px;padding:14px";
- var hint=document.createElement("p");hint.textContent="This diagnostic is from the app startup. Please share the message above.";hint.style.color="#aab4c0";
+ var hint=document.createElement("p");hint.textContent="Share this startup message so the failure can be identified.";hint.style.color="#aab4c0";
  panel.appendChild(title);panel.appendChild(detail);panel.appendChild(hint);document.body.appendChild(panel);
 };
 window.addEventListener("error",function(e){
- var target=e.target&&e.target.src?" Resource: "+e.target.src:"";
- window.tmBootFail((e.message||"A script or resource failed to load.")+target);
-});
+ if(e.target&&e.target!==window){
+  var src=e.target.src||e.target.href||"";
+  if(e.target.tagName==="SCRIPT"&&/\/tm\/(app|feed-client)\.js(?:\?|$)/.test(src))window.tmBootFail("Failed to load script: "+src);
+  return;
+ }
+ window.tmBootFail((e.message||"JavaScript startup error")+(e.filename?"\n"+e.filename+":"+e.lineno+":"+e.colno:""));
+},true);
 window.addEventListener("unhandledrejection",function(e){
  var reason=e.reason;window.tmBootFail(reason&&reason.stack?reason.stack:reason&&reason.message?reason.message:String(reason||"Unhandled promise rejection"));
 });
 setTimeout(function(){
- var app=document.getElementById("app");
- if(!app||!app.innerHTML.trim())window.tmBootFail("The app did not render its main screen within 4.5 seconds. Check that /tm/app.js?v=8 loaded successfully.");
- else window.tmReveal();
+ var app=document.getElementById("app"),lp=document.getElementById("lp");
+ if(!app||!app.innerHTML.trim()){window.tmBootFail("The app did not render its main screen within 4.5 seconds. Check that /tm/app.js?v=8 loaded successfully.");return}
+ if(lp&&(!lp.shadowRoot||!lp.shadowRoot.querySelector(".sc"))){lp.style.display="none";}
+ window.tmReveal();
 },4500);
-</script>>
+</script>>>
 </head>
 <body>
 <noscript style="color:#fff;font:16px sans-serif;padding:24px;display:block">TradeMate needs JavaScript to run.</noscript>
