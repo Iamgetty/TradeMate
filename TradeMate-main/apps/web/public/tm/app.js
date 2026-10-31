@@ -994,7 +994,7 @@ function feed(){
  var shown=rows.filter(function(p){return st.feedType==='All'||p.type===st.feedType});
  var html='<div class="top"><div style="flex:1"><h2 style="font-size:24px">Feed</h2><small style="color:var(--mut)">Community posts, feedback and announcements</small></div></div>';
  html+='<div class="sub">'+types.map(function(t){return '<button class="'+(st.feedType===t?'on':'')+'" data-feed-type="'+t+'">'+t+'</button>'}).join('')+'</div>';
- html+='<button type="button" data-act="feed-compose" style="display:flex;align-items:center;gap:13px;width:calc(100% - 32px);margin:12px 16px;padding:15px;background:linear-gradient(145deg,#171a20,#101216);border:1px solid #363940;border-radius:22px;color:var(--txt);text-align:left;box-shadow:0 8px 24px #0003"><span style="width:44px;height:44px;border-radius:15px;background:#0b0e12;border:1px solid #363940;display:grid;place-items:center;flex:none;overflow:hidden"><img src="'+LOGO+'" alt="TradeMate" style="width:35px;height:35px;object-fit:contain"></span><span style="flex:1;min-width:0"><b style="display:block;font-size:15px">Share with the community</b><small style="display:block;color:var(--mut);margin-top:4px">Start a post, add a file or record a voice note…</small></span><span style="background:#f5a83c;color:#17120a;border-radius:12px;padding:9px 12px;font-weight:800">＋</span></button>';
+ html+='<button type="button" data-act="feed-compose" style="display:flex;align-items:center;gap:13px;width:calc(100% - 32px);margin:12px 16px;padding:15px 17px;background:var(--s1);border:1px solid var(--line);border-radius:18px;color:var(--txt);text-align:left"><span style="width:42px;height:42px;border-radius:50%;background:var(--s2);border:1px solid var(--line);display:grid;place-items:center;flex:none;font-size:25px;font-weight:300">＋</span><span style="flex:1;min-width:0"><b style="display:block;font-size:15px">Create a post</b><small style="display:block;color:var(--mut);margin-top:4px">Share an update, attach a file or record a voice note</small></span></button>';
  if(st.feedLoading)html+='<div class="empty">Loading community posts…</div>';
  else if(st.feedError)html+='<div class="empty"><b>Feed unavailable</b>'+esc(st.feedError)+'<button class="btn sm" data-act="feed-refresh">Try again</button></div>';
  else if(!shown.length)html+='<div class="empty"><b>No posts yet</b>Be the first to share an update or feedback.</div>';
@@ -1037,7 +1037,7 @@ document.addEventListener("click",function(e){var t=e.target;
  if(t.id==="feedRecordStop"){if(feedRecorder&&feedRecorder.state==="recording")feedRecorder.stop();return}
  if(t.id==="feedPostSubmit"){
   var title=(document.getElementById("feedPostTitle")||{}).value||"",body=(document.getElementById("feedPostBody")||{}).value||"",type=(document.getElementById("feedPostType")||{}).value||"post";
-  if(!title.trim()||!body.trim()){toast("Add a title and post content.");return}
+  if(!body.trim()){toast("Write something before publishing.");return}
   if(feedDraftFiles.length>4){toast("Attach up to 4 files.");return}
   var submit=t;t.disabled=true;submit.textContent="…";
   Promise.all(feedDraftFiles.map(readFeedFile)).then(function(files){return api("POST","/feed/posts",{type:type,title:title.trim(),body:body.trim(),attachments:files})}).then(function(){closeFeedComposer();st.feedLoaded=false;loadFeed(true);toast("Your post was published.")}).catch(function(e){submit.disabled=false;submit.textContent="↑";fail(e)});
