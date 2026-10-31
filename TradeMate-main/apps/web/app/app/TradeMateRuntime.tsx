@@ -48,7 +48,7 @@ export default function TradeMateRuntime() {
     window.addEventListener('unhandledrejection', onRejection);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=74';
+    app.src = '/tm/app.js?v=75';
     app.async = false;
     app.dataset.trademateApp = 'true';
     app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=74. Check the deployment and static asset response.');
