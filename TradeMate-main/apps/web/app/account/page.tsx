@@ -40,20 +40,20 @@ export default function AccountPage(){
    :user&&<>
     <div className="section-kicker"><span/> YOUR TRADEMATE SPACE</div>
     <h1>Good to have you<br/><span>{user.display_name.split(' ')[0]}.</span></h1>
-    <p className="account-lead">Your TradeMate account and seller workspace are managed here.</p>
+    <p className="account-lead">Your TradeMate account and Alpha workspace are managed here.</p>
     <div className="account-card"><div className="account-avatar">{user.display_name.trim().charAt(0).toUpperCase()}</div><div><strong>{user.display_name}</strong><span>{user.email}</span><small>TRADEMATE MEMBER</small></div><i>●</i></div>
     {organization?
      <div className="account-next">
       <div className="section-kicker"><span/> BUSINESS SPACE CREATED</div>
       <h2>{organization.name}</h2>
-      <p>Your business space has been saved. Its current status is <strong>{organization.status}</strong>; this does not yet publish products or enable payments.</p>
+      <p>Your business space has been saved. Its current status is <strong>{organization.status}</strong>; this does not publish offers or enable payments.</p>
       <div className="account-steps"><span>01 <b>Account created</b><i>Complete</i></span><span>02 <b>Business setup</b><i>Complete</i></span><span>03 <b>Create an offer</b><i>Next</i></span></div>
       <div className="account-card"><div><strong>{organization.country_code} · {organization.default_currency}</strong><span>{organization.organization_type.replaceAll('_',' ')}</span><small>BUSINESS SPACE · {organization.status.toUpperCase()}</small></div></div>
       <Link className="cta-primary detail-back" href="/offers/new">Create an offer ↗</Link><Link className="account-secondary-link" href="/offers">Manage my offers →</Link><Link className="account-secondary-link" href="/messages">View buyer–seller enquiries →</Link><Link className="account-secondary-link" href="/#market">Explore the marketplace</Link>
      </div>
      :<div className="account-next">
-      <div className="section-kicker"><span/> NEXT MILESTONE</div><h2>Bring your business into the market.</h2>
-      <p>Set up your business identity and prepare to publish products or services. Listing creation comes next.</p>
+      <div className="section-kicker"><span/> NEXT MILESTONE</div><h2>Bring your organization into the market.</h2>
+      <p>Set up your organization identity and prepare Services or B2B offers for contract discussions.</p>
       <div className="account-steps"><span>01 <b>Account created</b><i>Complete</i></span><span>02 <b>Business setup</b><i>Next</i></span><span>03 <b>Publish an offer</b><i>Coming next</i></span></div>
       <Link className="cta-primary detail-back" href="/business">Set up business space ↗</Link><Link className="account-secondary-link" href="/#market">Explore the marketplace</Link>
      </div>}
