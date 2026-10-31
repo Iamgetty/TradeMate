@@ -213,7 +213,7 @@ class OrganizationsController {
     const userId = await this.currentUser(request);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid organization ID.');
     const files = Array.isArray(body?.files) ? body.files : [];
-    if (!files.length || files.length > 8) throw new BadRequestException('Select between 1 and 8 documents.');
+    if (!files.length || files.length > 4) throw new BadRequestException('Select between 1 and 4 documents.');
     const client = await databasePool!.connect();
     try {
       const member = await client.query('SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
@@ -1628,6 +1628,10 @@ class ModerationController {
       await client.query(
         'INSERT INTO organization_reviews (organization_id, decision, note, reviewer_key_id) VALUES ($1, $2, $3, $4)',
         [id, body.decision, note, keyId],
+      );
+      await client.query(
+        "UPDATE organization_documents SET review_status = $1, reviewer_note = $2, reviewed_at = now() WHERE organization_id = $3 AND review_status = 'pending'",
+        [body.decision === 'approved' ? 'approved' : 'rejected', note || null, id],
       );
       await client.query(
         "INSERT INTO audit_events (organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'organization.reviewed', 'organization', $1, $2::jsonb)",
