@@ -67,6 +67,7 @@ export async function GET(request: Request) {
           image: nft.image_url || nft.display_image_url || nft.image || null,
           collection: typeof collection === 'string' ? collection : (collection.name || collection.slug || 'OpenSea collection'),
           collectionSlug: typeof collection === 'string' ? collection.toLowerCase().replace(/\\s+/g, '-') : (collection.slug || null),
+          chain: nft.chain || chain,
           chainId: null,
           contract: nft.contract || null,
           tokenId: nft.identifier || nft.token_id || null,
