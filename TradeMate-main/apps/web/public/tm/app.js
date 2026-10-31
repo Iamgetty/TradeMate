@@ -1527,12 +1527,6 @@ function toListing(it,text){var d=st.deals.filter(function(x){return x.lid===it.
  return p.then(function(x){x.loaded=false;return x})}
 function viaServer(n){var it=byName(n);return CONNECTED&&it&&it.srv?it:null}
 var _chat=PC.chat;PC.chat=function(n){var it=viaServer(n);if(!it)return _chat(n);toListing(it,null).then(function(d){pg("deal",d.id)}).catch(fail)};
-var _db=PC.dobuy;PC.dobuy=function(n){var it=viaServer(n);if(!it)return _db(n);var f=st.fv;if(!f.bdel||!f.bpay){toast("Choose delivery and payment method");return}
- toListing(it,"Order request: "+(f.bq||1)+" × "+it.n+" ("+px(it)+"). Delivery: "+f.bdel+". Payment: "+f.bpay+"."+(f.bnote?" Note: "+f.bnote:"")).then(function(d){st.fv={};st.stack.pop();st.stack.pop();pg("deal",d.id)}).catch(fail)};
-var _bd=PC.dobid;PC.dobid=function(n){var it=viaServer(n);if(!it)return _bd(n);var f=st.fv;if(!(parseFloat(f.bidamt)>0)){toast("Enter an amount");return}
- toListing(it,(it.m==="Real Estate"||it.m==="B2B"?"Offer: ":"Bid: ")+f.bidamt+"."+(f.bidnote?" "+f.bidnote:"")).then(function(d){st.fv={};st.stack.pop();st.stack.pop();pg("deal",d.id)}).catch(fail)};
-var _do=PC.doorder;PC.doorder=function(n){var it=viaServer(n);if(!it)return _do(n);var f=st.fv;if(!(f.oreq||"").trim()||!f.odt){toast("Please complete the form");return}
- toListing(it,"Request: "+f.oreq.trim()+(f.obud?" Budget: "+f.obud+".":"")+" Needed by: "+f.odt+".").then(function(d){st.fv={};st.stack.pop();st.stack.pop();pg("deal",d.id)}).catch(fail)};
 /* ---- business space and my offers ---- */
 function loadOrg(){return api("GET","/organizations/mine").then(function(r){st.org=r.organization||null}).catch(function(){})}
 function loadMine(){return api("GET","/market/listings/mine").then(function(r){st.mine=r.data||[]}).catch(function(){})}
