@@ -1017,6 +1017,181 @@ class P2PMarketController {
 
 const reviewerKeyId = (key: string) => createHash('sha256').update(key).digest('hex').slice(0, 12);
 
+@Controller('feed')
+class CommunityFeedController {
+  private async currentUser(request: Request): Promise<string> {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to continue.');
+    const result = await databasePool.query(
+      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+      [tokenDigest(token)],
+    );
+    if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    return result.rows[0].id as string;
+  }
+
+  private reviewKey(request: Request): string {
+    const expected = process.env.TRADEMATE_REVIEW_API_KEY || '';
+    const supplied = request.header('x-review-key') || '';
+    const a = Buffer.from(expected), b = Buffer.from(supplied);
+    if (!expected || a.length !== b.length || !timingSafeEqual(a, b)) {
+      throw new UnauthorizedException('Feed moderation access is not authorized.');
+    }
+    return reviewerKeyId(expected);
+  }
+
+  @Get('posts')
+  async posts(@Query('type') type?: string, @Query('limit') rawLimit?: string) {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const normalized = type === 'Posts' || type === 'post' ? 'post'
+      : type === 'Feedback' || type === 'feedback' ? 'feedback'
+      : type === 'Announcements' || type === 'announcement' ? 'announcement' : null;
+    const limit = Math.min(50, Math.max(1, Number.parseInt(rawLimit || '30', 10) || 30));
+    const result = await databasePool.query(
+      `SELECT p.id, p.post_type, p.body, p.pinned, p.created_at,
+              u.display_name AS author_name,
+              (SELECT count(*)::int FROM feed_comments c WHERE c.post_id = p.id AND c.status = 'published') AS comment_count
+       FROM feed_posts p JOIN users u ON u.id = p.author_user_id
+       WHERE p.status = 'published' AND ($1::text IS NULL OR p.post_type = $1)
+       ORDER BY p.pinned DESC, p.created_at DESC LIMIT $2`,
+      [normalized, limit],
+    );
+    return { posts: result.rows };
+  }
+
+  @Post('posts')
+  async createPost(@Req() request: Request, @Body() body: { type?: string; body?: string }) {
+    const userId = await this.currentUser(request);
+    const content = typeof body?.body === 'string' ? body.body.trim() : '';
+    if (content.length < 1 || content.length > 5000) throw new BadRequestException('Posts must be between 1 and 5,000 characters.');
+    const type = body?.type === 'feedback' ? 'feedback' : body?.type === 'post' ? 'post' : null;
+    if (!type) throw new BadRequestException('Choose post or feedback. Announcements are published by moderators.');
+    const result = await databasePool!.query(
+      `INSERT INTO feed_posts (author_user_id, post_type, body) VALUES ($1, $2, $3)
+       RETURNING id, post_type, body, pinned, created_at`,
+      [userId, type, content],
+    );
+    await databasePool!.query(
+      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'feed.post.created', 'feed_post', $2, $3::jsonb)",
+      [userId, result.rows[0].id, JSON.stringify({ post_type: type })],
+    );
+    return { post: { ...result.rows[0], author_name: 'You', comment_count: 0 } };
+  }
+
+  @Get('posts/:id/comments')
+  async comments(@Param('id') id: string) {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid post id.');
+    const result = await databasePool.query(
+      `SELECT c.id, c.body, c.created_at, u.display_name AS author_name
+       FROM feed_comments c JOIN users u ON u.id = c.author_user_id
+       JOIN feed_posts p ON p.id = c.post_id
+       WHERE c.post_id = $1 AND c.status = 'published' AND p.status = 'published'
+       ORDER BY c.created_at ASC LIMIT 200`,
+      [id],
+    );
+    return { comments: result.rows };
+  }
+
+  @Post('posts/:id/comments')
+  async addComment(@Param('id') id: string, @Req() request: Request, @Body() body: { body?: string }) {
+    const userId = await this.currentUser(request);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid post id.');
+    const content = typeof body?.body === 'string' ? body.body.trim() : '';
+    if (content.length < 1 || content.length > 2000) throw new BadRequestException('Comments must be between 1 and 2,000 characters.');
+    const result = await databasePool!.query(
+      `INSERT INTO feed_comments (post_id, author_user_id, body)
+       SELECT p.id, $2, $3 FROM feed_posts p WHERE p.id = $1 AND p.status = 'published'
+       RETURNING id, post_id, body, created_at`,
+      [id, userId, content],
+    );
+    if (!result.rowCount) throw new NotFoundException('Published post not found.');
+    return { comment: { ...result.rows[0], author_name: 'You' } };
+  }
+
+  @Post('reports')
+  async report(@Req() request: Request, @Body() body: { postId?: string; commentId?: string; reason?: string }) {
+    const userId = await this.currentUser(request);
+    const postId = typeof body?.postId === 'string' ? body.postId : null;
+    const commentId = typeof body?.commentId === 'string' ? body.commentId : null;
+    const reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!!postId === !!commentId || (postId && !uuid.test(postId)) || (commentId && !uuid.test(commentId))) throw new BadRequestException('Report exactly one valid post or comment.');
+    if (reason.length < 3 || reason.length > 1000) throw new BadRequestException('Explain the report in 3 to 1,000 characters.');
+    const result = await databasePool!.query(
+      `INSERT INTO feed_reports (reporter_user_id, post_id, comment_id, reason)
+       VALUES ($1, $2, $3, $4) RETURNING id, status, created_at`,
+      [userId, postId, commentId, reason],
+    );
+    return { report: result.rows[0] };
+  }
+
+  @Get('moderation/reports')
+  async reportQueue(@Req() request: Request) {
+    this.reviewKey(request);
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const result = await databasePool.query(
+      `SELECT r.id, r.reason, r.status, r.created_at, r.post_id, r.comment_id,
+              reporter.display_name AS reporter_name, p.body AS post_body, c.body AS comment_body
+       FROM feed_reports r JOIN users reporter ON reporter.id = r.reporter_user_id
+       LEFT JOIN feed_posts p ON p.id = r.post_id LEFT JOIN feed_comments c ON c.id = r.comment_id
+       WHERE r.status = 'open' ORDER BY r.created_at ASC LIMIT 100`,
+    );
+    return { reports: result.rows };
+  }
+
+  @Patch('moderation/reports/:id')
+  async reviewReport(@Param('id') id: string, @Req() request: Request, @Body() body: { action?: string }) {
+    const keyId = this.reviewKey(request);
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid report id.');
+    if (!['hide', 'dismiss'].includes(body?.action || '')) throw new BadRequestException('Choose hide or dismiss.');
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const found = await client.query("SELECT * FROM feed_reports WHERE id = $1 AND status = 'open' FOR UPDATE", [id]);
+      if (!found.rowCount) throw new NotFoundException('Open report not found.');
+      const report = found.rows[0];
+      if (body.action === 'hide') {
+        if (report.post_id) await client.query("UPDATE feed_posts SET status = 'hidden', updated_at = now() WHERE id = $1", [report.post_id]);
+        if (report.comment_id) await client.query("UPDATE feed_comments SET status = 'hidden' WHERE id = $1", [report.comment_id]);
+      }
+      await client.query("UPDATE feed_reports SET status = $1, reviewed_by = $2, reviewed_at = now() WHERE id = $3", [body.action === 'hide' ? 'reviewed' : 'dismissed', keyId, id]);
+      await client.query(
+        "INSERT INTO audit_events (event_type, entity_type, entity_id, metadata) VALUES ('feed.report.reviewed', 'feed_report', $1, $2::jsonb)",
+        [id, JSON.stringify({ action: body.action, reviewer_key_id: keyId })],
+      );
+      await client.query('COMMIT');
+      return { success: true, message: body.action === 'hide' ? 'Reported content hidden.' : 'Report dismissed.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
+  }
+
+  @Post('announcements')
+  async announce(@Req() request: Request, @Body() body: { body?: string }) {
+    const keyId = this.reviewKey(request);
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const content = typeof body?.body === 'string' ? body.body.trim() : '';
+    if (content.length < 1 || content.length > 5000) throw new BadRequestException('Announcements must be between 1 and 5,000 characters.');
+    const result = await databasePool.query(
+      `INSERT INTO feed_posts (author_user_id, post_type, body, pinned)
+       SELECT u.id, 'announcement', $1, true FROM users u WHERE u.status = 'active'
+       ORDER BY u.created_at ASC LIMIT 1
+       RETURNING id, post_type, body, pinned, created_at`,
+      [content],
+    );
+    if (!result.rowCount) throw new ConflictException('No active account is available to own the announcement.');
+    await databasePool.query(
+      "INSERT INTO audit_events (event_type, entity_type, entity_id, metadata) VALUES ('feed.announcement.created', 'feed_post', $1, $2::jsonb)",
+      [result.rows[0].id, JSON.stringify({ reviewer_key_id: keyId })],
+    );
+    return { announcement: result.rows[0] };
+  }
+}
+
 @Controller('moderation')
 class ModerationController {
   private authorize(request: Request) {
@@ -1202,7 +1377,7 @@ class PublicMarketQuotesController {
   }
 }
 
-@Module({ controllers: [PublicMarketQuotesController, HealthController, AuthController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, ModerationController] })
+@Module({ controllers: [PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, ModerationController] })
 export class AppModule implements OnModuleDestroy {
   async onModuleDestroy() {
     if (databasePool) await databasePool.end();
