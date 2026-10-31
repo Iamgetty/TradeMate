@@ -972,13 +972,15 @@ function renderFeedDraftFiles(){
 }
 function addFeedDraftFile(file){
  if(feedDraftFiles.length>=4){toast('Attach up to 4 files.');return}
+ if(!file||!file.size){toast('The selected file is empty.');return}
  if(file.size>5*1024*1024){toast('Each attachment must be 5 MB or smaller.');return}
- var allowed=['image/jpeg','image/png','image/webp','image/gif','application/pdf','audio/webm','audio/ogg','audio/mp4','audio/mpeg','audio/wav'];
- if(allowed.indexOf(file.type)<0){toast('That file type is not supported.');return}
+ var mime=String(file.type||"").toLowerCase().split(";")[0],allowed=['image/jpeg','image/png','image/webp','image/gif','application/pdf','audio/webm','audio/ogg','audio/mp4','audio/mpeg','audio/wav'];
+ if(allowed.indexOf(mime)<0){toast('That file type is not supported.');return}
+ if(mime!==file.type)file=new File([file],file.name,{type:mime});
  feedDraftFiles.push(file);renderFeedDraftFiles();
 }
 function readFeedFile(file){
- return new Promise(function(resolve,reject){var reader=new FileReader();reader.onload=function(){resolve({name:file.name,type:file.type,data:reader.result})};reader.onerror=reject;reader.readAsDataURL(file)});
+ return new Promise(function(resolve,reject){var reader=new FileReader();reader.onload=function(){resolve({name:file.name,type:String(file.type||"").toLowerCase().split(";")[0],data:reader.result})};reader.onerror=reject;reader.readAsDataURL(file)});
 }
 function feed(){
  loadFeed(false);var types=['All','Posts','Feedback','Announcements'],rows=st.feedPosts||[];
@@ -989,7 +991,7 @@ function feed(){
  if(st.feedLoading)html+='<div class="empty">Loading community posts…</div>';
  else if(st.feedError)html+='<div class="empty"><b>Feed unavailable</b>'+esc(st.feedError)+'<button class="btn sm" data-act="feed-refresh">Try again</button></div>';
  else if(!shown.length)html+='<div class="empty"><b>No posts yet</b>Be the first to share an update or feedback.</div>';
- else html+=shown.map(function(p){return '<article class="card" style="margin:10px 16px"><b>'+esc(p.author||'TradeMate member')+'</b><small>'+esc(p.type)+' · '+esc(p.time)+'</small>'+(p.title?'<h3>'+esc(p.title)+'</h3>':'')+'<p style="white-space:pre-wrap">'+esc(p.body)+'</p>'+(p.attachments||[]).map(function(a){return '<p><a target="_blank" rel="noopener" href="'+esc(TMCFG.api+'/feed/posts/'+encodeURIComponent(p.id)+'/attachments/'+encodeURIComponent(a.id))+'">'+esc(a.file_name)+'</a></p>'}).join('')+'<div class="sub"><button data-feed-comments="'+esc(p.id)+'">Comments ('+Number(p.comments||0)+')</button><button data-feed-report="'+esc(p.id)+'">Report</button></div></article>'}).join('');
+ else html+=shown.map(function(p){return '<article class="card" style="margin:10px 16px"><b>'+esc(p.author||'TradeMate member')+'</b><small>'+esc(p.type)+' · '+esc(p.time)+'</small>'+(p.title?'<h3>'+esc(p.title)+'</h3>':'')+'<p style="white-space:pre-wrap">'+esc(p.body)+'</p>'+(p.attachments||[]).map(function(a){var url=TMCFG.api+'/feed/posts/'+encodeURIComponent(p.id)+'/attachments/'+encodeURIComponent(a.id),mime=String(a.content_type||"").toLowerCase();if(mime.indexOf("audio/")===0)return '<div class="sub"><audio controls preload="none" src="'+esc(url)+'"></audio><small>'+esc(a.file_name)+'</small></div>';if(mime.indexOf("image/")===0)return '<p><a target="_blank" rel="noopener" href="'+esc(url)+'"><img src="'+esc(url)+'" alt="'+esc(a.file_name)+'" style="display:block;max-width:100%;max-height:320px;object-fit:contain;border-radius:10px"></a></p>';return '<p><a target="_blank" rel="noopener" href="'+esc(url)+'">'+esc(a.file_name)+'</a></p>'}).join('')+'<div class="sub"><button data-feed-comments="'+esc(p.id)+'">Comments ('+Number(p.comments||0)+')</button><button data-feed-report="'+esc(p.id)+'">Report</button></div></article>'}).join('');
  return html+'<p class="fine">Posts and comments are shared through TradeMate accounts. Announcements are published by moderators.</p>';
 }
 function draw(){
@@ -1019,7 +1021,7 @@ document.addEventListener("click",function(e){var t=e.target;
    feedRecordStream=stream;feedRecordChunks=[];var mime=MediaRecorder.isTypeSupported("audio/webm")?"audio/webm":(MediaRecorder.isTypeSupported("audio/mp4")?"audio/mp4":"");
    feedRecorder=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
    feedRecorder.ondataavailable=function(ev){if(ev.data&&ev.data.size)feedRecordChunks.push(ev.data)};
-   feedRecorder.onstop=function(){var blob=new Blob(feedRecordChunks,{type:feedRecorder.mimeType||"audio/webm"});var ext=blob.type.indexOf("mp4")>=0?"m4a":"webm";addFeedDraftFile(new File([blob],"voice-note-"+Date.now()+"."+ext,{type:blob.type}));if(feedRecordStream){feedRecordStream.getTracks().forEach(function(x){x.stop()});feedRecordStream=null}var status=document.getElementById("feedRecordStatus");if(status)status.textContent="Voice note ready to publish.";var start=document.getElementById("feedRecordStart"),stop=document.getElementById("feedRecordStop");if(start)start.disabled=false;if(stop)stop.disabled=true};
+   feedRecorder.onstop=function(){var rawType=feedRecorder.mimeType||(feedRecordChunks[0]&&feedRecordChunks[0].type)||"audio/webm",blobType=String(rawType).toLowerCase().split(";")[0],blob=new Blob(feedRecordChunks,{type:blobType});var ext=blob.type.indexOf("mp4")>=0?"m4a":blob.type.indexOf("ogg")>=0?"ogg":blob.type.indexOf("mpeg")>=0?"mp3":"webm";addFeedDraftFile(new File([blob],"voice-note-"+Date.now()+"."+ext,{type:blob.type}));if(feedRecordStream){feedRecordStream.getTracks().forEach(function(x){x.stop()});feedRecordStream=null}var status=document.getElementById("feedRecordStatus");if(status)status.textContent="Voice note ready to publish.";var start=document.getElementById("feedRecordStart"),stop=document.getElementById("feedRecordStop");if(start)start.disabled=false;if(stop)stop.disabled=true};
    feedRecorder.start();var status=document.getElementById("feedRecordStatus");if(status)status.textContent="Recording…";t.disabled=true;var stop=document.getElementById("feedRecordStop");if(stop)stop.disabled=false;
   }).catch(function(){toast("Microphone permission was not granted.");});return;
  }
