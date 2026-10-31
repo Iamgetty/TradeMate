@@ -696,6 +696,349 @@ class EnquiriesController {
 
 
 
+
+@Controller('market/contracts')
+class MarketplaceContractsController {
+  private async authenticatedUser(request: Request): Promise<string> {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to manage contracts.');
+    const session = await databasePool.query(
+      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+      [tokenDigest(token)],
+    );
+    if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    return session.rows[0].id as string;
+  }
+
+  private async authorizedContract(id: string, userId: string) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      throw new BadRequestException('id must be a valid contract UUID.');
+    }
+    const result = await databasePool!.query(
+      \`SELECT c.*, l.title AS listing_title, l.listing_type, o.name AS seller_name,
+              buyer.display_name AS buyer_name,
+              (c.buyer_user_id = $2) AS is_buyer,
+              EXISTS (
+                SELECT 1 FROM organization_members om
+                WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2
+              ) AS is_seller
+       FROM marketplace_contracts c
+       JOIN listings l ON l.id = c.listing_id
+       JOIN organizations o ON o.id = c.seller_organization_id
+       JOIN users buyer ON buyer.id = c.buyer_user_id
+       WHERE c.id = $1
+         AND (c.buyer_user_id = $2 OR EXISTS (
+           SELECT 1 FROM organization_members om
+           WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2
+         ))
+       LIMIT 1\`,
+      [id, userId],
+    );
+    if (!result.rowCount) throw new NotFoundException('Contract not found.');
+    return result.rows[0];
+  }
+
+  @Post()
+  async create(
+    @Req() request: Request,
+    @Body() body: {
+      listingId?: string;
+      amount?: string | number;
+      scope?: string;
+      terms?: string;
+      startDate?: string;
+      completionDate?: string;
+    },
+  ) {
+    const buyerId = await this.authenticatedUser(request);
+    const listingId = typeof body?.listingId === 'string' ? body.listingId.trim() : '';
+    const amountText = String(body?.amount ?? '').trim();
+    const scope = typeof body?.scope === 'string' ? body.scope.trim() : '';
+    const terms = typeof body?.terms === 'string' ? body.terms.trim() : '';
+    const startDate = typeof body?.startDate === 'string' && body.startDate.trim() ? body.startDate.trim() : null;
+    const completionDate = typeof body?.completionDate === 'string' && body.completionDate.trim() ? body.completionDate.trim() : null;
+    const validDate = (value: string | null) => value === null ||
+      (/^\\d{4}-\\d{2}-\\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) &&
+       new Date(value + 'T00:00:00Z').toISOString().slice(0, 10) === value);
+
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(listingId)) {
+      throw new BadRequestException('listingId must be a valid offer UUID.');
+    }
+    if (!/^\\d{1,12}(\\.\\d{1,2})?$/.test(amountText)) {
+      throw new BadRequestException('Enter a proposed contract value with up to two decimal places.');
+    }
+    if (scope.length < 5 || scope.length > 5000) {
+      throw new BadRequestException('Contract scope must be between 5 and 5,000 characters.');
+    }
+    if (terms.length < 5 || terms.length > 10000) {
+      throw new BadRequestException('Contract terms must be between 5 and 10,000 characters.');
+    }
+    if (!validDate(startDate) || !validDate(completionDate)) {
+      throw new BadRequestException('Use valid dates in YYYY-MM-DD format.');
+    }
+    if (startDate && completionDate && completionDate < startDate) {
+      throw new BadRequestException('The completion date cannot be before the start date.');
+    }
+    const amountMinorUnits = Math.round(Number(amountText) * 100);
+    if (!Number.isSafeInteger(amountMinorUnits) || amountMinorUnits < 0) {
+      throw new BadRequestException('Enter a valid non-negative contract value.');
+    }
+
+    const listing = await databasePool!.query(
+      \`SELECT l.id, l.title, l.listing_type, l.seller_organization_id, l.currency_code,
+              l.status, o.status AS organization_status
+       FROM listings l
+       JOIN organizations o ON o.id = l.seller_organization_id
+       WHERE l.id = $1 AND l.status = 'published' AND o.status = 'active'
+         AND l.listing_type IN ('service', 'b2b')
+       LIMIT 1\`,
+      [listingId],
+    );
+    if (!listing.rowCount) throw new NotFoundException('This published Services or B2B offer is not available for a contract.');
+    const offer = listing.rows[0];
+    const sellerMembership = await databasePool!.query(
+      'SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1',
+      [offer.seller_organization_id, buyerId],
+    );
+    if (sellerMembership.rowCount) throw new BadRequestException('You cannot propose a contract to your own business space.');
+
+    const created = await databasePool!.query(
+      \`INSERT INTO marketplace_contracts
+       (listing_id, buyer_user_id, seller_organization_id, title, scope, terms,
+        amount_minor_units, currency_code, requested_start_date, requested_completion_date, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'proposed')
+       RETURNING id, listing_id, buyer_user_id, seller_organization_id, title, scope, terms,
+                 amount_minor_units::text AS amount_minor_units, currency_code,
+                 requested_start_date, requested_completion_date, status, created_at\`,
+      [listingId, buyerId, offer.seller_organization_id, offer.title, scope, terms,
+       String(amountMinorUnits), offer.currency_code, startDate, completionDate],
+    );
+    await databasePool!.query(
+      "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_proposed','contract',$3,$4::jsonb)",
+      [buyerId, offer.seller_organization_id, created.rows[0].id, JSON.stringify({ listing_id: listingId, listing_type: offer.listing_type })],
+    );
+    return { data: created.rows[0], message: 'Contract proposal sent to the business for review.' };
+  }
+
+  @Get('mine')
+  async mine(@Req() request: Request) {
+    const userId = await this.authenticatedUser(request);
+    const result = await databasePool!.query(
+      \`SELECT c.id, c.listing_id, c.buyer_user_id, c.seller_organization_id, c.title,
+              c.scope, c.terms, c.amount_minor_units::text AS amount_minor_units, c.currency_code,
+              c.requested_start_date, c.requested_completion_date, c.status,
+              c.accepted_at, c.buyer_confirmed_at, c.seller_confirmed_at, c.completed_at,
+              c.created_at, c.updated_at, l.listing_type, o.name AS seller_name,
+              buyer.display_name AS buyer_name,
+              CASE WHEN c.buyer_user_id = $1 THEN 'sent' ELSE 'received' END AS direction
+       FROM marketplace_contracts c
+       JOIN listings l ON l.id = c.listing_id
+       JOIN organizations o ON o.id = c.seller_organization_id
+       JOIN users buyer ON buyer.id = c.buyer_user_id
+       WHERE c.buyer_user_id = $1
+          OR EXISTS (
+            SELECT 1 FROM organization_members om
+            WHERE om.organization_id = c.seller_organization_id AND om.user_id = $1
+          )
+       ORDER BY c.created_at DESC, c.id
+       LIMIT 100\`,
+      [userId],
+    );
+    return { data: result.rows };
+  }
+
+  @Get(':id')
+  async getOne(@Param('id') id: string, @Req() request: Request) {
+    const userId = await this.authenticatedUser(request);
+    return { data: await this.authorizedContract(id, userId) };
+  }
+
+  @Patch(':id/respond')
+  async respond(
+    @Param('id') id: string,
+    @Req() request: Request,
+    @Body() body: { decision?: string },
+  ) {
+    const userId = await this.authenticatedUser(request);
+    if (!['accept', 'reject'].includes(body?.decision || '')) {
+      throw new BadRequestException('decision must be accept or reject.');
+    }
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const current = await client.query(
+        \`SELECT c.id, c.status, c.seller_organization_id,
+                EXISTS (SELECT 1 FROM organization_members om
+                        WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2) AS is_seller
+         FROM marketplace_contracts c WHERE c.id = $1 FOR UPDATE\`,
+        [id, userId],
+      );
+      if (!current.rowCount) throw new NotFoundException('Contract not found.');
+      if (!current.rows[0].is_seller) throw new NotFoundException('Contract not found.');
+      if (current.rows[0].status !== 'proposed') throw new ConflictException('This contract proposal is no longer awaiting a response.');
+      const status = body.decision === 'accept' ? 'accepted' : 'rejected';
+      const updated = await client.query(
+        \`UPDATE marketplace_contracts
+         SET status = $2, accepted_by_user_id = CASE WHEN $2 = 'accepted' THEN $3 ELSE NULL END,
+             accepted_at = CASE WHEN $2 = 'accepted' THEN now() ELSE NULL END, updated_at = now()
+         WHERE id = $1
+         RETURNING id, status, accepted_by_user_id, accepted_at, updated_at\`,
+        [id, status, userId],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,$3,'contract',$4,$5::jsonb)",
+        [userId, current.rows[0].seller_organization_id, status === 'accepted' ? 'marketplace.contract_accepted' : 'marketplace.contract_rejected', id, JSON.stringify({ status })],
+      );
+      await client.query('COMMIT');
+      return { data: updated.rows[0], message: status === 'accepted' ? 'Contract accepted.' : 'Contract proposal declined.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  @Patch(':id/cancel')
+  async cancel(@Param('id') id: string, @Req() request: Request) {
+    const userId = await this.authenticatedUser(request);
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const current = await client.query(
+        'SELECT id, buyer_user_id, seller_organization_id, status FROM marketplace_contracts WHERE id = $1 FOR UPDATE',
+        [id],
+      );
+      if (!current.rowCount || current.rows[0].buyer_user_id !== userId) throw new NotFoundException('Contract not found.');
+      if (current.rows[0].status !== 'proposed') throw new ConflictException('Only a pending contract proposal can be cancelled.');
+      const updated = await client.query(
+        "UPDATE marketplace_contracts SET status = 'cancelled', updated_at = now() WHERE id = $1 RETURNING id, status, updated_at",
+        [id],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_cancelled','contract',$3,'{}'::jsonb)",
+        [userId, current.rows[0].seller_organization_id, id],
+      );
+      await client.query('COMMIT');
+      return { data: updated.rows[0], message: 'Contract proposal cancelled.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  @Patch(':id/confirm-completion')
+  async confirmCompletion(@Param('id') id: string, @Req() request: Request) {
+    const userId = await this.authenticatedUser(request);
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const current = await client.query(
+        \`SELECT c.id, c.status, c.buyer_user_id, c.seller_organization_id,
+                c.buyer_confirmed_at, c.seller_confirmed_at,
+                EXISTS (SELECT 1 FROM organization_members om
+                        WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2) AS is_seller
+         FROM marketplace_contracts c WHERE c.id = $1 FOR UPDATE\`,
+        [id, userId],
+      );
+      if (!current.rowCount) throw new NotFoundException('Contract not found.');
+      const contract = current.rows[0];
+      const isBuyer = contract.buyer_user_id === userId;
+      if (!isBuyer && !contract.is_seller) throw new NotFoundException('Contract not found.');
+      if (contract.status !== 'accepted') throw new ConflictException('Only an accepted contract can be confirmed as fulfilled.');
+      const buyerConfirmed = Boolean(contract.buyer_confirmed_at) || isBuyer;
+      const sellerConfirmed = Boolean(contract.seller_confirmed_at) || Boolean(contract.is_seller);
+      const completed = buyerConfirmed && sellerConfirmed;
+      const updated = await client.query(
+        \`UPDATE marketplace_contracts
+         SET buyer_confirmed_at = CASE WHEN $2 THEN COALESCE(buyer_confirmed_at, now()) ELSE buyer_confirmed_at END,
+             seller_confirmed_at = CASE WHEN $3 THEN COALESCE(seller_confirmed_at, now()) ELSE seller_confirmed_at END,
+             status = CASE WHEN $4 THEN 'completed' ELSE status END,
+             completed_at = CASE WHEN $4 THEN COALESCE(completed_at, now()) ELSE completed_at END,
+             updated_at = now()
+         WHERE id = $1
+         RETURNING id, status, buyer_confirmed_at, seller_confirmed_at, completed_at, updated_at\`,
+        [id, isBuyer, Boolean(contract.is_seller), completed],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_fulfilment_confirmed','contract',$3,$4::jsonb)",
+        [userId, contract.seller_organization_id, id, JSON.stringify({ completed })],
+      );
+      await client.query('COMMIT');
+      return { data: updated.rows[0], message: completed ? 'Both parties confirmed fulfilment. Contract completed.' : 'Your confirmation is recorded. The other party must also confirm fulfilment.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  @Get(':id/messages')
+  async messages(@Param('id') id: string, @Req() request: Request) {
+    const userId = await this.authenticatedUser(request);
+    const contract = await this.authorizedContract(id, userId);
+    const result = await databasePool!.query(
+      \`SELECT m.id, m.contract_id, m.sender_user_id, u.display_name AS sender_name,
+              m.message, m.created_at
+       FROM marketplace_contract_messages m
+       JOIN users u ON u.id = m.sender_user_id
+       WHERE m.contract_id = $1
+       ORDER BY m.created_at ASC, m.id ASC
+       LIMIT 500\`,
+      [id],
+    );
+    return { data: { contract, messages: result.rows } };
+  }
+
+  @Post(':id/messages')
+  async reply(@Param('id') id: string, @Req() request: Request, @Body() body: { message?: string }) {
+    const userId = await this.authenticatedUser(request);
+    const message = typeof body?.message === 'string' ? body.message.trim() : '';
+    if (message.length < 1 || message.length > 2000) {
+      throw new BadRequestException('Your message must be between 1 and 2,000 characters.');
+    }
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const current = await client.query(
+        \`SELECT c.id, c.status, c.seller_organization_id,
+                (c.buyer_user_id = $2) AS is_buyer,
+                EXISTS (SELECT 1 FROM organization_members om
+                        WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2) AS is_seller
+         FROM marketplace_contracts c WHERE c.id = $1 FOR UPDATE\`,
+        [id, userId],
+      );
+      if (!current.rowCount || (!current.rows[0].is_buyer && !current.rows[0].is_seller)) {
+        throw new NotFoundException('Contract not found.');
+      }
+      if (!['proposed', 'accepted'].includes(current.rows[0].status)) {
+        throw new ConflictException('This contract is closed for new messages.');
+      }
+      const inserted = await client.query(
+        'INSERT INTO marketplace_contract_messages (contract_id, sender_user_id, message) VALUES ($1,$2,$3) RETURNING id, contract_id, sender_user_id, message, created_at',
+        [id, userId, message],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_message_sent','contract',$3,'{}'::jsonb)",
+        [userId, current.rows[0].seller_organization_id, id],
+      );
+      await client.query('COMMIT');
+      const sender = await databasePool!.query('SELECT display_name FROM users WHERE id = $1 LIMIT 1', [userId]);
+      return { data: { ...inserted.rows[0], sender_name: sender.rows[0]?.display_name ?? 'TradeMate user' }, message: 'Contract message sent.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+}
+
+
 @Controller('market/trades')
 class MarketplaceTradesController {
   private async userId(request: Request): Promise<string> {
