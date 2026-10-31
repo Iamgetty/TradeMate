@@ -956,7 +956,7 @@ class MarketplaceContractsController {
       if (!isBuyer && !contract.can_manage_contract) throw new NotFoundException('Contract not found.');
       if (contract.status !== 'accepted') throw new ConflictException('Only an accepted contract can be confirmed as fulfilled.');
       const buyerConfirmed = Boolean(contract.buyer_confirmed_at) || isBuyer;
-      const sellerActor = Boolean(contract.is_seller) && !isBuyer;
+      const sellerActor = Boolean(contract.can_manage_contract) && !isBuyer;
       const sellerConfirmed = Boolean(contract.seller_confirmed_at) || sellerActor;
       const completed = buyerConfirmed && sellerConfirmed;
       const updated = await client.query(
