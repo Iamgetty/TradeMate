@@ -1147,7 +1147,62 @@ class ModerationController {
   }
 }
 
-@Module({ controllers: [HealthController, AuthController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, ModerationController] })
+
+const MARKET_SYMBOLS = new Set([
+  '^GSPC','^DJI','^IXIC','^FTSE','^GDAXI','^FCHI','^N225','^HSI','^STOXX50E','^NSEI',
+  'GC=F','SI=F','CL=F','BZ=F','NG=F','HG=F','ZW=F','ZC=F','ZS=F','KC=F',
+  'AAPL','MSFT','NVDA','AMZN','GOOGL','META','TSLA','BRK-B','JPM','AVGO',
+  '^IRX','^FVX','^TNX','^TYX','TLT','IEF','SHY','GOVT','TIP','VGIT',
+]);
+const marketQuoteCache = new Map<string, { expiresAt: number; value: any }>();
+
+@Controller('market')
+class PublicMarketQuotesController {
+  @Get('quotes')
+  async quotes(@Query('symbols') raw: string) {
+    const requested = [...new Set(String(raw || '').split(',').map((s) => s.trim()).filter(Boolean))];
+    if (!requested.length || requested.length > 10 || requested.some((symbol) => !MARKET_SYMBOLS.has(symbol))) {
+      throw new BadRequestException('Request up to 10 supported market symbols.');
+    }
+    const now = Date.now();
+    const results = await Promise.all(requested.map(async (symbol) => {
+      const cached = marketQuoteCache.get(symbol);
+      if (cached && cached.expiresAt > now) return cached.value;
+      try {
+        const url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(symbol) + '?range=1d&interval=1m';
+        const response = await fetch(url, {
+          headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0 TradeMateMarketData/1.0' },
+          signal: AbortSignal.timeout(7000),
+        });
+        if (!response.ok) throw new Error('Upstream quote unavailable');
+        const payload: any = await response.json();
+        const result = payload?.chart?.result?.[0];
+        const meta = result?.meta;
+        const price = Number(meta?.regularMarketPrice);
+        const previous = Number(meta?.chartPreviousClose ?? meta?.previousClose);
+        const timestamp = Number(meta?.regularMarketTime) * 1000;
+        if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(timestamp) || timestamp <= 0) {
+          throw new Error('Upstream returned no current quote');
+        }
+        const value = {
+          symbol, price, previousClose: Number.isFinite(previous) && previous > 0 ? previous : null,
+          changePercent: Number.isFinite(previous) && previous > 0 ? ((price - previous) / previous) * 100 : null,
+          currency: typeof meta.currency === 'string' ? meta.currency : null,
+          marketTime: new Date(timestamp).toISOString(),
+          exchange: typeof meta.fullExchangeName === 'string' ? meta.fullExchangeName : null,
+          status: Date.now() - timestamp < 15 * 60 * 1000 ? 'live' : 'delayed',
+        };
+        marketQuoteCache.set(symbol, { expiresAt: Date.now() + 30000, value });
+        return value;
+      } catch {
+        return { symbol, status: 'unavailable', price: null, previousClose: null, changePercent: null, currency: null, marketTime: null, exchange: null };
+      }
+    }));
+    return { quotes: results, source: 'Yahoo Finance chart data', fetchedAt: new Date().toISOString() };
+  }
+}
+
+@Module({ controllers: [PublicMarketQuotesController, HealthController, AuthController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, ModerationController] })
 export class AppModule implements OnModuleDestroy {
   async onModuleDestroy() {
     if (databasePool) await databasePool.end();
