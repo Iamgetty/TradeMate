@@ -1455,6 +1455,9 @@ var _a8=act;act=function(n,a,el){
 /* Same-origin API (cookie session). Set window.TM_CONFIG={api:"/api"} before app.js.            */
 /* Without TM_CONFIG the app runs in local mode (data stays on this device).                       */
 var TMCFG=window.TM_CONFIG||{},CONNECTED=!!TMCFG.api,KEY="tm.live.v2";
+/* Prevent the authenticated shell from flashing before cookie-session validation. */
+var AUTH_GATE_STYLE=null;if(CONNECTED){AUTH_GATE_STYLE=d.createElement("style");AUTH_GATE_STYLE.id="tm-auth-gate";AUTH_GATE_STYLE.textContent="#app,#nav,#pg{visibility:hidden!important}";h.appendChild(AUTH_GATE_STYLE)}
+function releaseAuthGate(){if(AUTH_GATE_STYLE){AUTH_GATE_STYLE.remove();AUTH_GATE_STYLE=null}}
 var CSYM={NGN:"₦",USD:"$",EUR:"€",GBP:"£",GHS:"₵",KES:"KSh"},PER={"Per month":" /mo","Per year":" /yr","Per night":" /night"};
 var ISO={"Nigeria":"NG","Ghana":"GH","Kenya":"KE","South Africa":"ZA","Uganda":"UG","Tanzania":"TZ","Rwanda":"RW","Ethiopia":"ET","Egypt":"EG","Morocco":"MA","Senegal":"SN","Côte d’Ivoire":"CI","Cameroon":"CM","Zambia":"ZM","Zimbabwe":"ZW","United States":"US","Canada":"CA","United Kingdom":"GB","Ireland":"IE","Germany":"DE","France":"FR","Spain":"ES","Italy":"IT","Netherlands":"NL","Portugal":"PT","Turkey":"TR","United Arab Emirates":"AE","Saudi Arabia":"SA","Qatar":"QA","India":"IN","Pakistan":"PK","Bangladesh":"BD","China":"CN","Japan":"JP","South Korea":"KR","Singapore":"SG","Malaysia":"MY","Indonesia":"ID","Philippines":"PH","Thailand":"TH","Vietnam":"VN","Australia":"AU","New Zealand":"NZ","Brazil":"BR","Mexico":"MX","Argentina":"AR","Colombia":"CO","Chile":"CL"},CNAME={};
 Object.keys(ISO).forEach(function(k){CNAME[ISO[k]]=k});
@@ -1676,6 +1679,6 @@ R.addEventListener("keydown",function(e){var t=e.target;if(t.classList&&t.classL
 $("#bk2").onclick=function(){show("land")};
 $("#ab5").innerHTML=Object.keys(DS).map(function(k){return '<div class="wc" style="--c:'+COL[k]+'"><span class="ic">'+IC[k]+'</span><div><h3>'+k+'</h3><p>'+DS[k]+'</p></div></div>'}).join("");
 R.addEventListener("click",function(e){if(e.target.closest("[data-about]")){show("about");return}var kk=e.target.closest("[data-k]");if(kk){kact(kk);return}var l=e.target.closest("[data-login]");if(l){startFlow(l.dataset.login);return}var g=e.target.closest("[data-go]");if(g){var t=g.dataset.go==="top"?sc:R.getElementById(g.dataset.go);if(g.dataset.go==="top")sc.scrollTo({top:0,behavior:"smooth"});else if(t)sc.scrollTo({top:t.offsetTop-70,behavior:"smooth"})}});
-if(CONNECTED){host.style.visibility="hidden";api("GET","/auth/me").then(function(r){window.applyUser(r.user);host.style.display="none";try{window.draw();navH()}catch(e){}}).catch(function(){}).then(function(){host.style.visibility="";if(window.tmReveal)window.tmReveal()})}else if(window.tmReveal)window.tmReveal();
+if(CONNECTED){host.style.visibility="hidden";api("GET","/auth/me").then(function(r){window.applyUser(r.user);host.style.display="none";try{window.draw();navH()}catch(e){}releaseAuthGate()}).catch(function(){resetSession();st.stack=[];st.tab="Home";try{window.openLanding()}catch(e){host.style.display="block";show("land")}releaseAuthGate()}).then(function(){host.style.visibility="";if(window.tmReveal)window.tmReveal()})}else if(window.tmReveal)window.tmReveal();
 })();
 
