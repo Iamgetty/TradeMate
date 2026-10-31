@@ -1329,8 +1329,8 @@ function lblOf(it,t){return t==="contract"?"Propose contract":"Contact"}
 var DESC={Services:"Professional work delivered on time. Review the scope and propose a contract with the provider.",NFTs:"Digital collectible information and ownership history. This section is reference-only; TradeMate does not process direct purchases.",Software:"Software information and licensing context. Discuss a business arrangement with a verified provider before any agreement.","Real Estate":"Property listing. Message the seller to arrange a viewing or discuss your offer.",B2B:"Business opportunity or partnership. Discuss scope, due diligence, responsibilities and commercial terms with the counterparty."};
 function detsOf(it){var M={Services:[["Delivery","1–3 days"],["Mode","Remote"],["Revisions","2 included"]],NFTs:[["Collection","Pixel Cats"],["Chain","Ethereum"],["Token","#12"]],Software:[["Licence","Source code transfer"],["Platform","Web"],["Support","30 days"]],"Real Estate":[["Listing","For sale"],["Location","Lagos, Nigeria"],["Size","120 sqm"]],B2B:[["Industry","Food & beverage"],["Stage","Established"],["Years operating","5–10"]]};return M[it.m]||[]}
 function metaOf(it){return {opts:SELL[it.m]||[]}}
-var TL={chat:["Conversation open"]};
-var DT={chat:"Conversation"};
+var TL={p2p:["Order created","Payment sent","Asset released","Completed"],chat:["Conversation open"]};
+var DT={p2p:"P2P order",chat:"Conversation"};
 st.deals=[];st.dt="All";st.contracts=[];st.contractsLoaded=false;st.ct="All";
 function newDeal(o){o.id="TM-"+(2001+st.deals.length);o.step=0;o.created="Just now";o.msgs=o.msgs||[];st.deals.unshift(o);return o.id}
 function findDeal(id){return st.deals.filter(function(d){return d.id===id})[0]}
