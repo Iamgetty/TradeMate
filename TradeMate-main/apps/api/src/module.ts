@@ -873,7 +873,7 @@ class MarketplaceContractsController {
       const current = await client.query(
         `SELECT c.id, c.status, c.buyer_user_id, c.seller_organization_id,
                 EXISTS (SELECT 1 FROM organization_members om
-                        WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2) AND om.member_role IN ('owner', 'admin')) AS can_manage_contract
+                        WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2 AND om.member_role IN ('owner', 'admin')) AS can_manage_contract
          FROM marketplace_contracts c WHERE c.id = $1 FOR UPDATE`,
         [id, userId],
       );
@@ -945,7 +945,7 @@ class MarketplaceContractsController {
         `SELECT c.id, c.status, c.buyer_user_id, c.seller_organization_id,
                 c.buyer_confirmed_at, c.seller_confirmed_at,
                 EXISTS (SELECT 1 FROM organization_members om
-                        WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2) AND om.member_role IN ('owner', 'admin')) AS can_manage_contract
+                        WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2 AND om.member_role IN ('owner', 'admin')) AS can_manage_contract
          FROM marketplace_contracts c WHERE c.id = $1 FOR UPDATE`,
         [id, userId],
       );
