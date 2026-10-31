@@ -871,7 +871,7 @@ function trade(){
   return h+'<div class="tpx"><b>'+px(it)+'</b><span>'+esc(unit)+'</span></div><div class="card" style="margin:8px 16px"><b>'+status+'</b><p style="color:var(--mut);margin:6px 0 0">'+esc(it.assetClass)+' · '+(it.quoteTime?"Updated "+new Date(it.quoteTime).toLocaleString():"No quote timestamp yet")+'</p></div><p class="fine">Reference pricing from the public market-quote provider. This instrument is grouped under the Forex marketplace; executable order-book and trade feeds are not connected for this asset class.</p>';
  }
  if(fxm){
-  return h+'<div class="empty"><b>Live FX market feed not connected yet</b>Forex is an over-the-counter market. TradeMate will show provider-sourced bid/ask quotes when the live FX feed is integrated. No synthetic spread or invented trade records are displayed.</div>';
+  return h+'<div class="empty"><b>Indicative FX reference rates only</b>Currency conversion references are available in Markets → Forex → Currency Pairs. Live provider bid/ask execution data is not connected. TradeMate does not execute ordinary buy/sell orders here, and no synthetic spread is shown.</div>';
  }
  var kind=it.m==="Services"?"service":it.m==="B2B"?"b2b":null;
  if(kind)loadInternalTrades(kind);
