@@ -14,6 +14,7 @@ const MIGRATIONS = [
   '007_community_feed.sql',
   '008_feed_titles_attachments.sql',
   '009_b2b_listing_type.sql',
+  '010_marketplace_contracts.sql',
 ];
 
 async function main() {
