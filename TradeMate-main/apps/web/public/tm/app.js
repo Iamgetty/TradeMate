@@ -721,13 +721,17 @@ function money(n){return n>=1e12?"$"+(n/1e12).toFixed(2)+"T":n>=1e9?"$"+(n/1e9).
 function val(i){if(i.m==="Crypto")return i.cap?"MCap "+money(i.cap):"";if(i.m==="Forex"||typeof i.p==="number")return "";
  var n=pnum(i.p),s=psym(i.p),u=s==="$"?null:s==="Ξ"?n*byName("ETH/USDT").p:s==="₦"?n/byName("USD/NGN").p:null;return u==null?"":"≈ "+money(u)}
 function liveRefresh(){
- fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids="+Object.keys(CG).map(function(k){return CG[k]}).join(",")+"&price_change_percentage=24h").then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){
-  d.forEach(function(c){var k=Object.keys(CG).filter(function(x){return CG[x]===c.id})[0],it=k&&byName(k+"/USDT");if(!it||!(c.current_price>0))return;it.p=c.current_price;it.c=c.price_change_percentage_24h_in_currency!=null?c.price_change_percentage_24h_in_currency:(c.price_change_percentage_24h||0);if(c.market_cap)it.cap=c.market_cap;if(c.image&&!EMB[k])LOGOS[k]=c.image});st.live=true;softDraw()}).catch(function(){});
- fetch("https://open.er-api.com/v6/latest/USD").then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){var rates=d&&d.rates;if(!rates)return;
-  items.filter(function(i){return i.m==="Forex"}).forEach(function(it){var pair=it.n.split("/"),base=pair[0],quote=pair[1],b=base==="USD"?1:rates[base],q=quote==="USD"?1:rates[quote];if(b>0&&q>0)it.p=q/b});
-  st.live=true;softDraw()}).catch(function(){})
+ if(document.hidden||["Home","Markets","Trade","Portfolio","P2P"].indexOf(st.tab)<0)return;
+ var updated=false;
+ var coins=fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids="+Object.keys(CG).map(function(k){return CG[k]}).join(",")+"&price_change_percentage=24h").then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){
+  d.forEach(function(c){var k=Object.keys(CG).filter(function(x){return CG[x]===c.id})[0],it=k&&byName(k+"/USDT");if(!it||!(c.current_price>0))return;it.p=c.current_price;it.c=c.price_change_percentage_24h_in_currency!=null?c.price_change_percentage_24h_in_currency:(c.price_change_percentage_24h||0);if(c.market_cap)it.cap=c.market_cap;if(c.image&&!EMB[k])LOGOS[k]=c.image});st.live=true;updated=true
+ }).catch(function(){});
+ var fx=fetch("https://open.er-api.com/v6/latest/USD").then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){var rates=d&&d.rates;if(!rates)return;
+  items.filter(function(i){return i.m==="Forex"}).forEach(function(it){var pair=it.n.split("/"),base=pair[0],quote=pair[1],b=base==="USD"?1:rates[base],q=quote==="USD"?1:rates[quote];if(b>0&&q>0)it.p=q/b});st.live=true;updated=true
+ }).catch(function(){});
+ Promise.all([coins,fx]).then(function(){if(updated)softDraw()})
 }
-function softDraw(){var a=document.activeElement;if(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName))return;draw()}
+function softDraw(){if(["Home","Markets","Trade","Portfolio","P2P"].indexOf(st.tab)<0)return;var a=document.activeElement;if(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName))return;draw()}
 /* ---------- views ---------- */
 function topbar(){return '<div class="top"><button class="avb" data-pg="profile" aria-label="Profile">'+(st.me.photo?'<img src="'+st.me.photo+'" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">':ic("person"))+'</button><button class="srch" data-pg="search" aria-label="Search">'+ic("search")+'<span id="ph"></span><i class="car"></i></button><button class="ib" data-pg="scan" aria-label="Scan">'+ic("scan")+'</button><button class="ib" data-pg="support" aria-label="Support">'+ic("headset")+'</button><button class="ib" data-pg="notif" aria-label="Notifications">'+ic("bell")+(unread()?'<i></i>':'')+'</button></div>'}
 function rowH(i){
@@ -1572,7 +1576,7 @@ var _wn=PC.wnext;PC.wnext=function(){var w=st.cw;if(!w){_wn();return}var fin=w.s
 var _dr=draw;draw=function(){_dr();save()};
 /* ---- refresh: market + conversations ---- */
 if(CONNECTED){loadMarket();loadContracts();loadEnquiries();
- setInterval(function(){if(document.hidden)return;loadMarket();if(st.me.id){loadEnquiries();loadContracts()}},60000);
+ setInterval(function(){if(document.hidden)return;if(st.tab==="Markets")loadMarket();if(st.me.id){loadEnquiries();loadContracts()}},60000);
  setInterval(function(){var t=st.stack[st.stack.length-1],d=t&&t.id==="deal"&&findDeal(t.a);if(d&&d.eid&&!document.hidden)loadMsgs(d)},7000)}
 
 draw();navH();liveRefresh();setInterval(liveRefresh,90000);
