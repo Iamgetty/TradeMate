@@ -1,0 +1,50 @@
+name: TradeMate CI
+
+on:
+  push:
+    branches:
+      - main
+      - "work/**"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Web build and runtime syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate TradeMate runtime JavaScript
+        run: node --check TradeMate-main/apps/web/public/tm/app.js
+      - name: Install web dependencies
+        working-directory: TradeMate-main/apps/web
+        run: npm install --no-audit --no-fund
+      - name: Build web application
+        working-directory: TradeMate-main/apps/web
+        run: npm run build
+
+  api:
+    name: API TypeScript build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install API dependencies
+        working-directory: TradeMate-main/apps/api
+        run: npm install --no-audit --no-fund
+      - name: Build API
+        working-directory: TradeMate-main/apps/api
+        run: npm run build
