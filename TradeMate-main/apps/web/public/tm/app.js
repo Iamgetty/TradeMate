@@ -684,7 +684,7 @@ st.tp=items.findIndex(function(i){return i.n==="BTC/USDT"});
 var ads=[];
 function toast(t){var e=document.createElement("div");e.className="toast";e.textContent=t;document.body.appendChild(e);setTimeout(function(){e.remove()},2600)}
 function byName(n){return items.filter(function(i){return i.n===n})[0]}
-function px(i){return typeof i.p==="number"?fx2(i.p,i.m==="Forex"&&i.p<20?4:i.p<1?4:2):i.p}
+function px(i){if(typeof i.p!=="number")return i.p==null?"—":i.p;var v=fx2(i.p,i.m==="Forex"&&i.p<20?4:i.p<1?4:2);if(i.m==="Bonds & Treasuries"&&i.unit==="Yield %")return v+"%";if(i.m==="Stock Indices")return v;if(i.m==="Commodities"||i.m==="Equities"||i.m==="Bonds & Treasuries")return (i.quoteCurrency==="USD"?"$":(i.quoteCurrency?i.quoteCurrency+" ":""))+v;return v}
 function chg(c){return c==null?"":'<span class="chg '+(c>=0?"up":"dn")+'">'+(c>=0?"+":"")+c.toFixed(2)+'%</span>'}
 function unread(){return st.notifs.filter(function(n){return n.u}).length}
 function isFav(n){return st.favs.indexOf(n)>=0}
@@ -718,7 +718,10 @@ function liveRefresh(){
 function softDraw(){var a=document.activeElement;if(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName))return;draw()}
 /* ---------- views ---------- */
 function topbar(){return '<div class="top"><button class="avb" data-pg="profile" aria-label="Profile">'+(st.me.photo?'<img src="'+st.me.photo+'" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">':ic("person"))+'</button><button class="srch" data-pg="search" aria-label="Search">'+ic("search")+'<span id="ph"></span><i class="car"></i></button><button class="ib" data-pg="scan" aria-label="Scan">'+ic("scan")+'</button><button class="ib" data-pg="support" aria-label="Support">'+ic("headset")+'</button><button class="ib" data-pg="notif" aria-label="Notifications">'+ic("bell")+(unread()?'<i></i>':'')+'</button></div>'}
-function rowH(i){return '<div class="row" role="button" tabindex="0" data-open="'+esc(i.n)+'"><span class="nm"><button class="star'+(isFav(i.n)?" on":"")+'" data-fav="'+esc(i.n)+'" aria-label="Favorite">'+(isFav(i.n)?"★":"☆")+'</button><span class="coin" style="--ac:'+i.col+'">'+lg(i)+'</span><span><b>'+esc(i.n)+'</b><small>'+(val(i)||i.m)+'</small></span></span><span class="p" data-px="'+esc(i.n)+'">'+px(i)+'</span><span class="badge '+(i.c==null?"":i.c>=0?"up":"dn")+'">'+(i.c==null?"New":(i.c>=0?"+":"")+i.c.toFixed(2)+"%")+'</span></div>'}
+function rowH(i){
+ var meta=i.quoteStatus?(i.quoteStatus==="live"?"LIVE":i.quoteStatus==="delayed"?"DELAYED":"UNAVAILABLE")+(i.quoteTime?" · "+new Date(i.quoteTime).toLocaleTimeString():""):(i.providerSymbol?"Awaiting public quote"+(i.unit?" · "+i.unit:""):val(i)||i.m);
+ return '<div class="row" role="button" tabindex="0" data-open="'+esc(i.n)+'"><span class="nm"><button class="star'+(isFav(i.n)?" on":"")+'" data-fav="'+esc(i.n)+'" aria-label="Favorite">'+(isFav(i.n)?"★":"☆")+'</button><span class="coin" style="--ac:'+i.col+'">'+lg(i)+'</span><span><b>'+esc(i.n)+'</b><small>'+esc(meta)+'</small></span></span><span class="p" data-px="'+esc(i.n)+'">'+px(i)+'</span><span class="badge '+(i.c==null?"":i.c>=0?"up":"dn")+'">'+(i.c==null?(i.quoteStatus==="unavailable"?"Offline":i.providerSymbol?"—":"New"):(i.c>=0?"+":"")+i.c.toFixed(2)+"%")+'</span></div>'
+}
 function home(){
  var fv=st.ht==="Favorites",hm=fv?"All":st.hm,list=items.filter(function(i){return hm==="All"||i.m===hm});
  if(fv)list=st.favs.map(byName).filter(Boolean);
