@@ -716,7 +716,7 @@ class MarketplaceContractsController {
       throw new BadRequestException('id must be a valid contract UUID.');
     }
     const result = await databasePool!.query(
-      \`SELECT c.*, l.title AS listing_title, l.listing_type, o.name AS seller_name,
+      `SELECT c.*, l.title AS listing_title, l.listing_type, o.name AS seller_name,
               buyer.display_name AS buyer_name,
               (c.buyer_user_id = $2) AS is_buyer,
               EXISTS (
@@ -732,7 +732,7 @@ class MarketplaceContractsController {
            SELECT 1 FROM organization_members om
            WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2
          ))
-       LIMIT 1\`,
+       LIMIT 1`,
       [id, userId],
     );
     if (!result.rowCount) throw new NotFoundException('Contract not found.');
@@ -759,13 +759,13 @@ class MarketplaceContractsController {
     const startDate = typeof body?.startDate === 'string' && body.startDate.trim() ? body.startDate.trim() : null;
     const completionDate = typeof body?.completionDate === 'string' && body.completionDate.trim() ? body.completionDate.trim() : null;
     const validDate = (value: string | null) => value === null ||
-      (/^\\d{4}-\\d{2}-\\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) &&
+      (/^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) &&
        new Date(value + 'T00:00:00Z').toISOString().slice(0, 10) === value);
 
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(listingId)) {
       throw new BadRequestException('listingId must be a valid offer UUID.');
     }
-    if (!/^\\d{1,12}(\\.\\d{1,2})?$/.test(amountText)) {
+    if (!/^\d{1,12}(\\.\d{1,2})?$/.test(amountText)) {
       throw new BadRequestException('Enter a proposed contract value with up to two decimal places.');
     }
     if (scope.length < 5 || scope.length > 5000) {
@@ -786,13 +786,13 @@ class MarketplaceContractsController {
     }
 
     const listing = await databasePool!.query(
-      \`SELECT l.id, l.title, l.listing_type, l.seller_organization_id, l.currency_code,
+      `SELECT l.id, l.title, l.listing_type, l.seller_organization_id, l.currency_code,
               l.status, o.status AS organization_status
        FROM listings l
        JOIN organizations o ON o.id = l.seller_organization_id
        WHERE l.id = $1 AND l.status = 'published' AND o.status = 'active'
          AND l.listing_type IN ('service', 'b2b')
-       LIMIT 1\`,
+       LIMIT 1`,
       [listingId],
     );
     if (!listing.rowCount) throw new NotFoundException('This published Services or B2B offer is not available for a contract.');
@@ -804,13 +804,13 @@ class MarketplaceContractsController {
     if (sellerMembership.rowCount) throw new BadRequestException('You cannot propose a contract to your own business space.');
 
     const created = await databasePool!.query(
-      \`INSERT INTO marketplace_contracts
+      `INSERT INTO marketplace_contracts
        (listing_id, buyer_user_id, seller_organization_id, title, scope, terms,
         amount_minor_units, currency_code, requested_start_date, requested_completion_date, status)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'proposed')
        RETURNING id, listing_id, buyer_user_id, seller_organization_id, title, scope, terms,
                  amount_minor_units::text AS amount_minor_units, currency_code,
-                 requested_start_date, requested_completion_date, status, created_at\`,
+                 requested_start_date, requested_completion_date, status, created_at`,
       [listingId, buyerId, offer.seller_organization_id, offer.title, scope, terms,
        String(amountMinorUnits), offer.currency_code, startDate, completionDate],
     );
@@ -825,7 +825,7 @@ class MarketplaceContractsController {
   async mine(@Req() request: Request) {
     const userId = await this.authenticatedUser(request);
     const result = await databasePool!.query(
-      \`SELECT c.id, c.listing_id, c.buyer_user_id, c.seller_organization_id, c.title,
+      `SELECT c.id, c.listing_id, c.buyer_user_id, c.seller_organization_id, c.title,
               c.scope, c.terms, c.amount_minor_units::text AS amount_minor_units, c.currency_code,
               c.requested_start_date, c.requested_completion_date, c.status,
               c.accepted_at, c.buyer_confirmed_at, c.seller_confirmed_at, c.completed_at,
@@ -842,7 +842,7 @@ class MarketplaceContractsController {
             WHERE om.organization_id = c.seller_organization_id AND om.user_id = $1
           )
        ORDER BY c.created_at DESC, c.id
-       LIMIT 100\`,
+       LIMIT 100`,
       [userId],
     );
     return { data: result.rows };
@@ -868,10 +868,10 @@ class MarketplaceContractsController {
     try {
       await client.query('BEGIN');
       const current = await client.query(
-        \`SELECT c.id, c.status, c.seller_organization_id,
+        `SELECT c.id, c.status, c.seller_organization_id,
                 EXISTS (SELECT 1 FROM organization_members om
                         WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2) AS is_seller
-         FROM marketplace_contracts c WHERE c.id = $1 FOR UPDATE\`,
+         FROM marketplace_contracts c WHERE c.id = $1 FOR UPDATE`,
         [id, userId],
       );
       if (!current.rowCount) throw new NotFoundException('Contract not found.');
@@ -879,11 +879,11 @@ class MarketplaceContractsController {
       if (current.rows[0].status !== 'proposed') throw new ConflictException('This contract proposal is no longer awaiting a response.');
       const status = body.decision === 'accept' ? 'accepted' : 'rejected';
       const updated = await client.query(
-        \`UPDATE marketplace_contracts
+        `UPDATE marketplace_contracts
          SET status = $2, accepted_by_user_id = CASE WHEN $2 = 'accepted' THEN $3 ELSE NULL END,
              accepted_at = CASE WHEN $2 = 'accepted' THEN now() ELSE NULL END, updated_at = now()
          WHERE id = $1
-         RETURNING id, status, accepted_by_user_id, accepted_at, updated_at\`,
+         RETURNING id, status, accepted_by_user_id, accepted_at, updated_at`,
         [id, status, userId],
       );
       await client.query(
@@ -937,11 +937,11 @@ class MarketplaceContractsController {
     try {
       await client.query('BEGIN');
       const current = await client.query(
-        \`SELECT c.id, c.status, c.buyer_user_id, c.seller_organization_id,
+        `SELECT c.id, c.status, c.buyer_user_id, c.seller_organization_id,
                 c.buyer_confirmed_at, c.seller_confirmed_at,
                 EXISTS (SELECT 1 FROM organization_members om
                         WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2) AS is_seller
-         FROM marketplace_contracts c WHERE c.id = $1 FOR UPDATE\`,
+         FROM marketplace_contracts c WHERE c.id = $1 FOR UPDATE`,
         [id, userId],
       );
       if (!current.rowCount) throw new NotFoundException('Contract not found.');
@@ -953,14 +953,14 @@ class MarketplaceContractsController {
       const sellerConfirmed = Boolean(contract.seller_confirmed_at) || Boolean(contract.is_seller);
       const completed = buyerConfirmed && sellerConfirmed;
       const updated = await client.query(
-        \`UPDATE marketplace_contracts
+        `UPDATE marketplace_contracts
          SET buyer_confirmed_at = CASE WHEN $2 THEN COALESCE(buyer_confirmed_at, now()) ELSE buyer_confirmed_at END,
              seller_confirmed_at = CASE WHEN $3 THEN COALESCE(seller_confirmed_at, now()) ELSE seller_confirmed_at END,
              status = CASE WHEN $4 THEN 'completed' ELSE status END,
              completed_at = CASE WHEN $4 THEN COALESCE(completed_at, now()) ELSE completed_at END,
              updated_at = now()
          WHERE id = $1
-         RETURNING id, status, buyer_confirmed_at, seller_confirmed_at, completed_at, updated_at\`,
+         RETURNING id, status, buyer_confirmed_at, seller_confirmed_at, completed_at, updated_at`,
         [id, isBuyer, Boolean(contract.is_seller), completed],
       );
       await client.query(
@@ -982,13 +982,13 @@ class MarketplaceContractsController {
     const userId = await this.authenticatedUser(request);
     const contract = await this.authorizedContract(id, userId);
     const result = await databasePool!.query(
-      \`SELECT m.id, m.contract_id, m.sender_user_id, u.display_name AS sender_name,
+      `SELECT m.id, m.contract_id, m.sender_user_id, u.display_name AS sender_name,
               m.message, m.created_at
        FROM marketplace_contract_messages m
        JOIN users u ON u.id = m.sender_user_id
        WHERE m.contract_id = $1
        ORDER BY m.created_at ASC, m.id ASC
-       LIMIT 500\`,
+       LIMIT 500`,
       [id],
     );
     return { data: { contract, messages: result.rows } };
@@ -1005,11 +1005,11 @@ class MarketplaceContractsController {
     try {
       await client.query('BEGIN');
       const current = await client.query(
-        \`SELECT c.id, c.status, c.seller_organization_id,
+        `SELECT c.id, c.status, c.seller_organization_id,
                 (c.buyer_user_id = $2) AS is_buyer,
                 EXISTS (SELECT 1 FROM organization_members om
                         WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2) AS is_seller
-         FROM marketplace_contracts c WHERE c.id = $1 FOR UPDATE\`,
+         FROM marketplace_contracts c WHERE c.id = $1 FOR UPDATE`,
         [id, userId],
       );
       if (!current.rowCount || (!current.rows[0].is_buyer && !current.rows[0].is_seller)) {
