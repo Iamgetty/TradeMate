@@ -203,6 +203,58 @@ class OrganizationsController {
       client.release();
     }
   }
+
+  @Post(':id/documents')
+  async uploadOrganizationDocuments(
+    @Req() request: Request,
+    @Param('id') id: string,
+    @Body() body: { files?: Array<{ fileName?: string; mimeType?: string; dataBase64?: string }> },
+  ) {
+    const userId = await this.currentUser(request);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid organization ID.');
+    const files = Array.isArray(body?.files) ? body.files : [];
+    if (!files.length || files.length > 8) throw new BadRequestException('Select between 1 and 8 documents.');
+    const client = await databasePool!.connect();
+    try {
+      const member = await client.query('SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
+      if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
+      const saved = [];
+      for (const file of files) {
+        const fileName = typeof file.fileName === 'string' ? file.fileName.trim().slice(0, 180) : '';
+        const mimeType = String(file.mimeType || '').toLowerCase();
+        const encoded = String(file.dataBase64 || '').replace(/^data:[^,]+,/, '');
+        if (!fileName || !['application/pdf', 'image/jpeg', 'image/png'].includes(mimeType) || !/^[A-Za-z0-9+/]+=*$/.test(encoded)) {
+          throw new BadRequestException('Use PDF, JPG or PNG documents.');
+        }
+        const data = Buffer.from(encoded, 'base64');
+        if (!data.length || data.length > 5 * 1024 * 1024) throw new BadRequestException('Each document must be 5 MB or smaller.');
+        const result = await client.query(
+          "INSERT INTO organization_documents (organization_id, uploaded_by_user_id, file_name, mime_type, file_size, file_data) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, file_name, mime_type, file_size, review_status, created_at",
+          [id, userId, fileName, mimeType, data.length, data],
+        );
+        saved.push(result.rows[0]);
+      }
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'organization.documents_uploaded','organization',$2,$3::jsonb)",
+        [userId, id, JSON.stringify({ count: saved.length })],
+      );
+      return { documents: saved };
+    } finally {
+      client.release();
+    }
+  }
+
+  @Get(':id/documents')
+  async organizationDocuments(@Req() request: Request, @Param('id') id: string) {
+    const userId = await this.currentUser(request);
+    const member = await databasePool!.query('SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
+    if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
+    const result = await databasePool!.query(
+      'SELECT id, file_name, mime_type, file_size, review_status, created_at FROM organization_documents WHERE organization_id = $1 ORDER BY created_at DESC',
+      [id],
+    );
+    return { documents: result.rows };
+  }
 }
 
 @Controller('market/listings')
