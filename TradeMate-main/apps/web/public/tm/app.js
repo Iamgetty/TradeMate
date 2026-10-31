@@ -937,14 +937,22 @@ function portfolio(){
  [["Funding","wallet"],["P2P","swap"],["Fiat","brief"]].filter(function(x){return st.wt==="Overview"||st.wt===x[0]}).map(function(x){return '<button class="pfr" data-pg="acct" data-arg="'+x[0]+'"><span>'+ic(x[1],"width:20px;height:20px;color:var(--am)")+x[0]+'</span><em>'+(st.hide?"***":"—")+ic("chev","width:16px;height:16px")+'</em></button>'}).join("")+
  '<p class="fine">Balances, deposits and withdrawals are not connected yet. Nothing here is a confirmed blockchain balance.</p>'}
 var TABS=[["Home","home"],["Markets","mkts"],["Trade","trade"],["Feed","feedback"],["Portfolio","wallet"]];
+function loadFeed(force){
+ if(!CONNECTED){st.feedError='Sign in to view the community Feed.';return}
+ if(st.feedLoading||(!force&&st.feedLoaded))return;st.feedLoading=true;st.feedError='';
+ api('GET','/feed/posts?limit=40').then(function(d){st.feedPosts=(d.posts||[]).map(function(p){return {id:p.id,type:p.post_type==='feedback'?'Feedback':p.post_type==='announcement'?'Announcements':'Posts',author:p.author_name,body:p.body,time:fmtT(p.created_at),comments:p.comment_count||0,pinned:p.pinned}});st.feedLoaded=true}).catch(function(e){st.feedError=e.message}).finally(function(){st.feedLoading=false;if(st.tab==='Feed')draw()});
+}
 function feed(){
- var types=["All","Posts","Feedback","Announcements"],rows=st.feedPosts||[];
- var shown=rows.filter(function(p){return st.feedType==="All"||p.type===st.feedType});
- return '<div class="top"><div style="flex:1"><h2 style="font-size:24px">Feed</h2><small style="color:var(--mut)">Updates, ideas and announcements</small></div><button class="btn sm" data-act="feed-compose">New post</button></div>'+
- '<div class="sub">'+types.map(function(t){return '<button class="'+(st.feedType===t?"on":"")+'" data-feed-type="'+t+'">'+t+'</button>'}).join("")+'</div>'+
- '<div class="card" style="margin:10px 16px"><b>Share with the TradeMate community</b><p style="margin:5px 0 0;color:var(--mut)">Post an update, share feedback or make an announcement.</p><button class="btn sm" style="margin-top:12px" data-act="feed-compose">Write a post</button></div>'+
- (shown.length?shown.slice().reverse().map(function(p){return '<article class="card" style="margin:10px 16px"><div style="display:flex;justify-content:space-between;gap:8px"><b>'+esc(p.author||"You")+'</b><small style="color:var(--mut)">'+esc(p.type)+' · '+esc(p.time)+'</small></div><p style="margin:10px 0 0;white-space:pre-wrap">'+esc(p.body)+'</p></article>'}).join(""):'<div class="empty"><b>No posts yet</b>Community posts, feedback and announcements will appear here.</div>')+
- '<p class="fine">Feed posting is currently a local preview on this device. Shared publishing and reading across accounts needs the Feed API.</p>';
+ loadFeed(false);var types=['All','Posts','Feedback','Announcements'],rows=st.feedPosts||[];
+ var shown=rows.filter(function(p){return st.feedType==='All'||p.type===st.feedType});
+ var html='<div class="top"><div style="flex:1"><h2 style="font-size:24px">Feed</h2><small style="color:var(--mut)">Community posts, feedback and announcements</small></div><button class="btn sm" data-act="feed-compose">New post</button></div>';
+ html+='<div class="sub">'+types.map(function(t){return '<button class="'+(st.feedType===t?'on':'')+'" data-feed-type="'+t+'">'+t+'</button>'}).join('')+'</div>';
+ html+='<div class="card" style="margin:10px 16px"><b>Share with the TradeMate community</b><p>Publish an update or share feedback with other members.</p><button class="btn sm" data-act="feed-compose">Write a post</button></div>';
+ if(st.feedLoading)html+='<div class="empty">Loading community posts…</div>';
+ else if(st.feedError)html+='<div class="empty"><b>Feed unavailable</b>'+esc(st.feedError)+'<button class="btn sm" data-act="feed-refresh">Try again</button></div>';
+ else if(!shown.length)html+='<div class="empty"><b>No posts yet</b>Be the first to share an update or feedback.</div>';
+ else html+=shown.map(function(p){return '<article class="card" style="margin:10px 16px"><b>'+esc(p.author||'TradeMate member')+'</b><small>'+esc(p.type)+' · '+esc(p.time)+'</small><p style="white-space:pre-wrap">'+esc(p.body)+'</p><div class="sub"><button data-feed-comments="'+esc(p.id)+'">Comments ('+Number(p.comments||0)+')</button><button data-feed-report="'+esc(p.id)+'">Report</button></div></article>'}).join('');
+ return html+'<p class="fine">Posts and comments are shared through TradeMate accounts. Announcements are published by moderators.</p>';
 }
 function draw(){
  var v={Home:home,Markets:markets,Trade:trade,Feed:feed,Portfolio:portfolio}[st.tab]();
@@ -964,7 +972,10 @@ function feature(n,pre){var m={"Add contract":function(){openWiz(pre?"c:"+pre:"p
 /* ---------- events ---------- */
 document.addEventListener("click",function(e){var t=e.target;
  var ft=t.closest("[data-feed-type]");if(ft){st.feedType=ft.dataset.feedType;draw();return}
- var fp=t.closest("[data-act=\"feed-compose\"]");if(fp){var body=prompt("Write your post");if(body&&body.trim()){var type=prompt("Post type: Posts, Feedback or Announcements","Posts")||"Posts";type=type.charAt(0).toUpperCase()+type.slice(1).toLowerCase();if(["Posts","Feedback","Announcements"].indexOf(type)<0)type="Posts";st.feedPosts=st.feedPosts||[];st.feedPosts.push({author:st.me.nick||"You",type:type,body:body.trim(),time:"Just now"});st.feedType="All";draw()}return}
+ var fr=t.closest("[data-act=\"feed-refresh\"]");if(fr){loadFeed(true);draw();return}
+ var fp=t.closest("[data-act=\"feed-compose\"]");if(fp){if(!CONNECTED){toast("Sign in to publish to Feed.");return}var body=prompt("Write your post");if(body&&body.trim()){var type=(prompt("Post type: Posts or Feedback","Posts")||"Posts").toLowerCase().indexOf("feedback")>=0?"feedback":"post";api("POST","/feed/posts",{type:type,body:body.trim()}).then(function(){st.feedLoaded=false;loadFeed(true)}).catch(fail)}return}
+ var fc=t.closest("[data-feed-comments]");if(fc){var pid=fc.dataset.feedComments;api("GET","/feed/posts/"+pid+"/comments").then(function(d){var list=(d.comments||[]).map(function(c){return c.author_name+": "+c.body}).join("\n");var answer=prompt("Comments:\n"+(list||"No comments yet.")+"\nAdd a comment:");if(answer&&answer.trim())api("POST","/feed/posts/"+pid+"/comments",{body:answer.trim()}).then(function(){st.feedLoaded=false;loadFeed(true)}).catch(fail)}).catch(fail);return}
+ var frep=t.closest("[data-feed-report]");if(frep){var reason=prompt("Why are you reporting this post?");if(reason&&reason.trim())api("POST","/feed/reports",{postId:frep.dataset.feedReport,reason:reason.trim()}).then(function(){toast("Report sent to moderators.")}).catch(fail);return}
  var c=t.closest("[data-fav]");if(c){var n=c.dataset.fav,k=st.favs.indexOf(n);if(k>=0)st.favs.splice(k,1);else st.favs.push(n);draw();return}
  c=t.closest("[data-toast]");if(c){toast(c.dataset.toast);return}
  c=t.closest("[data-pg]");if(c){pg(c.dataset.pg,c.dataset.arg);return}
