@@ -20,7 +20,7 @@ The following work is present on the working branch only; it has not been deploy
 - **Feed:** required title, file attachments, voice-note recording, inline audio playback and image previews are implemented. Mobile-device and failure-state QA remains.
 - **Forex:** ten instruments are defined in each of the four requested groups, with a public quote route and no OANDA credentials. Live provider availability still needs verification.
 - **Buyer/Seller modes:** both have a Contracts view; enquiries remain a separate Conversations view. Permission and full workflow QA remains.
-- **Validation:** the web build, API build and clean PostgreSQL migration test have passed on tested branch commits. The latest commits must complete CI before this snapshot is treated as validated.
+- **Validation:** the latest working-branch commit passed the web build, `node --check` for the served app script, API TypeScript build and clean PostgreSQL migration integration job. Live end-to-end and mobile testing remain outstanding.
 - **Documents:** no litepaper or white paper source files were found in the available TradeMate repositories. The future Product consideration is recorded here and in the README; the original documents are needed before updating them.
 
 ## Pre-P2P completion
