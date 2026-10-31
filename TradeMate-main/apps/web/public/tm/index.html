@@ -32,7 +32,7 @@ window.addEventListener("unhandledrejection",function(e){
 });
 setTimeout(function(){
  var app=document.getElementById("app"),lp=document.getElementById("lp");
- if(!app||!app.innerHTML.trim()){window.tmBootFail("The app did not render its main screen within 4.5 seconds. Check that /tm/app.js?v=8 loaded successfully.");return}
+ if(!app||!app.innerHTML.trim()){window.tmBootFail("The app did not render its main screen within 4.5 seconds. Check that /tm/app.js?v=9 loaded successfully.");return}
  if(lp&&(!lp.shadowRoot||!lp.shadowRoot.querySelector(".sc"))){lp.style.display="none";}
  window.tmReveal();
 },4500);
