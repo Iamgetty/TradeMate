@@ -8,7 +8,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
   // Feed attachments are base64-encoded in JSON; cap the request size while
   // allowing four small attachments plus post metadata.
-  app.use(json({ limit: '24mb' }));
+  app.use(json({ limit: '28mb' }));
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
   attachMarketFeed(app.getHttpServer());
   app.setGlobalPrefix('api');
