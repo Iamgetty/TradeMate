@@ -873,12 +873,12 @@ class MarketplaceContractsController {
       const current = await client.query(
         `SELECT c.id, c.status, c.buyer_user_id, c.seller_organization_id,
                 EXISTS (SELECT 1 FROM organization_members om
-                        WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2) AS is_seller
+                        WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2) AND om.member_role IN ('owner', 'admin')) AS can_manage_contract
          FROM marketplace_contracts c WHERE c.id = $1 FOR UPDATE`,
         [id, userId],
       );
       if (!current.rowCount) throw new NotFoundException('Contract not found.');
-      if (!current.rows[0].is_seller || current.rows[0].buyer_user_id === userId) throw new NotFoundException('Contract not found.');
+      if (!current.rows[0].can_manage_contract || current.rows[0].buyer_user_id === userId) throw new NotFoundException('Contract not found.');
       if (current.rows[0].status !== 'proposed') throw new ConflictException('This contract proposal is no longer awaiting a response.');
       const status = body.decision === 'accept' ? 'accepted' : 'rejected';
       const updated = await client.query(
@@ -945,14 +945,14 @@ class MarketplaceContractsController {
         `SELECT c.id, c.status, c.buyer_user_id, c.seller_organization_id,
                 c.buyer_confirmed_at, c.seller_confirmed_at,
                 EXISTS (SELECT 1 FROM organization_members om
-                        WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2) AS is_seller
+                        WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2) AND om.member_role IN ('owner', 'admin')) AS can_manage_contract
          FROM marketplace_contracts c WHERE c.id = $1 FOR UPDATE`,
         [id, userId],
       );
       if (!current.rowCount) throw new NotFoundException('Contract not found.');
       const contract = current.rows[0];
       const isBuyer = contract.buyer_user_id === userId;
-      if (!isBuyer && !contract.is_seller) throw new NotFoundException('Contract not found.');
+      if (!isBuyer && !contract.can_manage_contract) throw new NotFoundException('Contract not found.');
       if (contract.status !== 'accepted') throw new ConflictException('Only an accepted contract can be confirmed as fulfilled.');
       const buyerConfirmed = Boolean(contract.buyer_confirmed_at) || isBuyer;
       const sellerActor = Boolean(contract.is_seller) && !isBuyer;
