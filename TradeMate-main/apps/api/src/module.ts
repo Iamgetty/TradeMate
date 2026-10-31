@@ -1350,10 +1350,18 @@ class CommunityFeedController {
     const prepared = files.map((file) => {
       const name = typeof file?.name === 'string' ? file.name.trim().slice(0, 180) : '';
       const mime = typeof file?.type === 'string' ? file.type.toLowerCase() : '';
-      const encoded = typeof file?.data === 'string' ? file.data.replace(/^data:[^,]*;base64,/, '') : '';
-      if (!name || !allowed.has(mime) || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) throw new BadRequestException('One of the attachments is invalid or unsupported.');
+      const rawData = typeof file?.data === 'string' ? file.data : '';
+      const dataUrl = rawData.match(/^data:([^;,]+);base64,([A-Za-z0-9+/]*={0,2})$/);
+      const encoded = dataUrl ? dataUrl[2] : rawData;
+      const validBase64 = !!encoded && encoded.length % 4 === 0
+        && /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded);
+      if (!name || !allowed.has(mime) || !validBase64 || (dataUrl && dataUrl[1].toLowerCase() !== mime)) {
+        throw new BadRequestException('One of the attachments is invalid or unsupported.');
+      }
       const bytes = Buffer.from(encoded, 'base64');
-      if (!bytes.length || bytes.length > 5 * 1024 * 1024) throw new BadRequestException('Each attachment must be 5 MB or smaller.');
+      if (!bytes.length || bytes.length > 5 * 1024 * 1024 || bytes.toString('base64') !== encoded) {
+        throw new BadRequestException('Each attachment must be valid and 5 MB or smaller.');
+      }
       return { name, mime, bytes };
     });
     const client = await databasePool!.connect();
