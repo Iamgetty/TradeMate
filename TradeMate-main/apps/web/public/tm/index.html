@@ -1,49 +1,19 @@
 <!DOCTYPE html>
-<html lang="en" style="background:#050505">
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#050505">
-<title>TradeMate — The Open Market</title>
-<style>html,body{background:#050505;margin:0}</style>
-<style id="tmboot">body>*:not(#lp){visibility:hidden}</style>
-<script>
-window.tmReveal=function(){var s=document.getElementById("tmboot");if(s)s.remove()};
-window.tmBootFail=function(message){
- window.tmReveal();
- var old=document.getElementById("tm-boot-error");if(old)return;
- var panel=document.createElement("div");panel.id="tm-boot-error";
- panel.style.cssText="position:fixed;z-index:2147483647;inset:0;overflow:auto;background:#050505;color:#fff;padding:28px 20px;font:14px/1.5 system-ui";
- var title=document.createElement("h2");title.textContent="TradeMate could not start";title.style.cssText="font-size:20px;margin:0 0 12px";
- var detail=document.createElement("pre");detail.textContent=String(message||"The app did not finish initializing.").slice(0,1600);detail.style.cssText="white-space:pre-wrap;overflow-wrap:anywhere;color:#e2b8b8;background:#1b1111;border:1px solid #663b3b;border-radius:12px;padding:14px";
- var hint=document.createElement("p");hint.textContent="Share this startup message so the failure can be identified.";hint.style.color="#aab4c0";
- panel.appendChild(title);panel.appendChild(detail);panel.appendChild(hint);document.body.appendChild(panel);
-};
-window.addEventListener("error",function(e){
- if(e.target&&e.target!==window){
-  var src=e.target.src||e.target.href||"";
-  if(e.target.tagName==="SCRIPT"&&/\/tm\/(app|feed-client)\.js(?:\?|$)/.test(src))window.tmBootFail("Failed to load script: "+src);
-  return;
- }
- window.tmBootFail((e.message||"JavaScript startup error")+(e.filename?"\n"+e.filename+":"+e.lineno+":"+e.colno:""));
-},true);
-window.addEventListener("unhandledrejection",function(e){
- var reason=e.reason;window.tmBootFail(reason&&reason.stack?reason.stack:reason&&reason.message?reason.message:String(reason||"Unhandled promise rejection"));
-});
-setTimeout(function(){
- var app=document.getElementById("app"),lp=document.getElementById("lp");
- var nav=document.getElementById("nav"),sc=lp&&lp.shadowRoot&&lp.shadowRoot.querySelector(".sc");
- if(!app||!app.querySelector(".view")||!nav||!nav.innerHTML.trim()){window.tmBootFail("The app shell did not finish rendering. Check that /tm/app.js?v=12 loaded and completed startup.");return}
- if(lp&&(!sc||!sc.textContent.trim()||sc.getBoundingClientRect().width===0||sc.getBoundingClientRect().height===0)){lp.style.display="none";}
- window.tmReveal();
-},4500);
-</script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <meta http-equiv="refresh" content="0;url=/app">
+  <title>TradeMate</title>
+  <script>
+    // Retire the legacy standalone entry point. The supported application
+    // is served by the Next.js /app route.
+    window.location.replace('/app');
+  </script>
 </head>
 <body>
-<noscript style="color:#fff;font:16px sans-serif;padding:24px;display:block">TradeMate needs JavaScript to run.</noscript>
-<!-- Same-origin API: /api is proxied to the NestJS service by apps/web/app/api/[...path]/route.ts -->
-<script>window.TM_CONFIG={api:"/api"};</script>
-<script defer src="/tm/feed-client.js?v=2"></script>
-<script defer src="/tm/app.js?v=12"></script>
+  <p>Opening TradeMate…</p>
+  <p><a href="/app">Continue to TradeMate</a></p>
 </body>
 </html>
