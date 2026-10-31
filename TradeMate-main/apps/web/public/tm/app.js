@@ -916,8 +916,8 @@ var p2pPrivate={ads:[],orders:[],loading:false,error:"",updated:0};
 function loadP2PPrivate(force){if(!CONNECTED||!st.me.id){p2pPrivate.ads=[];p2pPrivate.orders=[];p2pPrivate.updated=0;return Promise.resolve()}if(!force&&p2pPrivate.updated&&Date.now()-p2pPrivate.updated<12000)return Promise.resolve();if(p2pPrivate.loading)return Promise.resolve();p2pPrivate.loading=true;p2pPrivate.error="";return Promise.all([api("GET","/p2p/my-ads"),api("GET","/p2p/my-orders")]).then(function(x){p2pPrivate.ads=x[0].data||[];p2pPrivate.orders=x[1].data||[];p2pPrivate.updated=Date.now();p2pPrivate.loading=false;var top=st.stack[st.stack.length-1];if(st.tab==="P2P"||(top&&(top.id==="orders"||top.id==="myads")))softDraw()}).catch(function(e){p2pPrivate.loading=false;p2pPrivate.error=e.message||"Could not load your P2P records.";var top=st.stack[st.stack.length-1];if(st.tab==="P2P"||(top&&(top.id==="orders"||top.id==="myads")))softDraw()})}
 function publishP2P(f){var side=/^Sell/.test(f.side)?"sell":"buy",coin=String(f.coin||"").trim().toUpperCase(),fiat=String(f.fiat||"").trim().toUpperCase(),price=Number(f.price),quantity=Number(f.amt),min=Number(f.min),max=Number(f.max);if(!CONNECTED)return Promise.reject(new Error("Sign in and connect to TradeMate before publishing a P2P offer."));if(!(price>0&&quantity>0&&min>=0&&max>=min&&max>0))return Promise.reject(new Error("Check your P2P price, total quantity and order limits."));var methods=(f.methods||[]).map(function(x){return x==="Other"?(f.othm||""):x}).filter(Boolean);if(f.othm&&methods.indexOf(f.othm)<0)methods.push(f.othm);return api("POST","/p2p/ads",{side:side,asset:coin,fiat:fiat,price:price,quantity:quantity,minFiatAmount:min,maxFiatAmount:max,paymentMethods:methods}).then(function(r){p2pPrivate.updated=0;p2pCache.updated=0;return loadP2PPrivate(true).then(function(){return r})})}
 function p2pMoney(n,fiat){var symbols={NGN:"₦",USD:"$",EUR:"€",GBP:"£",GHS:"₵",KES:"KSh"};return (symbols[fiat]||fiat+" ")+fx2(Number(n)||0,2)}
-PG.p2p=function(){return hdr('P2P Marketplace')+p2p()};
-function p2p(){
+PG.p2p=(function(){
+ function renderP2P(){
  loadP2P();
  var want=st.side==="Buy"?"sell":"buy",SYM={NGN:"₦",USD:"$",EUR:"€",GBP:"£",GHS:"₵",KES:"KSh"};
  var rows=p2pCache.book.filter(function(x){return x.side===want});
@@ -935,7 +935,9 @@ function p2p(){
  '<div class="bsw"><div class="bsp">'+["Buy","Sell"].map(function(x){return '<button class="'+(st.side===x?"on":"")+'" data-side="'+x+'">'+x+'</button>'}).join("")+'</div></div>'+
  '<div class="filt"><label><select id="coin" aria-label="Asset">'+["USDT","BTC","ETH"].map(function(x){return '<option'+(x===st.coin?" selected":"")+'>'+x+'</option>'}).join("")+'</select></label><label><input id="amt" inputmode="decimal" placeholder="Fiat amount" value="'+esc(st.amt)+'"></label><button class="fi" data-act="resetf" aria-label="Reset filters">'+ic("fun","width:19px;height:19px")+'</button></div>'+
  content+'<p class="fine">Source: TradeMate database · '+(p2pCache.updated?"Updated "+fmtT(new Date(p2pCache.updated).toISOString()):"Awaiting first successful sync")+'. Completed transactions are shown in Trade > Trade.</p>';
-}
+ }
+ return function(){return hdr('P2P Marketplace')+renderP2P()};
+})();
 function portfolio(){
  var v=st.hide?"******":"—";
  return '<div class="cw"><div><b>Connect wallet</b><small>Link a Web3 wallet to pay and receive</small></div><button class="btn sm" data-pg="connect">Connect</button></div>'+
