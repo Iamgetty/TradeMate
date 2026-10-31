@@ -859,7 +859,7 @@ function trade(){
  if(cr){
   ensureMultiFeeds(it);
   var dp=it.p<1?6:it.p<20?4:2,stamp=tmStatus();
-  var head='<div class="tpx"><b data-px="'+esc(it.n)+'">'+px(it)+'</b><span>USDT</span></div><div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Offers</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">Trades</button></div>';
+  var head='<div class="tpx"><b data-px="'+esc(it.n)+'">'+px(it)+'</b><span>USDT</span></div><div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Market depth</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">Exchange tape</button></div>';
   var body="";
   if(st.tt==="Order book"){
    body=tmBooks(it,dp);
@@ -885,7 +885,7 @@ function trade(){
  var tradeHtml=internalTradeCache.loading?'<div class="empty"><b>Loading historical transaction records…</b>Checking the historical transaction ledger.</div>':
  internalTradeCache.error?'<div class="empty"><b>Historical records unavailable</b>'+esc(internalTradeCache.error)+'<button class="btn sm" data-act="markettraderetry">Retry</button></div>':
  tradeRows.length?tradeRows.map(function(x){return '<div class="ad"><div class="who"><b>'+esc(x.side)+' · '+esc(x.listing_title)+'</b><small>Historical · '+fmtT(x.completed_at)+'</small></div><div class="pr">'+esc(x.currency_code)+' '+(Number(x.total_minor_units)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+'</div><div class="kv">Quantity<b>'+esc(String(x.quantity))+'</b><br>Unit price<b>'+esc(x.currency_code)+' '+(Number(x.unit_price_minor_units)/100).toLocaleString()+'</b></div><small>Reference '+esc(x.transaction_reference)+'</small></div>'}).join(""):'<div class="empty"><b>No historical transaction records yet</b>These are historical records from the previous transaction ledger. New business agreements are tracked under Contracts.</div>';
- return h+'<div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Book</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">History</button></div>'+(st.tt==="Order book"?bookHtml:tradeHtml)+'<p class="fine">Source: TradeMate marketplace database. '+(st.tt==="Trades"?"Historical records from the previous transaction ledger only; new agreements use Contracts.":"Offers are published opportunities; use Propose contract to agree terms.")+' '+(internalTradeCache.updated?"Updated "+fmtT(new Date(internalTradeCache.updated).toISOString()):"Awaiting sync")+'</p>';
+ return h+'<div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Offers</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">History</button></div>'+(st.tt==="Order book"?bookHtml:tradeHtml)+'<p class="fine">Source: TradeMate marketplace database. '+(st.tt==="Trades"?"Historical records from the previous transaction ledger only; new agreements use Contracts.":"Offers are published opportunities; use Propose contract to agree terms.")+' '+(internalTradeCache.updated?"Updated "+fmtT(new Date(internalTradeCache.updated).toISOString()):"Awaiting sync")+'</p>';
 }
 
 var globalActivityCache={book:[],trades:[],loading:false,error:"",updated:null,market:"all"};
