@@ -777,7 +777,7 @@ function loadMarketQuotes(market,list){
  .then(function(r){if(!r.ok)throw new Error("Market quote service unavailable");return r.json()})
  .then(function(d){(d.quotes||[]).forEach(function(q){MARKET_QUOTES[q.symbol]=q;var it=rows.filter(function(x){return x.providerSymbol===q.symbol})[0];if(it){it.quoteStatus=q.status;it.quoteTime=q.marketTime;it.quoteCurrency=q.currency;if(q.status!=="unavailable"&&typeof q.price==="number"){it.p=q.price;it.c=typeof q.changePercent==="number"?q.changePercent:null}}});MARKET_QUOTE_STATE.last=Date.now();MARKET_QUOTE_STATE.error="";})
  .catch(function(){MARKET_QUOTE_STATE.error="Market quotes are temporarily unavailable."})
- .finally(function(){MARKET_QUOTE_STATE.loading=false;if(st.tab==="Markets"&&st.mm===market)softDraw()});
+ .finally(function(){MARKET_QUOTE_STATE.loading=false;var active=st.mm==="Forex"?st.fxGroup:"",activeRows=items.filter(function(i){return i.m==="Forex"&&i.assetClass===active&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)}),activeKey=active+":"+activeRows.map(function(i){return i.providerSymbol}).join(",");if(st.tab==="Markets"&&active&&active!=="Currency Pairs"&&activeKey!==MARKET_QUOTE_STATE.key)loadMarketQuotes(active,activeRows);else if(st.tab==="Markets"&&st.mm===market&&active===market)softDraw()});
 }
 function markets(){
  if(st.mm==="NFTs")loadLiveNFTs(st.q||NFTCOLLECTION);
