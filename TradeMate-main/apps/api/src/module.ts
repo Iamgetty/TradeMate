@@ -229,13 +229,13 @@ class PublicListingsController {
       ? null : String(body.quantityAvailable).trim();
     if (title.length < 3 || title.length > 140) throw new BadRequestException('Offer title must be between 3 and 140 characters.');
     if (description.length > 5000) throw new BadRequestException('Description must be 5,000 characters or fewer.');
-    if (!['product', 'service'].includes(listingType || '')) throw new BadRequestException('Choose product or service.');
+    if (!['b2b', 'service'].includes(listingType || '')) throw new BadRequestException('Choose a Services or B2B offer type.');
     if (!/^\d{1,12}(\.\d{1,2})?$/.test(priceText)) throw new BadRequestException('Enter a valid price with up to two decimal places.');
     const priceMinorUnits = Math.round(Number(priceText) * 100);
     if (!Number.isSafeInteger(priceMinorUnits) || priceMinorUnits < 0) throw new BadRequestException('Enter a valid non-negative price.');
     let quantity: number | null = null;
     if (quantityText !== null) {
-      if (!/^\d{1,12}$/.test(quantityText) || !Number.isSafeInteger(Number(quantityText))) throw new BadRequestException('Quantity must be a whole number, or leave it blank for services.');
+      if (!/^\d{1,12}$/.test(quantityText) || !Number.isSafeInteger(Number(quantityText))) throw new BadRequestException('Quantity must be a whole number, or leave it blank.');
       quantity = Number(quantityText);
     }
     const membership = await databasePool.query(
@@ -355,13 +355,13 @@ class PublicListingsController {
       ? null : String(body.quantityAvailable).trim();
     if (title.length < 3 || title.length > 140) throw new BadRequestException('Offer title must be between 3 and 140 characters.');
     if (description.length > 5000) throw new BadRequestException('Description must be 5,000 characters or fewer.');
-    if (!['product', 'service'].includes(listingType || '')) throw new BadRequestException('Choose product or service.');
+    if (!['b2b', 'service'].includes(listingType || '')) throw new BadRequestException('Choose a Services or B2B offer type.');
     if (!/^\d{1,12}(\.\d{1,2})?$/.test(priceText)) throw new BadRequestException('Enter a valid price with up to two decimal places.');
     const priceMinorUnits = Math.round(Number(priceText) * 100);
     if (!Number.isSafeInteger(priceMinorUnits) || priceMinorUnits < 0) throw new BadRequestException('Enter a valid non-negative price.');
     let quantity: number | null = null;
     if (quantityText !== null) {
-      if (listingType === 'service') throw new BadRequestException('Services cannot have a product quantity.');
+      if (listingType === 'service') throw new BadRequestException('Service offers cannot have a quantity.');
       if (!/^\d{1,12}$/.test(quantityText) || !Number.isSafeInteger(Number(quantityText))) throw new BadRequestException('Quantity must be a whole number, or leave it blank.');
       quantity = Number(quantityText);
     }
@@ -472,8 +472,8 @@ class PublicListingsController {
     if (!Number.isInteger(page) || page < 1 || !Number.isInteger(limit) || limit < 1 || limit > 50) {
       throw new BadRequestException('page must be a positive integer and limit must be between 1 and 50.');
     }
-    if (type && !['product', 'service'].includes(type)) {
-      throw new BadRequestException('type must be product or service.');
+    if (type && !['b2b', 'service'].includes(type)) {
+      throw new BadRequestException('type must be service or b2b.');
     }
     if (country && !/^[A-Za-z]{2}$/.test(country)) {
       throw new BadRequestException('country must be a two-letter country code.');
@@ -482,7 +482,7 @@ class PublicListingsController {
       throw new BadRequestException('category must be a valid category UUID.');
     }
 
-    const conditions = ["l.status = 'published'", "o.status = 'active'"];
+    const conditions = ["l.status = 'published'", "o.status = 'active'", "l.listing_type IN ('service', 'b2b')"];
     const values: unknown[] = [];
     const add = (clause: string, value: unknown) => {
       values.push(value);
@@ -717,17 +717,17 @@ class MarketplaceTradesController {
     const limit = limitValue === undefined ? 100 : Number(limitValue);
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new BadRequestException('limit must be between 1 and 100.');
     const category = (market || 'all').toLowerCase();
-    if (!['all', 'products', 'services', 'p2p'].includes(category)) throw new BadRequestException('market must be all, products, services, or p2p.');
+    if (!['all', 'b2b', 'services', 'p2p'].includes(category)) throw new BadRequestException('market must be all, b2b, services, or p2p.');
     if (view === 'book') {
       const values: unknown[] = [limit];
-      const listingFilter = category === 'products' ? " AND l.listing_type = 'product'" : category === 'services' ? " AND l.listing_type = 'service'" : category === 'p2p' ? ' AND 1=0' : '';
+      const listingFilter = category === 'b2b' ? " AND l.listing_type = 'b2b'" : category === 'services' ? " AND l.listing_type = 'service'" : category === 'p2p' ? ' AND 1=0' : '';
       const p2pFilter = category === 'p2p' || category === 'all' ? '' : ' AND 1=0';
       const result = await databasePool.query(
         `SELECT * FROM (
           SELECT l.id::text AS reference, l.title AS instrument, UPPER(l.listing_type) AS side,
                  l.price_minor_units::text AS price, l.currency_code AS currency,
                  l.quantity_available::text AS quantity, l.created_at AS occurred_at,
-                 'TradeMate marketplace'::text AS source, CASE WHEN l.listing_type='service' THEN 'Services' ELSE 'Products' END AS market
+                 'TradeMate marketplace'::text AS source, CASE WHEN l.listing_type='service' THEN 'Services' ELSE 'B2B' END AS market
           FROM listings l JOIN organizations o ON o.id=l.seller_organization_id
           WHERE l.status='published' AND o.status='active'${listingFilter}
           UNION ALL
@@ -739,14 +739,14 @@ class MarketplaceTradesController {
       return { view, source: 'TradeMate published listings and open P2P orders', as_of: new Date().toISOString(), data: result.rows };
     }
     const values: unknown[] = [limit];
-    const listingFilter = category === 'products' ? " AND listing_type='product'" : category === 'services' ? " AND listing_type='service'" : category === 'p2p' ? ' AND 1=0' : '';
+    const listingFilter = category === 'b2b' ? " AND listing_type='b2b'" : category === 'services' ? " AND listing_type='service'" : category === 'p2p' ? ' AND 1=0' : '';
     const p2pFilter = category === 'p2p' || category === 'all' ? '' : ' AND 1=0';
     const result = await databasePool.query(
       `SELECT * FROM (
         SELECT transaction_reference::text AS reference, listing_title AS instrument, side,
                total_minor_units::text AS price, currency_code AS currency, quantity::text AS quantity,
                completed_at AS occurred_at, 'TradeMate marketplace'::text AS source,
-               CASE WHEN listing_type='service' THEN 'Services' ELSE 'Products' END AS market
+               CASE WHEN listing_type='service' THEN 'Services' ELSE 'B2B' END AS market
         FROM marketplace_public_completed_trades WHERE TRUE${listingFilter}
         UNION ALL
         SELECT trade_reference::text, asset_code || '/' || fiat_code, side,
@@ -762,7 +762,7 @@ class MarketplaceTradesController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const limit = limitValue === undefined ? 50 : Number(limitValue);
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new BadRequestException('limit must be between 1 and 100.');
-    if (type && !['product', 'service'].includes(type)) throw new BadRequestException('type must be product or service.');
+    if (type && !['b2b', 'service'].includes(type)) throw new BadRequestException('type must be service or b2b.');
     if (currency && !/^[A-Za-z]{3}$/.test(currency)) throw new BadRequestException('currency must be a three-letter code.');
     const values: unknown[] = [];
     const conditions = ['1=1'];
