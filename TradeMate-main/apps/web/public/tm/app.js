@@ -671,9 +671,9 @@ var items=[
 ]
 items.forEach(function(i){i.col=MC[i.assetClass]||MC[i.m]});items.sort(function(a,b){return ORD.indexOf(a.m)-ORD.indexOf(b.m)});
 var HUE={"Add contract":"#ffb02e","Create order":"#ffb02e","Orders & bids":"#ffb02e",Rewards:"#ffb02e",Referral:"#ff7a59",Deposit:"#2dd4bf",P2P:"#8b7bff",Earn:"#a3e635",Promotions:"#f472b6",Announcements:"#38bdf8",More:"#94a3b8",Card:"#c084fc",Settings:"#94a3b8","Help Center":"#38bdf8","Feedback Hub":"#fb923c",Learn:"#34d399","Affiliate Programs":"#f472b6"};
-var HOMEF=function(){var r=FH.filter(function(o){return o[0]!=="P2P"&&!(st.mode==="Buyer"&&o[0]==="Add contract")});return st.mode==="Seller"?r.slice(0,1).concat([["Orders & bids","box"]],r.slice(1)):[["Contracts","box"],["Cart","cart"]].concat(r)};
+var HOMEF=function(){var r=FH.filter(function(o){return o[0]!=="P2P"&&!(st.mode==="Buyer"&&o[0]==="Add contract")});return st.mode==="Seller"?r.slice(0,1).concat([["Contracts","box"]],r.slice(1)):[["Contracts","box"]].concat(r)};
 var FH=[["Add contract","plus"],["Rewards","gift"],["Referral","users"],["Deposit","download"],["P2P","swap"],["Earn","earn"],["Promotions","tag"],["More","more"]];
-var FG=[["MARKETPLACE",[["Add contract","plus"],["Orders & bids","box"],["P2P","swap"],["Deposit","download"]]],["EARN & GROW",[["Rewards","gift"],["Referral","users"],["Earn","earn"],["Affiliate Programs","affiliate"],["Promotions","tag"]]],["MONEY & ACCOUNT",[["Card","card"],["Settings","settings"]]],["SUPPORT & LEARN",[["Help Center","help"],["Feedback Hub","feedback"],["Learn","learn"],["Announcements","horn"]]]];
+var FG=[["MARKETPLACE",[["Add contract","plus"],["Contracts","box"],["P2P","swap"],["Deposit","download"]]],["EARN & GROW",[["Rewards","gift"],["Referral","users"],["Earn","earn"],["Affiliate Programs","affiliate"],["Promotions","tag"]]],["MONEY & ACCOUNT",[["Card","card"],["Settings","settings"]]],["SUPPORT & LEARN",[["Help Center","help"],["Feedback Hub","feedback"],["Learn","learn"],["Announcements","horn"]]]];
 var st={tab:"Home",ht:"Favorites",hm:"All",mm:"Services",fxGroup:"Currency Pairs",tp:0,tt:"Order book",side:"Buy",coin:"USDT",fiat:"NGN",pay:"All payment methods",amt:"",hide:true,wt:"Overview",q:"",
  favs:[],
  stack:[],fv:{},cw:null,tickets:[],feedPosts:[],feedType:"All",nt:"All",uc:"My info",sq:"",recent:["P2P","Add contract","Rewards","Help Center"],joinedAff:false,mode:"Buyer",
@@ -1004,7 +1004,7 @@ function drawPage(){var top=st.stack[st.stack.length-1],el=$("pg"),old=el.queryS
  if(same){var np=el.querySelector(".pgs"),nb=np.querySelector(".pbody");np.classList.add("na");(nb||np).scrollTop=sc}if(top.id!=="scan")stopCam();if(top.id==="scan")startCam()}
 function pg(id,a){st.stack.push({id:id,a:a});drawPage()}
 function back(){st.stack.pop();drawPage()}
-function feature(n,pre){var m={"Add contract":function(){openWiz(pre?"c:"+pre:"pick")},"Create order":function(){openWiz(pre?"c:"+pre:"pick")},"My orders":"deals","Contracts":"deals",Cart:"cart",Rewards:"rewards",Referral:"referral",Deposit:"deposit","Orders & bids":"deals",Earn:"earn",Promotions:"promos",Announcements:"announce",Card:"card",Settings:function(){st.uc="Preference";pg("uc")},"Help Center":"help","Feedback Hub":"feedback",Learn:"learn","Affiliate Programs":"affiliate",More:"more",P2P:function(){st.stack=[];pg("p2p");$("app").scrollTop=0}};
+function feature(n,pre){var m={"Add contract":function(){openWiz(pre?"c:"+pre:"pick")},"Create order":function(){openWiz(pre?"c:"+pre:"pick")},"My orders":"conversations","Conversations":"conversations","Contracts":"contracts",Rewards:"rewards",Referral:"referral",Deposit:"deposit","Orders & bids":"contracts",Earn:"earn",Promotions:"promos",Announcements:"announce",Card:"card",Settings:function(){st.uc="Preference";pg("uc")},"Help Center":"help","Feedback Hub":"feedback",Learn:"learn","Affiliate Programs":"affiliate",More:"more",P2P:function(){st.stack=[];pg("p2p");$("app").scrollTop=0}};
  if(["Add contract","Create order","P2P","Deposit","Rewards","Help Center"].indexOf(n)>=0){st.recent=[n].concat(st.recent.filter(function(x){return x!==n})).slice(0,4)}
  var f=m[n];if(typeof f==="function")f();else if(f)pg(f)}
 /* ---------- events ---------- */
@@ -1320,20 +1320,20 @@ PC.wnext=function(){var w=st.cw,c=wzCfg(w.id),s=c.steps[w.step];
  else{w.done=true;drawPage()}};
 
 /* ===== listings: buy / bid / order + buyer-seller chat ===== */
-var SELL={Services:["order"],"Real Estate":["bid","order"],NFTs:["buy","bid"],Software:["buy"],B2B:["bid"]};
+var SELL={Services:["contract"],B2B:["contract"]};
 var SELLERS=["Adaeze Stores","Kolade Studio","Musa Digital","Ngozi Homes","Tunde Ventures","Ife Creative"];
 function sellerOf(it){var h=0;for(var i=0;i<it.n.length;i++)h+=it.n.charCodeAt(i);return SELLERS[h%SELLERS.length]}
-function lblOf(it,t){return t==="buy"?"Buy now":t==="bid"?(it.m==="Real Estate"||it.m==="B2B"?"Make an offer":"Place bid"):(it.m==="Real Estate"?"Book a viewing":"Order now")}
-var DESC={Services:"Professional work delivered on time. Message the seller to agree the scope and timing before you order.",NFTs:"Digital collectible with verified ownership history. Check the collection and chain details below.",Software:"Ready-to-use software with documentation. Ask about licence terms and support before you buy.","Real Estate":"Property listing. Message the seller to arrange a viewing or discuss your offer.",B2B:"Business opportunity or partnership. Discuss scope, due diligence, responsibilities and commercial terms with the counterparty."};
+function lblOf(it,t){return t==="contract"?"Propose contract":"Contact"}
+var DESC={Services:"Professional work delivered on time. Review the scope and propose a contract with the provider.",NFTs:"Digital collectible information and ownership history. This section is reference-only; TradeMate does not process direct purchases.",Software:"Software information and licensing context. Discuss a business arrangement with a verified provider before any agreement.","Real Estate":"Property listing. Message the seller to arrange a viewing or discuss your offer.",B2B:"Business opportunity or partnership. Discuss scope, due diligence, responsibilities and commercial terms with the counterparty."};
 function detsOf(it){var M={Services:[["Delivery","1–3 days"],["Mode","Remote"],["Revisions","2 included"]],NFTs:[["Collection","Pixel Cats"],["Chain","Ethereum"],["Token","#12"]],Software:[["Licence","Source code transfer"],["Platform","Web"],["Support","30 days"]],"Real Estate":[["Listing","For sale"],["Location","Lagos, Nigeria"],["Size","120 sqm"]],B2B:[["Industry","Food & beverage"],["Stage","Established"],["Years operating","5–10"]]};return M[it.m]||[]}
 function metaOf(it){return {opts:SELL[it.m]||[]}}
-var TL={buy:["Order placed","Seller confirms","Payment","Delivery","Completed"],order:["Request sent","Seller accepts","In progress","Delivered","Completed"],bid:["Bid placed","Seller reviews","Accepted","Completed"],p2p:["Order created","Payment sent","Asset released","Completed"],chat:["Enquiry open"]};
-var DT={buy:"Purchase",order:"Order",bid:"Bid",p2p:"P2P order",chat:"Chat"};
-st.deals=[];st.dt="All";
+var TL={chat:["Conversation open"]};
+var DT={chat:"Conversation"};
+st.deals=[];st.dt="All";st.contracts=[];st.ct="All";
 function newDeal(o){o.id="TM-"+(2001+st.deals.length);o.step=0;o.created="Just now";o.msgs=o.msgs||[];st.deals.unshift(o);return o.id}
 function findDeal(id){return st.deals.filter(function(d){return d.id===id})[0]}
-function safe(){return '<div class="card" style="display:flex;gap:10px;align-items:flex-start;margin:10px 16px"><span style="color:var(--am)">'+ic("shield")+'</span><p style="margin:0;font-size:11.5px">Keep chats and payments inside TradeMate. Never share OTPs or send money outside the platform.</p></div>'}
-PG.listing=function(n){var it=byName(n);if(!it)return hdr("Listing");var M=metaOf(it),s=sellerOf(it),acts=M.opts.map(function(t,i){return '<button class="btn'+(i?" o":"")+'" style="flex:1" data-pg="'+(t==="buy"?"buy":t==="bid"?"bid":"orderf")+'" data-arg="'+esc(n)+'">'+lblOf(it,t)+'</button>'}).join("");
+function safe(){return '<div class="card" style="display:flex;gap:10px;align-items:flex-start;margin:10px 16px"><span style="color:var(--am)">'+ic("shield")+'</span><p style="margin:0;font-size:11.5px">Keep contract discussions and agreed terms inside TradeMate. Do not treat a chat as an accepted contract.</p></div>'}
+PG.listing=function(n){var it=byName(n);if(!it)return hdr("Listing");var M=metaOf(it),s=sellerOf(it),acts=M.opts.map(function(t,i){return '<button class="btn'+(i?" o":"")+'" style="flex:1" data-pg="'+(t==="contract"?"contractf":t==="buy"?"buy":t==="bid"?"bid":"orderf")+'" data-arg="'+esc(n)+'">'+lblOf(it,t)+'</button>'}).join("");
  return hdr(it.m,{right:'<button class="rt" data-fav="'+esc(n)+'" aria-label="Favorite">'+(isFav(n)?"★":"☆")+'</button>'})+
  '<div class="card" style="margin-top:4px"><div style="display:flex;gap:12px;align-items:center"><span class="coin" style="--ac:'+it.col+';width:46px;height:46px;font-size:18px;border-radius:14px">'+lg(it)+'</span><div style="min-width:0"><h2 style="font-size:17px">'+esc(it.n)+'</h2><span class="pill2" style="margin-top:6px">'+it.m+'</span>'+(val(it)?'<small class="valn">'+val(it)+'</small>':'')+'</div></div>'+
  '<div style="font:700 26px Bricolage Grotesque,sans-serif;margin:16px 0 8px">'+px(it)+'</div><div style="display:flex;gap:6px;flex-wrap:wrap">'+M.opts.map(function(t){return '<span class="pill2 warn">'+(t==="buy"?"Buy now":t==="bid"?"Accepts bids":it.m==="Real Estate"?"Viewings":"Order on request")+'</span>'}).join("")+'</div></div>'+
@@ -1525,6 +1525,21 @@ function loadMarket(){return api("GET","/market/listings?limit=50").then(functio
   (r.data||[]).forEach(function(l,i){var it=mapListing(l,i),b=it.n,k=2;while(used[it.n])it.n=b+" ("+(k++)+")";used[it.n]=1;addItem(it)})});softDraw()}).catch(function(){})}
 /* ---- enquiries = conversations between buyers and sellers ---- */
 function dealFromEnq(e){var sent=e.direction==="sent";return {id:e.id,eid:e.id,lid:e.listing_id,type:"chat",title:e.listing_title,market:"",sub:esc(sent?e.seller_name:(e.buyer_name||"Buyer")),amount:(CSYM[e.currency_code]||e.currency_code||"")+" "+fmt(Number(e.price_minor_units||0)/100,2),step:0,created:fmtT(e.created_at),msgs:[],loaded:false}}
+
+function findContract(id){return st.contracts.filter(function(c){return c.id===id})[0]}
+function contractStatusLabel(s){return ({proposed:"Awaiting response",accepted:"Accepted",rejected:"Declined",cancelled:"Cancelled",completed:"Completed",disputed:"Disputed"})[s]||s}
+function loadContracts(){return api("GET","/market/contracts/mine").then(function(r){st.contracts=(r.data||[]).map(function(c){return Object.assign({},c,{amount:(CSYM[c.currency_code]||c.currency_code)+" "+fmt(Number(c.amount_minor_units)/100,2),counterparty:c.direction==="sent"?c.seller_name:c.buyer_name,created:fmtT(c.created_at)})});if(st.stack.length&&st.stack[st.stack.length-1].id==="contracts")drawPage()}).catch(function(){})}
+PG.contracts=function(){var direction=st.mode==="Buyer"?"sent":"received",rows=st.contracts.filter(function(c){return c.direction===direction});return hdr("Contracts")+(rows.length?rows.map(function(c){return '<button class="lr" data-pg="contract" data-arg="'+c.id+'">'+esc(c.title)+' · '+esc(c.amount)+' · '+contractStatusLabel(c.status)+'</button>'}).join(""):'<div class="empty">No contracts yet.</div>')+'<button class="btn sm" data-pc="contractsRefresh">Refresh</button>'}
+PG.contractf=function(n){var it=byName(n);if(!CONNECTED||!it||!it.srv)return hdr("Propose contract")+'<div class="empty">Published Services or B2B offer required.</div>';st.fv={};return hdr("Propose contract")+'<div class="fs" style="padding:12px">'+Ftext("ctamount","Proposed amount","Amount in offer currency",1,"decimal")+Farea("ctscope","Scope and deliverables","What each party will provide",1)+Farea("ctterms","Contract terms","Responsibilities, milestones and cancellation terms",1)+'<button class="btn wide" data-pc="contractCreate" data-arg="'+esc(n)+'">Send contract proposal</button></div>'}
+PG.contract=function(id){var c=findContract(id);if(!c)return hdr("Contract")+'<div class="empty">Contract not found.</div>';var buyer=c.direction==="sent",actions="";if(!buyer&&c.status==="proposed")actions='<button class="btn" data-pc="contractRespond" data-arg="'+c.id+'|accept">Accept</button><button class="btn o" data-pc="contractRespond" data-arg="'+c.id+'|reject">Decline</button>';if(buyer&&c.status==="proposed")actions='<button class="btn o" data-pc="contractCancel" data-arg="'+c.id+'">Cancel proposal</button>';if(c.status==="accepted")actions='<button class="btn" data-pc="contractConfirm" data-arg="'+c.id+'">Confirm fulfilment</button>';return hdr("Contract")+'<div class="card"><b>'+esc(c.title)+'</b><p>'+esc(c.amount)+'</p><p>'+contractStatusLabel(c.status)+'</p></div><div class="sec">SCOPE</div><div class="card">'+esc(c.scope)+'</div><div class="sec">TERMS</div><div class="card">'+esc(c.terms)+'</div><div class="card">'+actions+'</div>'}
+PC.contractsRefresh=function(){loadContracts()};
+PC.contractCreate=function(n){var it=byName(n),f=st.fv;if(!it||!it.srv)return;api("POST","/market/contracts",{listingId:it.id,amount:f.ctamount,scope:f.ctscope,terms:f.ctterms}).then(function(r){return loadContracts().then(function(){pg("contract",r.data.id)})}).catch(fail)};
+PC.contractRespond=function(a){var p=a.split("|");api("PATCH","/market/contracts/"+p[0]+"/respond",{decision:p[1]}).then(function(){return loadContracts()}).then(drawPage).catch(fail)};
+PC.contractCancel=function(id){api("PATCH","/market/contracts/"+id+"/cancel").then(function(){return loadContracts()}).then(drawPage).catch(fail)};
+PC.contractConfirm=function(id){api("PATCH","/market/contracts/"+id+"/confirm-completion").then(function(){return loadContracts()}).then(drawPage).catch(fail)};
+PG.conversations=function(){var rows=st.deals.filter(function(d){return d.type==="chat"});return hdr("Conversations")+(rows.length?rows.map(function(d){return '<button class="lr" data-pg="deal" data-arg="'+d.id+'">'+esc(d.title)+'</button>'}).join(""):'<div class="empty">No conversations yet.</div>')}
+PG.deals=function(){return PG.conversations()};
+
 function loadEnquiries(){return api("GET","/market/enquiries/mine").then(function(r){var old={};st.deals.forEach(function(d){old[d.id]=d});
  st.deals=(r.data||[]).map(function(e){var d=dealFromEnq(e),o=old[d.id];if(o){d.msgs=o.msgs;d.loaded=o.loaded}return d});softDraw()}).catch(function(){})}
 function toBottom(){var e=document.querySelector(".pgs");if(e)e.scrollTop=e.scrollHeight}
@@ -1592,8 +1607,8 @@ var _wn=PC.wnext;PC.wnext=function(){var w=st.cw;if(!w){_wn();return}var fin=w.s
  _wn();if(fin&&w.done&&w.id!=="kyc"){publishLocal(w.id,f);save()}};
 var _dr=draw;draw=function(){_dr();save()};
 /* ---- refresh: market + conversations ---- */
-if(CONNECTED){loadMarket();
- setInterval(function(){if(document.hidden)return;loadMarket();if(st.me.id)loadEnquiries()},60000);
+if(CONNECTED){loadMarket();loadContracts();
+ setInterval(function(){if(document.hidden)return;loadMarket();if(st.me.id){loadEnquiries();loadContracts()}},60000);
  setInterval(function(){var t=st.stack[st.stack.length-1],d=t&&t.id==="deal"&&findDeal(t.a);if(d&&d.eid&&!document.hidden)loadMsgs(d)},7000)}
 
 draw();navH();liveRefresh();setInterval(liveRefresh,90000);
