@@ -85,7 +85,7 @@ export async function GET(request: Request) {
         });
         if (!statsResponse.ok) return [slug, null] as const;
         const payload = await statsResponse.json();
-        const day = payload?.intervals?.find((interval: any) => interval.interval === 'one_day')?.stats || payload?.one_day || {};
+        const day = payload?.intervals?.find((interval: any) => interval.interval === 'one_day') || payload?.one_day || {};
         return [slug, {
           sales24h: typeof day.sales === 'number' ? day.sales : null,
           volume24h: typeof day.volume === 'number' ? day.volume : null
