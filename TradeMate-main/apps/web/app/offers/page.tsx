@@ -8,7 +8,7 @@ type Offer = {
   id: string;
   title: string;
   description: string | null;
-  listing_type: 'product' | 'service';
+  listing_type: 'b2b' | 'service';
   price_minor_units: string;
   currency_code: string;
   country_code: string;
@@ -34,9 +34,8 @@ export default function MyOffersPage() {
   const [editingId, setEditingId] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [listingType, setListingType] = useState<'product' | 'service'>('product');
+  const [listingType, setListingType] = useState<'b2b' | 'service'>('service');
   const [price, setPrice] = useState('');
-  const [quantity, setQuantity] = useState('');
 
   async function loadOffers() {
     setLoading(true);
@@ -65,7 +64,6 @@ export default function MyOffersPage() {
     setDescription(offer.description || '');
     setListingType(offer.listing_type);
     setPrice((Number(offer.price_minor_units) / 100).toFixed(2));
-    setQuantity(offer.quantity_available == null ? '' : String(offer.quantity_available));
   }
 
   async function saveEdit(event: FormEvent<HTMLFormElement>) {
@@ -78,7 +76,7 @@ export default function MyOffersPage() {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, listingType, price, quantityAvailable: listingType === 'product' && quantity.trim() !== '' ? quantity : null }),
+        body: JSON.stringify({ title, description, listingType, price, quantityAvailable: null }),
       });
       const result = await response.json().catch(() => ({}));
       if (response.status === 401) { router.replace('/auth?mode=login'); return; }
@@ -117,9 +115,9 @@ export default function MyOffersPage() {
       <Link className="nav-pill" href="/account">My space ↗</Link>
     </header>
     <section className="account-wrap offers-wrap">
-      <div className="section-kicker"><span/> SELLER WORKSPACE / YOUR OFFERS</div>
+      <div className="section-kicker"><span/> ALPHA WORKSPACE / YOUR OFFERS</div>
       <h1>Your offers.<br/><span>Your next move.</span></h1>
-      <p className="account-lead">Keep track of the products and services you have prepared for the global marketplace.</p>
+      <p className="account-lead">Keep track of the Services and B2B opportunities your organization has prepared for contract discussions.</p>
       <div className="offers-toolbar">
         <div><span className="offers-count">{offers.length.toString().padStart(2, '0')}</span><span className="offers-count-label">SAVED OFFERS</span></div>
         <Link className="cta-primary" href="/offers/new">＋ Create an offer</Link>
@@ -131,19 +129,18 @@ export default function MyOffersPage() {
         <div className="empty-orb3"><span>↗</span></div>
         <div className="section-kicker"><span/> A CLEAN SLATE</div>
         <h2>Your first offer starts here.</h2>
-        <p>When you save a product or service, it will appear here with its price, type, and current status.</p>
+        <p>When you save a Services or B2B offer, it will appear here with its price, type, and current status.</p>
         <Link className="cta-primary detail-back" href="/offers/new">Create your first offer ↗</Link>
       </div> : <div className="offers-list">
         {offers.map((offer, index) => <article className="offer-row" key={offer.id}>
           <div className="offer-index">{String(index + 1).padStart(2, '0')}</div>
           <div className="offer-row-main">
-            <div className="offer-row-meta"><span>{offer.listing_type === 'product' ? 'PHYSICAL PRODUCT' : 'SERVICE'}</span><span className={'offer-status offer-status-' + offer.status.toLowerCase()}>{offer.status.replaceAll('_', ' ')}</span></div>
+            <div className="offer-row-meta"><span>{offer.listing_type === 'b2b' ? 'B2B' : 'SERVICES'}</span><span className={'offer-status offer-status-' + offer.status.toLowerCase()}>{offer.status.replaceAll('_', ' ')}</span></div>
             {editingId === offer.id ? <form className="offer-edit-form" onSubmit={saveEdit}>
               <label>Offer title<input value={title} onChange={e => setTitle(e.target.value)} minLength={3} maxLength={140} required/></label>
               <label>Description<textarea value={description} onChange={e => setDescription(e.target.value)} maxLength={5000} rows={3}/></label>
-              <label>Offer type<select value={listingType} onChange={e => setListingType(e.target.value as 'product' | 'service')}><option value="product">Product</option><option value="service">Service</option></select></label>
+              <label>Offer type<select value={listingType} onChange={e => setListingType(e.target.value as 'b2b' | 'service')}><option value="service">Services</option><option value="b2b">B2B</option></select></label>
               <label>Price ({offer.currency_code})<input type="number" min="0" step="0.01" value={price} onChange={e => setPrice(e.target.value)} required/></label>
-              {listingType === 'product' && <label>Quantity<input type="number" min="0" step="1" value={quantity} onChange={e => setQuantity(e.target.value)} placeholder="Leave blank if unknown"/></label>}
               <div className="offer-actions"><button className="offer-action-primary" type="submit" disabled={busyId === offer.id}>{busyId === offer.id ? 'Saving…' : 'Save changes'}</button><button className="offer-action-secondary" type="button" onClick={() => { setEditingId(''); setActionError(''); }}>Cancel</button></div>
             </form> : <>
               <h2>{offer.title}</h2>
@@ -151,7 +148,7 @@ export default function MyOffersPage() {
               <small>{offer.country_code} · Created {new Date(offer.created_at).toLocaleDateString()}</small>
             </>}
           </div>
-          <div className="offer-row-price"><strong>{money(offer.price_minor_units, offer.currency_code)}</strong><span>{offer.quantity_available == null ? 'Quantity not set' : 'Qty ' + offer.quantity_available}</span>
+          <div className="offer-row-price"><strong>{money(offer.price_minor_units, offer.currency_code)}</strong><span>{offer.listing_type === 'service' ? 'Service offer' : 'B2B opportunity'}</span>
             {offer.status === 'draft' && editingId !== offer.id && <div className="offer-actions offer-actions-stack"><button className="offer-action-secondary" type="button" onClick={() => startEditing(offer)}>Edit draft</button><button className="offer-action-danger" type="button" disabled={busyId === offer.id} onClick={() => void deleteOffer(offer)}>{busyId === offer.id ? 'Working…' : 'Delete draft'}</button></div>}
           </div>
         </article>)}
