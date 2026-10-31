@@ -764,7 +764,7 @@ var MARKET_QUOTES={},MARKET_QUOTE_STATE={key:"",loading:false,last:0,error:""};
 var FOREX_GROUPS=["Currency Pairs","Stock Indices","Commodities","Equities","Bonds & Treasuries"];
 function loadMarketQuotes(market,list){
  var allowed=["Stock Indices","Commodities","Equities","Bonds & Treasuries"];
- if(allowed.indexOf(market)<0||!CONNECTED||!TMCFG.api)return;
+ if(allowed.indexOf(market)<0||!TMCFG.api)return;
  var rows=list.filter(function(i){return i.assetClass===market&&i.providerSymbol});
  var key=market+":"+rows.map(function(i){return i.providerSymbol}).join(",");
  if(!rows.length||MARKET_QUOTE_STATE.loading||(MARKET_QUOTE_STATE.key===key&&Date.now()-MARKET_QUOTE_STATE.last<45000))return;
