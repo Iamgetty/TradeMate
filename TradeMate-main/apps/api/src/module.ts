@@ -1391,6 +1391,7 @@ class CommunityFeedController {
     if (!result.rowCount) throw new NotFoundException('Attachment not found.');
     const file = result.rows[0];
     response.setHeader('Content-Type', file.content_type);
+    response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Content-Length', String(file.byte_size));
     response.setHeader('Content-Disposition', 'inline; filename="' + String(file.file_name).replace(/[\\"\\r\\n]/g, '_') + '"');
     response.setHeader('Cache-Control', 'public, max-age=3600');
