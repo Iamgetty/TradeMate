@@ -1024,7 +1024,7 @@ function feature(n,pre){var m={"Add contract":function(){openWiz(pre?"c:"+pre:"p
  var f=m[n];if(typeof f==="function")f();else if(f)pg(f)}
 /* ---------- events ---------- */
 document.addEventListener("click",function(e){var t=e.target;
- if(t.id==="nftchain"){NFTCHAIN=t.value;NFTQUERY="";NFTLIVE=[];loadLiveNFTs(st.q||NFTCOLLECTION);draw();return}\n var ft=t.closest("[data-feed-type]");if(ft){st.feedType=ft.dataset.feedType;draw();return}
+ var ft=t.closest("[data-feed-type]");if(ft){st.feedType=ft.dataset.feedType;draw();return}
  var fr=t.closest("[data-act=\"feed-refresh\"]");if(fr){loadFeed(true);draw();return}
  var fp=t.closest("[data-act=\"feed-compose\"]");if(fp){openFeedComposer();return}
  var feedClose=t.closest("[data-feed-close]");if(feedClose){closeFeedComposer();return}
@@ -1391,7 +1391,7 @@ function scrolling(){return Date.now()-lastScroll<1200}
   if(!rm&&!document.hidden)requestAnimationFrame(f);else if(!rm)setTimeout(f,500)}
  f()})();
 /* ---- profile photo upload ---- */
-document.addEventListener("change",function(e){var t=e.target;if(!t||t.id!=="photoin")return;var f=t.files&&t.files[0];if(!f)return;
+document.addEventListener("change",function(e){var t=e.target;if(t&&t.id==="nftchain"){NFTCHAIN=t.value;NFTQUERY="";NFTLIVE=[];loadLiveNFTs(st.q||NFTCOLLECTION);draw();return}if(!t||t.id!=="photoin")return;var f=t.files&&t.files[0];if(!f)return;
  if(!/^image\//.test(f.type)){toast("Please choose an image");t.value="";return}
  var fr=new FileReader();fr.onerror=function(){toast("Could not read that photo")};
  fr.onload=function(){var im=new Image();im.onerror=function(){toast("Could not open that photo")};
