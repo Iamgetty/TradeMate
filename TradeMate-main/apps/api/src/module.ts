@@ -699,6 +699,12 @@ class EnquiriesController {
 
 @Controller('market/contracts')
 class MarketplaceContractsController {
+  private validateContractId(id: string) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      throw new BadRequestException("id must be a valid contract UUID.");
+    }
+  }
+
   private async authenticatedUser(request: Request): Promise<string> {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
@@ -712,9 +718,7 @@ class MarketplaceContractsController {
   }
 
   private async authorizedContract(id: string, userId: string) {
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
-      throw new BadRequestException('id must be a valid contract UUID.');
-    }
+    this.validateContractId(id);
     const result = await databasePool!.query(
       `SELECT c.*, l.title AS listing_title, l.listing_type, o.name AS seller_name,
               buyer.display_name AS buyer_name,
@@ -780,10 +784,8 @@ class MarketplaceContractsController {
     if (startDate && completionDate && completionDate < startDate) {
       throw new BadRequestException('The completion date cannot be before the start date.');
     }
-    const amountMinorUnits = Math.round(Number(amountText) * 100);
-    if (!Number.isSafeInteger(amountMinorUnits) || amountMinorUnits < 0) {
-      throw new BadRequestException('Enter a valid non-negative contract value.');
-    }
+    const amountParts = amountText.split(".");
+    const amountMinorUnits = (BigInt(amountParts[0]) * 100n + BigInt(((amountParts[1] || "") + "00").slice(0, 2))).toString();
 
     const listing = await databasePool!.query(
       `SELECT l.id, l.title, l.listing_type, l.seller_organization_id, l.currency_code,
@@ -860,6 +862,7 @@ class MarketplaceContractsController {
     @Req() request: Request,
     @Body() body: { decision?: string },
   ) {
+    this.validateContractId(id);
     const userId = await this.authenticatedUser(request);
     if (!['accept', 'reject'].includes(body?.decision || '')) {
       throw new BadRequestException('decision must be accept or reject.');
@@ -902,6 +905,7 @@ class MarketplaceContractsController {
 
   @Patch(':id/cancel')
   async cancel(@Param('id') id: string, @Req() request: Request) {
+    this.validateContractId(id);
     const userId = await this.authenticatedUser(request);
     const client = await databasePool!.connect();
     try {
@@ -932,6 +936,7 @@ class MarketplaceContractsController {
 
   @Patch(':id/confirm-completion')
   async confirmCompletion(@Param('id') id: string, @Req() request: Request) {
+    this.validateContractId(id);
     const userId = await this.authenticatedUser(request);
     const client = await databasePool!.connect();
     try {
