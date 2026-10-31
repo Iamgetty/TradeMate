@@ -23,6 +23,7 @@ TradeMate connects people and organizations to explore opportunities, negotiate 
 - Seller offer-draft creation, viewing, editing and moderation submission.
 - Public market data endpoint for supported stock indices, commodities, equities and bonds/treasuries.
 - Feed posts with titles, file/audio attachments and comments.
+- Initial durable contract proposals for published Services/B2B offers, seller acceptance/decline, buyer cancellation and mutual fulfilment confirmation. This is not payment processing, escrow or e-signature.
 - Health and database-health endpoints.
 
 Offer drafts are private and are not public marketplace offers. A business space may remain pending. Do not treat these foundations as evidence that production readiness, all security testing, or end-to-end deployment verification is complete.
