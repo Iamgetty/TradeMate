@@ -671,7 +671,7 @@ var items=[
 ]
 items.forEach(function(i){i.col=MC[i.assetClass]||MC[i.m]});items.sort(function(a,b){return ORD.indexOf(a.m)-ORD.indexOf(b.m)});
 var HUE={"Add contract":"#ffb02e",Contracts:"#ffb02e",Conversations:"#38bdf8",Rewards:"#ffb02e",Referral:"#ff7a59",Deposit:"#2dd4bf",P2P:"#8b7bff",Earn:"#a3e635",Promotions:"#f472b6",Announcements:"#38bdf8",More:"#94a3b8",Card:"#c084fc",Settings:"#94a3b8","Help Center":"#38bdf8","Feedback Hub":"#fb923c",Learn:"#34d399","Affiliate Programs":"#f472b6"};
-var HOMEF=function(){var r=FH.filter(function(o){return o[0]!=="P2P"&&!(st.mode==="Buyer"&&o[0]==="Add contract")});return st.mode==="Seller"?r.slice(0,1).concat([["Contracts","box"],["Learn","learn"]],r.slice(1)):[["Contracts","box"],["Learn","learn"]].concat(r)};
+var HOMEF=function(){var r=FH.filter(function(o){return o[0]!=="P2P"&&!(st.mode==="Buyer"&&o[0]==="Add contract")});return st.mode==="Seller"?r.slice(0,1).concat([["Contracts","box"]],r.slice(1)):[["Contracts","box"],["Learn","learn"]].concat(r)};
 var FH=[["Add contract","plus"],["Rewards","gift"],["Referral","users"],["Deposit","download"],["P2P","swap"],["Earn","earn"],["Promotions","tag"],["More","more"]];
 var FG=[["MARKETPLACE",[["Add contract","plus"],["Contracts","box"],["P2P","swap"],["Deposit","download"]]],["EARN & GROW",[["Rewards","gift"],["Referral","users"],["Earn","earn"],["Affiliate Programs","affiliate"],["Promotions","tag"]]],["MONEY & ACCOUNT",[["Card","card"],["Settings","settings"]]],["SUPPORT & LEARN",[["Conversations","message-circle"],["Help Center","help"],["Feedback Hub","feedback"],["Announcements","horn"]]]];
 var st={tab:"Home",ht:"Favorites",hm:"All",mm:"Services",fxGroup:"Currency Pairs",tp:0,tt:"Order book",side:"Buy",coin:"USDT",fiat:"NGN",pay:"All payment methods",amt:"",hide:true,wt:"Overview",q:"",
@@ -1088,8 +1088,8 @@ function act(n,a,el){var m={
  resetf:function(){st.amt="";st.pay="All payment methods";draw()},eye:function(){st.hide=!st.hide;draw()},
  copy:function(){copyText(a,function(){toast("Copied")},function(){toast("Could not copy. Press and hold to select it.")})},
  avatar:function(){st.me.av=+a;st.me.photo=null;draw()},rmphoto:function(){st.me.photo=null;toast("Photo removed");draw()},faq:function(){st.open[a]=!st.open[a];drawPage()},
- pref:function(){st.prefs[a]=!st.prefs[a];drawPage()},mode:function(){st.mode=st.mode==="Buyer"?"Seller":"Buyer";toast((st.mode==="Seller"?"Alpha":"Clients")+" mode on");draw()},
- uc:function(){st.uc=a;if(st.stack[st.stack.length-1].id==="uc")drawPage();else pg("uc")},suptab:function(){st.sup=a;drawPage()},nt:function(){st.nt=a;drawPage()},
+ pref:function(){st.prefs[a]=!st.prefs[a];drawPage()},mode:function(){st.mode=st.mode==="Buyer"?"Seller":"Buyer";save();toast((st.mode==="Seller"?"Alpha":"Clients")+" mode on");draw();if(st.stack.length&&st.stack[st.stack.length-1].id==="more")drawPage()},
+ uc:function(){st.uc=a||"My info";if(st.stack.length&&st.stack[st.stack.length-1].id==="uc")drawPage();else pg("uc")},suptab:function(){st.sup=a;drawPage()},nt:function(){st.nt=a;drawPage()},
  readn:function(){st.notifs.forEach(function(x){if(x.id==+a)x.u=false});draw()},readall:function(){st.notifs.forEach(function(x){x.u=false});draw();toast("All caught up")},
  joinaff:function(){st.joinedAff=true;toast("You joined the affiliate programme");drawPage()},
  savenick:function(){var v=($("nick").value||"").trim();if(!v){toast("Enter a nickname");return}st.me.nick=v;draw();toast("Nickname saved");back()},
@@ -1110,7 +1110,7 @@ function act(n,a,el){var m={
  wsub:function(){toast(a)}};
  if(m[n])m[n]()}
 /* ----- more / search ----- */
-PG.more=function(){return hdr("All services")+FG.map(function(g){var opts=g[1].filter(function(o){return !(st.mode==="Buyer"&&o[0]==="Add contract")});return '<div class="sec">'+g[0]+'</div><div class="grid" style="padding-top:4px">'+opts.map(function(o){return '<button class="opt" data-f="'+o[0]+'" style="--h:'+HUE[o[0]]+'"><span class="tile">'+ic(o[1])+'</span>'+o[0]+'</button>'}).join("")+'</div>'}).join("")};
+PG.more=function(){return hdr("All services")+FG.map(function(g){var opts=g[1].slice();if(st.mode==="Seller"&&g[0]==="SUPPORT & LEARN")opts.unshift(["Learn","learn"]);opts=opts.filter(function(o){return !(st.mode==="Buyer"&&o[0]==="Add contract")});return '<div class="sec">'+g[0]+'</div><div class="grid" style="padding-top:4px">'+opts.map(function(o){return '<button class="opt" data-f="'+o[0]+'" style="--h:'+HUE[o[0]]+'"><span class="tile">'+ic(o[1])+'</span>'+o[0]+'</button>'}).join("")+'</div>'}).join("")};
 function sresHTML(){var q=(st.sq||"").toLowerCase();if(!q)return '<div class="sec">RECENT SEARCHES</div><div class="sub" style="flex-wrap:wrap">'+["Web design","Lekki apartment","USD/NGN","Invoice software"].map(function(x){return '<button data-pc="sq" data-arg="'+x+'">'+x+'</button>'}).join("")+'</div><div class="sec">BROWSE MARKETS</div><div class="mgrid">'+ORD.map(function(t){return '<button class="mcard" data-pc="goMarket" data-arg="'+t+'" style="--ac:'+MC[t]+'">'+ic(MI[t])+t.replace("Real Estate","Estate")+'</button>'}).join("")+'</div>';
  var r=items.filter(function(i){return i.n.toLowerCase().indexOf(q)>=0||i.m.toLowerCase().indexOf(q)>=0});return r.length?'<div class="sec">'+r.length+' RESULTS</div>'+r.map(rowH).join(""):'<div class="empty"><b>No results for “'+esc(st.sq)+'”</b>Try another word or browse a market.</div>'}
 PG.search=function(){return '<header class="ph"><button class="bk2" data-back aria-label="Back">'+ic("left")+'</button><label class="srch" style="flex:1">'+ic("search")+'<input id="sq" value="'+esc(st.sq)+'" placeholder="Search services, B2B, NFTs, forex…" aria-label="Search"></label></header><div id="sres">'+sresHTML()+'</div>'};
