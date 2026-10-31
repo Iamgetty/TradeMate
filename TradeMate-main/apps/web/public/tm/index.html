@@ -32,17 +32,18 @@ window.addEventListener("unhandledrejection",function(e){
 });
 setTimeout(function(){
  var app=document.getElementById("app"),lp=document.getElementById("lp");
- if(!app||!app.innerHTML.trim()){window.tmBootFail("The app did not render its main screen within 4.5 seconds. Check that /tm/app.js?v=9 loaded successfully.");return}
- if(lp&&(!lp.shadowRoot||!lp.shadowRoot.querySelector(".sc"))){lp.style.display="none";}
+ var nav=document.getElementById("nav"),sc=lp&&lp.shadowRoot&&lp.shadowRoot.querySelector(".sc");
+ if(!app||!app.querySelector(".view")||!nav||!nav.innerHTML.trim()){window.tmBootFail("The app shell did not finish rendering. Check that /tm/app.js?v=10 loaded and completed startup.");return}
+ if(lp&&(!sc||!sc.textContent.trim()||sc.getBoundingClientRect().width===0||sc.getBoundingClientRect().height===0)){lp.style.display="none";}
  window.tmReveal();
 },4500);
-</script>>>
+</script>
 </head>
 <body>
 <noscript style="color:#fff;font:16px sans-serif;padding:24px;display:block">TradeMate needs JavaScript to run.</noscript>
 <!-- Same-origin API: /api is proxied to the NestJS service by apps/web/app/api/[...path]/route.ts -->
 <script>window.TM_CONFIG={api:"/api"};</script>
 <script defer src="/tm/feed-client.js"></script>
-<script defer src="/tm/app.js?v=8"></script>
+<script defer src="/tm/app.js?v=10"></script>
 </body>
 </html>
