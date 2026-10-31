@@ -833,6 +833,7 @@ class MarketplaceContractsController {
               c.accepted_at, c.buyer_confirmed_at, c.seller_confirmed_at, c.completed_at,
               c.created_at, c.updated_at, l.listing_type, o.name AS seller_name,
               buyer.display_name AS buyer_name,
+              (SELECT om.member_role FROM organization_members om WHERE om.organization_id = c.seller_organization_id AND om.user_id = $1 LIMIT 1) AS seller_member_role,
               CASE WHEN c.buyer_user_id = $1 THEN 'sent' ELSE 'received' END AS direction
        FROM marketplace_contracts c
        JOIN listings l ON l.id = c.listing_id
