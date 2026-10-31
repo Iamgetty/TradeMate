@@ -17,9 +17,8 @@ export default function NewOfferPage() {
   const [business, setBusiness] = useState<Business | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [listingType, setListingType] = useState('product');
+  const [listingType, setListingType] = useState('service');
   const [price, setPrice] = useState('');
-  const [quantity, setQuantity] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -50,7 +49,7 @@ export default function NewOfferPage() {
       const response = await fetch('/api/market/listings', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, listingType, price, quantityAvailable: listingType === 'product' ? quantity : null }),
+        body: JSON.stringify({ title, description, listingType, price, quantityAvailable: null }),
       });
       const data = await response.json().catch(() => ({}));
       if (response.status === 401) { router.replace('/auth?mode=login'); return; }
@@ -72,24 +71,24 @@ export default function NewOfferPage() {
           <h1>Your offer is <span>taking shape.</span></h1>
           <p className="business-intro">“{saved.title}” has been saved to your business space as a draft.</p>
           <div className="account-card"><div><strong>{money(saved.price_minor_units, saved.currency_code)}</strong><span>{saved.title}</span><small>OFFER STATUS · {saved.status.toUpperCase()}</small></div></div>
-          <p className="business-footnote">This draft is not publicly visible yet. Publishing will be enabled when TradeMate's seller review and publishing controls are ready.</p>
+          <p className="business-footnote">This draft is private. Public publishing requires the review workflow.</p>
           <Link className="cta-primary detail-back" href="/offers">View my offers ↗</Link><Link className="account-secondary-link" href="/account">Return to your space</Link>
-          <button type="button" className="retry-btn" onClick={() => { setSaved(null); setTitle(''); setDescription(''); setPrice(''); setQuantity(''); }}>Create another draft ↻</button>
+          <button type="button" className="retry-btn" onClick={() => { setSaved(null); setTitle(''); setDescription(''); setPrice(''); }}>Create another draft ↻</button>
         </> : <>
           <h1>Put your offer <span>out there.</span></h1>
-          <p className="business-intro">Start with the essentials. You can prepare a product or service offer for the global marketplace.</p>
+          <p className="business-intro">Start with the essentials. Prepare a Services or B2B opportunity for a contract-led conversation.</p>
           {loading ? <div className="market-state"><h3>Loading your business space…</h3></div> : business && <>
             <div className="detail-note">BUSINESS · {business.name} · {business.country_code} <br/>Currency: {business.default_currency} · Business status: {business.status}</div>
             <form className="auth-form" onSubmit={submit}>
-              <label>What are you offering?<select value={listingType} onChange={e => setListingType(e.target.value)}><option value="product">A physical product</option><option value="service">A service</option></select></label>
-              <label>Offer title<input value={title} onChange={e => setTitle(e.target.value)} minLength={3} maxLength={140} placeholder="e.g. Handcrafted leather travel bag" required/></label>
-              <label>Description<textarea className="offer-description-input" value={description} onChange={e => setDescription(e.target.value)} maxLength={5000} rows={4} placeholder="Describe what buyers should know about this offer."/></label>
+              <label>What are you offering?<select value={listingType} onChange={e => setListingType(e.target.value)}><option value="service">Services</option><option value="b2b">B2B opportunity</option></select></label>
+              <label>Offer title<input value={title} onChange={e => setTitle(e.target.value)} minLength={3} maxLength={140} placeholder="e.g. Brand identity design or wholesale supply partnership" required/></label>
+              <label>Description<textarea className="offer-description-input" value={description} onChange={e => setDescription(e.target.value)} maxLength={5000} rows={4} placeholder="Describe the scope, expectations and commercial context for this offer."/></label>
               <label>Price ({business.default_currency})<input type="number" inputMode="decimal" min="0" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" required/><small>Uses your business's default currency: {business.default_currency}.</small></label>
-              {listingType === 'product' && <label>Available quantity <input type="number" inputMode="numeric" min="0" step="1" value={quantity} onChange={e => setQuantity(e.target.value)} placeholder="Leave blank if not specified"/><small>Leave blank if quantity is not known yet.</small></label>}
+              
               {error && <div className="auth-error" role="alert">{error}</div>}
               <button className="auth-submit" disabled={busy || loading}>{busy ? 'Saving your draft…' : 'Save offer as draft'} <span>↗</span></button>
             </form>
-            <p className="business-footnote">Your offer is saved privately as a draft. It will not appear in public search or accept payments until publishing and seller-review controls are implemented.</p>
+            <p className="business-footnote">Your offer is saved privately as a draft. It is not publicly visible and does not initiate a purchase or payment.</p>
           </>}
         </>}
       </div>

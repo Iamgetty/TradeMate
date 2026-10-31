@@ -13,22 +13,22 @@ Build for international use from day one. No single country, currency, language,
 - Keep country, language, currency, tax, shipping, and payment availability as separate configurable concepts.
 - Use country-aware validation for phone numbers and addresses.
 - Allow discovery across markets by default; apply country filters only when users choose them.
-- Do not imply every payment method, service, product, or crypto feature is available in every jurisdiction. Availability depends on provider support and applicable requirements.
+- Do not imply every payment method, service, B2B opportunity or crypto feature is available in every jurisdiction. Availability depends on provider support and applicable requirements.
 
 ## Product modules
-- Market: product listings, discovery, seller pages, favourites, reporting.
-- Services: provider pages, enquiries, quotes, booking requests.
-- Connect: messaging, ratings, reputation.
-- Admin: moderation, support, disputes, audit views.
-- P2P and Wallet: planned capabilities for peer-to-peer cryptocurrency offers, wallet connections, and eligible crypto payments. These are not implemented in the current foundation.
+- Market: Services and B2B opportunities, discovery, counterparty pages, favourites and reporting.
+- Contracts: contract proposals, counterparty review, acceptance, fulfilment and mutual completion confirmation.
+- Connect: enquiries, messaging, ratings and reputation.
+- Admin: moderation, support, disputes and audit views.
+- P2P and Wallet: later-stage capabilities for peer-to-peer cryptocurrency offers, wallet connections and eligible crypto payments. Do not start this workstream until the pre-P2P roadmap and additional product instructions are complete.
 
 ## Data foundation
-Use PostgreSQL for persistent marketplace data, with version-controlled schema migrations and backups. Introduce users and organizations, seller storefronts, listings and media, categories, enquiries/orders, moderation reports, and audit events incrementally. Enforce authorization and organization boundaries server-side.
+Use PostgreSQL for persistent marketplace data, with version-controlled schema migrations and backups. Introduce users and organizations, counterparty profiles, Services and B2B offers, contract proposals and messages, moderation reports and audit events incrementally. Enforce authorization and organization boundaries server-side.
 
 Do not store real customer information until authentication, access controls, validation, and operational safeguards are in place.
 
 ## Current implementation boundary
-The current foundation includes a responsive web experience, an API health endpoint, and public marketplace listing discovery backed by PostgreSQL. Authentication, seller listing creation, messaging, payment processing, escrow, crypto trading/custody, wallet connection, and mobile apps are not yet implemented.
+The repository currently includes a responsive Next.js web app, NestJS API, PostgreSQL-backed authentication and business-space/offer foundations, enquiries and messaging, Feed posts with attachments, and public market quote endpoints. The repository now includes an initial durable contract proposal/acceptance/dual-fulfilment-confirmation API and Buyer/Seller Contracts views. This foundation still requires end-to-end security and workflow QA, and does not process payments, provide escrow or constitute an e-signature. Crypto custody and wallet connection are not established as production capabilities. P2P foundations are present in the codebase but remain outside the current pre-P2P workstream.
 
 ## Security principles
 - Never commit `.env` files, API keys, or secrets.
