@@ -14,7 +14,7 @@ This roadmap records the current product direction. It is not a claim that each 
 
 1. Remove legacy Product UI, API paths and terminology; retain B2B as its own marketplace offer type.
 2. Complete B2B and Services publishing, discovery, review and counterparty flows.
-3. Replace conventional buy/order/bid mechanics with a contract-first lifecycle: proposal, review, acceptance or rejection, agreed scope and value, fulfilment milestones, and mutual completion confirmation.
+3. Complete end-to-end QA of the initial contract proposal, review, acceptance/rejection, cancellation and mutual fulfilment confirmation flow; extend it consistently across supported market categories and remove all remaining conventional buy/sell/order/bid checkout paths.
 4. Make Buyer Mode and Seller Mode reflect the same durable contract records and permissions.
 5. Complete Feed post titles, file attachments and voice notes, including playback/download and mobile failure states.
 6. Verify Forex market groups and public quote availability for the requested top-ten indices, commodities, equities and bonds/treasuries.
