@@ -77,7 +77,7 @@ export async function GET(request: Request) {
       });
 
     const slugs = items.map((item: any) => item.collectionSlug).filter((slug: any, index: number, all: any[]) => Boolean(slug) && all.indexOf(slug) === index).slice(0, 8);
-    const stats = await Promise.all(slugs.map(async (slug) => {
+    const stats = await Promise.all(slugs.map(async (slug: string) => {
       try {
         const statsResponse = await fetch(`https://api.opensea.io/api/v2/collections/${encodeURIComponent(slug)}/stats`, {
           headers: { 'x-api-key': apiKey, accept: 'application/json' },
