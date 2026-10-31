@@ -916,6 +916,7 @@ var p2pPrivate={ads:[],orders:[],loading:false,error:"",updated:0};
 function loadP2PPrivate(force){if(!CONNECTED||!st.me.id){p2pPrivate.ads=[];p2pPrivate.orders=[];p2pPrivate.updated=0;return Promise.resolve()}if(!force&&p2pPrivate.updated&&Date.now()-p2pPrivate.updated<12000)return Promise.resolve();if(p2pPrivate.loading)return Promise.resolve();p2pPrivate.loading=true;p2pPrivate.error="";return Promise.all([api("GET","/p2p/my-ads"),api("GET","/p2p/my-orders")]).then(function(x){p2pPrivate.ads=x[0].data||[];p2pPrivate.orders=x[1].data||[];p2pPrivate.updated=Date.now();p2pPrivate.loading=false;var top=st.stack[st.stack.length-1];if(st.tab==="P2P"||(top&&(top.id==="orders"||top.id==="myads")))softDraw()}).catch(function(e){p2pPrivate.loading=false;p2pPrivate.error=e.message||"Could not load your P2P records.";var top=st.stack[st.stack.length-1];if(st.tab==="P2P"||(top&&(top.id==="orders"||top.id==="myads")))softDraw()})}
 function publishP2P(f){var side=/^Sell/.test(f.side)?"sell":"buy",coin=String(f.coin||"").trim().toUpperCase(),fiat=String(f.fiat||"").trim().toUpperCase(),price=Number(f.price),quantity=Number(f.amt),min=Number(f.min),max=Number(f.max);if(!CONNECTED)return Promise.reject(new Error("Sign in and connect to TradeMate before publishing a P2P offer."));if(!(price>0&&quantity>0&&min>=0&&max>=min&&max>0))return Promise.reject(new Error("Check your P2P price, total quantity and order limits."));var methods=(f.methods||[]).map(function(x){return x==="Other"?(f.othm||""):x}).filter(Boolean);if(f.othm&&methods.indexOf(f.othm)<0)methods.push(f.othm);return api("POST","/p2p/ads",{side:side,asset:coin,fiat:fiat,price:price,quantity:quantity,minFiatAmount:min,maxFiatAmount:max,paymentMethods:methods}).then(function(r){p2pPrivate.updated=0;p2pCache.updated=0;return loadP2PPrivate(true).then(function(){return r})})}
 function p2pMoney(n,fiat){var symbols={NGN:"₦",USD:"$",EUR:"€",GBP:"£",GHS:"₵",KES:"KSh"};return (symbols[fiat]||fiat+" ")+fx2(Number(n)||0,2)}
+PG.p2p=function(){return hdr('P2P Marketplace')+p2p()};
 function p2p(){
  loadP2P();
  var want=st.side==="Buy"?"sell":"buy",SYM={NGN:"₦",USD:"$",EUR:"€",GBP:"£",GHS:"₵",KES:"KSh"};
@@ -996,7 +997,7 @@ document.addEventListener("click",function(e){var t=e.target;
  c=t.closest("[data-ht]");if(c){st.ht=c.dataset.ht;draw();return}
  c=t.closest("[data-hm]");if(c){st.hm=c.dataset.hm;draw();return}
  c=t.closest("[data-fxgroup]");if(c){st.fxGroup=c.dataset.fxgroup;st.q="";draw();return}
- c=t.closest("[data-mm]");if(c){if(c.dataset.mm==="P2P"){st.stack=[];st.tab="P2P";draw();$("app").scrollTop=0;return}st.mm=c.dataset.mm;if(st.mm==="Forex")st.fxGroup="Currency Pairs";st.q="";draw();return}
+ c=t.closest("[data-mm]");if(c){if(c.dataset.mm==="P2P"){pg("p2p");$("app").scrollTop=0;return}st.mm=c.dataset.mm;if(st.mm==="Forex")st.fxGroup="Currency Pairs";st.q="";draw();return}
  c=t.closest("[data-tt]");if(c){st.tt=c.dataset.tt;draw();return}
  c=t.closest("[data-marketfilter]");if(c){globalActivityCache.market=c.dataset.marketfilter;draw();return}
  c=t.closest("[data-side]");if(c){st.side=c.dataset.side;draw();return}
