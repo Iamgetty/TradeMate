@@ -866,7 +866,7 @@ function trade(){
  if(cr){
   ensureMultiFeeds(it);
   var dp=it.p<1?6:it.p<20?4:2,stamp=tmStatus();
-  var head='<div class="tpx"><b data-px="'+esc(it.n)+'">'+px(it)+'</b><span>USDT</span></div><div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Market depth</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">Exchange tape</button></div>';
+  var head='<div class="tpx"><b data-px="'+esc(it.n)+'">'+px(it)+'</b><span>USDT</span></div><div class="seg"><button class="'+(st.tt==="Order book"?"on":"")+'" data-tt="Order book">Order book</button><button class="'+(st.tt==="Trades"?"on":"")+'" data-tt="Trades">Exchange tape</button></div>';
   var body="";
   if(st.tt==="Order book"){
    body=tmBooks(it,dp);
@@ -874,7 +874,7 @@ function trade(){
    var trades=tmTape();
    body='<div class="tr h"><span>Exchange / time</span><span>Price (USDT)</span><span>Amount ('+esc(it.n.split("/")[0])+')</span></div>'+(trades.length?trades.map(function(x){return '<div class="tr"><span>'+esc(x.venue.toUpperCase()+' · '+x.market.toUpperCase())+'<br><small>'+new Date(x.time).toLocaleTimeString()+'</small></span><span class="'+(x.side==="BUY"?"up":"dn")+'">'+fx2(x.p,dp)+' <small>'+x.side+'</small></span><span>'+fx2(x.q,6)+'</span></div>'}).join(""):'<div class="empty">Waiting for executed trades from connected exchanges…</div>');
   }
-  return h+head+body+'<p class="fine">Live public exchange reference data only. Market depth combines price levels across connected exchanges; Exchange tape shows the shared execution feed. TradeMate business agreements are negotiated separately through Contracts. '+stamp+'.</p>';
+  return h+head+body+'<p class="fine">Live public exchange reference data only. Order book shows available price levels; Trades shows recent executions. TradeMate business agreements are negotiated separately through Contracts. '+stamp+'.</p>';
  }
  if(it.assetClass){
   var status=it.quoteStatus==="live"?"Live public quote":it.quoteStatus==="delayed"?"Delayed public quote":it.quoteStatus==="unavailable"?"Public quote unavailable":"Awaiting public quote";
