@@ -1570,7 +1570,7 @@ var _wn=PC.wnext;PC.wnext=function(){var w=st.cw;if(!w){_wn();return}var fin=w.s
  _wn();if(fin&&w.done&&w.id!=="kyc"){publishLocal(w.id,f);save()}};
 var _dr=draw;draw=function(){_dr();save()};
 /* ---- refresh: market + conversations ---- */
-if(CONNECTED){loadMarket();loadContracts();
+if(CONNECTED){loadMarket();loadContracts();loadEnquiries();
  setInterval(function(){if(document.hidden)return;loadMarket();if(st.me.id){loadEnquiries();loadContracts()}},60000);
  setInterval(function(){var t=st.stack[st.stack.length-1],d=t&&t.id==="deal"&&findDeal(t.a);if(d&&d.eid&&!document.hidden)loadMsgs(d)},7000)}
 
