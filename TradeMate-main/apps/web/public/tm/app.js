@@ -989,9 +989,9 @@ function readFeedFile(file){
 function feed(){
  loadFeed(false);var types=['All','Posts','Feedback','Announcements'],rows=st.feedPosts||[];
  var shown=rows.filter(function(p){return st.feedType==='All'||p.type===st.feedType});
- var html='<div class="top"><div style="flex:1"><h2 style="font-size:24px">Feed</h2><small style="color:var(--mut)">Community posts, feedback and announcements</small></div><button class="btn sm" data-act="feed-compose">New post</button></div>';
+ var html='<div class="top"><div style="flex:1"><h2 style="font-size:24px">Feed</h2><small style="color:var(--mut)">Community posts, feedback and announcements</small></div></div>';
  html+='<div class="sub">'+types.map(function(t){return '<button class="'+(st.feedType===t?'on':'')+'" data-feed-type="'+t+'">'+t+'</button>'}).join('')+'</div>';
- html+='<div class="card" style="margin:10px 16px"><b>Share with the TradeMate community</b><p>Publish an update or share feedback with other members.</p><button class="btn sm" data-act="feed-compose">Write a post</button></div>';
+ html+='<button type="button" data-act="feed-compose" style="display:flex;align-items:center;gap:13px;width:calc(100% - 32px);margin:12px 16px;padding:15px;background:linear-gradient(145deg,#171a20,#101216);border:1px solid #363940;border-radius:22px;color:var(--txt);text-align:left;box-shadow:0 8px 24px #0003"><span style="width:44px;height:44px;border-radius:15px;background:#0b0e12;border:1px solid #363940;display:grid;place-items:center;flex:none;overflow:hidden"><img src="'+LOGO+'" alt="TradeMate" style="width:35px;height:35px;object-fit:contain"></span><span style="flex:1;min-width:0"><b style="display:block;font-size:15px">Share with the community</b><small style="display:block;color:var(--mut);margin-top:4px">Start a post, add a file or record a voice note…</small></span><span style="background:#f5a83c;color:#17120a;border-radius:12px;padding:9px 12px;font-weight:800">＋</span></button>';
  if(st.feedLoading)html+='<div class="empty">Loading community posts…</div>';
  else if(st.feedError)html+='<div class="empty"><b>Feed unavailable</b>'+esc(st.feedError)+'<button class="btn sm" data-act="feed-refresh">Try again</button></div>';
  else if(!shown.length)html+='<div class="empty"><b>No posts yet</b>Be the first to share an update or feedback.</div>';
@@ -1019,6 +1019,7 @@ document.addEventListener("click",function(e){var t=e.target;
  var fr=t.closest("[data-act=\"feed-refresh\"]");if(fr){loadFeed(true);draw();return}
  var fp=t.closest("[data-act=\"feed-compose\"]");if(fp){openFeedComposer();return}
  var feedClose=t.closest("[data-feed-close]");if(feedClose){closeFeedComposer();return}
+ if(t.id==="feedChooseFiles"){var picker=document.getElementById("feedPostFiles");if(picker)picker.click();return}
  if(t.id==="feedRecordStart"){
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||typeof MediaRecorder==="undefined"){toast("Voice recording is not supported on this device/browser.");return}
   navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
