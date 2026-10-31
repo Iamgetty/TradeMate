@@ -871,14 +871,14 @@ class MarketplaceContractsController {
     try {
       await client.query('BEGIN');
       const current = await client.query(
-        `SELECT c.id, c.status, c.seller_organization_id,
+        `SELECT c.id, c.status, c.buyer_user_id, c.seller_organization_id,
                 EXISTS (SELECT 1 FROM organization_members om
                         WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2) AS is_seller
          FROM marketplace_contracts c WHERE c.id = $1 FOR UPDATE`,
         [id, userId],
       );
       if (!current.rowCount) throw new NotFoundException('Contract not found.');
-      if (!current.rows[0].is_seller) throw new NotFoundException('Contract not found.');
+      if (!current.rows[0].is_seller || current.rows[0].buyer_user_id === userId) throw new NotFoundException('Contract not found.');
       if (current.rows[0].status !== 'proposed') throw new ConflictException('This contract proposal is no longer awaiting a response.');
       const status = body.decision === 'accept' ? 'accepted' : 'rejected';
       const updated = await client.query(
@@ -955,7 +955,8 @@ class MarketplaceContractsController {
       if (!isBuyer && !contract.is_seller) throw new NotFoundException('Contract not found.');
       if (contract.status !== 'accepted') throw new ConflictException('Only an accepted contract can be confirmed as fulfilled.');
       const buyerConfirmed = Boolean(contract.buyer_confirmed_at) || isBuyer;
-      const sellerConfirmed = Boolean(contract.seller_confirmed_at) || Boolean(contract.is_seller);
+      const sellerActor = Boolean(contract.is_seller) && !isBuyer;
+      const sellerConfirmed = Boolean(contract.seller_confirmed_at) || sellerActor;
       const completed = buyerConfirmed && sellerConfirmed;
       const updated = await client.query(
         `UPDATE marketplace_contracts
@@ -966,7 +967,7 @@ class MarketplaceContractsController {
              updated_at = now()
          WHERE id = $1
          RETURNING id, status, buyer_confirmed_at, seller_confirmed_at, completed_at, updated_at`,
-        [id, isBuyer, Boolean(contract.is_seller), completed],
+        [id, isBuyer, sellerActor, completed],
       );
       await client.query(
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_fulfilment_confirmed','contract',$3,$4::jsonb)",
