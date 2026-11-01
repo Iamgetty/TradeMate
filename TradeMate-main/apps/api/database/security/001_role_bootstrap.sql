@@ -108,3 +108,14 @@ GRANT DELETE ON TABLE public.user_sessions, public.user_credentials,
 GRANT UPDATE (sender_user_id, sender_type) ON TABLE public.support_ticket_messages TO trademate_worker;
 GRANT UPDATE (accepted_by_user_id) ON TABLE public.marketplace_contracts TO trademate_worker;
 GRANT INSERT ON TABLE public.audit_events TO trademate_worker;
+
+DO $$
+DECLARE
+  audit_sequence TEXT;
+BEGIN
+  audit_sequence := pg_get_serial_sequence('public.audit_events', 'id');
+  IF audit_sequence IS NOT NULL THEN
+    EXECUTE format('GRANT USAGE ON SEQUENCE %s TO trademate_worker', audit_sequence);
+  END IF;
+END
+$$;
