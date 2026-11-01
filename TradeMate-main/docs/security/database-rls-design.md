@@ -11,7 +11,7 @@ RLS must be introduced only after the runtime role, request context and connecti
 | --- | --- | --- | --- | --- |
 | `trademate_migrator` | Yes, deployment only | Owns schema objects and runs migrations | Owner privileges only | DDL and controlled data migrations; never used for web requests |
 | `trademate_app` | Yes | No | No | Minimum CRUD privileges required by API; subject to RLS |
-| `trademate_worker` | Yes | No | No | Narrow permissions for scheduled/background jobs only |
+| `trademate_worker` | Yes | No | No | Narrow account-deletion processing permissions only |
 | `trademate_readonly` | Yes, only if required | No | No | Explicitly approved read-only operational queries |
 | Current Render administrator | Existing administrative access | Existing | Administrative | Role bootstrap, grants and emergency maintenance only |
 
