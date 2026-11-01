@@ -2,6 +2,7 @@ import { BadRequestException, Body, ConflictException, Controller, ForbiddenExce
 import type { Request, Response } from 'express';
 import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { Pool } from 'pg';
+import { changePasswordBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, loginBodySchema, parseBody, registerBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -163,6 +164,7 @@ class HealthController {
 class AuthController {
   @Post('register')
   async register(@Body() body: { email?: string; password?: string; displayName?: string }, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    parseBody(registerBodySchema, body);
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
     const displayName = typeof body?.displayName === 'string' ? body.displayName.trim() : '';
@@ -202,6 +204,7 @@ class AuthController {
   @Post('login')
   @HttpCode(200)
   async login(@Body() body: { email?: string; password?: string }, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    parseBody(loginBodySchema, body);
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
     const password = typeof body?.password === 'string' ? body.password : '';
@@ -267,6 +270,7 @@ class AuthController {
 
   @Patch('profile')
   async updateProfile(@Req() request: Request, @Body() body: { displayName?: string }) {
+    parseBody(displayNameBodySchema, body);
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to update your profile.');
@@ -295,6 +299,7 @@ class AuthController {
     @Req() request: Request,
     @Body() body: { currentPassword?: string; newPassword?: string },
   ) {
+    parseBody(changePasswordBodySchema, body);
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to change your password.');
@@ -368,6 +373,7 @@ class AuthController {
 
   @Post('2fa/confirm')
   async confirmTwoFactor(@Req() request: Request, @Body() body: { code?: string }) {
+    parseBody(totpCodeBodySchema, body);
     const token = sessionTokenFrom(request);
     if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
     const session = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
@@ -386,6 +392,7 @@ class AuthController {
 
   @Post('2fa/disable')
   async disableTwoFactor(@Req() request: Request, @Body() body: { code?: string }) {
+    parseBody(totpCodeBodySchema, body);
     const token = sessionTokenFrom(request);
     if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
     const session = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
@@ -405,6 +412,7 @@ class AuthController {
   @Post('2fa/verify')
   @HttpCode(200)
   async verifyTwoFactor(@Body() body: { challengeToken?: string; code?: string }, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    parseBody(totpChallengeBodySchema, body);
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const challengeToken = typeof body?.challengeToken === 'string' ? body.challengeToken : '';
     const code = typeof body?.code === 'string' ? body.code : '';
@@ -504,6 +512,7 @@ class AuthController {
   @Post('account-deletion/request')
   @HttpCode(200)
   async requestAccountDeletion(@Req() request: Request, @Body() body: { password?: string }, @Res({ passthrough: true }) response: Response) {
+    parseBody(deletionRequestBodySchema, body);
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to request account deletion.');
@@ -543,6 +552,7 @@ class AuthController {
   @Post('account-deletion/cancel')
   @HttpCode(200)
   async cancelAccountDeletion(@Body() body: { token?: string }) {
+    parseBody(deletionCancelBodySchema, body);
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const token = typeof body?.token === 'string' ? body.token : '';
     if (!/^[A-Za-z0-9_-]{40,60}$/.test(token)) throw new BadRequestException('Enter a valid cancellation token.');
