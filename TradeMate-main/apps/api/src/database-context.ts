@@ -28,8 +28,9 @@ const establishTransactionContext = async (client: PoolClient, context: Database
   await client.query("SELECT set_config('app.session_token_hash', $1, true)", [context.sessionTokenHash]);
 };
 
-const isTransactionCommand = (sql: unknown, command: 'BEGIN' | 'COMMIT' | 'ROLLBACK') =>
-  typeof sql === 'string' && new RegExp('^\\s*' + command + '\\b', 'i').test(sql);
+const isBeginCommand = (sql: unknown) => typeof sql === 'string' && /^\\s*BEGIN\\b/i.test(sql);
+const isCommitCommand = (sql: unknown) => typeof sql === 'string' && /^\\s*COMMIT\\b/i.test(sql);
+const isRollbackCommand = (sql: unknown) => typeof sql === 'string' && /^\\s*ROLLBACK\\b/i.test(sql);
 
 /**
  * Wraps every API query in a transaction and sets identity context transaction-locally.
@@ -73,14 +74,14 @@ export const createRlsAwarePool = (pool: Pool): Pool => new Proxy(pool, {
               return async (...args: unknown[]) => {
                 const sql = typeof args[0] === 'string' ? args[0] : (args[0] as { text?: unknown } | undefined)?.text;
 
-                if (isTransactionCommand(sql, 'BEGIN')) {
+                if (isBeginCommand(sql)) {
                   const result = await (inner.query as (...queryArgs: unknown[]) => unknown).apply(inner, args);
                   await establishTransactionContext(inner, context);
                   inTransaction = true;
                   return result;
                 }
 
-                if (isTransactionCommand(sql, 'COMMIT') || isTransactionCommand(sql, 'ROLLBACK')) {
+                if (isCommitCommand(sql) || isRollbackCommand(sql)) {
                   const result = await (inner.query as (...queryArgs: unknown[]) => unknown).apply(inner, args);
                   inTransaction = false;
                   return result;
@@ -104,13 +105,13 @@ export const createRlsAwarePool = (pool: Pool): Pool => new Proxy(pool, {
             }
 
             if (innerProperty === 'release') {
-              return (...releaseArgs: unknown[]) => {
+              return (releaseError?: Error | boolean) => {
                 if (released) return;
                 released = true;
                 if (inTransaction) {
                   void inner.query('ROLLBACK')
                     .catch(() => undefined)
-                    .finally(() => inner.release(...releaseArgs));
+                    .finally(() => inner.release(releaseError));
                   return;
                 }
                 inner.release(...releaseArgs);
