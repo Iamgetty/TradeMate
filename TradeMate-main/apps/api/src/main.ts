@@ -4,6 +4,7 @@ import { AppModule } from './module';
 import { attachMarketFeed } from './market-feed';
 import { json } from 'express';
 import { validateEnvironment } from './environment';
+import { databaseRequestContextMiddleware } from './database-context';
 
 async function bootstrap() {
   validateEnvironment();
@@ -11,6 +12,7 @@ async function bootstrap() {
   // Feed attachments are base64-encoded in JSON; cap the request size while
   // allowing four small attachments plus post metadata.
   app.use(json({ limit: '28mb' }));
+  app.use(databaseRequestContextMiddleware);
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
   attachMarketFeed(app.getHttpServer());
   app.setGlobalPrefix('api');
