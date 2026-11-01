@@ -1,6 +1,6 @@
 # PostgreSQL roles and Row-Level Security design
 
-**Status:** Design baseline only — RLS is not yet enabled.  
+**Status:** Role/grant and request-context groundwork is implemented and CI-tested; production role cutover and RLS are not yet enabled.  
 **Applies to:** Render PostgreSQL, API connection pool, migration runner and background workers.
 
 RLS must be introduced only after the runtime role, request context and connection-pool behaviour have been tested. The current API issues queries through a shared `pg.Pool` and also opens explicit transactions. Enabling policies before those paths establish transaction-local identity would break legitimate workflows and could create unsafe partial coverage.
@@ -33,11 +33,11 @@ RLS policies will use transaction-local PostgreSQL settings, not session-wide se
 - `app.organization_id`: organization UUID only after membership has been checked for the current request.
 - `app.session_token_hash`: optional bootstrap context for resolving the current session without exposing another user's session rows.
 
-The API must establish context with parameterized `set_config(name, value, true)` calls inside the same transaction as the protected query. The final `true` argument makes the setting transaction-local. Never use session-level `SET` or `set_config(..., false)` with a pooled connection: a reused connection could leak one user's context into another request.
+The API now establishes `app.session_token_hash` with parameterized `set_config(name, value, true)` calls inside the same transaction as each protected query. The final `true` argument makes the setting transaction-local. The middleware hashes the session cookie with SHA-256; the raw cookie is never placed in PostgreSQL settings. The `database-context.ts` pool wrapper applies this to ordinary `pool.query` calls and explicit checked-out-client transactions. Unit tests cover query transactions, explicit transactions, malformed cookies and concurrent-user context isolation. Never use session-level `SET` or `set_config(..., false)` with a pooled connection: a reused connection could leak one user's context into another request.
 
 The session bootstrap path must resolve the user from a valid, unexpired, unrevoked session before assigning `app.user_id`. Organization context must be derived from a verified membership record, never trusted directly from a request body or query string.
 
-Every query path must be covered, including direct `pool.query`, explicit `pool.connect()` transactions, public routes, account recovery, webhook handlers and scheduled workers. The API must not start with RLS enabled until this inventory and refactor are complete.
+Every query path must be covered, including direct `pool.query`, explicit `pool.connect()` transactions, public routes, account recovery, webhook handlers and scheduled workers. The current implementation supplies only the session-token hash, not yet the resolved `app.user_id` or verified `app.organization_id`. It is groundwork only. Login/registration bootstrap, TOTP challenge flows, webhook/system operations and worker identity need explicit policy design. The API must not start with RLS enabled until this inventory and refactor are complete.
 
 RLS is a database backstop against missing application predicates. It does not make a compromised application role safe if arbitrary SQL can be executed as that role; parameterized SQL, least privilege and application authorization remain mandatory.
 
@@ -116,3 +116,15 @@ When the implementation is ready for production role separation:
 7. Do not delete or rotate the existing administrator credential until the API and migration jobs have both been verified with their new credentials.
 
 Do not paste either connection string into chat, source control or logs. Do not switch the production API to the new runtime role until the owner-approved rollout step is scheduled. The role bootstrap is tested in CI, but production credentials and access must still be verified on the actual Render database.
+
+
+## 8. Implemented role-bootstrap groundwork
+
+The CI-tested bootstrap script is `apps/api/database/security/001_role_bootstrap.sql`; its assertions are in `002_role_bootstrap_test.sql`.
+
+- `trademate_app`: runtime CRUD grants, no schema creation, no migration history access and append-only audit-event access.
+- `trademate_migrator`: owns application objects and is the only role intended to run migrations.
+- `trademate_worker`: limited to account-deletion processing tables and columns; cannot read or modify marketplace enquiries and cannot update or delete audit events.
+- The account-deletion worker now expects `WORKER_DATABASE_URL` in production. It no longer mutates historical audit-event actor references; user rows are retained and anonymised.
+
+The CI role bootstrap runs on an isolated PostgreSQL 16 instance. This does not mean the production Render roles have been created. Production role creation and credential cutover remain a controlled operator task after the final grants and RLS policies are approved.
