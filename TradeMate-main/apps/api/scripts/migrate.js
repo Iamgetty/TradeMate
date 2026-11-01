@@ -18,6 +18,7 @@ const MIGRATIONS = [
   '011_organization_documents.sql',
   '012_user_notifications.sql',
   '013_support_feedback.sql',
+  '014_user_preferences.sql',
 ];
 
 async function main() {
