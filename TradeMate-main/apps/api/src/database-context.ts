@@ -28,9 +28,16 @@ const establishTransactionContext = async (client: PoolClient, context: Database
   await client.query("SELECT set_config('app.session_token_hash', $1, true)", [context.sessionTokenHash]);
 };
 
-const isBeginCommand = (sql: unknown) => typeof sql === 'string' && /^\\s*BEGIN\\b/i.test(sql);
-const isCommitCommand = (sql: unknown) => typeof sql === 'string' && /^\\s*COMMIT\\b/i.test(sql);
-const isRollbackCommand = (sql: unknown) => typeof sql === 'string' && /^\\s*ROLLBACK\\b/i.test(sql);
+const matchesSqlCommand = (sql: unknown, command: string) => {
+  if (typeof sql !== 'string') return false;
+  const normalized = sql.trimStart().toUpperCase();
+  return normalized === command || normalized.startsWith(command + ' ') ||
+    normalized.startsWith(command + ';') || normalized.startsWith(command + '\n') ||
+    normalized.startsWith(command + '\t');
+};
+const isBeginCommand = (sql: unknown) => matchesSqlCommand(sql, 'BEGIN');
+const isCommitCommand = (sql: unknown) => matchesSqlCommand(sql, 'COMMIT');
+const isRollbackCommand = (sql: unknown) => matchesSqlCommand(sql, 'ROLLBACK');
 
 /**
  * Wraps every API query in a transaction and sets identity context transaction-locally.
