@@ -204,6 +204,67 @@ class AuthController {
 }
 
 
+
+@Controller('preferences')
+class PreferencesController {
+  private async currentUser(request: Request): Promise<string> {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to manage preferences.');
+    const result = await databasePool.query(
+      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+      [tokenDigest(token)],
+    );
+    if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    return result.rows[0].id as string;
+  }
+
+  private defaults() {
+    return { cur: 'NGN', market: 'Services', orders: true, p2p: true, promos: false, news: true, language: 'English' };
+  }
+
+  @Get()
+  async getPreferences(@Req() request: Request) {
+    const userId = await this.currentUser(request);
+    const result = await databasePool!.query('SELECT preferences FROM user_preferences WHERE user_id = $1 LIMIT 1', [userId]);
+    return { preferences: { ...this.defaults(), ...(result.rows[0]?.preferences || {}) } };
+  }
+
+  @Patch()
+  async updatePreferences(@Req() request: Request, @Body() body: Record<string, unknown>) {
+    const userId = await this.currentUser(request);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new BadRequestException('Send valid preference values.');
+    const allowed = new Set(['cur', 'market', 'orders', 'p2p', 'promos', 'news', 'language']);
+    const update: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(body)) {
+      if (!allowed.has(key)) throw new BadRequestException(`Unsupported preference: ${key}.`);
+      if (['orders', 'p2p', 'promos', 'news'].includes(key)) {
+        if (typeof value !== 'boolean') throw new BadRequestException(`${key} must be true or false.`);
+        update[key] = value;
+      } else if (key === 'cur') {
+        if (typeof value !== 'string' || !['NGN', 'USD', 'EUR', 'GBP', 'GHS', 'KES'].includes(value)) throw new BadRequestException('Choose a supported display currency.');
+        update[key] = value;
+      } else if (key === 'market') {
+        if (typeof value !== 'string' || !['Services', 'B2B', 'Real Estate', 'Software', 'NFTs', 'Forex', 'Crypto', 'P2P'].includes(value)) throw new BadRequestException('Choose a supported default market.');
+        update[key] = value;
+      } else if (key === 'language') {
+        if (typeof value !== 'string' || !['English', 'Français', 'Hausa', 'Yorùbá', 'Igbo', 'Kiswahili', 'Português', 'العربية'].includes(value)) throw new BadRequestException('Choose a supported language.');
+        update[key] = value;
+      }
+    }
+    if (!Object.keys(update).length) throw new BadRequestException('No supported preferences were supplied.');
+    const result = await databasePool!.query(
+      'INSERT INTO user_preferences (user_id, preferences, updated_at) VALUES ($1, $2::jsonb, now()) ON CONFLICT (user_id) DO UPDATE SET preferences = user_preferences.preferences || EXCLUDED.preferences, updated_at = now() RETURNING preferences',
+      [userId, JSON.stringify(update)],
+    );
+    await databasePool!.query(
+      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'account.preferences_updated', 'user', $1, $2::jsonb)",
+      [userId, JSON.stringify({ keys: Object.keys(update) })],
+    );
+    return { preferences: { ...this.defaults(), ...result.rows[0].preferences } };
+  }
+}
+
 @Controller('notifications')
 class NotificationsController {
   private async currentUser(request: Request) {
@@ -2061,7 +2122,7 @@ class PublicMarketQuotesController {
   }
 }
 
-@Module({ controllers: [PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController] })
+@Module({ controllers: [PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController] })
 export class AppModule implements OnModuleDestroy {
   async onModuleDestroy() {
     if (databasePool) await databasePool.end();
