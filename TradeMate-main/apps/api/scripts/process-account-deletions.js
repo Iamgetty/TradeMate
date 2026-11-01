@@ -6,6 +6,11 @@ if (!connectionString) {
   process.exit(1);
 }
 const execute = process.env.ACCOUNT_DELETION_EXECUTE === 'true';
+const legalApproval = process.env.ACCOUNT_DELETION_LEGAL_APPROVAL === 'true';
+if (execute && !legalApproval) {
+  console.error('Permanent account deletion is blocked. Complete global, jurisdiction-specific legal and records-retention review, then set ACCOUNT_DELETION_LEGAL_APPROVAL=true explicitly.');
+  process.exit(1);
+}
 const pool = new Pool({
   connectionString,
   ssl: process.env.PGSSLMODE === 'require' ? { rejectUnauthorized: false } : undefined,
@@ -26,7 +31,7 @@ async function main() {
   );
   console.log(`Found ${due.rowCount} account deletion request(s) due.`);
   if (!execute) {
-    console.log('Dry run only. Set ACCOUNT_DELETION_EXECUTE=true after legal and retention approval to process these requests.');
+    console.log('Dry run only. Permanent processing remains disabled until global, jurisdiction-specific privacy, financial-record retention, contractual, and dispute-preservation reviews are complete. Then explicitly set both ACCOUNT_DELETION_EXECUTE=true and ACCOUNT_DELETION_LEGAL_APPROVAL=true.');
     return;
   }
 
