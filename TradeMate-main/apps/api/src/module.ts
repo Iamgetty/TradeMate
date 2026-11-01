@@ -2,7 +2,7 @@ import { BadRequestException, Body, ConflictException, Controller, ForbiddenExce
 import type { Request, Response } from 'express';
 import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { Pool } from 'pg';
-import { changePasswordBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, loginBodySchema, parseBody, registerBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
+import { changePasswordBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, feedPostBodySchema, loginBodySchema, parseBody, preferencesBodySchema, publicProfileBodySchema, registerBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -632,6 +632,7 @@ class PreferencesController {
 
   @Patch()
   async updatePreferences(@Req() request: Request, @Body() body: Record<string, unknown>) {
+    parseBody(preferencesBodySchema, body);
     const userId = await this.currentUser(request);
     if (!body || typeof body !== 'object' || Array.isArray(body)) throw new BadRequestException('Send valid preference values.');
     const allowed = new Set(['cur', 'market', 'orders', 'p2p', 'promos', 'news', 'language']);
@@ -2193,6 +2194,7 @@ class PublicProfilesController {
 
   @Patch('me')
   async updateMyProfile(@Req() request: Request, @Body() body: { bio?: string; instagramUsername?: string; xUsername?: string; websiteUrl?: string; profilePhotoData?: string; coverPhotoData?: string; highlights?: unknown[] }) {
+    parseBody(publicProfileBodySchema, body);
     const userId = await this.currentUser(request);
     const bio = typeof body?.bio === 'string' ? body.bio.trim() : '';
     const instagram = typeof body?.instagramUsername === 'string' ? body.instagramUsername.trim() : '';
@@ -2309,6 +2311,7 @@ class CommunityFeedController {
 
   @Post('posts')
   async createPost(@Req() request: Request, @Body() body: { type?: string; title?: string; body?: string; attachments?: Array<{ name?: string; type?: string; data?: string }> }) {
+    parseBody(feedPostBodySchema, body);
     const userId = await this.currentUser(request);
     const title = typeof body?.title === 'string' ? body.title.trim() : '';
     const content = typeof body?.body === 'string' ? body.body.trim() : '';
