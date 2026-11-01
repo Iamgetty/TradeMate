@@ -110,4 +110,3 @@ BEGIN
   END IF;
 END
 $;
-$$;
