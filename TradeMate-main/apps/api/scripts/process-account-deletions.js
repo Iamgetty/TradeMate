@@ -88,7 +88,7 @@ async function main() {
       console.log(`Processed deletion for user ${item.user_id}.`);
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
-      console.error(`Failed to process deletion for user ${item.user_id}:`, error);
+      console.error('Failed to process account deletion.', error);
       process.exitCode = 1;
     } finally {
       client.release();
