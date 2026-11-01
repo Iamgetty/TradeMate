@@ -1,6 +1,6 @@
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, HttpCode, HttpException, HttpStatus, Module, NotFoundException, OnModuleDestroy, Param, Post, Patch, Delete, Query, Req, Res, UnauthorizedException } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { Pool } from 'pg';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
@@ -28,6 +28,63 @@ const passwordMatches = async (password: string, encoded: string) => {
     return timingSafeEqual(actual, expected);
   } catch { return false; }
 };
+
+const totpEncryptionKey = () => {
+  const raw = process.env.TOTP_ENCRYPTION_KEY || '';
+  if (!/^[0-9a-f]{64}$/i.test(raw)) throw new Error('TOTP_ENCRYPTION_KEY must be configured as 64 hexadecimal characters.');
+  return Buffer.from(raw, 'hex');
+};
+const encryptTotpSecret = (secret: string) => {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', totpEncryptionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(secret, 'utf8'), cipher.final()]);
+  return [iv.toString('hex'), cipher.getAuthTag().toString('hex'), encrypted.toString('hex')].join(':');
+};
+const decryptTotpSecret = (value: string) => {
+  const [ivHex, tagHex, encryptedHex] = value.split(':');
+  if (!ivHex || !tagHex || !encryptedHex) throw new Error('Invalid encrypted authenticator secret.');
+  const decipher = createDecipheriv('aes-256-gcm', totpEncryptionKey(), Buffer.from(ivHex, 'hex'));
+  decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+  return Buffer.concat([decipher.update(Buffer.from(encryptedHex, 'hex')), decipher.final()]).toString('utf8');
+};
+const base32Encode = (input: Buffer) => {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = 0, value = 0, output = '';
+  for (const byte of input) {
+    value = (value << 8) | byte; bits += 8;
+    while (bits >= 5) { output += alphabet[(value >>> (bits - 5)) & 31]; bits -= 5; }
+  }
+  if (bits) output += alphabet[(value << (5 - bits)) & 31];
+  return output;
+};
+const base32Decode = (input: string) => {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = 0, value = 0;
+  const output: number[] = [];
+  for (const char of input.replace(/=+$/g, '').toUpperCase()) {
+    const index = alphabet.indexOf(char);
+    if (index < 0) throw new Error('Invalid authenticator secret.');
+    value = (value << 5) | index; bits += 5;
+    if (bits >= 8) { output.push((value >>> (bits - 8)) & 255); bits -= 8; }
+  }
+  return Buffer.from(output);
+};
+const verifyTotp = (secret: string, code: string) => {
+  if (!/^\d{6}$/.test(code)) return false;
+  const key = base32Decode(secret);
+  const counter = Math.floor(Date.now() / 30000);
+  for (let offset = -1; offset <= 1; offset++) {
+    const buffer = Buffer.alloc(8);
+    buffer.writeBigUInt64BE(BigInt(counter + offset));
+    const digest = createHmac('sha1', key).update(buffer).digest();
+    const position = digest[digest.length - 1] & 15;
+    const binary = ((digest[position] & 127) << 24) | ((digest[position + 1] & 255) << 16) | ((digest[position + 2] & 255) << 8) | (digest[position + 3] & 255);
+    const expected = String(binary % 1000000).padStart(6, '0');
+    if (timingSafeEqual(Buffer.from(expected), Buffer.from(code))) return true;
+  }
+  return false;
+};
+
 const tokenDigest = (token: string) => createHash('sha256').update(token).digest('hex');
 const cookieOptions = () => ({ httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/', maxAge: SESSION_DAYS * 24 * 60 * 60 * 1000 });
 const sessionTokenFrom = (request: Request) => {
@@ -107,6 +164,16 @@ class AuthController {
     const result = await databasePool.query("SELECT u.id, u.email, u.display_name, u.country_code, u.status, c.password_hash FROM users u JOIN user_credentials c ON c.user_id = u.id WHERE lower(u.email) = $1 LIMIT 1", [email]);
     const user = result.rows[0];
     if (!user || user.status !== 'active' || !(await passwordMatches(password, user.password_hash))) throw new UnauthorizedException('Email or password is incorrect.');
+    const security = await databasePool.query('SELECT totp_enabled FROM user_auth_security WHERE user_id = $1 LIMIT 1', [user.id]);
+    if (security.rows[0]?.totp_enabled) {
+      const challengeToken = randomBytes(32).toString('base64url');
+      await databasePool.query(
+        'INSERT INTO auth_login_challenges (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval \'5 minutes\')',
+        [user.id, tokenDigest(challengeToken)],
+      );
+      await databasePool.query('DELETE FROM auth_rate_limits WHERE key_hash = $1', [rateKey]);
+      return { requiresTwoFactor: true, challengeToken, expiresInSeconds: 300 };
+    }
     await databasePool.query('DELETE FROM auth_rate_limits WHERE key_hash = $1', [rateKey]);
     const token = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
@@ -191,6 +258,105 @@ class AuthController {
     } finally {
       client.release();
     }
+  }
+
+
+  @Get('2fa/status')
+  async twoFactorStatus(@Req() request: Request) {
+    const token = sessionTokenFrom(request);
+    if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
+    const session = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
+    if (!session.rowCount) throw new UnauthorizedException('Your session has expired.');
+    const result = await databasePool.query('SELECT totp_enabled, totp_confirmed_at FROM user_auth_security WHERE user_id=$1', [session.rows[0].id]);
+    return { enabled: Boolean(result.rows[0]?.totp_enabled), confirmedAt: result.rows[0]?.totp_confirmed_at || null, available: /^[0-9a-f]{64}$/i.test(process.env.TOTP_ENCRYPTION_KEY || '') };
+  }
+
+  @Post('2fa/setup')
+  async setupTwoFactor(@Req() request: Request) {
+    const token = sessionTokenFrom(request);
+    if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
+    const session = await databasePool.query("SELECT u.id,u.email FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
+    if (!session.rowCount) throw new UnauthorizedException('Your session has expired.');
+    const encryptionKey = process.env.TOTP_ENCRYPTION_KEY || '';
+    if (!/^[0-9a-f]{64}$/i.test(encryptionKey)) throw new HttpException('Authenticator setup is not available until the server encryption key is configured.', HttpStatus.SERVICE_UNAVAILABLE);
+    const existing = await databasePool.query('SELECT totp_enabled FROM user_auth_security WHERE user_id=$1', [session.rows[0].id]);
+    if (existing.rows[0]?.totp_enabled) throw new ConflictException('Two-factor authentication is already enabled.');
+    const secret = base32Encode(randomBytes(20));
+    await databasePool.query(
+      'INSERT INTO user_auth_security (user_id, totp_secret_encrypted, totp_enabled, setup_expires_at) VALUES ($1,$2,false,now()+interval \'15 minutes\') ON CONFLICT (user_id) DO UPDATE SET totp_secret_encrypted=EXCLUDED.totp_secret_encrypted, totp_enabled=false, setup_expires_at=EXCLUDED.setup_expires_at, updated_at=now()',
+      [session.rows[0].id, encryptTotpSecret(secret)],
+    );
+    const label = encodeURIComponent('TradeMate:' + session.rows[0].email);
+    const issuer = encodeURIComponent('TradeMate');
+    return { secret, otpauthUrl: 'otpauth://totp/' + label + '?secret=' + secret + '&issuer=' + issuer + '&algorithm=SHA1&digits=6&period=30', expiresInSeconds: 900 };
+  }
+
+  @Post('2fa/confirm')
+  async confirmTwoFactor(@Req() request: Request, @Body() body: { code?: string }) {
+    const token = sessionTokenFrom(request);
+    if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
+    const session = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
+    if (!session.rowCount) throw new UnauthorizedException('Your session has expired.');
+    const result = await databasePool.query('SELECT totp_secret_encrypted, setup_expires_at FROM user_auth_security WHERE user_id=$1 AND totp_enabled=false', [session.rows[0].id]);
+    if (!result.rowCount || !result.rows[0].setup_expires_at || new Date(result.rows[0].setup_expires_at).getTime() < Date.now()) throw new ConflictException('Start authenticator setup again; the setup has expired.');
+    let valid = false;
+    try { valid = verifyTotp(decryptTotpSecret(result.rows[0].totp_secret_encrypted), String(body?.code || '')); } catch { valid = false; }
+    if (!valid) throw new UnauthorizedException('That authenticator code is invalid. Check the code and try again.');
+    await databasePool.query('UPDATE user_auth_security SET totp_enabled=true, totp_confirmed_at=now(), setup_expires_at=NULL, updated_at=now() WHERE user_id=$1', [session.rows[0].id]);
+    await databasePool.query("INSERT INTO audit_events (actor_user_id,event_type,entity_type,entity_id,metadata) VALUES ($1,'auth.totp_enabled','user',$1,'{}'::jsonb)", [session.rows[0].id]);
+    return { success: true, enabled: true };
+  }
+
+  @Post('2fa/disable')
+  async disableTwoFactor(@Req() request: Request, @Body() body: { code?: string }) {
+    const token = sessionTokenFrom(request);
+    if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
+    const session = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
+    if (!session.rowCount) throw new UnauthorizedException('Your session has expired.');
+    const result = await databasePool.query('SELECT totp_secret_encrypted FROM user_auth_security WHERE user_id=$1 AND totp_enabled=true', [session.rows[0].id]);
+    if (!result.rowCount) throw new ConflictException('Two-factor authentication is not enabled.');
+    let valid = false;
+    try { valid = verifyTotp(decryptTotpSecret(result.rows[0].totp_secret_encrypted), String(body?.code || '')); } catch { valid = false; }
+    if (!valid) throw new UnauthorizedException('That authenticator code is invalid.');
+    await databasePool.query('UPDATE user_auth_security SET totp_enabled=false, totp_secret_encrypted=NULL, totp_confirmed_at=NULL, setup_expires_at=NULL, updated_at=now() WHERE user_id=$1', [session.rows[0].id]);
+    await databasePool.query("INSERT INTO audit_events (actor_user_id,event_type,entity_type,entity_id,metadata) VALUES ($1,'auth.totp_disabled','user',$1,'{}'::jsonb)", [session.rows[0].id]);
+    return { success: true, enabled: false };
+  }
+
+  @Post('2fa/verify')
+  @HttpCode(200)
+  async verifyTwoFactor(@Body() body: { challengeToken?: string; code?: string }, @Res({ passthrough: true }) response: Response) {
+    if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
+    const challengeToken = typeof body?.challengeToken === 'string' ? body.challengeToken : '';
+    const code = typeof body?.code === 'string' ? body.code : '';
+    if (!challengeToken || challengeToken.length > 128 || !/^\d{6}$/.test(code)) throw new UnauthorizedException('Enter the six-digit authenticator code.');
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const challenge = await client.query(
+        'SELECT c.id,c.user_id,c.attempts,u.email,u.display_name,u.country_code FROM auth_login_challenges c JOIN users u ON u.id=c.user_id WHERE c.token_hash=$1 AND c.expires_at>now() AND c.consumed_at IS NULL FOR UPDATE OF c',
+        [tokenDigest(challengeToken)],
+      );
+      if (!challenge.rowCount || challenge.rows[0].attempts >= 5) throw new UnauthorizedException('This verification attempt has expired. Sign in again.');
+      const secretResult = await client.query('SELECT totp_secret_encrypted,totp_enabled FROM user_auth_security WHERE user_id=$1', [challenge.rows[0].user_id]);
+      let valid = false;
+      try { valid = Boolean(secretResult.rows[0]?.totp_enabled && verifyTotp(decryptTotpSecret(secretResult.rows[0].totp_secret_encrypted), code)); } catch { valid = false; }
+      if (!valid) {
+        await client.query('UPDATE auth_login_challenges SET attempts=attempts+1 WHERE id=$1', [challenge.rows[0].id]);
+        await client.query('COMMIT');
+        throw new UnauthorizedException('The authenticator code is incorrect.');
+      }
+      await client.query('UPDATE auth_login_challenges SET consumed_at=now() WHERE id=$1', [challenge.rows[0].id]);
+      const sessionToken = randomBytes(32).toString('base64url');
+      const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+      await client.query('INSERT INTO user_sessions (user_id,token_hash,expires_at) VALUES ($1,$2,$3)', [challenge.rows[0].user_id,tokenDigest(sessionToken),expiresAt]);
+      await client.query('COMMIT');
+      response.cookie(SESSION_COOKIE, sessionToken, cookieOptions());
+      return { user: { id: challenge.rows[0].user_id, email: challenge.rows[0].email, display_name: challenge.rows[0].display_name, country_code: challenge.rows[0].country_code } };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
   }
 
   @Get('sessions')
