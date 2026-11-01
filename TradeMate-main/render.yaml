@@ -1,23 +1,5 @@
 # TradeMate deployment. PostgreSQL is configured separately in Render.
 services:
-  - type: cron
-    name: trademate-account-deletion-dry-run
-    runtime: node
-    plan: starter
-    region: oregon
-    rootDir: TradeMate-main/apps/api
-    buildCommand: npm install --include=dev
-    startCommand: node scripts/process-account-deletions.js
-    schedule: "0 3 * * *"
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-      - key: ACCOUNT_DELETION_EXECUTE
-        value: "false"
-      - key: ACCOUNT_DELETION_LEGAL_APPROVAL
-        value: "false"
   - type: web
     name: trademate-api
     runtime: node
