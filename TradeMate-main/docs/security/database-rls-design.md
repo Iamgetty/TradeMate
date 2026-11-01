@@ -100,3 +100,19 @@ The migration inventory includes the following data classes. Exact policy expres
 8. Verify production permissions and application workflows after deployment; retain evidence of role grants, policy coverage and test runs.
 
 **Do not execute a bulk `ENABLE ROW LEVEL SECURITY` migration against the current production schema.** The present API is not yet using a complete transaction-scoped identity context.
+
+## 8. Render credential setup (owner action required)
+
+Render supports multiple PostgreSQL credentials. Creating a new credential makes it the default credential shown in the dashboard, while existing credentials remain active. Credentials created directly with SQL are not managed or displayed by Render. See the [Render PostgreSQL credential guide](https://render.com/docs/postgresql-credentials).
+
+When the implementation is ready for production role separation:
+
+1. Open the TradeMate PostgreSQL service in the Render Dashboard.
+2. Under **Info → Credentials**, create a credential with username `trademate_app`. Copy its connection string immediately and store it only in the API service's `DATABASE_URL` secret.
+3. Create a second credential with username `trademate_migrator`. Copy its connection string immediately and store it only in the API service's `MIGRATION_DATABASE_URL` secret.
+4. Keep the existing administrator credential available for controlled database administration and the migration workflow until the new credentials have been verified.
+5. Connect with the existing administrator credential and run `database/security/001_role_bootstrap.sql` once. It is tested in CI against a clean PostgreSQL database. It does not print or set passwords.
+6. Verify the role grants with `database/security/002_role_bootstrap_test.sql` or the CI runner `scripts/test-db-roles.js`.
+7. Do not delete or rotate the existing administrator credential until the API and migration jobs have both been verified with their new credentials.
+
+Do not paste either connection string into chat, source control or logs. Do not switch the production API to the new runtime role until the owner-approved rollout step is scheduled. The role bootstrap is tested in CI, but production credentials and access must still be verified on the actual Render database.
