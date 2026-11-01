@@ -59,6 +59,11 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: node scripts/test-rls-pilot.js
+      - name: Verify immutable audit-event history
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-audit-immutability.js
       - name: Verify transaction-local user identity and connection-pool isolation
         working-directory: TradeMate-main/apps/api
         env:
