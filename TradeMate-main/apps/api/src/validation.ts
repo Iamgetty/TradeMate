@@ -5,7 +5,7 @@ import { z } from 'zod';
  * Parse untrusted request data at the API boundary.
  * Strict object schemas reject unexpected keys instead of silently accepting them.
  */
-export const parseBody = <T extends z.ZodTypeAny>(schema: T, input: unknown): z.infer<T> => {
+export const parseBody = <T extends z.ZodType>(schema: T, input: unknown): z.infer<T> => {
   const parsed = schema.safeParse(input);
   if (!parsed.success) {
     throw new BadRequestException(parsed.error.issues[0]?.message || 'The request contains invalid data.');
