@@ -17,6 +17,7 @@ const MIGRATIONS = [
   '010_marketplace_contracts.sql',
   '011_organization_documents.sql',
   '012_user_notifications.sql',
+  '013_support_feedback.sql',
 ];
 
 async function main() {
