@@ -139,7 +139,7 @@ jobs:
           npm audit --audit-level=high
 
       - name: Install Semgrep
-        run: python -m pip install --disable-pip-version-check semgrep
+        run: python -m pip install --disable-pip-version-check semgrep==1.183.0
 
       - name: Static application security testing
         run: semgrep scan --config p/default --error --timeout 15 --timeout-threshold 10 TradeMate-main/apps/api/src TradeMate-main/apps/api/scripts TradeMate-main/apps/api/database/security TradeMate-main/apps/web
