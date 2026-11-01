@@ -46,6 +46,11 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: npm run db:migrate
+      - name: Verify least-privilege PostgreSQL roles and grants
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-db-roles.js
 
   web:
     name: Web build and runtime syntax
