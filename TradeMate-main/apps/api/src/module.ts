@@ -257,6 +257,151 @@ class NotificationsController {
 }
 
 
+@Controller('support')
+class SupportController {
+  private async currentUser(request: Request): Promise<string> {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to contact support.');
+    const result = await databasePool.query(
+      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+      [tokenDigest(token)],
+    );
+    if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    return result.rows[0].id as string;
+  }
+
+  private validateTicketId(id: string) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      throw new BadRequestException('Invalid ticket identifier.');
+    }
+  }
+
+  @Get('tickets')
+  async tickets(@Req() request: Request) {
+    const userId = await this.currentUser(request);
+    const result = await databasePool!.query(
+      'SELECT id, ticket_code, category, subject, status, created_at, updated_at FROM support_tickets WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 100',
+      [userId],
+    );
+    return { tickets: result.rows };
+  }
+
+  @Post('tickets')
+  async createTicket(@Req() request: Request, @Body() body: { category?: string; subject?: string; message?: string }) {
+    const userId = await this.currentUser(request);
+    const category = typeof body?.category === 'string' ? body.category.trim() : '';
+    const subject = typeof body?.subject === 'string' ? body.subject.trim() : '';
+    const message = typeof body?.message === 'string' ? body.message.trim() : '';
+    const categories = ['Account & security', 'Orders', 'P2P & payments', 'Listings & selling', 'Report a user or scam', 'Technical issue', 'Other'];
+    if (!categories.includes(category)) throw new BadRequestException('Choose a valid support category.');
+    if (subject.length < 2 || subject.length > 180) throw new BadRequestException('Your subject must be between 2 and 180 characters.');
+    if (message.length < 5 || message.length > 10000) throw new BadRequestException('Your message must be between 5 and 10,000 characters.');
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const ticket = await client.query(
+        'INSERT INTO support_tickets (user_id, category, subject) VALUES ($1,$2,$3) RETURNING id, ticket_code, category, subject, status, created_at, updated_at',
+        [userId, category, subject],
+      );
+      await client.query(
+        "INSERT INTO support_ticket_messages (ticket_id, sender_user_id, sender_type, message) VALUES ($1,$2,'user',$3)",
+        [ticket.rows[0].id, userId, message],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1,'support.ticket_created','support_ticket',$2,$3::jsonb)",
+        [userId, ticket.rows[0].id, JSON.stringify({ category })],
+      );
+      await client.query('COMMIT');
+      return { ticket: ticket.rows[0], message: 'Your support ticket has been created.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  @Get('tickets/:id/messages')
+  async ticketMessages(@Param('id') id: string, @Req() request: Request) {
+    const userId = await this.currentUser(request);
+    this.validateTicketId(id);
+    const ticket = await databasePool!.query(
+      'SELECT id, ticket_code, category, subject, status, created_at, updated_at FROM support_tickets WHERE id = $1 AND user_id = $2 LIMIT 1',
+      [id, userId],
+    );
+    if (!ticket.rowCount) throw new NotFoundException('Support ticket not found.');
+    const messages = await databasePool!.query(
+      'SELECT id, sender_type, message, created_at FROM support_ticket_messages WHERE ticket_id = $1 ORDER BY created_at, id LIMIT 500',
+      [id],
+    );
+    return { ticket: ticket.rows[0], messages: messages.rows };
+  }
+
+  @Post('tickets/:id/messages')
+  async replyTicket(@Param('id') id: string, @Req() request: Request, @Body() body: { message?: string }) {
+    const userId = await this.currentUser(request);
+    this.validateTicketId(id);
+    const message = typeof body?.message === 'string' ? body.message.trim() : '';
+    if (message.length < 1 || message.length > 10000) throw new BadRequestException('Your reply must be between 1 and 10,000 characters.');
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const ticket = await client.query(
+        "SELECT id, status FROM support_tickets WHERE id = $1 AND user_id = $2 FOR UPDATE",
+        [id, userId],
+      );
+      if (!ticket.rowCount) throw new NotFoundException('Support ticket not found.');
+      if (['resolved', 'closed'].includes(ticket.rows[0].status)) throw new ConflictException('This ticket is closed. Open a new ticket if you still need help.');
+      const inserted = await client.query(
+        "INSERT INTO support_ticket_messages (ticket_id, sender_user_id, sender_type, message) VALUES ($1,$2,'user',$3) RETURNING id, sender_type, message, created_at",
+        [id, userId, message],
+      );
+      await client.query("UPDATE support_tickets SET status = 'open', updated_at = now() WHERE id = $1", [id]);
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1,'support.ticket_replied','support_ticket',$2,'{}'::jsonb)",
+        [userId, id],
+      );
+      await client.query('COMMIT');
+      return { message: inserted.rows[0], success: true };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  @Get('feedback')
+  async feedback(@Req() request: Request) {
+    const userId = await this.currentUser(request);
+    const result = await databasePool!.query(
+      'SELECT id, feedback_type, message, status, created_at FROM user_feedback WHERE user_id = $1 ORDER BY created_at DESC LIMIT 100',
+      [userId],
+    );
+    return { feedback: result.rows };
+  }
+
+  @Post('feedback')
+  async submitFeedback(@Req() request: Request, @Body() body: { type?: string; message?: string }) {
+    const userId = await this.currentUser(request);
+    const type = typeof body?.type === 'string' ? body.type.trim() : '';
+    const message = typeof body?.message === 'string' ? body.message.trim() : '';
+    if (!['Idea', 'Bug', 'Complaint', 'Praise'].includes(type)) throw new BadRequestException('Choose a valid feedback type.');
+    if (message.length < 3 || message.length > 10000) throw new BadRequestException('Feedback must be between 3 and 10,000 characters.');
+    const result = await databasePool!.query(
+      'INSERT INTO user_feedback (user_id, feedback_type, message) VALUES ($1,$2,$3) RETURNING id, feedback_type, message, status, created_at',
+      [userId, type, message],
+    );
+    await databasePool!.query(
+      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1,'feedback.submitted','user_feedback',$2,$3::jsonb)",
+      [userId, result.rows[0].id, JSON.stringify({ type })],
+    );
+    return { feedback: result.rows[0], message: 'Thank you. Your feedback has been submitted.' };
+  }
+}
+
+
 @Controller('organizations')
 class OrganizationsController {
   private async currentUser(request: Request) {
