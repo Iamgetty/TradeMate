@@ -1781,7 +1781,7 @@ function act(n,a,el){var m={
  uc:function(){st.uc=a||"My info";if(st.stack.length&&st.stack[st.stack.length-1].id==="uc")drawPage();else pg("uc")},suptab:function(){st.sup=a;drawPage()},nt:function(){st.nt=a;drawPage()},
  readn:function(){st.notifs.forEach(function(x){if(x.id==+a)x.u=false});draw()},readall:function(){st.notifs.forEach(function(x){x.u=false});draw();toast("All caught up")},
  joinaff:function(){st.joinedAff=true;toast("You joined the affiliate programme");drawPage()},
- savenick:function(){var v=($("nick").value||"").trim();if(!v){toast("Enter a nickname");return}st.me.nick=v;draw();toast("Nickname saved");back()},
+ savenick:function(){var v=($("nick").value||"").trim();if(v.length<2||v.length>24){toast("Use a nickname between 2 and 24 characters");return}if(CONNECTED){api("PATCH","/auth/profile",{displayName:v}).then(function(r){st.me.nick=r.user.display_name;st.me.name=r.user.display_name;save();draw();toast("Nickname saved to your account");back()}).catch(function(e){toast(e.message||"Could not save nickname")});return}st.me.nick=v;save();draw();toast("Nickname saved on this device only");back()},
  logout:function(){st.stack=[];draw();toast("Signed out (preview only)")},
  ticket:function(){var f=st.fv;if(!f.tcat||!(f.tsub||"").trim()||!(f.tmsg||"").trim()){toast("Choose a category and add a subject and message");return}
   var id="TM-"+(1001+st.tickets.length);st.tickets.unshift({id:id,cat:f.tcat,sub:f.tsub,status:"Open",time:"Just now",msgs:[{me:true,t:f.tmsg,time:"Just now"},{me:false,t:"Your ticket is saved on this device. Support messaging is not connected to the server yet.",time:"Just now"}]});
