@@ -2277,7 +2277,7 @@ class CommunityFeedController {
       : type === 'Announcements' || type === 'announcement' ? 'announcement' : null;
     const limit = Math.min(50, Math.max(1, Number.parseInt(rawLimit || '30', 10) || 30));
     const result = await databasePool.query(
-      `SELECT p.id, p.post_type, p.title, p.body, p.pinned, p.created_at,
+      `SELECT p.id, p.author_user_id, p.post_type, p.title, p.body, p.pinned, p.created_at,
               COALESCE(u.display_name, 'TradeMate Team') AS author_name,
               (SELECT count(*)::int FROM feed_comments c WHERE c.post_id = p.id AND c.status = 'published') AS comment_count,
               COALESCE((SELECT json_agg(json_build_object('id', a.id, 'file_name', a.file_name, 'content_type', a.content_type, 'byte_size', a.byte_size) ORDER BY a.created_at)
