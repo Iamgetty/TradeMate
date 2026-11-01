@@ -1045,7 +1045,7 @@ function lg(i){var a=i.n.split("/"),y=a[0].toLowerCase();
  }
  if(i.m==="Crypto"){var b=BR[a[0]];return '<span class="lgb" style="background:'+b[0]+';color:'+(a[0]==="SOL"||a[0]==="BNB"?"#111":"#fff")+'">'+b[1]+'</span>'+chainImg("lgi",[LOGOS[a[0]],"https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/svg/color/"+y+".svg","https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/svg/color/"+y+".svg","https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@master/svg/color/"+y+".svg"])}
  if(i.m==="Forex")return '<span class="lgb" style="background:#16222a;font-size:1.05em">'+(FLAG[a[0]]||"")+flag(a[0],"fl")+'</span><span class="lgq">'+(FLAG[a[1]]||"")+flag(a[1],"fl")+'</span>';
- return '<span class="lgb">'+ic(MI[i.m],"width:58%;height:58%")+'</span>'}
+ return '<span class="lgb">'+ic(MI[i.m],"width:58%;height:58%")+'</span>'+(i.image?chainImg("lgi",[esc(i.image)],esc(i.n)):"")}
 
 function money(n){return n>=1e12?"$"+(n/1e12).toFixed(2)+"T":n>=1e9?"$"+(n/1e9).toFixed(2)+"B":n>=1e6?"$"+(n/1e6).toFixed(2)+"M":"$"+fx2(n,n<100?2:0)}
 function val(i){if(i.m==="Crypto")return i.cap?"MCap "+money(i.cap):"";if(i.m==="Forex"||typeof i.p==="number")return "";
@@ -1131,15 +1131,20 @@ function mkMix(max){
  var pools={},order=ORD.slice();
  items.forEach(function(i){if(order.indexOf(i.m)<0)return;(pools[i.m]=pools[i.m]||[]).push(i)});
  ["Crypto","Forex"].forEach(function(t){if(pools[t])pools[t]=pools[t].filter(function(i){return typeof i.c==="number"&&typeof i.p==="number"}).sort(function(a,b){return Math.abs(b.c)-Math.abs(a.c)})});
- pools.NFTs=(NFTLIVE||[]).slice(0,4);
- pools.P2P=(p2pCache.book||[]).slice(0,4).map(function(x){return {__p2p:1,x:x}});
+ var seen={};
+ pools.NFTs=(NFTLIVE||[]).filter(function(i){var k=String(i.collectionSlug||i.collection||i.n||"").toLowerCase();if(!k||seen[k])return false;seen[k]=1;return true}).slice(0,3);
+ pools.P2P=(p2pCache.book||[]).slice(0,3).map(function(x){return {__p2p:1,x:x}});
  var out=[],r=0,more=true;
  while(out.length<max&&more){more=false;order.forEach(function(t){var q=pools[t];if(q&&q[r]&&out.length<max){out.push(q[r]);more=true}});r++}
- return out;
+ function oi(i){return order.indexOf(i.__p2p?"P2P":i.m)}
+ return out.map(function(i,k){return {i:i,k:k}}).sort(function(a,b){return oi(a.i)-oi(b.i)||a.k-b.k}).map(function(o){return o.i});
 }
 function mixRow(i){
- if(i.__p2p){var x=i.x,buy=String(x.side).toLowerCase()==="buy";return '<div class="row" role="button" tabindex="0" data-mm="P2P"><span class="nm"><span class="coin" style="--ac:#8b7bff">\u21c5</span><span><b>'+esc(x.asset_code)+'/'+esc(x.fiat_code)+'</b><small>P2P \u00b7 '+esc(String(x.side||"").toUpperCase())+'</small></span></span><span class="p">'+p2pMoney(x.price,x.fiat_code)+'</span><span class="badge '+(buy?"up":"dn")+'">'+(buy?"Buy":"Sell")+'</span></div>'}
- if(i.m==="NFTs"){var pr=typeof i.p==="number"?fx2(i.p,i.p<1?4:2)+" "+esc(i.currency||"ETH"):"\u2014";return '<div class="row" role="button" tabindex="0" data-mm="NFTs"><span class="nm"><span class="coin" style="--ac:'+(i.col||"#8b7bff")+'">\u25c8</span><span><b>'+esc(i.collection||i.n)+'</b><small>NFT \u00b7 '+esc(i.chain||"Live")+'</small></span></span><span class="p">'+pr+'</span><span class="badge">NFT</span></div>'}
+ var sp='<span class="star" aria-hidden="true" style="visibility:hidden">\u2606</span>';
+ if(i.__p2p){var x=i.x,buy=String(x.side).toLowerCase()==="buy",code=String(x.asset_code||"").toUpperCase(),ico=(typeof BR!=="undefined"&&BR[code])?lg({n:code+"/USDT",m:"Crypto"}):'<span class="lgb" style="background:#8b7bff;color:#fff">'+ic("swap","width:58%;height:58%")+'</span>';
+  return '<div class="row" role="button" tabindex="0" data-mm="P2P"><span class="nm">'+sp+'<span class="coin" style="--ac:#8b7bff">'+ico+'</span><span><b>'+esc(code)+'/'+esc(x.fiat_code)+'</b><small>P2P \u00b7 '+(buy?"Buying":"Selling")+'</small></span></span><span class="p">'+p2pMoney(x.price,x.fiat_code)+'</span><span class="badge '+(buy?"up":"dn")+'">'+(buy?"Buy":"Sell")+'</span></div>'}
+ if(i.m==="NFTs"){var pr=typeof i.p==="number"?fx2(i.p,i.p<1?4:2)+" "+esc(i.currency||"ETH"):"\u2014",nm=String(i.collection||i.n||""),ch=String(i.chain||"").replace(/^./,function(c){return c.toUpperCase()});
+  return '<div class="row" role="button" tabindex="0" data-mm="NFTs"><span class="nm">'+sp+'<span class="coin" style="--ac:#8b7bff"><span class="lgb" style="background:#8b7bff;color:#fff">'+ic("nft","width:58%;height:58%")+'</span>'+(i.image?chainImg("lgi",[esc(i.image)],esc(nm)):"")+'</span><span><b style="text-transform:capitalize">'+esc(nm)+'</b><small>NFT'+(ch?' \u00b7 '+esc(ch):'')+'</small></span></span><span class="p">'+pr+'</span><span class="badge">NFT</span></div>'}
  return rowH(i);
 }
 function nftHub(list,chains){
