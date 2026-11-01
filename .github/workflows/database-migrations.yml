@@ -25,6 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
+      MIGRATION_DATABASE_URL: ${{ secrets.TRADEMATE_MIGRATION_DATABASE_URL }}
       DATABASE_URL: ${{ secrets.TRADEMATE_DATABASE_URL }}
       PGSSLMODE: require
     steps:
@@ -38,8 +39,8 @@ jobs:
 
       - name: Verify database secret is configured
         run: |
-          if [ -z "$DATABASE_URL" ]; then
-            echo "::error::GitHub Actions secret TRADEMATE_DATABASE_URL is missing or empty."
+          if [ -z "$MIGRATION_DATABASE_URL" ] && [ -z "$DATABASE_URL" ]; then
+            echo "::error::Configure TRADEMATE_MIGRATION_DATABASE_URL or the temporary TRADEMATE_DATABASE_URL fallback."
             exit 1
           fi
 
