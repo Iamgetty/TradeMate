@@ -1125,7 +1125,7 @@ var MK_META={
 function mkEmpty(icon,title,msg,btn){return '<div class="empty mk-empty"><span class="mk-empty-ico">'+ic(icon)+'</span><b>'+title+'</b><p>'+msg+'</p>'+(btn||"")+'</div>'}
 function mkTile(t,k){
  var n=t==="P2P"?(p2pCache.book||[]).length:t==="NFTs"?((NFTLIVE||[]).length):items.filter(function(i){return i.m===t}).length,label=t.replace("Real Estate","Estate");
- return '<button class="mk-card" data-mm="'+t+'" style="--i:'+k+'" aria-label="'+label+' marketplace, '+n+'"><span class="mk-ico">'+ic(MI[t])+'</span><span class="mk-name">'+label+'</span><span class="mk-count">'+n+'</span></button>'
+ return '<button class="mk-card" data-mm="'+t+'" style="--i:'+k+'" aria-label="'+label+' marketplace"><span class="mk-ico">'+ic(MI[t])+'</span><span class="mk-name">'+label+'</span></button>'
 }
 function mkMix(max){
  var pools={},order=ORD.slice();
