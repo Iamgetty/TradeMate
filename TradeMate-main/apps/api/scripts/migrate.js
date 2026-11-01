@@ -24,6 +24,7 @@ const MIGRATIONS = [
   '017_transactional_email_account_deletion.sql',
   '018_enquiry_read_receipts.sql',
   '019_public_profiles_and_follows.sql',
+  '020_immutable_audit_events.sql',
 ];
 
 async function main() {
