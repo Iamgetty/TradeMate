@@ -2146,6 +2146,103 @@ class P2PMarketController {
   }
 }
 
+
+@Controller('profiles')
+class PublicProfilesController {
+  private async currentUser(request: Request): Promise<string> {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to continue.');
+    const result = await databasePool.query(
+      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+      [tokenDigest(token)],
+    );
+    if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    return result.rows[0].id as string;
+  }
+
+  @Get(':id')
+  async getProfile(@Param('id') id: string, @Req() request: Request) {
+    const viewerId = await this.currentUser(request);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid profile id.');
+    const result = await databasePool!.query(
+      `SELECT u.id, u.display_name, p.bio, p.instagram_username, p.x_username, p.website_url,
+              p.profile_photo_data, p.cover_photo_data, p.highlights,
+              (SELECT count(*)::int FROM feed_posts fp WHERE fp.author_user_id = u.id AND fp.status = 'published') AS post_count,
+              (SELECT count(*)::int FROM user_follows f WHERE f.followed_user_id = u.id) AS follower_count,
+              (SELECT count(*)::int FROM user_follows f WHERE f.follower_user_id = u.id) AS following_count,
+              EXISTS(SELECT 1 FROM user_follows f WHERE f.follower_user_id = $2 AND f.followed_user_id = u.id) AS is_following
+       FROM users u LEFT JOIN user_profiles p ON p.user_id = u.id
+       WHERE u.id = $1 AND u.status = 'active' LIMIT 1`,
+      [id, viewerId],
+    );
+    if (!result.rowCount) throw new NotFoundException('Profile not found.');
+    const p = result.rows[0];
+    return { profile: { ...p, bio: p.bio || '', instagram_username: p.instagram_username || '', x_username: p.x_username || '', website_url: p.website_url || '', profile_photo_data: p.profile_photo_data || '', cover_photo_data: p.cover_photo_data || '', highlights: p.highlights || [] } };
+  }
+
+  @Patch('me')
+  async updateMyProfile(@Req() request: Request, @Body() body: { bio?: string; instagramUsername?: string; xUsername?: string; websiteUrl?: string; profilePhotoData?: string; coverPhotoData?: string; highlights?: unknown[] }) {
+    const userId = await this.currentUser(request);
+    const bio = typeof body?.bio === 'string' ? body.bio.trim() : '';
+    const instagram = typeof body?.instagramUsername === 'string' ? body.instagramUsername.trim() : '';
+    const x = typeof body?.xUsername === 'string' ? body.xUsername.trim() : '';
+    const website = typeof body?.websiteUrl === 'string' ? body.websiteUrl.trim() : '';
+    const photo = typeof body?.profilePhotoData === 'string' ? body.profilePhotoData : '';
+    const cover = typeof body?.coverPhotoData === 'string' ? body.coverPhotoData : '';
+    const highlights = Array.isArray(body?.highlights) ? body.highlights : [];
+    if (bio.length > 160 || instagram.length > 30 || x.length > 15 || website.length > 2048) throw new BadRequestException('One or more profile fields exceed their allowed length.');
+    if (instagram && !/^[A-Za-z0-9._]{1,30}$/.test(instagram)) throw new BadRequestException('Enter a valid Instagram username.');
+    if (x && !/^[A-Za-z0-9_]{1,15}$/.test(x)) throw new BadRequestException('Enter a valid X username.');
+    if (website && (!/^https:\/\//i.test(website) || website.length > 2048)) throw new BadRequestException('Enter a valid HTTPS website URL.');
+    const validImage = (value: string) => !value || (/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value) && value.length <= 900000);
+    if (!validImage(photo) || !validImage(cover)) throw new BadRequestException('Profile images must be JPEG, PNG or WebP and smaller than 650 KB each.');
+    if (highlights.length > 12 || JSON.stringify(highlights).length > 200000 || highlights.some((h) => !h || typeof h !== 'object' || typeof (h as any).id !== 'string' || typeof (h as any).title !== 'string' || (h as any).title.length > 20 || typeof (h as any).img !== 'string' || (h as any).img.length > 700000)) {
+      throw new BadRequestException('Highlights are invalid or exceed the profile limits.');
+    }
+    const result = await databasePool!.query(
+      `INSERT INTO user_profiles (user_id, bio, instagram_username, x_username, website_url, profile_photo_data, cover_photo_data, highlights)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)
+       ON CONFLICT (user_id) DO UPDATE SET bio=EXCLUDED.bio, instagram_username=EXCLUDED.instagram_username,
+         x_username=EXCLUDED.x_username, website_url=EXCLUDED.website_url, profile_photo_data=EXCLUDED.profile_photo_data,
+         cover_photo_data=EXCLUDED.cover_photo_data, highlights=EXCLUDED.highlights, updated_at=now()
+       RETURNING bio, instagram_username, x_username, website_url, profile_photo_data, cover_photo_data, highlights`,
+      [userId, bio, instagram, x, website, photo, cover, JSON.stringify(highlights)],
+    );
+    await databasePool!.query(
+      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.public_details_updated', 'user', $1, '{}'::jsonb)",
+      [userId],
+    );
+    return { profile: result.rows[0] };
+  }
+
+  @Post(':id/follow')
+  async follow(@Param('id') id: string, @Req() request: Request) {
+    const userId = await this.currentUser(request);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid profile id.');
+    if (id === userId) throw new BadRequestException('You cannot follow your own profile.');
+    const result = await databasePool!.query(
+      "INSERT INTO user_follows (follower_user_id, followed_user_id) SELECT $1, u.id FROM users u WHERE u.id=$2 AND u.status='active' ON CONFLICT DO NOTHING RETURNING followed_user_id",
+      [userId, id],
+    );
+    const exists = await databasePool!.query("SELECT 1 FROM users WHERE id=$1 AND status='active'", [id]);
+    if (!exists.rowCount) throw new NotFoundException('Profile not found.');
+    if (result.rowCount) await databasePool!.query(
+      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.followed', 'user', $2, '{}'::jsonb)",
+      [userId, id],
+    );
+    return { following: true };
+  }
+
+  @Delete(':id/follow')
+  async unfollow(@Param('id') id: string, @Req() request: Request) {
+    const userId = await this.currentUser(request);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid profile id.');
+    await databasePool!.query('DELETE FROM user_follows WHERE follower_user_id=$1 AND followed_user_id=$2', [userId, id]);
+    return { following: false };
+  }
+}
+
 const reviewerKeyId = (key: string) => createHash('sha256').update(key).digest('hex').slice(0, 12);
 
 @Controller('feed')
