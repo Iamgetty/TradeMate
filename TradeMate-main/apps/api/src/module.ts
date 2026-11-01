@@ -86,6 +86,31 @@ const verifyTotp = (secret: string, code: string) => {
 };
 
 const tokenDigest = (token: string) => createHash('sha256').update(token).digest('hex');
+
+const sendTransactionalEmail = async (to: string, subject: string, html: string) => {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM_EMAIL;
+  if (!apiKey || !from) {
+    console.warn('[email] Resend is not configured; transactional email was not sent.');
+    return false;
+  }
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to: [to], subject, html }),
+    });
+    if (!response.ok) {
+      console.error('[email] Resend delivery failed:', response.status, (await response.text()).slice(0, 500));
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('[email] Resend request failed:', error);
+    return false;
+  }
+};
+
 const cookieOptions = () => ({ httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/', maxAge: SESSION_DAYS * 24 * 60 * 60 * 1000 });
 const sessionTokenFrom = (request: Request) => {
   const cookie = request.headers.cookie?.split(';').map((part) => part.trim()).find((part) => part.startsWith(SESSION_COOKIE + '='));
@@ -219,6 +244,7 @@ class AuthController {
     } finally {
       client.release();
     }
+    void sendTransactionalEmail(user.email, 'New sign-in to your TradeMate account', '<p>A sign-in to your TradeMate account was completed.</p><p>If this was not you, change your password and review your active sessions immediately.</p>');
     response.cookie(SESSION_COOKIE, token, cookieOptions());
     return { user: { id: user.id, email: user.email, display_name: user.display_name, country_code: user.country_code } };
   }
@@ -293,6 +319,8 @@ class AuthController {
         [userId],
       );
       await client.query('COMMIT');
+      const account = await databasePool.query('SELECT email FROM users WHERE id = $1', [userId]);
+      if (account.rows[0]?.email) void sendTransactionalEmail(account.rows[0].email, 'Your TradeMate password was changed', '<p>Your TradeMate password was changed successfully.</p><p>If you did not make this change, contact TradeMate support immediately.</p>');
       return { success: true, message: 'Password updated. Other active sessions have been signed out.' };
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
@@ -466,6 +494,61 @@ class AuthController {
       [current.rows[0].id, id, JSON.stringify({ current: isCurrent })],
     );
     return { success: true, current: isCurrent };
+  }
+
+  @Post('account-deletion/request')
+  @HttpCode(200)
+  async requestAccountDeletion(@Req() request: Request, @Body() body: { password?: string }, @Res({ passthrough: true }) response: Response) {
+    if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to request account deletion.');
+    const current = await databasePool.query(
+      "SELECT u.id, u.email, u.status, c.password_hash FROM user_sessions s JOIN users u ON u.id = s.user_id JOIN user_credentials c ON c.user_id = u.id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+      [tokenDigest(token)],
+    );
+    if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    const password = typeof body?.password === 'string' ? body.password : '';
+    if (!password || password.length > 128 || !(await passwordMatches(password, current.rows[0].password_hash))) throw new UnauthorizedException('Your password is incorrect.');
+    const owner = await databasePool.query("SELECT 1 FROM organization_members WHERE user_id = $1 AND member_role = 'owner' LIMIT 1", [current.rows[0].id]);
+    if (owner.rowCount) throw new ConflictException('Transfer organization ownership before requesting account deletion.');
+    const cancelToken = randomBytes(32).toString('base64url');
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("UPDATE users SET status = 'deletion_pending', updated_at = now() WHERE id = $1 AND status = 'active'", [current.rows[0].id]);
+      await client.query("INSERT INTO user_deletion_requests (user_id, cancellation_token_hash, requested_at, scheduled_for) VALUES ($1, $2, now(), now() + interval '30 days') ON CONFLICT (user_id) DO UPDATE SET cancellation_token_hash = EXCLUDED.cancellation_token_hash, requested_at = now(), scheduled_for = now() + interval '30 days', cancelled_at = NULL", [current.rows[0].id, tokenDigest(cancelToken)]);
+      await client.query('DELETE FROM user_sessions WHERE user_id = $1', [current.rows[0].id]);
+      await client.query("INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'account.deletion_requested', 'user', $1, '{\"grace_period_days\":30}'::jsonb)", [current.rows[0].id]);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
+    response.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' });
+    void sendTransactionalEmail(current.rows[0].email, 'TradeMate account deletion requested', `<p>Your account is scheduled for deletion in 30 days.</p><p>To cancel, submit this one-time cancellation token to TradeMate support or the account recovery interface:</p><p><strong>${cancelToken}</strong></p><p>Your sessions have been revoked and account access is disabled.</p>`);
+    return { success: true, status: 'deletion_pending', scheduledFor: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), message: 'Your account is locked and scheduled for deletion. The cancellation token has been sent to your email.' };
+  }
+
+  @Post('account-deletion/cancel')
+  @HttpCode(200)
+  async cancelAccountDeletion(@Body() body: { token?: string }) {
+    if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
+    const token = typeof body?.token === 'string' ? body.token : '';
+    if (!/^[A-Za-z0-9_-]{40,60}$/.test(token)) throw new BadRequestException('Enter a valid cancellation token.');
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const restored = await client.query("UPDATE users u SET status = 'active', updated_at = now() FROM user_deletion_requests d WHERE d.user_id = u.id AND d.cancellation_token_hash = $1 AND d.cancelled_at IS NULL AND d.scheduled_for > now() AND u.status = 'deletion_pending' RETURNING u.id, u.email", [tokenDigest(token)]);
+      if (!restored.rowCount) throw new NotFoundException('This cancellation token is invalid, expired, or already used.');
+      await client.query('UPDATE user_deletion_requests SET cancelled_at = now(), cancellation_token_hash = NULL WHERE user_id = $1', [restored.rows[0].id]);
+      await client.query("INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'account.deletion_cancelled', 'user', $1, '{}'::jsonb)", [restored.rows[0].id]);
+      await client.query('COMMIT');
+      if (restored.rows[0].email) void sendTransactionalEmail(restored.rows[0].email, 'TradeMate account deletion cancelled', '<p>Your TradeMate account deletion request was cancelled. Sign in to continue using your account.</p>');
+      return { success: true, status: 'active', message: 'Account deletion cancelled. Sign in again to create a new session.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
   }
 
   @Post('logout')
