@@ -87,10 +87,12 @@ async function main() {
     assert.equal(otherProfileUpdate.rowCount, 0);
     const ownFollow = await client.query('INSERT INTO user_follows (follower_user_id, followed_user_id) VALUES ($1, $2) RETURNING follower_user_id', [users[0], users[1]]);
     assert.equal(ownFollow.rowCount, 1);
+    await client.query('SAVEPOINT forbidden_follow');
     await assert.rejects(
       client.query('INSERT INTO user_follows (follower_user_id, followed_user_id) VALUES ($1, $2)', [users[1], users[0]]),
       /row-level security policy/i,
     );
+    await client.query('ROLLBACK TO SAVEPOINT forbidden_follow');
     const crossFollowDelete = await client.query('DELETE FROM user_follows WHERE follower_user_id = $1 AND followed_user_id = $2', [users[1], users[0]]);
     assert.equal(crossFollowDelete.rowCount, 0);
     const crossUserUpdate = await client.query(
