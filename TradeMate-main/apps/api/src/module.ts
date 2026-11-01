@@ -507,7 +507,7 @@ class AuthController {
       [tokenDigest(token)],
     );
     if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
-    if (!current.rows[0].email) throw new ConflictException('Add and verify an email address before requesting account deletion so you can receive the cancellation code.');
+    if (!current.rows[0].email) throw new ConflictException('Add an email address you can access before requesting account deletion so you can receive the cancellation code.');
     const password = typeof body?.password === 'string' ? body.password : '';
     if (!password || password.length > 128 || !(await passwordMatches(password, current.rows[0].password_hash))) throw new UnauthorizedException('Your password is incorrect.');
     const owner = await databasePool.query("SELECT 1 FROM organization_members WHERE user_id = $1 AND member_role = 'owner' LIMIT 1", [current.rows[0].id]);
