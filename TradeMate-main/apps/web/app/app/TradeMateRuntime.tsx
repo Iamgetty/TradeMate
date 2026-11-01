@@ -35,7 +35,7 @@ export default function TradeMateRuntime() {
 
     const onError = (event: ErrorEvent) => {
       const source = event.filename || '';
-      if (!source || source.includes('/tm/app.js') || source.includes('feed-client.js')) {
+      if (!source || source.includes('/tm/app.js') || source.includes('/tm/app.light.js') || source.includes('feed-client.js')) {
         fail('TradeMate could not start', [event.message || 'A JavaScript startup error occurred.', event.filename ? `${event.filename}:${event.lineno || 0}:${event.colno || 0}` : '', event.error instanceof Error && event.error.stack ? event.error.stack : ''].filter(Boolean).join('\n'));
       }
     };
