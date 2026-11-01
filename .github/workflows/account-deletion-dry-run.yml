@@ -34,6 +34,7 @@ jobs:
         working-directory: TradeMate-main/apps/api
         env:
           DATABASE_URL: ${{ secrets.TRADEMATE_DATABASE_URL }}
+          PGSSLMODE: require
           ACCOUNT_DELETION_EXECUTE: "false"
           ACCOUNT_DELETION_LEGAL_APPROVAL: "false"
           NODE_ENV: production
