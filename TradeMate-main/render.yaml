@@ -16,6 +16,10 @@ services:
         value: https://trademate-web.onrender.com
       - key: TOTP_ENCRYPTION_KEY
         sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        sync: false
   - type: web
     name: exchange-feed
     runtime: node
