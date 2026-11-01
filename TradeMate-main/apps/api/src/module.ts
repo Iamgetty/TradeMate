@@ -125,6 +125,30 @@ class AuthController {
     return { user: result.rows[0] };
   }
 
+  @Patch('profile')
+  async updateProfile(@Req() request: Request, @Body() body: { displayName?: string }) {
+    if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to update your profile.');
+    const session = await databasePool.query(
+      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+      [tokenDigest(token)],
+    );
+    if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    const displayName = typeof body?.displayName === 'string' ? body.displayName.trim() : '';
+    if (displayName.length < 2 || displayName.length > 24) throw new BadRequestException('Your nickname must be between 2 and 24 characters.');
+    const userId = session.rows[0].id as string;
+    const updated = await databasePool.query(
+      'UPDATE users SET display_name = $1, updated_at = now() WHERE id = $2 RETURNING id, email, display_name, country_code',
+      [displayName, userId],
+    );
+    await databasePool.query(
+      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.display_name_updated', 'user', $1, '{}'::jsonb)",
+      [userId],
+    );
+    return { user: updated.rows[0] };
+  }
+
   @Post('change-password')
   @HttpCode(200)
   async changePassword(
