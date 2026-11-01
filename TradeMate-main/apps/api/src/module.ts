@@ -993,6 +993,10 @@ class MarketplaceContractsController {
       "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_proposed','contract',$3,$4::jsonb)",
       [buyerId, offer.seller_organization_id, created.rows[0].id, JSON.stringify({ listing_id: listingId, listing_type: offer.listing_type })],
     );
+    await databasePool!.query(
+      "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', 'New contract proposal', $1, 'file-text' FROM organization_members om WHERE om.organization_id = $2 AND om.user_id <> $3 AND om.member_role IN ('owner','admin')",
+      ['A buyer sent a proposal for ' + offer.title + '.', offer.seller_organization_id, buyerId],
+    );
     return { data: created.rows[0], message: 'Contract proposal sent to the business for review.' };
   }
 
@@ -1066,6 +1070,10 @@ class MarketplaceContractsController {
       await client.query(
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,$3,'contract',$4,$5::jsonb)",
         [userId, current.rows[0].seller_organization_id, status === 'accepted' ? 'marketplace.contract_accepted' : 'marketplace.contract_rejected', id, JSON.stringify({ status })],
+      );
+      await client.query(
+        "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'Contracts', $2, $3, 'file-text')",
+        [current.rows[0].buyer_user_id, status === 'accepted' ? 'Contract accepted' : 'Contract declined', status === 'accepted' ? 'Your contract proposal has been accepted.' : 'Your contract proposal was declined.'],
       );
       await client.query('COMMIT');
       return { data: updated.rows[0], message: status === 'accepted' ? 'Contract accepted.' : 'Contract proposal declined.' };
