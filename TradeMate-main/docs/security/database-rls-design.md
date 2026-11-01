@@ -137,7 +137,8 @@ The CI role bootstrap runs on an isolated PostgreSQL 16 instance. This does not 
 - `user_preferences`
 - `user_notifications`
 - `user_auth_security`
+- `user_profiles` and `user_follows` (public profile/follow reads with owner-only profile and follower-edge writes)
 
-The matching `scripts/test-rls-pilot.js` test runs as `trademate_app` and verifies own-row reads, cross-user update denial, rejection of cross-user inserts, anonymous default-deny, and `FORCE ROW LEVEL SECURITY` against the table owner role. The clean PostgreSQL CI job passed this pilot.
+The matching `scripts/test-rls-pilot.js` test runs as `trademate_app` and verifies private own-row reads, public profile/follow reads, owner-only profile and follower-edge writes, cross-user update denial, rejection of cross-user inserts, anonymous default-deny for private tables, and `FORCE ROW LEVEL SECURITY` against the table owner role. The clean PostgreSQL CI job passed this pilot.
 
 **This pilot is not part of `scripts/migrate.js` and has not been applied to Render production.** It proves the policy pattern for these three tables only. Production rollout still requires the complete policy inventory, authentication bootstrap policies, all-query-path review, role cutover, cross-organization tests, and operational approval.
