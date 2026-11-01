@@ -20,6 +20,12 @@ const {
   p2pOrderBodySchema,
   feedReportBodySchema,
   reviewDecisionBodySchema,
+  marketplaceBrowseQuerySchema,
+  marketActivityQuerySchema,
+  marketCompletedQuerySchema,
+  p2pMarketQuerySchema,
+  feedPostsQuerySchema,
+  marketQuotesQuerySchema,
 } = require('../dist/validation');
 
 test('registration accepts normalized valid account data', () => {
@@ -139,4 +145,21 @@ test('reports require exactly one target and review actions are allow-listed', (
   assert.equal(feedReportBodySchema.safeParse({ postId, commentId: postId, reason: 'This post is fraudulent.' }).success, false);
   assert.equal(reviewDecisionBodySchema.safeParse({ decision: 'approved', note: 'Verified' }).success, true);
   assert.equal(reviewDecisionBodySchema.safeParse({ decision: 'delete' }).success, false);
+});
+
+test('marketplace and market-data query schemas enforce supported filters and pagination', () => {
+  assert.equal(marketplaceBrowseQuerySchema.safeParse({ search: 'rice', country: 'NG', type: 'b2b', page: '1', limit: '20' }).success, true);
+  assert.equal(marketplaceBrowseQuerySchema.safeParse({ page: '-1', limit: '999' }).success, false);
+  assert.equal(marketActivityQuerySchema.safeParse({ view: 'book', market: 'p2p', limit: '100' }).success, true);
+  assert.equal(marketActivityQuerySchema.safeParse({ view: 'admin', limit: '100' }).success, false);
+  assert.equal(marketCompletedQuerySchema.safeParse({ type: 'service', currency: 'NGN', limit: '50' }).success, true);
+});
+
+test('P2P, feed and market quote queries reject unsupported values', () => {
+  assert.equal(p2pMarketQuerySchema.safeParse({ asset: 'USDT', fiat: 'NGN', side: 'buy', limit: '50' }).success, true);
+  assert.equal(p2pMarketQuerySchema.safeParse({ asset: 'USDT', fiat: 'NGN', side: 'short' }).success, false);
+  assert.equal(feedPostsQuerySchema.safeParse({ type: 'Announcements', limit: '30' }).success, true);
+  assert.equal(feedPostsQuerySchema.safeParse({ limit: '1000' }).success, false);
+  assert.equal(marketQuotesQuerySchema.safeParse({ symbols: 'AAPL,MSFT' }).success, true);
+  assert.equal(marketQuotesQuerySchema.safeParse({ symbols: '' }).success, false);
 });
