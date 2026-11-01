@@ -117,7 +117,12 @@ const sessionTokenFrom = (request: Request) => {
   return cookie ? decodeURIComponent(cookie.slice(SESSION_COOKIE.length + 1)) : '';
 };
 const databasePool = process.env.DATABASE_URL
-  ? new Pool({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 5000, max: 5 })
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.PGSSLMODE === 'require' ? { rejectUnauthorized: false } : undefined,
+      connectionTimeoutMillis: 5000,
+      max: 5,
+    })
   : null;
 
 const enforceTotpRateLimit = async (request: Request, userId: string) => {
