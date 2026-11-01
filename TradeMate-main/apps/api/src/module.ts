@@ -1106,6 +1106,10 @@ class MarketplaceContractsController {
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_cancelled','contract',$3,'{}'::jsonb)",
         [userId, current.rows[0].seller_organization_id, id],
       );
+      await client.query(
+        "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', 'Contract proposal cancelled', 'The buyer cancelled a pending contract proposal.', 'file-text' FROM organization_members om WHERE om.organization_id = $1 AND om.user_id <> $2 AND om.member_role IN ('owner','admin')",
+        [current.rows[0].seller_organization_id, userId],
+      );
       await client.query('COMMIT');
       return { data: updated.rows[0], message: 'Contract proposal cancelled.' };
     } catch (error) {
@@ -1155,6 +1159,17 @@ class MarketplaceContractsController {
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_fulfilment_confirmed','contract',$3,$4::jsonb)",
         [userId, contract.seller_organization_id, id, JSON.stringify({ completed })],
       );
+      if (isBuyer && !contract.buyer_confirmed_at) {
+        await client.query(
+          "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', $2, $3, 'file-text' FROM organization_members om WHERE om.organization_id = $1 AND om.user_id <> $4 AND om.member_role IN ('owner','admin')",
+          [contract.seller_organization_id, completed ? 'Contract completed' : 'Buyer confirmed fulfilment', completed ? 'Both parties confirmed fulfilment. The contract is complete.' : 'The buyer confirmed fulfilment. Please confirm your side.', userId],
+        );
+      } else if (sellerActor && !contract.seller_confirmed_at) {
+        await client.query(
+          "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'Contracts', $2, $3, 'file-text')",
+          [contract.buyer_user_id, completed ? 'Contract completed' : 'Seller confirmed fulfilment', completed ? 'Both parties confirmed fulfilment. The contract is complete.' : 'The seller confirmed fulfilment. Please confirm your side.'],
+        );
+      }
       await client.query('COMMIT');
       return { data: updated.rows[0], message: completed ? 'Both parties confirmed fulfilment. Contract completed.' : 'Your confirmation is recorded. The other party must also confirm fulfilment.' };
     } catch (error) {
@@ -1193,7 +1208,7 @@ class MarketplaceContractsController {
     try {
       await client.query('BEGIN');
       const current = await client.query(
-        `SELECT c.id, c.status, c.seller_organization_id,
+        `SELECT c.id, c.status, c.buyer_user_id, c.seller_organization_id,
                 (c.buyer_user_id = $2) AS is_buyer,
                 EXISTS (SELECT 1 FROM organization_members om
                         WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2) AS is_seller
@@ -1214,6 +1229,17 @@ class MarketplaceContractsController {
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_message_sent','contract',$3,'{}'::jsonb)",
         [userId, current.rows[0].seller_organization_id, id],
       );
+      if (current.rows[0].is_buyer) {
+        await client.query(
+          "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', 'New contract message', 'The buyer sent a new message on a contract.', 'message-square' FROM organization_members om WHERE om.organization_id = $1 AND om.user_id <> $2 AND om.member_role IN ('owner','admin')",
+          [current.rows[0].seller_organization_id, userId],
+        );
+      } else {
+        await client.query(
+          "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'Contracts', 'New contract message', 'The seller sent a new message on a contract.', 'message-square')",
+          [current.rows[0].buyer_user_id],
+        );
+      }
       await client.query('COMMIT');
       const sender = await databasePool!.query('SELECT display_name FROM users WHERE id = $1 LIMIT 1', [userId]);
       return { data: { ...inserted.rows[0], sender_name: sender.rows[0]?.display_name ?? 'TradeMate user' }, message: 'Contract message sent.' };
