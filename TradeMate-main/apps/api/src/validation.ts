@@ -36,12 +36,12 @@ export const changePasswordBodySchema = z.object({
 });
 
 export const totpCodeBodySchema = z.object({
-  code: z.string().regex(/^\\d{6}$/, 'Enter the six-digit authenticator code.'),
+  code: z.string().regex(/^\d{6}$/, 'Enter the six-digit authenticator code.'),
 }).strict();
 
 export const totpChallengeBodySchema = z.object({
   challengeToken: z.string().min(40).max(128),
-  code: z.string().regex(/^\\d{6}$/, 'Enter the six-digit authenticator code.'),
+  code: z.string().regex(/^\d{6}$/, 'Enter the six-digit authenticator code.'),
 }).strict();
 
 export const deletionRequestBodySchema = z.object({
@@ -71,9 +71,9 @@ const profileImageSchema = z.string().max(900000).refine(
 
 export const publicProfileBodySchema = z.object({
   bio: z.string().max(160).optional(),
-  instagramUsername: z.string().max(30).regex(/^[A-Za-z0-9._]*$/).optional(),
-  xUsername: z.string().max(15).regex(/^[A-Za-z0-9_]*$/).optional(),
-  websiteUrl: z.string().max(2048).refine((value) => value === '' || /^https:\/\//i.test(value), 'Enter a valid HTTPS website URL.').optional(),
+  instagramUsername: z.string().trim().max(30).regex(/^[A-Za-z0-9._]*$/).optional(),
+  xUsername: z.string().trim().max(15).regex(/^[A-Za-z0-9_]*$/).optional(),
+  websiteUrl: z.string().trim().max(2048).refine((value) => value === '' || /^https:\/\//i.test(value), 'Enter a valid HTTPS website URL.').optional(),
   profilePhotoData: profileImageSchema.optional(),
   coverPhotoData: profileImageSchema.optional(),
   highlights: z.array(z.object({
