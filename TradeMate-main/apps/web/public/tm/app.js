@@ -1548,13 +1548,13 @@ function feed(){
 (function(){var s=document.createElement("style");s.id="tmPatchStyles";s.textContent=[
 /* market tiles */
 ".mk-livebar{display:flex;justify-content:flex-end;padding:14px 16px 6px}",
-".mk-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;padding:0 16px 10px!important}",
-".mk-card{align-items:center!important;justify-content:center!important;text-align:center!important;gap:3px!important;min-height:0!important;height:auto!important;aspect-ratio:1/1;padding:8px 4px!important;border-radius:22px!important}",
+".mk-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important;padding:0 16px 10px!important}",
+".mk-card{align-items:center!important;justify-content:center!important;text-align:center!important;gap:2px!important;min-height:0!important;height:auto!important;aspect-ratio:1/1;padding:6px 2px!important;border-radius:20px!important}",
 ".mk-ico{width:auto!important;height:auto!important;margin:0 0 2px!important;background:none!important;color:var(--txt)!important;border-radius:0!important}",
-".mk-ico svg{width:24px!important;height:24px!important}",
+".mk-ico svg{width:22px!important;height:22px!important}",
 ".mk-card:hover .mk-ico,.mk-card:focus-visible .mk-ico{background:none!important;color:var(--am)!important;transform:scale(1.08)!important}",
-".mk-name{font-size:13.5px!important;font-weight:700!important;line-height:1.15!important;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
-".mk-count{color:var(--mut);font:700 12.5px 'Hanken Grotesk',sans-serif;font-variant-numeric:tabular-nums}",
+".mk-name{font-size:12px!important;font-weight:700!important;line-height:1.15!important;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+".mk-count{color:var(--mut);font:700 11px 'Hanken Grotesk',sans-serif;font-variant-numeric:tabular-nums}",
 ".mk-go,.mk-tag{display:none!important}",
 "@media(min-width:900px){.mk-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}}",
 /* nft stats row + toolbar */
