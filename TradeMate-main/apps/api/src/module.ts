@@ -204,6 +204,59 @@ class AuthController {
 }
 
 
+@Controller('notifications')
+class NotificationsController {
+  private async currentUser(request: Request) {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to view notifications.');
+    const result = await databasePool.query(
+      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+      [tokenDigest(token)],
+    );
+    if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    return result.rows[0].id as string;
+  }
+
+  @Get()
+  async list(@Req() request: Request) {
+    const userId = await this.currentUser(request);
+    const result = await databasePool!.query(
+      'SELECT id, category, title, body, icon, action_url, read_at, created_at FROM user_notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 100',
+      [userId],
+    );
+    return {
+      notifications: result.rows,
+      unread_count: result.rows.filter((item) => !item.read_at).length,
+    };
+  }
+
+  @Patch('read-all')
+  async markAllRead(@Req() request: Request) {
+    const userId = await this.currentUser(request);
+    const result = await databasePool!.query(
+      'UPDATE user_notifications SET read_at = now() WHERE user_id = $1 AND read_at IS NULL',
+      [userId],
+    );
+    return { success: true, updated: result.rowCount || 0 };
+  }
+
+  @Patch(':id/read')
+  async markRead(@Param('id') id: string, @Req() request: Request) {
+    const userId = await this.currentUser(request);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      throw new BadRequestException('Invalid notification identifier.');
+    }
+    const result = await databasePool!.query(
+      'UPDATE user_notifications SET read_at = COALESCE(read_at, now()) WHERE id = $1 AND user_id = $2 RETURNING id, read_at',
+      [id, userId],
+    );
+    if (!result.rowCount) throw new NotFoundException('Notification not found.');
+    return { success: true, notification: result.rows[0] };
+  }
+}
+
+
 @Controller('organizations')
 class OrganizationsController {
   private async currentUser(request: Request) {
