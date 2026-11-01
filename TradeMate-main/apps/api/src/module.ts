@@ -507,6 +507,7 @@ class AuthController {
       [tokenDigest(token)],
     );
     if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    if (!current.rows[0].email) throw new ConflictException('Add and verify an email address before requesting account deletion so you can receive the cancellation code.');
     const password = typeof body?.password === 'string' ? body.password : '';
     if (!password || password.length > 128 || !(await passwordMatches(password, current.rows[0].password_hash))) throw new UnauthorizedException('Your password is incorrect.');
     const owner = await databasePool.query("SELECT 1 FROM organization_members WHERE user_id = $1 AND member_role = 'owner' LIMIT 1", [current.rows[0].id]);
@@ -524,9 +525,14 @@ class AuthController {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;
     } finally { client.release(); }
+    const emailSent = await sendTransactionalEmail(current.rows[0].email, 'TradeMate account deletion requested', `<p>Your account is scheduled for deletion in 30 days.</p><p>To cancel, submit this one-time cancellation token in TradeMate account recovery:</p><p><strong>${cancelToken}</strong></p><p>Your sessions have been revoked and account access is disabled.</p>`);
+    if (!emailSent) {
+      await databasePool.query("UPDATE users SET status = 'active', updated_at = now() WHERE id = $1 AND status = 'deletion_pending'", [current.rows[0].id]);
+      await databasePool.query("UPDATE user_deletion_requests SET cancellation_token_hash = NULL, cancelled_at = now() WHERE user_id = $1", [current.rows[0].id]);
+      throw new HttpException('We could not send your cancellation email, so the deletion request was not activated. Please try again later.', HttpStatus.SERVICE_UNAVAILABLE);
+    }
     response.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' });
-    void sendTransactionalEmail(current.rows[0].email, 'TradeMate account deletion requested', `<p>Your account is scheduled for deletion in 30 days.</p><p>To cancel, submit this one-time cancellation token to TradeMate support or the account recovery interface:</p><p><strong>${cancelToken}</strong></p><p>Your sessions have been revoked and account access is disabled.</p>`);
-    return { success: true, status: 'deletion_pending', scheduledFor: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), message: 'Your account is locked and scheduled for deletion. The cancellation token has been sent to your email.' };
+    return { success: true, status: 'deletion_pending', scheduledFor: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), message: 'Your account is locked and scheduled for deletion. The cancellation code has been emailed to you.' };
   }
 
   @Post('account-deletion/cancel')
