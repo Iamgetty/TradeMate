@@ -7,7 +7,7 @@ const postgresUrl = z.string().url().refine((value) => {
 
 const environmentSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).optional(),
-  PORT: z.string().regex(/^\\d{1,5}$/).optional(),
+  PORT: z.string().regex(/^\d{1,5}$/).optional(),
   DATABASE_URL: postgresUrl.optional(),
   MIGRATION_DATABASE_URL: postgresUrl.optional(),
   PGSSLMODE: z.enum(['require', 'disable']).optional(),
