@@ -2664,7 +2664,7 @@ class PublicMarketQuotesController {
   }
 }
 
-@Module({ controllers: [PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController] })
+@Module({ controllers: [PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController] })
 export class AppModule implements OnModuleDestroy {
   async onModuleDestroy() {
     if (databasePool) await databasePool.end();
