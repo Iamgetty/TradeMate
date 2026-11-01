@@ -45,6 +45,7 @@ These have matching frontend requests and backend routes in the current source. 
 - Profile highlights: create, add cover, pin a Feed post, view and remove are local-only.
 - Organization profile photo is stored locally; there is no organization-image upload route.
 - Account linking for Telegram, X and Google only toggles local flags; no OAuth/link-account flow is connected.
+- The avatar picker/photo upload and profile nickname editor do not persist to the user record.
 - Two-factor authentication and login-alert switches are local preferences. Device history is explicitly sample data.
 - Forgot-password action has no reset endpoint.
 - Social sign-in action has no provider integration.
@@ -66,14 +67,18 @@ These have matching frontend requests and backend routes in the current source. 
 - Withdrawals are not connected.
 - Internal transfers are not connected.
 - Wallet-provider connection buttons (MetaMask, WalletConnect, Trust Wallet, Coinbase Wallet, Phantom and other wallet) are placeholders.
-- These screens must not imply that funds are held, credited or moved by TradeMate.
+- These screens must not imply that funds are held, credited or moved by TradeMate. The balance visibility switch only hides/shows placeholder values; it does not query a ledger.
 
 ### Business growth and monetization
 
 - Promotion “Join” buttons only toggle local state; no promotion enrolment endpoint exists.
 - Advertise placement requests only show a local confirmation toast; no campaign-request endpoint exists.
-- Referral code copy/share works as a device action, but referral attribution, invited-user counts and reward balances are not server-backed.
+- Referral code copy/share works as a device action, but the code is generated client-side and referral attribution, invited-user counts and reward balances are not server-backed.
+- Rewards Hub points/tasks, Alpha level progress and fee rates are static placeholders; they are not calculated from verified account activity.
+- Social community buttons (Telegram, X, WhatsApp, Instagram) and the affiliate-community button show placeholder toasts rather than opening configured destinations or a connected community.
 - Affiliate programme and TradeMate Card pages are explicitly marked “Coming soon”; they are not connected products.
+- Promotion enrolment only toggles local state; Advertise placement requests show a local confirmation toast without creating a server-side campaign request.
+- The offline-preview B2B sub-account/team-creation screen stores local names only. The connected app instead shows the backend-backed Organization profile; no team-member invitation/role-management workflow is exposed.
 
 ### Marketplace coverage and execution
 
@@ -83,7 +88,7 @@ These have matching frontend requests and backend routes in the current source. 
 
 ### Device-only preferences
 
-These currently persist on the device, not in the account: theme, language, display currency, default market, Buyer/Seller mode, home shortcuts/recent items, balance visibility, notification preferences and favorites/watchlist. Some are reasonable device preferences; favorites/watchlist and notification preferences may be better as account-synced features if cross-device continuity is required.
+These currently persist on the device, not in the account: theme, language, display currency, default market, Buyer/Seller mode, home shortcuts/recent items, balance visibility, notification preferences and favorites/watchlist. Some are reasonable device preferences; favorites/watchlist and notification preferences may be better as account-synced features if cross-device continuity is required. The Learn guides and Announcements are also hard-coded in the frontend rather than loaded from a content-management API.
 
 ## Follow-up work queue (before roadmap progression)
 
