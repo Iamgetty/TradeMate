@@ -1410,6 +1410,13 @@ class EnquiriesController {
   async messages(@Param('id') id: string, @Req() request: Request) {
     const userId = await this.authenticatedUser(request);
     const enquiry = await this.authorizedEnquiry(id, userId);
+    await databasePool!.query(
+      `INSERT INTO enquiry_reads (enquiry_id, user_id, last_read_at)
+       VALUES ($1, $2, now())
+       ON CONFLICT (enquiry_id, user_id)
+       DO UPDATE SET last_read_at = EXCLUDED.last_read_at`,
+      [id, userId],
+    );
     const replies = await databasePool!.query(
       `SELECT m.id, m.enquiry_id, m.sender_user_id, u.display_name AS sender_name,
               m.message, m.created_at
@@ -1477,8 +1484,23 @@ class EnquiriesController {
       `SELECT e.id, e.listing_id, e.buyer_user_id, e.message, e.status, e.created_at, e.updated_at,
               l.title AS listing_title, l.currency_code, l.price_minor_units::text AS price_minor_units,
               o.name AS seller_name, buyer.display_name AS buyer_name,
-              CASE WHEN e.buyer_user_id = $1 THEN 'sent' ELSE 'received' END AS direction
+              CASE WHEN e.buyer_user_id = $1 THEN 'sent' ELSE 'received' END AS direction,
+              (
+                CASE
+                  WHEN e.buyer_user_id <> $1
+                   AND COALESCE(er.last_read_at, '-infinity'::timestamptz) < e.created_at
+                  THEN 1 ELSE 0
+                END
+                + (
+                  SELECT COUNT(*)::int
+                  FROM enquiry_messages unread
+                  WHERE unread.enquiry_id = e.id
+                    AND unread.sender_user_id <> $1
+                    AND unread.created_at > COALESCE(er.last_read_at, '-infinity'::timestamptz)
+                )
+              ) AS unread_count
        FROM marketplace_enquiries e
+       LEFT JOIN enquiry_reads er ON er.enquiry_id = e.id AND er.user_id = $1
        JOIN listings l ON l.id = e.listing_id
        JOIN organizations o ON o.id = l.seller_organization_id
        JOIN users buyer ON buyer.id = e.buyer_user_id
