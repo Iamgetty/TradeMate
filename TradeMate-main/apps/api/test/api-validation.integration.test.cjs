@@ -60,3 +60,15 @@ test('invalid support payload is rejected before authentication or database acce
   });
   assert.equal(response.status, 400);
 });
+
+test('support and notification controllers are registered and enforce authentication', async () => {
+  const notificationResponse = await fetch(baseUrl + '/api/notifications');
+  assert.equal(notificationResponse.status, 401);
+
+  const supportResponse = await fetch(baseUrl + '/api/support/tickets', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ category: 'Orders', subject: 'Order issue', message: 'Please help with my order.' }),
+  });
+  assert.equal(supportResponse.status, 401);
+});
