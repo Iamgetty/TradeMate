@@ -140,6 +140,16 @@ class AuthController {
     if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new BadRequestException('Enter a valid email address.');
     if (displayName.length < 2 || displayName.length > 80) throw new BadRequestException('Your name must be between 2 and 80 characters.');
     if (password.length < 12 || password.length > 128) throw new BadRequestException('Use a password between 12 and 128 characters.');
+    // Registration performs an expensive scrypt operation; limit attempts before hashing
+    // so unauthenticated clients cannot exhaust API CPU by repeatedly creating accounts.
+    const registrationRateKey = tokenDigest((request.ip || 'unknown') + '|register');
+    const registrationRate = await databasePool.query(
+      "INSERT INTO auth_rate_limits (key_hash, window_started_at, attempts, blocked_until) VALUES ($1, now(), 1, NULL) ON CONFLICT (key_hash) DO UPDATE SET attempts = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END, window_started_at = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN now() ELSE auth_rate_limits.window_started_at END, blocked_until = CASE WHEN (CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END) >= 5 THEN now() + interval '15 minutes' ELSE auth_rate_limits.blocked_until END RETURNING attempts, blocked_until",
+      [registrationRateKey],
+    );
+    if (registrationRate.rows[0].attempts > 5 || (registrationRate.rows[0].blocked_until && new Date(registrationRate.rows[0].blocked_until).getTime() > Date.now())) {
+      throw new HttpException('Too many registration attempts. Please wait 15 minutes before trying again.', HttpStatus.TOO_MANY_REQUESTS);
+    }
     const hash = await passwordHash(password);
     const client = await databasePool.connect();
     try {
