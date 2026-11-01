@@ -52,10 +52,10 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 **Implementation status (2026-11-01): in progress.** The first code and process tranche is implemented and CI-verified:
 
 - API TypeScript uses `strict: true`; API build passes with strict checks.
-- Zod runtime schemas cover every current `@Body` request body, all current `@Query` inputs and UUID route parameters in the API module. Schemas reject unknown object keys and validate formats, limits, enumerations and numeric inputs.
-- API Zod schema tests cover authentication, TOTP, deletion, profiles, feed, support, organization documents, listings, enquiries, contracts, P2P, moderation and query filters.
+- Zod runtime schemas cover every current `@Body` request body, all current `@Query` inputs and UUID route parameters in the API module. Schemas reject unknown object keys and validate formats, limits, enumerations and numeric inputs. Critical startup environment values are also schema-validated before the API starts.
+- API Zod schema tests cover authentication, TOTP, deletion, profiles, feed, support, organization documents, listings, enquiries, contracts, P2P, moderation, query filters and environment configuration.
 - NIST SSDF policy: `docs/security/ssdf-policy.md`.
-- PostgreSQL roles/RLS architecture: `docs/security/database-rls-design.md`. This is a design, not an enabled production control.
+- PostgreSQL roles/RLS architecture: `docs/security/database-rls-design.md`. A least-privilege role bootstrap script and SQL assertions are implemented and passed on a clean PostgreSQL database in CI. Production roles have not yet been created or switched; RLS is not enabled.
 - Pull-request security checklist: `.github/PULL_REQUEST_TEMPLATE.md`.
 - CI security job runs Semgrep SAST, npm dependency audits for API/web/exchange-feed, and Gitleaks secret scanning. The high-severity audit threshold and all three scanners passed in CI run 41324646848.
 - Next.js/React and NestJS/Zod dependency upgrades are applied. The API dependency tree still has lower-severity development-tool advisories below the current high-severity gate; these remain tracked for remediation.
@@ -65,8 +65,8 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 
 **Still open before S1 is complete:**
 
-1. Finish environment-variable schema validation and API-wide negative tests.
-2. Create separate Render-managed runtime and migration credentials, grant least-privilege access, and verify deployment using the split URLs.
+1. Add API-level integration tests that exercise authenticated and unauthenticated requests against a running API, not only isolated schema tests.
+2. Create separate Render-managed runtime and migration credentials, run the tested role bootstrap on Render, grant least-privilege access, and verify deployment using the split URLs.
 3. Implement transaction-scoped user/organization context across every pooled query and explicit transaction.
 4. Apply RLS and FORCE RLS to the sensitive table inventory only after context refactoring and cross-user/cross-organization/pool-reuse tests pass.
 5. Add database-role/RLS integration tests and verify audit-event append-only permissions.
