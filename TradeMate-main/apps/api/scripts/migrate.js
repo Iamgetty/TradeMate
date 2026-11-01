@@ -20,6 +20,8 @@ const MIGRATIONS = [
   '013_support_feedback.sql',
   '014_user_preferences.sql',
   '015_authenticator_2fa.sql',
+  '016_session_device_metadata.sql',
+  '017_transactional_email_account_deletion.sql',
 ];
 
 async function main() {
