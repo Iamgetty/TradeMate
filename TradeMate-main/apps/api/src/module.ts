@@ -37,7 +37,7 @@ const totpEncryptionKey = () => {
 };
 const encryptTotpSecret = (secret: string) => {
   const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', totpEncryptionKey(), iv);
+  const cipher = createCipheriv('aes-256-gcm', totpEncryptionKey(), iv, { authTagLength: 16 });
   const encrypted = Buffer.concat([cipher.update(secret, 'utf8'), cipher.final()]);
   return [iv.toString('hex'), cipher.getAuthTag().toString('hex'), encrypted.toString('hex')].join(':');
 };
