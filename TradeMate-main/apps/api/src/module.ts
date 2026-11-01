@@ -193,6 +193,50 @@ class AuthController {
     }
   }
 
+  @Get('sessions')
+  async listSessions(@Req() request: Request) {
+    if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to review your sessions.');
+    const digest = tokenDigest(token);
+    const current = await databasePool.query(
+      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+      [digest],
+    );
+    if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    const result = await databasePool.query(
+      'SELECT id, created_at, last_seen_at, expires_at, (token_hash = $2) AS is_current FROM user_sessions WHERE user_id = $1 AND expires_at > now() ORDER BY is_current DESC, last_seen_at DESC LIMIT 50',
+      [current.rows[0].id, digest],
+    );
+    return { sessions: result.rows };
+  }
+
+  @Delete('sessions/:id')
+  async revokeSession(@Param('id') id: string, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to manage sessions.');
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid session identifier.');
+    const digest = tokenDigest(token);
+    const current = await databasePool.query(
+      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+      [digest],
+    );
+    if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    const result = await databasePool.query(
+      'DELETE FROM user_sessions WHERE id = $1 AND user_id = $2 RETURNING (token_hash = $3) AS is_current',
+      [id, current.rows[0].id, digest],
+    );
+    if (!result.rowCount) throw new NotFoundException('Session not found.');
+    const isCurrent = Boolean(result.rows[0].is_current);
+    if (isCurrent) response.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' });
+    await databasePool.query(
+      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.session_revoked', 'user_session', $2, $3::jsonb)",
+      [current.rows[0].id, id, JSON.stringify({ current: isCurrent })],
+    );
+    return { success: true, current: isCurrent };
+  }
+
   @Post('logout')
   @HttpCode(200)
   async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
