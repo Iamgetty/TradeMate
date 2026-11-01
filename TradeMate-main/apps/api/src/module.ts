@@ -125,6 +125,50 @@ class AuthController {
     return { user: result.rows[0] };
   }
 
+  @Post('change-password')
+  @HttpCode(200)
+  async changePassword(
+    @Req() request: Request,
+    @Body() body: { currentPassword?: string; newPassword?: string },
+  ) {
+    if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to change your password.');
+    const session = await databasePool.query(
+      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+      [tokenDigest(token)],
+    );
+    if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    const currentPassword = typeof body?.currentPassword === 'string' ? body.currentPassword : '';
+    const newPassword = typeof body?.newPassword === 'string' ? body.newPassword : '';
+    if (!currentPassword || currentPassword.length > 128) throw new BadRequestException('Enter your current password.');
+    if (newPassword.length < 12 || newPassword.length > 128) throw new BadRequestException('Use a new password between 12 and 128 characters.');
+    if (currentPassword === newPassword) throw new BadRequestException('Choose a password you have not used for this change.');
+    const userId = session.rows[0].id as string;
+    const credentials = await databasePool.query('SELECT password_hash FROM user_credentials WHERE user_id = $1 LIMIT 1', [userId]);
+    if (!credentials.rowCount || !(await passwordMatches(currentPassword, credentials.rows[0].password_hash))) {
+      throw new UnauthorizedException('Your current password is incorrect.');
+    }
+    const nextHash = await passwordHash(newPassword);
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('UPDATE user_credentials SET password_hash = $1, updated_at = now() WHERE user_id = $2', [nextHash, userId]);
+      await client.query('DELETE FROM user_sessions WHERE user_id = $1 AND token_hash <> $2', [userId, tokenDigest(token)]);
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.password_changed', 'user', $1, '{}'::jsonb)",
+        [userId],
+      );
+      await client.query('COMMIT');
+      return { success: true, message: 'Password updated. Other active sessions have been signed out.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   @Post('logout')
   @HttpCode(200)
   async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
