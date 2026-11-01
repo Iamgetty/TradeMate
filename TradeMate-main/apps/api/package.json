@@ -9,7 +9,7 @@
     "start:prod": "node dist/main.js",
     "db:migrate": "node scripts/migrate.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
-    "test:security": "node --test test/security-validation.test.cjs"
+    "test:security": "node --test test/*.test.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.2.8",
