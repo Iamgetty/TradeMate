@@ -132,7 +132,7 @@ export const organizationDocumentsBodySchema = z.object({
 
 const priceInputSchema = z.union([z.string(), z.number()]).refine((value) => {
   const text = String(value).trim();
-  return /^\d{1,12}(?:\\.\d{1,2})?$/.test(text) && Number.isSafeInteger(Math.round(Number(text) * 100));
+  return /^\d{1,12}(?:\.\d{1,2})?$/.test(text) && Number.isSafeInteger(Math.round(Number(text) * 100));
 }, 'Enter a valid price with up to two decimal places.');
 
 const quantityInputSchema = z.union([z.string(), z.number()]).nullable().optional().refine((value) => {
