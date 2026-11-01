@@ -2,6 +2,7 @@ DO $$
 DECLARE
   app_role RECORD;
   migrator_role RECORD;
+  worker_role RECORD;
 BEGIN
   SELECT rolsuper, rolcreatedb, rolcreaterole, rolbypassrls
   INTO app_role
@@ -11,7 +12,11 @@ BEGIN
   INTO migrator_role
   FROM pg_roles WHERE rolname = 'trademate_migrator';
 
-  IF app_role IS NULL OR migrator_role IS NULL THEN
+  SELECT rolsuper, rolcreatedb, rolcreaterole, rolbypassrls
+  INTO worker_role
+  FROM pg_roles WHERE rolname = 'trademate_worker';
+
+  IF app_role IS NULL OR migrator_role IS NULL OR worker_role IS NULL THEN
     RAISE EXCEPTION 'TradeMate database roles were not created.';
   END IF;
 
@@ -21,6 +26,10 @@ BEGIN
 
   IF migrator_role.rolsuper OR migrator_role.rolcreatedb OR migrator_role.rolcreaterole OR migrator_role.rolbypassrls THEN
     RAISE EXCEPTION 'trademate_migrator has excessive role attributes.';
+  END IF;
+
+  IF worker_role.rolsuper OR worker_role.rolcreatedb OR worker_role.rolcreaterole OR worker_role.rolbypassrls THEN
+    RAISE EXCEPTION 'trademate_worker has excessive role attributes.';
   END IF;
 
   IF NOT has_schema_privilege('trademate_migrator', 'public', 'CREATE') THEN
@@ -71,3 +80,32 @@ BEGIN
   END IF;
 END
 $$;
+
+
+  IF has_schema_privilege('trademate_worker', 'public', 'CREATE') THEN
+    RAISE EXCEPTION 'trademate_worker must not create schema objects.';
+  END IF;
+
+  IF NOT has_table_privilege('trademate_worker', 'public.user_deletion_requests', 'SELECT')
+     OR NOT has_table_privilege('trademate_worker', 'public.users', 'UPDATE')
+     OR NOT has_table_privilege('trademate_worker', 'public.user_sessions', 'DELETE')
+     OR NOT has_table_privilege('trademate_worker', 'public.audit_events', 'INSERT') THEN
+    RAISE EXCEPTION 'trademate_worker is missing required account-deletion privileges.';
+  END IF;
+
+  IF has_table_privilege('trademate_worker', 'public.audit_events', 'UPDATE')
+     OR has_table_privilege('trademate_worker', 'public.audit_events', 'DELETE')
+     OR has_table_privilege('trademate_worker', 'public.marketplace_enquiries', 'SELECT')
+     OR has_table_privilege('trademate_worker', 'public.marketplace_enquiries', 'UPDATE') THEN
+    RAISE EXCEPTION 'trademate_worker has excessive privileges.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind IN ('r', 'p', 'f', 'S', 'v', 'm')
+      AND c.relowner = (SELECT oid FROM pg_roles WHERE rolname = 'trademate_worker')
+  ) THEN
+    RAISE EXCEPTION 'trademate_worker must not own database objects.';
+  END IF;
