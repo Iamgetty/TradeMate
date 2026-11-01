@@ -921,6 +921,39 @@ class OrganizationsController {
     }
   }
 
+  @Patch(':id')
+  async updateOrganization(
+    @Req() request: Request,
+    @Param('id') id: string,
+    @Body() body: { name?: string },
+  ) {
+    const userId = await this.currentUser(request);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      throw new BadRequestException('Invalid organization ID.');
+    }
+    const name = typeof body?.name === 'string' ? body.name.trim() : '';
+    if (name.length < 2 || name.length > 120) {
+      throw new BadRequestException('Business name must be between 2 and 120 characters.');
+    }
+    const updated = await databasePool!.query(
+      `UPDATE organizations o
+       SET name = $1, updated_at = now()
+       WHERE o.id = $2
+         AND EXISTS (
+           SELECT 1 FROM organization_members om
+           WHERE om.organization_id = o.id AND om.user_id = $3 AND om.member_role = 'owner'
+         )
+       RETURNING o.id, o.name, o.organization_type, o.country_code, o.default_currency, o.status, o.updated_at`,
+      [name, id, userId],
+    );
+    if (!updated.rowCount) throw new NotFoundException('Business space not found or you are not its owner.');
+    await databasePool!.query(
+      "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, $2, 'organization.updated', 'organization', $2, $3::jsonb)",
+      [userId, id, JSON.stringify({ changed_fields: ['name'] })],
+    );
+    return { organization: updated.rows[0], message: 'Business profile updated.' };
+  }
+
   @Post(':id/documents')
   async uploadOrganizationDocuments(
     @Req() request: Request,
