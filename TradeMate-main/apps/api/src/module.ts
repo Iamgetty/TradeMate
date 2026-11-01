@@ -2,7 +2,7 @@ import { BadRequestException, Body, ConflictException, Controller, ForbiddenExce
 import type { Request, Response } from 'express';
 import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { Pool } from 'pg';
-import { changePasswordBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, feedPostBodySchema, loginBodySchema, parseBody, preferencesBodySchema, publicProfileBodySchema, registerBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
+import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPostBodySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, organizationCreateBodySchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -751,6 +751,7 @@ class SupportController {
 
   @Post('tickets')
   async createTicket(@Req() request: Request, @Body() body: { category?: string; subject?: string; message?: string }) {
+    parseBody(supportTicketBodySchema, body);
     const userId = await this.currentUser(request);
     const category = typeof body?.category === 'string' ? body.category.trim() : '';
     const subject = typeof body?.subject === 'string' ? body.subject.trim() : '';
@@ -802,6 +803,7 @@ class SupportController {
 
   @Post('tickets/:id/messages')
   async replyTicket(@Param('id') id: string, @Req() request: Request, @Body() body: { message?: string }) {
+    parseBody(supportReplyBodySchema, body);
     const userId = await this.currentUser(request);
     this.validateTicketId(id);
     const message = typeof body?.message === 'string' ? body.message.trim() : '';
@@ -846,6 +848,7 @@ class SupportController {
 
   @Post('feedback')
   async submitFeedback(@Req() request: Request, @Body() body: { type?: string; message?: string }) {
+    parseBody(feedbackBodySchema, body);
     const userId = await this.currentUser(request);
     const type = typeof body?.type === 'string' ? body.type.trim() : '';
     const message = typeof body?.message === 'string' ? body.message.trim() : '';
@@ -892,6 +895,7 @@ class OrganizationsController {
 
   @Post()
   async create(@Req() request: Request, @Body() body: { name?: string; organizationType?: string; countryCode?: string; defaultCurrency?: string }) {
+    parseBody(organizationCreateBodySchema, body);
     const userId = await this.currentUser(request);
     const name = typeof body?.name === 'string' ? body.name.trim() : '';
     const organizationType = body?.organizationType;
@@ -938,6 +942,7 @@ class OrganizationsController {
     @Param('id') id: string,
     @Body() body: { name?: string },
   ) {
+    parseBody(organizationNameBodySchema, body);
     const userId = await this.currentUser(request);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
       throw new BadRequestException('Invalid organization ID.');
@@ -971,6 +976,7 @@ class OrganizationsController {
     @Param('id') id: string,
     @Body() body: { files?: Array<{ fileName?: string; mimeType?: string; dataBase64?: string }> },
   ) {
+    parseBody(organizationDocumentsBodySchema, body);
     const userId = await this.currentUser(request);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid organization ID.');
     const files = Array.isArray(body?.files) ? body.files : [];
@@ -1025,6 +1031,7 @@ class PublicListingsController {
     @Req() request: Request,
     @Body() body: { title?: string; description?: string; listingType?: string; price?: string | number; quantityAvailable?: string | number | null },
   ) {
+    parseBody(listingBodySchema, body);
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to create an offer.');
@@ -1148,6 +1155,7 @@ class PublicListingsController {
     @Req() request: Request,
     @Body() body: { title?: string; description?: string; listingType?: string; price?: string | number; quantityAvailable?: string | number | null },
   ) {
+    parseBody(listingBodySchema, body);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
       throw new BadRequestException('id must be a valid listing UUID.');
     }
@@ -1357,6 +1365,7 @@ class EnquiriesController {
 
   @Post()
   async create(@Req() request: Request, @Body() body: { listingId?: string; message?: string }) {
+    parseBody(enquiryCreateBodySchema, body);
     const userId = await this.authenticatedUser(request);
     const listingId = typeof body?.listingId === 'string' ? body.listingId.trim() : '';
     const message = typeof body?.message === 'string' ? body.message.trim() : '';
@@ -1443,6 +1452,8 @@ class EnquiriesController {
 
   @Post(':id/messages')
   async reply(@Param('id') id: string, @Req() request: Request, @Body() body: { message?: string }) {
+    parseBody(contractMessageBodySchema, body);
+    parseBody(enquiryReplyBodySchema, body);
     const userId = await this.authenticatedUser(request);
     const enquiry = await this.authorizedEnquiry(id, userId);
     const message = typeof body?.message === 'string' ? body.message.trim() : '';
@@ -1590,6 +1601,7 @@ class MarketplaceContractsController {
       completionDate?: string;
     },
   ) {
+    parseBody(contractCreateBodySchema, body);
     const buyerId = await this.authenticatedUser(request);
     const listingId = typeof body?.listingId === 'string' ? body.listingId.trim() : '';
     const amountText = String(body?.amount ?? '').trim();
@@ -1702,6 +1714,7 @@ class MarketplaceContractsController {
     @Req() request: Request,
     @Body() body: { decision?: string },
   ) {
+    parseBody(contractDecisionBodySchema, body);
     this.validateContractId(id);
     const userId = await this.authenticatedUser(request);
     if (!['accept', 'reject'].includes(body?.decision || '')) {
@@ -2046,6 +2059,7 @@ class P2PMarketController {
 
   @Post('ads')
   async createAd(@Req() request: Request, @Body() body: any) {
+    parseBody(p2pAdBodySchema, body);
     const userId = await this.authenticatedUser(request);
     const side = String(body?.side || '').toLowerCase(), asset = String(body?.asset || '').trim().toUpperCase(), fiat = String(body?.fiat || '').trim().toUpperCase();
     const price = Number(body?.price), quantity = Number(body?.quantity), min = Number(body?.minFiatAmount ?? 0), max = Number(body?.maxFiatAmount ?? price * quantity);
@@ -2074,6 +2088,7 @@ class P2PMarketController {
 
   @Post('orders')
   async placeOrder(@Req() request: Request, @Body() body: any) {
+    parseBody(p2pOrderBodySchema, body);
     const userId = await this.authenticatedUser(request), adId = String(body?.adId || ''), fiatAmount = Number(body?.fiatAmount);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(adId) || !(fiatAmount > 0) || !Number.isFinite(fiatAmount)) throw new BadRequestException('Choose an offer and enter a valid fiat amount.');
     const client = await databasePool!.connect();
@@ -2105,6 +2120,7 @@ class P2PMarketController {
 
   @Post('orders/:id/payment-sent')
   async paymentSent(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+    parseBody(p2pPaymentSentBodySchema, body);
     const userId = await this.authenticatedUser(request), ref = typeof body?.reference === 'string' ? body.reference.trim() : '';
     if (ref.length > 160) throw new BadRequestException('Reference is too long.');
     const result = await databasePool!.query("UPDATE p2p_trades SET buyer_payment_sent_at=now(),payment_reference=NULLIF($1,''),updated_at=now() WHERE id=$2 AND buyer_user_id=$3 AND status='pending' AND buyer_payment_sent_at IS NULL RETURNING id,status,buyer_payment_sent_at",[ref,id,userId]);
@@ -2148,6 +2164,7 @@ class P2PMarketController {
 
   @Post('orders/:id/dispute')
   async dispute(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+    parseBody(p2pDisputeBodySchema, body);
     const userId = await this.authenticatedUser(request), reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('id must be a valid order UUID.');
     if (reason.length < 5 || reason.length > 1000) throw new BadRequestException('Dispute reason must be 5 to 1,000 characters.');
@@ -2400,6 +2417,7 @@ class CommunityFeedController {
 
   @Post('posts/:id/comments')
   async addComment(@Param('id') id: string, @Req() request: Request, @Body() body: { body?: string }) {
+    parseBody(feedCommentBodySchema, body);
     const userId = await this.currentUser(request);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid post id.');
     const content = typeof body?.body === 'string' ? body.body.trim() : '';
@@ -2416,6 +2434,7 @@ class CommunityFeedController {
 
   @Post('reports')
   async report(@Req() request: Request, @Body() body: { postId?: string; commentId?: string; reason?: string }) {
+    parseBody(feedReportBodySchema, body);
     const userId = await this.currentUser(request);
     const postId = typeof body?.postId === 'string' ? body.postId : null;
     const commentId = typeof body?.commentId === 'string' ? body.commentId : null;
@@ -2447,6 +2466,7 @@ class CommunityFeedController {
 
   @Patch('moderation/reports/:id')
   async reviewReport(@Param('id') id: string, @Req() request: Request, @Body() body: { action?: string }) {
+    parseBody(feedModerationBodySchema, body);
     const keyId = this.reviewKey(request);
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid report id.');
@@ -2476,6 +2496,7 @@ class CommunityFeedController {
 
   @Post('announcements')
   async announce(@Req() request: Request, @Body() body: { body?: string }) {
+    parseBody(announcementBodySchema, body);
     const keyId = this.reviewKey(request);
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const content = typeof body?.body === 'string' ? body.body.trim() : '';
@@ -2530,6 +2551,7 @@ class ModerationController {
     @Req() request: Request,
     @Body() body: { decision?: string; note?: string },
   ) {
+    parseBody(reviewDecisionBodySchema, body);
     const keyId = this.authorize(request);
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('id must be a valid organization UUID.');
@@ -2589,6 +2611,7 @@ class ModerationController {
     @Req() request: Request,
     @Body() body: { decision?: string; note?: string },
   ) {
+    parseBody(reviewDecisionBodySchema, body);
     const keyId = this.authorize(request);
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('id must be a valid listing UUID.');
