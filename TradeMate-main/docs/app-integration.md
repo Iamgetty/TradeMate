@@ -6,9 +6,9 @@ The mobile-style TradeMate app (`apps/web/public/tm/app.js`) is served by the Ne
 
 | App feature | API |
 |---|---|
-| Sign up / sign in, session lookup, sign out | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout` |
+| Sign up / sign in, session lookup, sign out, change password | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout`, `PATCH /api/auth/password` |
 | Services and B2B offer discovery | `GET /api/market/listings` |
-| Business spaces | `GET/POST /api/organizations` |
+| Business spaces | `GET/POST /api/organizations`, `PATCH /api/organizations/:id` (owner/admin profile rename) |
 | Create, view, edit and submit an offer draft | `POST /api/market/listings`, `GET /api/market/listings/mine`, `POST /api/market/listings/:id/submit`, `DELETE /api/market/listings/:id` |
 | Contract list and detail | `GET /api/market/contracts/mine`, `GET /api/market/contracts/:id` |
 | Propose a contract against a published Services/B2B offer | `POST /api/market/contracts` |
@@ -19,7 +19,7 @@ The mobile-style TradeMate app (`apps/web/public/tm/app.js`) is served by the Ne
 | Public Forex reference quotes | `GET /api/market/quotes` |
 | Feed posts, titles and attachments | `GET/POST /api/feed/posts`, `GET /api/feed/posts/:id/attachments/:attachmentId` |
 | Feed comments and reports | `GET/POST /api/feed/posts/:id/comments`, `POST /api/feed/reports` |
-| Health | `GET /api/health`, `GET /api/health/db` |
+| Health | `GET /api/health`, `GET /api/health/database` |
 
 ## Contract model
 
