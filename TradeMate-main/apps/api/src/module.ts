@@ -95,6 +95,19 @@ const databasePool = process.env.DATABASE_URL
   ? new Pool({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 5000, max: 5 })
   : null;
 
+const enforceTotpRateLimit = async (request: Request, userId: string) => {
+  if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
+  const key = tokenDigest((request.ip || 'unknown') + '|totp-action|' + userId);
+  const result = await databasePool.query(
+    "INSERT INTO auth_rate_limits (key_hash, window_started_at, attempts, blocked_until) VALUES ($1, now(), 1, NULL) ON CONFLICT (key_hash) DO UPDATE SET attempts = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END, window_started_at = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN now() ELSE auth_rate_limits.window_started_at END, blocked_until = CASE WHEN (CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END) >= 10 THEN now() + interval '15 minutes' ELSE auth_rate_limits.blocked_until END RETURNING attempts, blocked_until",
+    [key],
+  );
+  if (result.rows[0].attempts > 10 || (result.rows[0].blocked_until && new Date(result.rows[0].blocked_until).getTime() > Date.now())) {
+    throw new HttpException('Too many authenticator attempts. Please wait 15 minutes before trying again.', HttpStatus.TOO_MANY_REQUESTS);
+  }
+  return key;
+};
+
 @Controller()
 class HealthController {
   @Get('health')
@@ -315,11 +328,13 @@ class AuthController {
     if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
     const session = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired.');
+    const rateKey = await enforceTotpRateLimit(request, session.rows[0].id);
     const result = await databasePool.query('SELECT totp_secret_encrypted, setup_expires_at FROM user_auth_security WHERE user_id=$1 AND totp_enabled=false', [session.rows[0].id]);
     if (!result.rowCount || !result.rows[0].setup_expires_at || new Date(result.rows[0].setup_expires_at).getTime() < Date.now()) throw new ConflictException('Start authenticator setup again; the setup has expired.');
     let valid = false;
     try { valid = verifyTotp(decryptTotpSecret(result.rows[0].totp_secret_encrypted), String(body?.code || '')); } catch { valid = false; }
     if (!valid) throw new UnauthorizedException('That authenticator code is invalid. Check the code and try again.');
+    await databasePool.query('DELETE FROM auth_rate_limits WHERE key_hash=$1', [rateKey]);
     await databasePool.query('UPDATE user_auth_security SET totp_enabled=true, totp_confirmed_at=now(), setup_expires_at=NULL, updated_at=now() WHERE user_id=$1', [session.rows[0].id]);
     await databasePool.query("INSERT INTO audit_events (actor_user_id,event_type,entity_type,entity_id,metadata) VALUES ($1,'auth.totp_enabled','user',$1,'{}'::jsonb)", [session.rows[0].id]);
     return { success: true, enabled: true };
@@ -331,11 +346,13 @@ class AuthController {
     if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
     const session = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired.');
+    const rateKey = await enforceTotpRateLimit(request, session.rows[0].id);
     const result = await databasePool.query('SELECT totp_secret_encrypted FROM user_auth_security WHERE user_id=$1 AND totp_enabled=true', [session.rows[0].id]);
     if (!result.rowCount) throw new ConflictException('Two-factor authentication is not enabled.');
     let valid = false;
     try { valid = verifyTotp(decryptTotpSecret(result.rows[0].totp_secret_encrypted), String(body?.code || '')); } catch { valid = false; }
     if (!valid) throw new UnauthorizedException('That authenticator code is invalid.');
+    await databasePool.query('DELETE FROM auth_rate_limits WHERE key_hash=$1', [rateKey]);
     await databasePool.query('UPDATE user_auth_security SET totp_enabled=false, totp_secret_encrypted=NULL, totp_confirmed_at=NULL, setup_expires_at=NULL, updated_at=now() WHERE user_id=$1', [session.rows[0].id]);
     await databasePool.query("INSERT INTO audit_events (actor_user_id,event_type,entity_type,entity_id,metadata) VALUES ($1,'auth.totp_disabled','user',$1,'{}'::jsonb)", [session.rows[0].id]);
     return { success: true, enabled: false };
