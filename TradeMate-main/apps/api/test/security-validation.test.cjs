@@ -152,12 +152,14 @@ test('marketplace and market-data query schemas enforce supported filters and pa
   assert.equal(marketplaceBrowseQuerySchema.safeParse({ search: 'rice', country: 'NG', type: 'b2b', page: '1', limit: '20' }).success, true);
   assert.equal(marketplaceBrowseQuerySchema.safeParse({ page: '-1', limit: '999' }).success, false);
   assert.equal(marketActivityQuerySchema.safeParse({ view: 'book', market: 'p2p', limit: '100' }).success, true);
+  assert.equal(marketActivityQuerySchema.safeParse({ view: 'book', market: 'P2P', limit: '100' }).success, true);
   assert.equal(marketActivityQuerySchema.safeParse({ view: 'admin', limit: '100' }).success, false);
   assert.equal(marketCompletedQuerySchema.safeParse({ type: 'service', currency: 'NGN', limit: '50' }).success, true);
 });
 
 test('P2P, feed and market quote queries reject unsupported values', () => {
   assert.equal(p2pMarketQuerySchema.safeParse({ asset: 'USDT', fiat: 'NGN', side: 'buy', limit: '50' }).success, true);
+  assert.equal(p2pMarketQuerySchema.safeParse({ asset: 'USDT', fiat: 'NGN', side: 'BUY', limit: '50' }).success, true);
   assert.equal(p2pMarketQuerySchema.safeParse({ asset: 'USDT', fiat: 'NGN', side: 'short' }).success, false);
   assert.equal(feedPostsQuerySchema.safeParse({ type: 'Announcements', limit: '30' }).success, true);
   assert.equal(feedPostsQuerySchema.safeParse({ limit: '1000' }).success, false);
