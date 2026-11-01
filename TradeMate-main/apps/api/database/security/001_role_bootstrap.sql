@@ -1,6 +1,6 @@
 -- TradeMate PostgreSQL role bootstrap.
 -- Run ONCE as the current Render database administrator after creating
--- Render-managed credentials named trademate_app and trademate_migrator.
+-- Render-managed credentials named trademate_app, trademate_migrator and trademate_worker.
 -- Do not run this script against production until the API is ready to use
 -- the split DATABASE_URL / MIGRATION_DATABASE_URL settings.
 --
