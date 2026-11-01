@@ -171,7 +171,7 @@ class AuthController {
         'INSERT INTO auth_login_challenges (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval \'5 minutes\')',
         [user.id, tokenDigest(challengeToken)],
       );
-      await databasePool.query('DELETE FROM auth_rate_limits WHERE key_hash = $1', [rateKey]);
+      // Keep the password-stage rate limit until the second factor succeeds.
       return { requiresTwoFactor: true, challengeToken, expiresInSeconds: 300 };
     }
     await databasePool.query('DELETE FROM auth_rate_limits WHERE key_hash = $1', [rateKey]);
@@ -343,7 +343,7 @@ class AuthController {
 
   @Post('2fa/verify')
   @HttpCode(200)
-  async verifyTwoFactor(@Body() body: { challengeToken?: string; code?: string }, @Res({ passthrough: true }) response: Response) {
+  async verifyTwoFactor(@Body() body: { challengeToken?: string; code?: string }, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const challengeToken = typeof body?.challengeToken === 'string' ? body.challengeToken : '';
     const code = typeof body?.code === 'string' ? body.code : '';
@@ -352,10 +352,19 @@ class AuthController {
     try {
       await client.query('BEGIN');
       const challenge = await client.query(
-        'SELECT c.id,c.user_id,c.attempts,u.email,u.display_name,u.country_code FROM auth_login_challenges c JOIN users u ON u.id=c.user_id WHERE c.token_hash=$1 AND c.expires_at>now() AND c.consumed_at IS NULL FOR UPDATE OF c',
+        "SELECT c.id,c.user_id,c.attempts,u.email,u.display_name,u.country_code FROM auth_login_challenges c JOIN users u ON u.id=c.user_id WHERE c.token_hash=$1 AND c.expires_at>now() AND c.consumed_at IS NULL AND u.status='active' FOR UPDATE OF c",
         [tokenDigest(challengeToken)],
       );
       if (!challenge.rowCount || challenge.rows[0].attempts >= 5) throw new UnauthorizedException('This verification attempt has expired. Sign in again.');
+      const totpRateKey = tokenDigest((request.ip || 'unknown') + '|totp|' + challenge.rows[0].user_id);
+      const totpRate = await client.query(
+        "INSERT INTO auth_rate_limits (key_hash, window_started_at, attempts, blocked_until) VALUES ($1, now(), 1, NULL) ON CONFLICT (key_hash) DO UPDATE SET attempts = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END, window_started_at = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN now() ELSE auth_rate_limits.window_started_at END, blocked_until = CASE WHEN (CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END) >= 10 THEN now() + interval '15 minutes' ELSE auth_rate_limits.blocked_until END RETURNING attempts, blocked_until",
+        [totpRateKey],
+      );
+      if (totpRate.rows[0].attempts > 10 || (totpRate.rows[0].blocked_until && new Date(totpRate.rows[0].blocked_until).getTime() > Date.now())) {
+        await client.query('COMMIT');
+        throw new HttpException('Too many authenticator attempts. Please wait 15 minutes before trying again.', HttpStatus.TOO_MANY_REQUESTS);
+      }
       const secretResult = await client.query('SELECT totp_secret_encrypted,totp_enabled FROM user_auth_security WHERE user_id=$1', [challenge.rows[0].user_id]);
       let valid = false;
       try { valid = Boolean(secretResult.rows[0]?.totp_enabled && verifyTotp(decryptTotpSecret(secretResult.rows[0].totp_secret_encrypted), code)); } catch { valid = false; }
@@ -365,6 +374,7 @@ class AuthController {
         throw new UnauthorizedException('The authenticator code is incorrect.');
       }
       await client.query('UPDATE auth_login_challenges SET consumed_at=now() WHERE id=$1', [challenge.rows[0].id]);
+      await client.query('DELETE FROM auth_rate_limits WHERE key_hash IN ($1, $2)', [totpRateKey, tokenDigest((request.ip || 'unknown') + '|' + String(challenge.rows[0].email).trim().toLowerCase())]);
       const sessionToken = randomBytes(32).toString('base64url');
       const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
       await client.query('INSERT INTO user_sessions (user_id,token_hash,expires_at) VALUES ($1,$2,$3)', [challenge.rows[0].user_id,tokenDigest(sessionToken),expiresAt]);
