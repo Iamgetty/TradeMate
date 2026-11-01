@@ -994,7 +994,7 @@ class MarketplaceContractsController {
       [buyerId, offer.seller_organization_id, created.rows[0].id, JSON.stringify({ listing_id: listingId, listing_type: offer.listing_type })],
     );
     await databasePool!.query(
-      "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', 'New contract proposal', $1, 'file-text' FROM organization_members om WHERE om.organization_id = $2 AND om.user_id <> $3 AND om.member_role IN ('owner','admin')",
+      "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', 'New contract proposal', $1, 'doc' FROM organization_members om WHERE om.organization_id = $2 AND om.user_id <> $3 AND om.member_role IN ('owner','admin')",
       ['A buyer sent a proposal for ' + offer.title + '.', offer.seller_organization_id, buyerId],
     );
     return { data: created.rows[0], message: 'Contract proposal sent to the business for review.' };
@@ -1072,7 +1072,7 @@ class MarketplaceContractsController {
         [userId, current.rows[0].seller_organization_id, status === 'accepted' ? 'marketplace.contract_accepted' : 'marketplace.contract_rejected', id, JSON.stringify({ status })],
       );
       await client.query(
-        "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'Contracts', $2, $3, 'file-text')",
+        "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'Contracts', $2, $3, 'doc')",
         [current.rows[0].buyer_user_id, status === 'accepted' ? 'Contract accepted' : 'Contract declined', status === 'accepted' ? 'Your contract proposal has been accepted.' : 'Your contract proposal was declined.'],
       );
       await client.query('COMMIT');
@@ -1107,7 +1107,7 @@ class MarketplaceContractsController {
         [userId, current.rows[0].seller_organization_id, id],
       );
       await client.query(
-        "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', 'Contract proposal cancelled', 'The buyer cancelled a pending contract proposal.', 'file-text' FROM organization_members om WHERE om.organization_id = $1 AND om.user_id <> $2 AND om.member_role IN ('owner','admin')",
+        "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', 'Contract proposal cancelled', 'The buyer cancelled a pending contract proposal.', 'doc' FROM organization_members om WHERE om.organization_id = $1 AND om.user_id <> $2 AND om.member_role IN ('owner','admin')",
         [current.rows[0].seller_organization_id, userId],
       );
       await client.query('COMMIT');
@@ -1161,12 +1161,12 @@ class MarketplaceContractsController {
       );
       if (isBuyer && !contract.buyer_confirmed_at) {
         await client.query(
-          "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', $2, $3, 'file-text' FROM organization_members om WHERE om.organization_id = $1 AND om.user_id <> $4 AND om.member_role IN ('owner','admin')",
+          "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', $2, $3, 'doc' FROM organization_members om WHERE om.organization_id = $1 AND om.user_id <> $4 AND om.member_role IN ('owner','admin')",
           [contract.seller_organization_id, completed ? 'Contract completed' : 'Buyer confirmed fulfilment', completed ? 'Both parties confirmed fulfilment. The contract is complete.' : 'The buyer confirmed fulfilment. Please confirm your side.', userId],
         );
       } else if (sellerActor && !contract.seller_confirmed_at) {
         await client.query(
-          "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'Contracts', $2, $3, 'file-text')",
+          "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'Contracts', $2, $3, 'doc')",
           [contract.buyer_user_id, completed ? 'Contract completed' : 'Seller confirmed fulfilment', completed ? 'Both parties confirmed fulfilment. The contract is complete.' : 'The seller confirmed fulfilment. Please confirm your side.'],
         );
       }
@@ -1231,12 +1231,12 @@ class MarketplaceContractsController {
       );
       if (current.rows[0].is_buyer) {
         await client.query(
-          "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', 'New contract message', 'The buyer sent a new message on a contract.', 'message-square' FROM organization_members om WHERE om.organization_id = $1 AND om.user_id <> $2 AND om.member_role IN ('owner','admin')",
+          "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', 'New contract message', 'The buyer sent a new message on a contract.', 'conversation' FROM organization_members om WHERE om.organization_id = $1 AND om.user_id <> $2 AND om.member_role IN ('owner','admin')",
           [current.rows[0].seller_organization_id, userId],
         );
       } else {
         await client.query(
-          "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'Contracts', 'New contract message', 'The seller sent a new message on a contract.', 'message-square')",
+          "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'Contracts', 'New contract message', 'The seller sent a new message on a contract.', 'conversation')",
           [current.rows[0].buyer_user_id],
         );
       }
