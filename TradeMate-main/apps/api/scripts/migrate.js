@@ -22,6 +22,7 @@ const MIGRATIONS = [
   '015_authenticator_2fa.sql',
   '016_session_device_metadata.sql',
   '017_transactional_email_account_deletion.sql',
+  '018_enquiry_read_receipts.sql',
 ];
 
 async function main() {
