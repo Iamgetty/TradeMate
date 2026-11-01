@@ -1,8 +1,8 @@
 const { Pool } = require('pg');
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString = process.env.WORKER_DATABASE_URL || (process.env.NODE_ENV === 'production' ? '' : process.env.DATABASE_URL);
 if (!connectionString) {
-  console.error('DATABASE_URL is required.');
+  console.error('WORKER_DATABASE_URL is required in production (DATABASE_URL is allowed for local development only).');
   process.exit(1);
 }
 const execute = process.env.ACCOUNT_DELETION_EXECUTE === 'true';
@@ -13,7 +13,7 @@ if (execute && !legalApproval) {
 }
 const pool = new Pool({
   connectionString,
-  ssl: process.env.PGSSLMODE === 'require' ? { rejectUnauthorized: false } : undefined,
+  ssl: process.env.PGSSLMODE === 'require' ? true : undefined,
   connectionTimeoutMillis: 5000,
   max: 2,
 });
@@ -63,7 +63,6 @@ async function main() {
       await client.query('DELETE FROM user_notifications WHERE user_id = $1', [item.user_id]);
       await client.query('UPDATE support_ticket_messages SET sender_user_id = NULL, sender_type = CASE WHEN sender_type = \'user\' THEN \'system\' ELSE sender_type END WHERE sender_user_id = $1', [item.user_id]);
       await client.query('UPDATE marketplace_contracts SET accepted_by_user_id = NULL WHERE accepted_by_user_id = $1', [item.user_id]);
-      await client.query('UPDATE audit_events SET actor_user_id = NULL WHERE actor_user_id = $1', [item.user_id]);
       await client.query(
         `UPDATE users
             SET email = 'deleted+' || id::text || '@deleted.invalid',
