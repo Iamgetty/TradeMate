@@ -132,7 +132,7 @@ class HealthController {
 @Controller('auth')
 class AuthController {
   @Post('register')
-  async register(@Body() body: { email?: string; password?: string; displayName?: string }, @Res({ passthrough: true }) response: Response) {
+  async register(@Body() body: { email?: string; password?: string; displayName?: string }, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
     const displayName = typeof body?.displayName === 'string' ? body.displayName.trim() : '';
@@ -148,7 +148,7 @@ class AuthController {
       await client.query('INSERT INTO user_credentials (user_id, password_hash) VALUES ($1, $2)', [created.rows[0].id, hash]);
       const token = randomBytes(32).toString('base64url');
       const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
-      await client.query('INSERT INTO user_sessions (user_id, token_hash, expires_at) VALUES ($1, $2, $3)', [created.rows[0].id, tokenDigest(token), expiresAt]);
+      await client.query('INSERT INTO user_sessions (user_id, token_hash, expires_at, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5)', [created.rows[0].id, tokenDigest(token), expiresAt, request.ip || null, request.get('user-agent')?.slice(0, 500) || null]);
       await client.query('COMMIT');
       response.cookie(SESSION_COOKIE, token, cookieOptions());
       return { user: created.rows[0] };
@@ -193,7 +193,7 @@ class AuthController {
     const client = await databasePool.connect();
     try {
       await client.query('BEGIN');
-      await client.query('INSERT INTO user_sessions (user_id, token_hash, expires_at) VALUES ($1, $2, $3)', [user.id, tokenDigest(token), expiresAt]);
+      await client.query('INSERT INTO user_sessions (user_id, token_hash, expires_at, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5)', [user.id, tokenDigest(token), expiresAt, request.ip || null, request.get('user-agent')?.slice(0, 500) || null]);
       await client.query(
         "INSERT INTO user_notifications (user_id, category, title, body, icon, action_url) VALUES ($1, 'System', 'New sign-in', 'A sign-in to your TradeMate account was completed. If this was not you, review your active sessions and secure your account.', 'shield-check', '/settings/security')",
         [user.id],
@@ -220,6 +220,7 @@ class AuthController {
     if (!token) throw new UnauthorizedException('Please sign in.');
     const result = await databasePool.query("SELECT u.id, u.email, u.display_name, u.country_code FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1", [tokenDigest(token)]);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    await databasePool.query('UPDATE user_sessions SET last_seen_at=now() WHERE token_hash=$1', [tokenDigest(token)]);
     return { user: result.rows[0] };
   }
 
@@ -394,7 +395,7 @@ class AuthController {
       await client.query('DELETE FROM auth_rate_limits WHERE key_hash IN ($1, $2)', [totpRateKey, tokenDigest((request.ip || 'unknown') + '|' + String(challenge.rows[0].email).trim().toLowerCase())]);
       const sessionToken = randomBytes(32).toString('base64url');
       const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
-      await client.query('INSERT INTO user_sessions (user_id,token_hash,expires_at) VALUES ($1,$2,$3)', [challenge.rows[0].user_id,tokenDigest(sessionToken),expiresAt]);
+      await client.query('INSERT INTO user_sessions (user_id,token_hash,expires_at,ip_address,user_agent) VALUES ($1,$2,$3,$4,$5)', [challenge.rows[0].user_id,tokenDigest(sessionToken),expiresAt,request.ip || null,request.get('user-agent')?.slice(0,500) || null]);
       await client.query(
         "INSERT INTO user_notifications (user_id, category, title, body, icon, action_url) VALUES ($1, 'System', 'New sign-in', 'A sign-in to your TradeMate account was completed. If this was not you, review your active sessions and secure your account.', 'shield-check', '/settings/security')",
         [challenge.rows[0].user_id],
@@ -423,8 +424,9 @@ class AuthController {
       [digest],
     );
     if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    await databasePool.query('UPDATE user_sessions SET last_seen_at=now() WHERE token_hash=$1', [digest]);
     const result = await databasePool.query(
-      'SELECT id, created_at, last_seen_at, expires_at, (token_hash = $2) AS is_current FROM user_sessions WHERE user_id = $1 AND expires_at > now() ORDER BY is_current DESC, last_seen_at DESC LIMIT 50',
+      'SELECT id, created_at, last_seen_at, expires_at, ip_address, user_agent, (token_hash = $2) AS is_current FROM user_sessions WHERE user_id = $1 AND expires_at > now() ORDER BY is_current DESC, last_seen_at DESC LIMIT 50',
       [current.rows[0].id, digest],
     );
     return { sessions: result.rows };
