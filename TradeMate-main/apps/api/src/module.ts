@@ -1452,7 +1452,6 @@ class EnquiriesController {
 
   @Post(':id/messages')
   async reply(@Param('id') id: string, @Req() request: Request, @Body() body: { message?: string }) {
-    parseBody(contractMessageBodySchema, body);
     parseBody(enquiryReplyBodySchema, body);
     const userId = await this.authenticatedUser(request);
     const enquiry = await this.authorizedEnquiry(id, userId);
@@ -1874,6 +1873,7 @@ class MarketplaceContractsController {
 
   @Post(':id/messages')
   async reply(@Param('id') id: string, @Req() request: Request, @Body() body: { message?: string }) {
+    parseBody(contractMessageBodySchema, body);
     const userId = await this.authenticatedUser(request);
     const message = typeof body?.message === 'string' ? body.message.trim() : '';
     if (message.length < 1 || message.length > 2000) {
