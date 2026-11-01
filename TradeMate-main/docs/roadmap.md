@@ -68,7 +68,7 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 1. **API integration tests:** authenticated/unauthenticated requests are now exercised against a running Nest HTTP server in CI; expand these tests as endpoints and policies change.
 2. Create separate Render-managed runtime, migration and worker credentials, run the tested role bootstrap on Render, grant least-privilege access, and verify deployment using the split URLs.
 3. Complete organization-membership context and auth-bootstrap policy design. Session hash and database-resolved user ID are now applied transaction-locally to ordinary pool queries and explicit transactions; concurrent-request and connection-context tests are in CI.
-4. Apply RLS and FORCE RLS to the sensitive table inventory only after auth-bootstrap, cross-user, cross-organization and pool-reuse tests pass.
+4. Expand the CI-only RLS pilot to the complete sensitive-table inventory, including login/registration/TOTP bootstrap and organization membership. Only then promote RLS and FORCE RLS to production after auth-bootstrap, cross-user, cross-organization and pool-reuse tests pass.
 5. Add database-role/RLS integration tests and verify audit-event append-only permissions under the actual runtime role.
 6. Set GitHub main-branch protection so required CI checks and independent review cannot be bypassed. The repository currently has no GitHub rulesets visible to the connected integration; branch-protection settings require owner-level dashboard access.
 7. Review and remediate the remaining moderate/low dependency advisories, then decide whether to raise the SCA gate to moderate.
