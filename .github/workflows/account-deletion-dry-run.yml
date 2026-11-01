@@ -1,0 +1,45 @@
+name: TradeMate account-deletion dry run
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trademate-account-deletion-dry-run
+  cancel-in-progress: false
+
+jobs:
+  dry-run:
+    name: Inspect due account-deletion requests (dry run)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out TradeMate
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install API runtime dependencies
+        working-directory: TradeMate-main/apps/api
+        run: npm install --omit=dev --no-audit --no-fund
+
+      - name: Run account-deletion worker in dry-run mode
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: ${{ secrets.TRADEMATE_DATABASE_URL }}
+          ACCOUNT_DELETION_EXECUTE: "false"
+          ACCOUNT_DELETION_LEGAL_APPROVAL: "false"
+          NODE_ENV: production
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Configure the TRADEMATE_DATABASE_URL GitHub Actions secret before running this workflow."
+            exit 1
+          fi
+          node scripts/process-account-deletions.js
