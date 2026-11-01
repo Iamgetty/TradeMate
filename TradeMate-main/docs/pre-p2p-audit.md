@@ -19,6 +19,7 @@ Scope: source-level audit of the active Next.js runtime, browser bundle, Nest AP
 - Made Feed post titles optional at the API, matching the composer label and its existing submit payload. The body remains required.
 - Made organization-document uploads transactional, so a failed multi-file upload rolls back instead of leaving a partial set of documents. Added UUID validation to the document-list route.
 - Changed live logout to wait for the server response before clearing the local session. A failed logout now reports the error rather than silently discarding the local session.
+- Changed session restoration so only an actual HTTP 401 clears the local session. A temporary network/API failure no longer silently signs the user out.
 - Bumped the runtime asset query version after changing the browser bundle.
 - Updated the API integration notes for the new routes and the actual database-health path.
 
@@ -99,6 +100,10 @@ These currently persist on the device, not in the account: theme, language, disp
 5. Build server-side promotion enrolment, campaign requests and referral attribution before showing success states.
 6. Decide whether device preferences remain local or selected settings/watchlists sync to the account.
 7. Keep P2P roadmap work paused until these pre-roadmap items are reviewed and prioritized.
+
+## Additional confirmed reliability issue still to fix
+
+- Several connected data loaders (`loadMarket`, `loadMine`, `loadOrg`, `loadContracts`, `loadContractMessages`, `loadEnquiries` and `loadMsgs`) swallow request failures. This can make a temporary API outage look like an empty marketplace, organization, contract list or conversation. Add explicit loading/error states and retry actions rather than silently returning empty data.
 
 ## Audit limitations
 
