@@ -65,11 +65,11 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 
 **Still open before S1 is complete:**
 
-1. Add API-level integration tests that exercise authenticated and unauthenticated requests against a running API, not only isolated schema tests.
-2. Create separate Render-managed runtime and migration credentials, run the tested role bootstrap on Render, grant least-privilege access, and verify deployment using the split URLs.
-3. Implement transaction-scoped user/organization context across every pooled query and explicit transaction.
-4. Apply RLS and FORCE RLS to the sensitive table inventory only after context refactoring and cross-user/cross-organization/pool-reuse tests pass.
-5. Add database-role/RLS integration tests and verify audit-event append-only permissions.
+1. **API integration tests:** authenticated/unauthenticated requests are now exercised against a running Nest HTTP server in CI; expand these tests as endpoints and policies change.
+2. Create separate Render-managed runtime, migration and worker credentials, run the tested role bootstrap on Render, grant least-privilege access, and verify deployment using the split URLs.
+3. Complete organization-membership context and auth-bootstrap policy design. Session hash and database-resolved user ID are now applied transaction-locally to ordinary pool queries and explicit transactions; concurrent-request and connection-context tests are in CI.
+4. Apply RLS and FORCE RLS to the sensitive table inventory only after auth-bootstrap, cross-user, cross-organization and pool-reuse tests pass.
+5. Add database-role/RLS integration tests and verify audit-event append-only permissions under the actual runtime role.
 6. Set GitHub main-branch protection so required CI checks and independent review cannot be bypassed. The repository currently has no GitHub rulesets visible to the connected integration; branch-protection settings require owner-level dashboard access.
 7. Review and remediate the remaining moderate/low dependency advisories, then decide whether to raise the SCA gate to moderate.
 
