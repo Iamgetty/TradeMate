@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { validateEnvironment } = require('../dist/environment');
 
 const {
   registerBodySchema,
@@ -162,4 +163,35 @@ test('P2P, feed and market quote queries reject unsupported values', () => {
   assert.equal(feedPostsQuerySchema.safeParse({ limit: '1000' }).success, false);
   assert.equal(marketQuotesQuerySchema.safeParse({ symbols: 'AAPL,MSFT' }).success, true);
   assert.equal(marketQuotesQuerySchema.safeParse({ symbols: '' }).success, false);
+});
+
+test('production environment validation requires PostgreSQL and a 256-bit TOTP key', () => {
+  const valid = validateEnvironment({
+    NODE_ENV: 'production',
+    DATABASE_URL: 'postgres://trade_user:placeholder@localhost:5432/trademate',
+    TOTP_ENCRYPTION_KEY: 'a'.repeat(64),
+    WEB_ORIGIN: 'https://trademate-web.onrender.com',
+  });
+  assert.equal(valid.NODE_ENV, 'production');
+  assert.throws(() => validateEnvironment({
+    NODE_ENV: 'production',
+    TOTP_ENCRYPTION_KEY: 'a'.repeat(64),
+  }), /DATABASE_URL/);
+  assert.throws(() => validateEnvironment({
+    NODE_ENV: 'production',
+    DATABASE_URL: 'postgres://trade_user:placeholder@localhost:5432/trademate',
+  }), /TOTP_ENCRYPTION_KEY/);
+});
+
+test('environment validation rejects malformed URLs, origins and key formats', () => {
+  assert.throws(() => validateEnvironment({
+    NODE_ENV: 'production', DATABASE_URL: 'https://example.com',
+    TOTP_ENCRYPTION_KEY: 'a'.repeat(64),
+  }), /DATABASE_URL/);
+  assert.throws(() => validateEnvironment({
+    NODE_ENV: 'development', WEB_ORIGIN: 'javascript:alert(1)',
+  }), /WEB_ORIGIN/);
+  assert.throws(() => validateEnvironment({
+    NODE_ENV: 'development', TOTP_ENCRYPTION_KEY: 'not-a-key',
+  }), /TOTP_ENCRYPTION_KEY/);
 });
