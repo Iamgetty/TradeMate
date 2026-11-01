@@ -109,4 +109,4 @@ BEGIN
     RAISE EXCEPTION 'trademate_worker must not own database objects.';
   END IF;
 END
-$;
+$$;
