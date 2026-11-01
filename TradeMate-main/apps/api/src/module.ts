@@ -2238,7 +2238,14 @@ class PublicProfilesController {
   async unfollow(@Param('id') id: string, @Req() request: Request) {
     const userId = await this.currentUser(request);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid profile id.');
-    await databasePool!.query('DELETE FROM user_follows WHERE follower_user_id=$1 AND followed_user_id=$2', [userId, id]);
+    const removed = await databasePool!.query(
+      'DELETE FROM user_follows WHERE follower_user_id=$1 AND followed_user_id=$2 RETURNING followed_user_id',
+      [userId, id],
+    );
+    if (removed.rowCount) await databasePool!.query(
+      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.unfollowed', 'user', $2, '{}'::jsonb)",
+      [userId, id],
+    );
     return { following: false };
   }
 }
