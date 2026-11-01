@@ -40,10 +40,10 @@ test('malformed registration is rejected before database access', async () => {
 });
 
 test('invalid marketplace query and UUID path values are rejected', async () => {
-  const queryResponse = await fetch(baseUrl + '/api/marketplace?page=0&limit=999');
+  const queryResponse = await fetch(baseUrl + '/api/market/listings?page=0&limit=999');
   assert.equal(queryResponse.status, 400);
 
-  const pathResponse = await fetch(baseUrl + '/api/marketplace/not-a-uuid');
+  const pathResponse = await fetch(baseUrl + '/api/market/listings/not-a-uuid');
   assert.equal(pathResponse.status, 400);
 });
 
