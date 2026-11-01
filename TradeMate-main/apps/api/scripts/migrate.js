@@ -27,12 +27,13 @@ const MIGRATIONS = [
 ];
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL is required to run database migrations.');
+  const migrationDatabaseUrl = process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL;
+  if (!migrationDatabaseUrl) {
+    throw new Error('MIGRATION_DATABASE_URL (or DATABASE_URL during the transition) is required to run database migrations.');
   }
 
   const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: migrationDatabaseUrl,
     ssl: process.env.PGSSLMODE === 'require' ? true : undefined,
     connectionTimeoutMillis: 10000,
     max: 1,
