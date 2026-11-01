@@ -26,6 +26,7 @@ jobs:
     timeout-minutes: 10
     env:
       DATABASE_URL: ${{ secrets.TRADEMATE_DATABASE_URL }}
+      PGSSLMODE: require
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
