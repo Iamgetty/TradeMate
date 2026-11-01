@@ -33,7 +33,7 @@ async function main() {
 
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.PGSSLMODE === 'require' ? { rejectUnauthorized: false } : undefined,
+    ssl: process.env.PGSSLMODE === 'require' ? true : undefined,
     connectionTimeoutMillis: 10000,
     max: 1,
   });
