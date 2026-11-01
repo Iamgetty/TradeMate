@@ -26,7 +26,7 @@ async function bootstrap() {
   ]);
 
   app.enableCors({
-    origin: (origin, callback) => {
+    origin: (origin: string | undefined, callback: (error: Error | null, allow?: boolean | string | RegExp | Array<string | RegExp>) => void) => {
       const normalizedOrigin = origin?.replace(/\/+$/, '');
       if (!normalizedOrigin || allowedOrigins.has(normalizedOrigin)) {
         return callback(null, true);
