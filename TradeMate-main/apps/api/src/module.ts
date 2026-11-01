@@ -1482,7 +1482,7 @@ class CommunityFeedController {
     const userId = await this.currentUser(request);
     const title = typeof body?.title === 'string' ? body.title.trim() : '';
     const content = typeof body?.body === 'string' ? body.body.trim() : '';
-    if (title.length < 1 || title.length > 140) throw new BadRequestException('Post titles must be between 1 and 140 characters.');
+    if (title.length > 140) throw new BadRequestException('Post titles must be 140 characters or fewer.');
     if (content.length < 1 || content.length > 5000) throw new BadRequestException('Posts must be between 1 and 5,000 characters.');
     const type = body?.type === 'feedback' ? 'feedback' : body?.type === 'post' ? 'post' : null;
     if (!type) throw new BadRequestException('Choose post or feedback. Announcements are published by moderators.');
