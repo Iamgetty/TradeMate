@@ -16,6 +16,7 @@ const MIGRATIONS = [
   '009_b2b_listing_type.sql',
   '010_marketplace_contracts.sql',
   '011_organization_documents.sql',
+  '012_user_notifications.sql',
 ];
 
 async function main() {
