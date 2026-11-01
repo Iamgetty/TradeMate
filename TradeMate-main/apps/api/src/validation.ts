@@ -261,7 +261,7 @@ export const marketplaceBrowseQuerySchema = z.object({
 
 export const marketActivityQuerySchema = z.object({
   view: z.enum(['book', 'trades']),
-  market: z.enum(['all', 'b2b', 'services', 'p2p']).optional(),
+  market: z.string().trim().toLowerCase().pipe(z.enum(['all', 'b2b', 'services', 'p2p'])).optional(),
   limit: boundedIntegerQuery(100),
 }).strict();
 
@@ -274,7 +274,7 @@ export const marketCompletedQuerySchema = z.object({
 export const p2pMarketQuerySchema = z.object({
   asset: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,16}$/).optional(),
   fiat: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/).optional(),
-  side: z.enum(['buy', 'sell']).optional(),
+  side: z.string().trim().toLowerCase().pipe(z.enum(['buy', 'sell'])).optional(),
   limit: boundedIntegerQuery(100),
 }).strict();
 
