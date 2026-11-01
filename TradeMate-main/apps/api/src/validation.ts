@@ -243,3 +243,46 @@ export const parseUuidParam = (value: string, message = 'Invalid identifier.') =
   if (!parsed.success) throw new BadRequestException(message);
   return parsed.data;
 };
+
+const positiveIntegerQuery = z.string().regex(/^\d{1,7}$/).optional();
+const boundedIntegerQuery = (maximum: number) => z.string().regex(/^\d{1,4}$/).optional().refine(
+  (value) => value === undefined || (Number(value) >= 1 && Number(value) <= maximum),
+  'Query limit is outside the supported range.',
+);
+
+export const marketplaceBrowseQuerySchema = z.object({
+  search: z.string().max(200).optional(),
+  country: z.string().regex(/^[A-Za-z]{2}$/).optional(),
+  type: z.enum(['b2b', 'service']).optional(),
+  category: z.string().uuid().optional(),
+  page: positiveIntegerQuery,
+  limit: boundedIntegerQuery(50),
+}).strict();
+
+export const marketActivityQuerySchema = z.object({
+  view: z.enum(['book', 'trades']),
+  market: z.enum(['all', 'b2b', 'services', 'p2p']).optional(),
+  limit: boundedIntegerQuery(100),
+}).strict();
+
+export const marketCompletedQuerySchema = z.object({
+  type: z.enum(['b2b', 'service']).optional(),
+  currency: z.string().regex(/^[A-Za-z]{3}$/).optional(),
+  limit: boundedIntegerQuery(100),
+}).strict();
+
+export const p2pMarketQuerySchema = z.object({
+  asset: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,16}$/).optional(),
+  fiat: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/).optional(),
+  side: z.enum(['buy', 'sell']).optional(),
+  limit: boundedIntegerQuery(100),
+}).strict();
+
+export const feedPostsQuerySchema = z.object({
+  type: z.enum(['Posts', 'post', 'Feedback', 'feedback', 'Announcements', 'announcement']).optional(),
+  limit: z.string().regex(/^\d{1,3}$/).optional(),
+}).strict();
+
+export const marketQuotesQuerySchema = z.object({
+  symbols: z.string().trim().min(1).max(120),
+}).strict();
