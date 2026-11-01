@@ -3,8 +3,10 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './module';
 import { attachMarketFeed } from './market-feed';
 import { json } from 'express';
+import { validateEnvironment } from './environment';
 
 async function bootstrap() {
+  validateEnvironment();
   const app = await NestFactory.create(AppModule, { bodyParser: false });
   // Feed attachments are base64-encoded in JSON; cap the request size while
   // allowing four small attachments plus post metadata.
