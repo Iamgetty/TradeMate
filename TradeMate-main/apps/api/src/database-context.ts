@@ -114,7 +114,7 @@ export const createRlsAwarePool = (pool: Pool): Pool => new Proxy(pool, {
                     .finally(() => inner.release(releaseError));
                   return;
                 }
-                inner.release(...releaseArgs);
+                inner.release(releaseError);
               };
             }
 
