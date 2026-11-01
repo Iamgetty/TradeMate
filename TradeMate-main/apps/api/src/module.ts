@@ -125,6 +125,52 @@ class AuthController {
     return { user: result.rows[0] };
   }
 
+  @Patch('password')
+  async changePassword(
+    @Req() request: Request,
+    @Body() body: { currentPassword?: string; newPassword?: string },
+  ) {
+    if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in again.');
+    const currentPassword = typeof body?.currentPassword === 'string' ? body.currentPassword : '';
+    const newPassword = typeof body?.newPassword === 'string' ? body.newPassword : '';
+    if (newPassword.length < 12 || newPassword.length > 128) {
+      throw new BadRequestException('Use a new password between 12 and 128 characters.');
+    }
+    const current = await databasePool.query(
+      "SELECT u.id, c.password_hash FROM user_sessions s JOIN users u ON u.id = s.user_id JOIN user_credentials c ON c.user_id = u.id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+      [tokenDigest(token)],
+    );
+    if (!current.rowCount || !(await passwordMatches(currentPassword, current.rows[0].password_hash))) {
+      throw new UnauthorizedException('Your current password is incorrect.');
+    }
+    if (await passwordMatches(newPassword, current.rows[0].password_hash)) {
+      throw new BadRequestException('Choose a password you have not used before.');
+    }
+    const userId = current.rows[0].id as string;
+    const hash = await passwordHash(newPassword);
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        'UPDATE user_credentials SET password_hash = $1, updated_at = now() WHERE user_id = $2',
+        [hash, userId],
+      );
+      await client.query(
+        'DELETE FROM user_sessions WHERE user_id = $1 AND token_hash <> $2',
+        [userId, tokenDigest(token)],
+      );
+      await client.query('COMMIT');
+      return { success: true, message: 'Password updated. Other sessions have been signed out.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   @Post('logout')
   @HttpCode(200)
   async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
@@ -160,6 +206,50 @@ class OrganizationsController {
       [userId],
     );
     return { organization: result.rows[0] || null };
+  }
+
+  @Patch(':id')
+  async update(
+    @Req() request: Request,
+    @Param('id') id: string,
+    @Body() body: { name?: string },
+  ) {
+    const userId = await this.currentUser(request);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      throw new BadRequestException('Invalid organization ID.');
+    }
+    const name = typeof body?.name === 'string' ? body.name.trim() : '';
+    if (name.length < 2 || name.length > 120) {
+      throw new BadRequestException('Organization name must be between 2 and 120 characters.');
+    }
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const member = await client.query(
+        'SELECT member_role FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1',
+        [id, userId],
+      );
+      if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
+      if (!['owner', 'admin'].includes(member.rows[0].member_role)) {
+        throw new ForbiddenException('Only an organization owner or admin can edit its profile.');
+      }
+      const updated = await client.query(
+        'UPDATE organizations SET name = $1, updated_at = now() WHERE id = $2 RETURNING id, name, organization_type, country_code, default_currency, status, created_at',
+        [name, id],
+      );
+      if (!updated.rowCount) throw new NotFoundException('Organization not found.');
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, $2, 'organization.updated', 'organization', $2, $3::jsonb)",
+        [userId, id, JSON.stringify({ fields: ['name'] })],
+      );
+      await client.query('COMMIT');
+      return { organization: { ...updated.rows[0], member_role: member.rows[0].member_role } };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Post()
@@ -216,6 +306,7 @@ class OrganizationsController {
     if (!files.length || files.length > 4) throw new BadRequestException('Select between 1 and 4 documents.');
     const client = await databasePool!.connect();
     try {
+      await client.query('BEGIN');
       const member = await client.query('SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
       if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
       const saved: Array<Record<string, unknown>> = [];
@@ -238,7 +329,11 @@ class OrganizationsController {
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'organization.documents_uploaded','organization',$2,$3::jsonb)",
         [userId, id, JSON.stringify({ count: saved.length })],
       );
+      await client.query('COMMIT');
       return { documents: saved };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
     } finally {
       client.release();
     }
@@ -247,6 +342,7 @@ class OrganizationsController {
   @Get(':id/documents')
   async organizationDocuments(@Req() request: Request, @Param('id') id: string) {
     const userId = await this.currentUser(request);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid organization ID.');
     const member = await databasePool!.query('SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
     if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
     const result = await databasePool!.query(
@@ -1392,7 +1488,7 @@ class CommunityFeedController {
     const userId = await this.currentUser(request);
     const title = typeof body?.title === 'string' ? body.title.trim() : '';
     const content = typeof body?.body === 'string' ? body.body.trim() : '';
-    if (title.length < 1 || title.length > 140) throw new BadRequestException('Post titles must be between 1 and 140 characters.');
+    if (title.length > 140) throw new BadRequestException('Post titles must be 140 characters or fewer.');
     if (content.length < 1 || content.length > 5000) throw new BadRequestException('Posts must be between 1 and 5,000 characters.');
     const type = body?.type === 'feedback' ? 'feedback' : body?.type === 'post' ? 'post' : null;
     if (!type) throw new BadRequestException('Choose post or feedback. Announcements are published by moderators.');
