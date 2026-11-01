@@ -78,8 +78,7 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'trademate_migrator must own application tables.';
   END IF;
-END
-$$;
+
 
 
   IF has_schema_privilege('trademate_worker', 'public', 'CREATE') THEN
@@ -109,3 +108,5 @@ $$;
   ) THEN
     RAISE EXCEPTION 'trademate_worker must not own database objects.';
   END IF;
+END
+$;
