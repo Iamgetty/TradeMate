@@ -66,7 +66,7 @@ async function main() {
       await client.query('UPDATE audit_events SET actor_user_id = NULL WHERE actor_user_id = $1', [item.user_id]);
       await client.query(
         `UPDATE users
-            SET email = NULL,
+            SET email = 'deleted+' || id::text || '@deleted.invalid',
                 phone_e164 = NULL,
                 display_name = 'Deleted user ' || left(id::text, 8),
                 preferred_locale = 'en',
