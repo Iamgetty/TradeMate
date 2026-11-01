@@ -44,7 +44,7 @@ const encryptTotpSecret = (secret: string) => {
 const decryptTotpSecret = (value: string) => {
   const [ivHex, tagHex, encryptedHex] = value.split(':');
   if (!ivHex || !tagHex || !encryptedHex) throw new Error('Invalid encrypted authenticator secret.');
-  const decipher = createDecipheriv('aes-256-gcm', totpEncryptionKey(), Buffer.from(ivHex, 'hex'));
+  const decipher = createDecipheriv('aes-256-gcm', totpEncryptionKey(), Buffer.from(ivHex, 'hex'), { authTagLength: 16 });
   decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
   return Buffer.concat([decipher.update(Buffer.from(encryptedHex, 'hex')), decipher.final()]).toString('utf8');
 };
