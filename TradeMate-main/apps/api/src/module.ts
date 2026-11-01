@@ -2,7 +2,7 @@ import { BadRequestException, Body, ConflictException, Controller, ForbiddenExce
 import type { Request, Response } from 'express';
 import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { Pool } from 'pg';
-import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPostBodySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, organizationCreateBodySchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
+import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPostBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -1295,6 +1295,7 @@ class PublicListingsController {
     @Query('page') pageValue?: string,
     @Query('limit') limitValue?: string,
   ) {
+    parseBody(marketplaceBrowseQuerySchema, { search, country, type, category, page: pageValue, limit: limitValue });
     if (!databasePool) {
       return { data: [], pagination: { page: 1, limit: 20, total: 0 }, message: 'Marketplace database is not configured.' };
     }
@@ -1951,6 +1952,7 @@ class MarketplaceContractsController {
 class MarketplaceTradesController {
   @Get('activity')
   async activity(@Query('view') view?: string, @Query('market') market?: string, @Query('limit') limitValue?: string) {
+    parseBody(marketActivityQuerySchema, { view, market, limit: limitValue });
     if (!databasePool) return { source: 'TradeMate marketplace', as_of: new Date().toISOString(), data: [], message: 'Marketplace database is not configured.' };
     if (!view || !['book', 'trades'].includes(view)) throw new BadRequestException('view must be book or trades.');
     const limit = limitValue === undefined ? 100 : Number(limitValue);
@@ -1998,6 +2000,7 @@ class MarketplaceTradesController {
 
   @Get()
   async completed(@Query('type') type?: string, @Query('currency') currency?: string, @Query('limit') limitValue?: string) {
+    parseBody(marketCompletedQuerySchema, { type, currency, limit: limitValue });
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const limit = limitValue === undefined ? 50 : Number(limitValue);
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new BadRequestException('limit must be between 1 and 100.');
@@ -2035,6 +2038,7 @@ class P2PMarketController {
 
   @Get('book')
   async book(@Query('asset') asset?: string, @Query('fiat') fiat?: string, @Query('side') side?: string, @Query('limit') limit?: string) {
+    parseBody(p2pMarketQuerySchema, { asset, fiat, side, limit });
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const { assetCode, fiatCode, pageSize } = this.filters(asset, fiat, limit);
     if (side && !['buy', 'sell'].includes(side.toLowerCase())) throw new BadRequestException('side must be buy or sell.');
@@ -2055,6 +2059,7 @@ class P2PMarketController {
 
   @Get('trades')
   async trades(@Query('asset') asset?: string, @Query('fiat') fiat?: string, @Query('limit') limit?: string) {
+    parseBody(p2pMarketQuerySchema, { asset, fiat, limit });
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const { assetCode, fiatCode, pageSize } = this.filters(asset, fiat, limit);
     const result = await databasePool.query(
@@ -2334,6 +2339,7 @@ class CommunityFeedController {
 
   @Get('posts')
   async posts(@Query('type') type?: string, @Query('limit') rawLimit?: string) {
+    parseBody(feedPostsQuerySchema, { type, limit: rawLimit });
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const normalized = type === 'Posts' || type === 'post' ? 'post'
       : type === 'Feedback' || type === 'feedback' ? 'feedback'
@@ -2699,6 +2705,7 @@ const marketQuoteCache = new Map<string, { expiresAt: number; value: any }>();
 class PublicMarketQuotesController {
   @Get('quotes')
   async quotes(@Query('symbols') raw: string) {
+    parseBody(marketQuotesQuerySchema, { symbols: raw });
     const requested = [...new Set(String(raw || '').split(',').map((s) => s.trim()).filter(Boolean))];
     if (!requested.length || requested.length > 10 || requested.some((symbol) => !MARKET_SYMBOLS.has(symbol))) {
       throw new BadRequestException('Request up to 10 supported market symbols.');
