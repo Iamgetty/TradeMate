@@ -49,16 +49,29 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 
 ### Phase S1 — Secure development foundations
 
-**Implementation status (2026-11-01): in progress.** The API TypeScript configuration now has `strict: true`; the strict build passed in CI before the setting was applied to `main`, and the main-branch CI run also passed. Zod has been added to the API and strict schemas currently cover registration, login, display-name updates, password changes, TOTP confirmation/disable/verification and account-deletion request/cancellation. This is the first validation tranche, not complete API coverage. The NIST SSDF policy is documented at `docs/security/ssdf-policy.md`. Database roles/RLS, remaining API input schemas, CI security scanners and the PR security checklist remain open.
+**Implementation status (2026-11-01): in progress.** The first code and process tranche is implemented and CI-verified:
 
+- API TypeScript uses `strict: true`; API build passes with strict checks.
+- Zod runtime schemas cover every current `@Body` request body, all current `@Query` inputs and UUID route parameters in the API module. Schemas reject unknown object keys and validate formats, limits, enumerations and numeric inputs.
+- API Zod schema tests cover authentication, TOTP, deletion, profiles, feed, support, organization documents, listings, enquiries, contracts, P2P, moderation and query filters.
+- NIST SSDF policy: `docs/security/ssdf-policy.md`.
+- PostgreSQL roles/RLS architecture: `docs/security/database-rls-design.md`. This is a design, not an enabled production control.
+- Pull-request security checklist: `.github/PULL_REQUEST_TEMPLATE.md`.
+- CI security job runs Semgrep SAST, npm dependency audits for API/web/exchange-feed, and Gitleaks secret scanning. The high-severity audit threshold and all three scanners passed in CI run 41324646848.
+- Next.js/React and NestJS/Zod dependency upgrades are applied. The API dependency tree still has lower-severity development-tool advisories below the current high-severity gate; these remain tracked for remediation.
+- PostgreSQL TLS certificate verification is enabled for SSL connections. External Render DB migration workflow succeeded with verification enabled.
+- AES-256-GCM TOTP encryption and decryption explicitly require a 16-byte authentication tag.
+- Migration runner now prefers `MIGRATION_DATABASE_URL`, falling back to `DATABASE_URL` during the transition. Render Blueprint exposes the new secret slot.
 
-1. Adopt and document the NIST Secure Software Development Framework (SSDF), with ownership, evidence and release criteria.
-2. Enable full TypeScript strict mode incrementally and resolve all resulting type errors; retain no implicit escape hatches without documented justification.
-3. Adopt Zod schemas for API request bodies, query parameters, route parameters and important environment configuration; validate at trust boundaries.
-4. Design separate least-privilege database roles for migrations, application runtime and read-only/background workloads.
-5. Implement PostgreSQL Row-Level Security on sensitive tables, including FORCE ROW LEVEL SECURITY where appropriate. Define transaction-scoped user/tenant context and test connection-pool isolation before enabling policies.
-6. Add mandatory CI security gates: Semgrep SAST, dependency/SCA scanning and secret scanning (for example GitGuardian or TruffleHog), with documented triage and exception expiry.
-7. Add a security-focused pull-request checklist and review requirements.
+**Still open before S1 is complete:**
+
+1. Finish environment-variable schema validation and API-wide negative tests.
+2. Create separate Render-managed runtime and migration credentials, grant least-privilege access, and verify deployment using the split URLs.
+3. Implement transaction-scoped user/organization context across every pooled query and explicit transaction.
+4. Apply RLS and FORCE RLS to the sensitive table inventory only after context refactoring and cross-user/cross-organization/pool-reuse tests pass.
+5. Add database-role/RLS integration tests and verify audit-event append-only permissions.
+6. Set GitHub main-branch protection so required CI checks and independent review cannot be bypassed. The repository currently has no GitHub rulesets visible to the connected integration; branch-protection settings require owner-level dashboard access.
+7. Review and remediate the remaining moderate/low dependency advisories, then decide whether to raise the SCA gate to moderate.
 
 ### Phase S2 — Identity, verification and financial crime controls
 
