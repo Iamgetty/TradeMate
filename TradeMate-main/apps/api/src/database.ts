@@ -10,7 +10,7 @@ export class DatabaseService implements OnModuleDestroy {
     this.pool = connectionString
       ? new Pool({
           connectionString,
-          ssl: process.env.PGSSLMODE === 'require' ? { rejectUnauthorized: false } : undefined,
+          ssl: process.env.PGSSLMODE === 'require' ? true : undefined,
           connectionTimeoutMillis: 5000,
           max: 5,
         })
