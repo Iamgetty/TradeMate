@@ -49,6 +49,9 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 
 ### Phase S1 — Secure development foundations
 
+**Implementation status (2026-11-01): in progress.** The API TypeScript configuration now has `strict: true`; the strict build passed in CI before the setting was applied to `main`, and the main-branch CI run also passed. Zod has been added to the API and strict schemas currently cover registration, login, display-name updates, password changes, TOTP confirmation/disable/verification and account-deletion request/cancellation. This is the first validation tranche, not complete API coverage. The NIST SSDF policy is documented at `docs/security/ssdf-policy.md`. Database roles/RLS, remaining API input schemas, CI security scanners and the PR security checklist remain open.
+
+
 1. Adopt and document the NIST Secure Software Development Framework (SSDF), with ownership, evidence and release criteria.
 2. Enable full TypeScript strict mode incrementally and resolve all resulting type errors; retain no implicit escape hatches without documented justification.
 3. Adopt Zod schemas for API request bodies, query parameters, route parameters and important environment configuration; validate at trust boundaries.
