@@ -128,3 +128,16 @@ The CI-tested bootstrap script is `apps/api/database/security/001_role_bootstrap
 - The account-deletion worker now expects `WORKER_DATABASE_URL` in production. It no longer mutates historical audit-event actor references; user rows are retained and anonymised.
 
 The CI role bootstrap runs on an isolated PostgreSQL 16 instance. This does not mean the production Render roles have been created. Production role creation and credential cutover remain a controlled operator task after the final grants and RLS policies are approved.
+
+
+## 9. CI-only RLS pilot evidence
+
+`apps/api/database/security/003_rls_pilot.sql` enables and forces RLS in the isolated CI PostgreSQL database only for:
+
+- `user_preferences`
+- `user_notifications`
+- `user_auth_security`
+
+The matching `scripts/test-rls-pilot.js` test runs as `trademate_app` and verifies own-row reads, cross-user update denial, rejection of cross-user inserts, anonymous default-deny, and `FORCE ROW LEVEL SECURITY` against the table owner role. The clean PostgreSQL CI job passed this pilot.
+
+**This pilot is not part of `scripts/migrate.js` and has not been applied to Render production.** It proves the policy pattern for these three tables only. Production rollout still requires the complete policy inventory, authentication bootstrap policies, all-query-path review, role cutover, cross-organization tests, and operational approval.
