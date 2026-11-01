@@ -485,6 +485,7 @@ class AuthController {
 
   @Delete('sessions/:id')
   async revokeSession(@Param('id') id: string, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    parseUuidParam(id);
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to manage sessions.');
@@ -705,6 +706,7 @@ class NotificationsController {
 
   @Patch(':id/read')
   async markRead(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
     const userId = await this.currentUser(request);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
       throw new BadRequestException('Invalid notification identifier.');
@@ -787,6 +789,7 @@ class SupportController {
 
   @Get('tickets/:id/messages')
   async ticketMessages(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
     const userId = await this.currentUser(request);
     this.validateTicketId(id);
     const ticket = await databasePool!.query(
@@ -803,6 +806,7 @@ class SupportController {
 
   @Post('tickets/:id/messages')
   async replyTicket(@Param('id') id: string, @Req() request: Request, @Body() body: { message?: string }) {
+    parseUuidParam(id);
     parseBody(supportReplyBodySchema, body);
     const userId = await this.currentUser(request);
     this.validateTicketId(id);
@@ -942,6 +946,7 @@ class OrganizationsController {
     @Param('id') id: string,
     @Body() body: { name?: string },
   ) {
+    parseUuidParam(id);
     parseBody(organizationNameBodySchema, body);
     const userId = await this.currentUser(request);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
@@ -976,6 +981,7 @@ class OrganizationsController {
     @Param('id') id: string,
     @Body() body: { files?: Array<{ fileName?: string; mimeType?: string; dataBase64?: string }> },
   ) {
+    parseUuidParam(id);
     parseBody(organizationDocumentsBodySchema, body);
     const userId = await this.currentUser(request);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid organization ID.');
@@ -1013,6 +1019,7 @@ class OrganizationsController {
 
   @Get(':id/documents')
   async organizationDocuments(@Req() request: Request, @Param('id') id: string) {
+    parseUuidParam(id);
     const userId = await this.currentUser(request);
     const member = await databasePool!.query('SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
     if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
@@ -1103,6 +1110,7 @@ class PublicListingsController {
 
   @Post(':id/submit')
   async submitForReview(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
       throw new BadRequestException('id must be a valid listing UUID.');
     }
@@ -1155,6 +1163,7 @@ class PublicListingsController {
     @Req() request: Request,
     @Body() body: { title?: string; description?: string; listingType?: string; price?: string | number; quantityAvailable?: string | number | null },
   ) {
+    parseUuidParam(id);
     parseBody(listingBodySchema, body);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
       throw new BadRequestException('id must be a valid listing UUID.');
@@ -1213,6 +1222,7 @@ class PublicListingsController {
 
   @Delete(':id')
   async deleteDraft(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
       throw new BadRequestException('id must be a valid listing UUID.');
     }
@@ -1250,6 +1260,7 @@ class PublicListingsController {
 
   @Get(':id')
   async detail(@Param('id') id: string) {
+    parseUuidParam(id);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
       throw new BadRequestException('id must be a valid listing UUID.');
     }
@@ -1428,6 +1439,7 @@ class EnquiriesController {
 
   @Get(':id/messages')
   async messages(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
     const userId = await this.authenticatedUser(request);
     const enquiry = await this.authorizedEnquiry(id, userId);
     await databasePool!.query(
@@ -1452,6 +1464,7 @@ class EnquiriesController {
 
   @Post(':id/messages')
   async reply(@Param('id') id: string, @Req() request: Request, @Body() body: { message?: string }) {
+    parseUuidParam(id);
     parseBody(enquiryReplyBodySchema, body);
     const userId = await this.authenticatedUser(request);
     const enquiry = await this.authorizedEnquiry(id, userId);
@@ -1703,6 +1716,7 @@ class MarketplaceContractsController {
 
   @Get(':id')
   async getOne(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
     const userId = await this.authenticatedUser(request);
     return { data: await this.authorizedContract(id, userId) };
   }
@@ -1713,6 +1727,7 @@ class MarketplaceContractsController {
     @Req() request: Request,
     @Body() body: { decision?: string },
   ) {
+    parseUuidParam(id);
     parseBody(contractDecisionBodySchema, body);
     this.validateContractId(id);
     const userId = await this.authenticatedUser(request);
@@ -1761,6 +1776,7 @@ class MarketplaceContractsController {
 
   @Patch(':id/cancel')
   async cancel(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
     this.validateContractId(id);
     const userId = await this.authenticatedUser(request);
     const client = await databasePool!.connect();
@@ -1796,6 +1812,7 @@ class MarketplaceContractsController {
 
   @Patch(':id/confirm-completion')
   async confirmCompletion(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
     this.validateContractId(id);
     const userId = await this.authenticatedUser(request);
     const client = await databasePool!.connect();
@@ -1856,6 +1873,7 @@ class MarketplaceContractsController {
 
   @Get(':id/messages')
   async messages(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
     const userId = await this.authenticatedUser(request);
     const contract = await this.authorizedContract(id, userId);
     const result = await databasePool!.query(
@@ -1873,6 +1891,7 @@ class MarketplaceContractsController {
 
   @Post(':id/messages')
   async reply(@Param('id') id: string, @Req() request: Request, @Body() body: { message?: string }) {
+    parseUuidParam(id);
     parseBody(contractMessageBodySchema, body);
     const userId = await this.authenticatedUser(request);
     const message = typeof body?.message === 'string' ? body.message.trim() : '';
@@ -2080,6 +2099,7 @@ class P2PMarketController {
 
   @Delete('ads/:id')
   async cancelAd(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
     const userId = await this.authenticatedUser(request);
     const result = await databasePool!.query("UPDATE p2p_orders SET status='cancelled',updated_at=now() WHERE id=$1 AND user_id=$2 AND status IN ('open','partially_filled') RETURNING id",[id,userId]);
     if (!result.rowCount) throw new NotFoundException('Open advertisement not found.');
@@ -2120,6 +2140,7 @@ class P2PMarketController {
 
   @Post('orders/:id/payment-sent')
   async paymentSent(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+    parseUuidParam(id);
     parseBody(p2pPaymentSentBodySchema, body);
     const userId = await this.authenticatedUser(request), ref = typeof body?.reference === 'string' ? body.reference.trim() : '';
     if (ref.length > 160) throw new BadRequestException('Reference is too long.');
@@ -2130,6 +2151,7 @@ class P2PMarketController {
 
   @Post('orders/:id/confirm-receipt')
   async confirmReceipt(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
     const userId = await this.authenticatedUser(request);
     const result = await databasePool!.query("UPDATE p2p_trades SET seller_payment_confirmed_at=now(),status='completed',completed_at=now(),updated_at=now() WHERE id=$1 AND seller_user_id=$2 AND status='pending' AND buyer_payment_sent_at IS NOT NULL AND seller_payment_confirmed_at IS NULL RETURNING id,status,completed_at",[id,userId]);
     if (!result.rowCount) throw new ConflictException('Buyer must first mark payment sent; order must still be pending.');
@@ -2138,6 +2160,7 @@ class P2PMarketController {
 
   @Post('orders/:id/cancel')
   async cancelOrder(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
     const userId = await this.authenticatedUser(request);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('id must be a valid order UUID.');
     const client = await databasePool!.connect();
@@ -2164,6 +2187,7 @@ class P2PMarketController {
 
   @Post('orders/:id/dispute')
   async dispute(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+    parseUuidParam(id);
     parseBody(p2pDisputeBodySchema, body);
     const userId = await this.authenticatedUser(request), reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('id must be a valid order UUID.');
@@ -2191,6 +2215,7 @@ class PublicProfilesController {
 
   @Get(':id')
   async getProfile(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
     const viewerId = await this.currentUser(request);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid profile id.');
     const result = await databasePool!.query(
@@ -2247,6 +2272,7 @@ class PublicProfilesController {
 
   @Post(':id/follow')
   async follow(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
     const userId = await this.currentUser(request);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid profile id.');
     if (id === userId) throw new BadRequestException('You cannot follow your own profile.');
@@ -2265,6 +2291,7 @@ class PublicProfilesController {
 
   @Delete(':id/follow')
   async unfollow(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
     const userId = await this.currentUser(request);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid profile id.');
     const removed = await databasePool!.query(
@@ -2382,6 +2409,8 @@ class CommunityFeedController {
 
   @Get('posts/:id/attachments/:attachmentId')
   async attachment(@Param('id') id: string, @Param('attachmentId') attachmentId: string, @Res() response: Response) {
+    parseUuidParam(attachmentId);
+    parseUuidParam(id);
     const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!uuid.test(id) || !uuid.test(attachmentId)) throw new BadRequestException('Invalid attachment id.');
     const result = await databasePool!.query(
@@ -2402,6 +2431,7 @@ class CommunityFeedController {
 
   @Get('posts/:id/comments')
   async comments(@Param('id') id: string) {
+    parseUuidParam(id);
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid post id.');
     const result = await databasePool.query(
@@ -2417,6 +2447,7 @@ class CommunityFeedController {
 
   @Post('posts/:id/comments')
   async addComment(@Param('id') id: string, @Req() request: Request, @Body() body: { body?: string }) {
+    parseUuidParam(id);
     parseBody(feedCommentBodySchema, body);
     const userId = await this.currentUser(request);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid post id.');
@@ -2466,6 +2497,7 @@ class CommunityFeedController {
 
   @Patch('moderation/reports/:id')
   async reviewReport(@Param('id') id: string, @Req() request: Request, @Body() body: { action?: string }) {
+    parseUuidParam(id);
     parseBody(feedModerationBodySchema, body);
     const keyId = this.reviewKey(request);
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
@@ -2551,6 +2583,7 @@ class ModerationController {
     @Req() request: Request,
     @Body() body: { decision?: string; note?: string },
   ) {
+    parseUuidParam(id);
     parseBody(reviewDecisionBodySchema, body);
     const keyId = this.authorize(request);
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
@@ -2611,6 +2644,7 @@ class ModerationController {
     @Req() request: Request,
     @Body() body: { decision?: string; note?: string },
   ) {
+    parseUuidParam(id);
     parseBody(reviewDecisionBodySchema, body);
     const keyId = this.authorize(request);
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
