@@ -19,6 +19,7 @@ const MIGRATIONS = [
   '012_user_notifications.sql',
   '013_support_feedback.sql',
   '014_user_preferences.sql',
+  '015_authenticator_2fa.sql',
 ];
 
 async function main() {
