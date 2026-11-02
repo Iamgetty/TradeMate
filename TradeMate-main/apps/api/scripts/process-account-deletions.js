@@ -18,8 +18,8 @@ function reportDatabaseError(context, error) {
   const rawMessage = typeof error?.message === 'string' ? error.message : 'No error message provided';
   // Never print connection strings, credentials, or URL user-info to workflow logs.
   const safeMessage = rawMessage
-    .replace(/postgres(?:ql)?:\\/\\/[^\\s"'<>]+/gi, '[REDACTED_DATABASE_URL]')
-    .replace(/(password\\s*[=:]\\s*)[^\\s,;]+/gi, '$1[REDACTED]')
+    .replace(/postgres(?:ql)?:\/\/[^\s"'<>]+/gi, '[REDACTED_DATABASE_URL]')
+    .replace(/(password\s*[=:]\s*)[^\s,;]+/gi, '$1[REDACTED]')
     .slice(0, 300);
   console.error(`Account deletion worker database error [${context}]: code=${code} severity=${severity} message=${safeMessage}`);
 }
