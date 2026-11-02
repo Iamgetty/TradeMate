@@ -112,7 +112,7 @@ async function main() {
         [item.user_id],
       );
       await client.query(
-        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES (NULL, 'account.deletion_processed', 'user', $1, '{\\"method\\":\\"anonymised\\",\\"preserved_commercial_records\\":true}'::jsonb)",
+        `INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES (NULL, 'account.deletion_processed', 'user', $1, '{"method":"anonymised","preserved_commercial_records":true}'::jsonb)`,
         [item.user_id],
       );
       await client.query('COMMIT');
