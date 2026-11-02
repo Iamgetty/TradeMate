@@ -11,6 +11,19 @@ if (execute && !legalApproval) {
   console.error('Permanent account deletion is blocked. Complete global, jurisdiction-specific legal and records-retention review, then set ACCOUNT_DELETION_LEGAL_APPROVAL=true explicitly.');
   process.exit(1);
 }
+
+function reportDatabaseError(context, error) {
+  const code = typeof error?.code === 'string' ? error.code : 'UNKNOWN';
+  const severity = typeof error?.severity === 'string' ? error.severity : 'UNKNOWN';
+  const rawMessage = typeof error?.message === 'string' ? error.message : 'No error message provided';
+  // Never print connection strings, credentials, or URL user-info to workflow logs.
+  const safeMessage = rawMessage
+    .replace(/postgres(?:ql)?:\/\/[^\s"'<>]+/gi, '[REDACTED_DATABASE_URL]')
+    .replace(/(password\s*[=:]\s*)[^\s,;]+/gi, '$1[REDACTED]')
+    .slice(0, 300);
+  console.error(`Account deletion worker database error [${context}]: code=${code} severity=${severity} message=${safeMessage}`);
+}
+
 const pool = new Pool({
   connectionString,
   ssl: process.env.PGSSLMODE === 'require' ? true : undefined,
@@ -86,9 +99,9 @@ async function main() {
       );
       await client.query('COMMIT');
       console.log(`Processed deletion for user ${item.user_id}.`);
-    } catch {
+    } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
-      console.error('Failed to process account deletion. See restricted database logs for details.');
+      reportDatabaseError('processing deletion', error);
       process.exitCode = 1;
     } finally {
       client.release();
@@ -96,8 +109,8 @@ async function main() {
   }
 }
 
-main().catch(() => {
-  console.error('Account deletion worker failed. See restricted database logs for details.');
+main().catch((error) => {
+  reportDatabaseError('initial query or connection', error);
   process.exitCode = 1;
 }).finally(async () => {
   await pool.end();
