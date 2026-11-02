@@ -18,15 +18,33 @@ function reportDatabaseError(context, error) {
   const rawMessage = typeof error?.message === 'string' ? error.message : 'No error message provided';
   // Never print connection strings, credentials, or URL user-info to workflow logs.
   const safeMessage = rawMessage
-    .replace(/postgres(?:ql)?:\/\/[^\s"'<>]+/gi, '[REDACTED_DATABASE_URL]')
-    .replace(/(password\s*[=:]\s*)[^\s,;]+/gi, '$1[REDACTED]')
+    .replace(/postgres(?:ql)?:\\/\\/[^\\s"'<>]+/gi, '[REDACTED_DATABASE_URL]')
+    .replace(/(password\\s*[=:]\\s*)[^\\s,;]+/gi, '$1[REDACTED]')
     .slice(0, 300);
   console.error(`Account deletion worker database error [${context}]: code=${code} severity=${severity} message=${safeMessage}`);
 }
 
+function isRenderInternalDatabaseUrl(value) {
+  try {
+    return new URL(value).hostname.endsWith('.render.internal');
+  } catch {
+    return false;
+  }
+}
+
+// Render's internal PostgreSQL endpoint may present a self-signed certificate.
+// Permit that certificate only when explicitly enabled AND the URL is a Render
+// internal hostname. TLS encryption remains enabled. External connections
+// (including GitHub Actions) continue to verify the server certificate.
+const allowRenderInternalSelfSignedCert =
+  process.env.WORKER_DATABASE_ALLOW_SELF_SIGNED_INTERNAL_CERT === 'true' &&
+  isRenderInternalDatabaseUrl(connectionString);
+
 const pool = new Pool({
   connectionString,
-  ssl: process.env.PGSSLMODE === 'require' ? true : undefined,
+  ssl: process.env.PGSSLMODE === 'require'
+    ? { rejectUnauthorized: !allowRenderInternalSelfSignedCert }
+    : undefined,
   connectionTimeoutMillis: 5000,
   max: 2,
 });
@@ -94,7 +112,7 @@ async function main() {
         [item.user_id],
       );
       await client.query(
-        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES (NULL, 'account.deletion_processed', 'user', $1, '{\"method\":\"anonymised\",\"preserved_commercial_records\":true}'::jsonb)",
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES (NULL, 'account.deletion_processed', 'user', $1, '{\\"method\\":\\"anonymised\\",\\"preserved_commercial_records\\":true}'::jsonb)",
         [item.user_id],
       );
       await client.query('COMMIT');
