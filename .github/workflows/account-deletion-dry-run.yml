@@ -40,7 +40,7 @@ jobs:
           NODE_ENV: production
         run: |
           if [ -z "$WORKER_DATABASE_URL" ]; then
-            echo "::warning::Configure TRADEMATE_WORKER_DATABASE_URL after the dedicated worker role is created; skipping this dry run."
-            exit 0
+            echo "::error::TRADEMATE_WORKER_DATABASE_URL is not configured. This scheduled check cannot be considered successful."
+            exit 1
           fi
           node scripts/process-account-deletions.js
