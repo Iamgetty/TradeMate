@@ -86,9 +86,9 @@ async function main() {
       );
       await client.query('COMMIT');
       console.log(`Processed deletion for user ${item.user_id}.`);
-    } catch (error) {
+    } catch {
       await client.query('ROLLBACK').catch(() => undefined);
-      console.error('Failed to process account deletion.', error);
+      console.error('Failed to process account deletion. See restricted database logs for details.');
       process.exitCode = 1;
     } finally {
       client.release();
@@ -96,8 +96,8 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error('Account deletion worker failed:', error);
+main().catch(() => {
+  console.error('Account deletion worker failed. See restricted database logs for details.');
   process.exitCode = 1;
 }).finally(async () => {
   await pool.end();
