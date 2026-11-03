@@ -1495,7 +1495,7 @@ function readFeedFile(file){
   var mime=String(file.type||"").toLowerCase().split(";")[0],reader=new FileReader();
   reader.onload=function(){
    var original=reader.result,plain={name:file.name,type:mime,data:original};
-   if(!/^image\\/(?:jpeg|png|webp)$/.test(mime)){resolve(plain);return}
+   if(!/^image\/(?:jpeg|png|webp)$/.test(mime)){resolve(plain);return}
    var im=new Image();
    im.onload=function(){
     var largest=Math.max(im.naturalWidth||im.width,im.naturalHeight||im.height);
@@ -1507,7 +1507,7 @@ function readFeedFile(file){
      var ctx=c.getContext("2d");if(!ctx){resolve(plain);return}
      ctx.drawImage(im,0,0,c.width,c.height);
      var resized=c.toDataURL(mime,mime==="image/png"?undefined:.82);
-     if(resized.slice(0, mime.length+5)!=="data:"+mime+";"){resolve(plain);return}
+     if(resized.slice(0, mime.length+6)!=="data:"+mime+";"){resolve(plain);return}
      resolve({name:file.name,type:mime,data:resized});
     }catch(e){resolve(plain)}
    };
