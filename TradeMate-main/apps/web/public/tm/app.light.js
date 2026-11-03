@@ -1034,6 +1034,7 @@ function assetBadge(label,bg,fg,urls){return '<span class="lgb" style="backgroun
 function lg(i){var a=i.n.split("/"),y=a[0].toLowerCase();
  if(i.assetClass){
   var g=i.assetClass;
+  if(g==="Stock Indices"||g==="Commodities"||g==="Equities"||g==="Bonds & Treasuries")return "";
   if(g==="Stock Indices"){
    var indexMarks={"S&P 500":["SPX","#173b70","#fff"],"Dow Jones":["DJI","#183a5b","#fff"],"Nasdaq Composite":["IXIC","#0756a5","#fff"],"FTSE 100":["UK 100","#164078","#fff"],"DAX 40":["DAX","#e8bd32","#171717"],"CAC 40":["CAC","#2452a4","#fff"],"Nikkei 225":["N225","#bc2534","#fff"],"Hang Seng":["HSI","#bd2636","#fff"],"Euro Stoxx 50":["SX5E","#174b91","#fff"],"Nifty 50":["NIFTY","#e87924","#fff"]};
    var im=indexMarks[i.n]||[i.k||"IDX","#263746","#fff"];return assetBadge(im[0],im[1],im[2]);
@@ -1072,8 +1073,10 @@ function softDraw(){if(["Home","Markets","Trade","Portfolio","P2P"].indexOf(st.t
 /* ---------- views ---------- */
 function topbar(){return '<div class="top"><button class="avb" data-pg="profile" aria-label="Profile">'+ic("person")+'</button><button class="srch" data-pg="search" aria-label="Search">'+ic("search")+'<span id="ph"></span><i class="car"></i></button><button class="ib" data-pg="scan" aria-label="Scan">'+ic("scan")+'</button><button class="ib" data-pg="support" aria-label="Support">'+ic("headset")+'</button><button class="ib" data-pg="notif" aria-label="Notifications">'+ic("bell")+(unread()?'<i></i>':'')+'</button></div>'}
 function rowH(i){
- var meta=i.quoteStatus?(i.quoteStatus==="live"?"LIVE":i.quoteStatus==="delayed"?"DELAYED":"UNAVAILABLE")+(i.quoteTime?" · "+new Date(i.quoteTime).toLocaleTimeString():""):(i.providerSymbol?"Awaiting public quote"+(i.unit?" · "+i.unit:""):val(i)||(i.assetClass||i.m));
- return '<div class="row" role="button" tabindex="0" data-open="'+esc(i.n)+'"><span class="nm"><button class="star'+(isFav(i.n)?" on":"")+'" data-fav="'+esc(i.n)+'" aria-label="Favorite">'+(isFav(i.n)?"★":"☆")+'</button><span class="coin" style="--ac:'+i.col+'">'+lg(i)+'</span><span><b>'+esc(i.n)+'</b><small>'+esc(meta)+'</small></span></span><span class="p" data-px="'+esc(i.n)+'">'+px(i)+'</span><span class="badge '+(i.c==null?"":i.c>=0?"up":"dn")+'">'+(i.c==null?(i.quoteStatus==="unavailable"?"Offline":i.providerSymbol?"—":"New"):(i.c>=0?"+":"")+i.c.toFixed(2)+"%")+'</span></div>'
+ var plainAsset=["Stock Indices","Commodities","Equities","Bonds & Treasuries"].indexOf(i.assetClass)>=0;
+ var bond=i.assetClass==="Bonds & Treasuries";
+ var meta=bond?"24H":i.quoteStatus?(i.quoteStatus==="live"?"LIVE":i.quoteStatus==="delayed"?"DELAYED":"UNAVAILABLE")+(i.quoteTime?" · "+new Date(i.quoteTime).toLocaleTimeString():""):(i.providerSymbol?"Awaiting public quote"+(i.unit?" · "+i.unit:""):val(i)||(i.assetClass||i.m));
+ return '<div class="row" role="button" tabindex="0" data-open="'+esc(i.n)+'"><span class="nm"><button class="star'+(isFav(i.n)?" on":"")+'" data-fav="'+esc(i.n)+'" aria-label="Favorite">'+(isFav(i.n)?"★":"☆")+'</button>'+(plainAsset?"":'<span class="coin" style="--ac:'+i.col+'">'+lg(i)+'</span>')+'<span><b>'+esc(i.n)+'</b><small>'+esc(meta)+'</small></span></span>'+(bond?"":'<span class="p" data-px="'+esc(i.n)+'">'+px(i)+'</span>')+'<span class="badge '+(i.c==null?"":i.c>=0?"up":"dn")+'">'+(i.c==null?(i.quoteStatus==="unavailable"?"Offline":i.providerSymbol?"—":"New"):(i.c>=0?"+":"")+i.c.toFixed(2)+"%")+'</span></div>'
 }
 function home(){
  var fv=st.ht==="Favorites",hm=fv?"All":st.hm,list=items.filter(function(i){return hm==="All"||i.m===hm});
