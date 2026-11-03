@@ -1034,6 +1034,8 @@ function nx(i){var l=(i.dataset.s||"").split("|");l.shift();if(l.length&&l[0]){i
 function chainImg(cls,urls,alt){urls=urls.filter(Boolean);return urls.length?'<img class="'+cls+'" data-s="'+urls.join("|")+'" src="'+urls[0]+'" alt="'+(alt||"")+'" referrerpolicy="no-referrer" onerror="nx(this)">':""}
 function flag(c,cls){var k=FC[c];return k?chainImg(cls,["https://flagcdn.com/w80/"+k+".png","https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/flags/4x3/"+k+".svg"]):""}
 function assetBadge(label,bg,fg,urls){return '<span class="lgb" style="background:'+bg+';color:'+fg+'"><b>'+esc(label)+'</b>'+chainImg("lgi",urls||[],label)+'</span>'}
+function isPlainMarketAsset(i){return !!i&&["Stock Indices","Commodities","Equities","Bonds & Treasuries"].indexOf(i.assetClass)>=0}
+function marketIcon(i,cls,style){return isPlainMarketAsset(i)?"":'<span class="'+cls+'" style="'+style+'">'+lg(i)+'</span>'}
 function lg(i){var a=i.n.split("/"),y=a[0].toLowerCase();
  if(i.assetClass){
   var g=i.assetClass;
@@ -1079,7 +1081,7 @@ function rowH(i){
  var plainAsset=["Stock Indices","Commodities","Equities","Bonds & Treasuries"].indexOf(i.assetClass)>=0;
  var bond=i.assetClass==="Bonds & Treasuries";
  var meta=bond?"24H":i.quoteStatus?(i.quoteStatus==="live"?"LIVE":i.quoteStatus==="delayed"?"DELAYED":"UNAVAILABLE")+(i.quoteTime?" · "+new Date(i.quoteTime).toLocaleTimeString():""):(i.providerSymbol?"Awaiting public quote"+(i.unit?" · "+i.unit:""):val(i)||(i.assetClass||i.m));
- return '<div class="row" role="button" tabindex="0" data-open="'+esc(i.n)+'"><span class="nm"><button class="star'+(isFav(i.n)?" on":"")+'" data-fav="'+esc(i.n)+'" aria-label="Favorite">'+(isFav(i.n)?"★":"☆")+'</button>'+(plainAsset?"":'<span class="coin" style="--ac:'+i.col+'">'+lg(i)+'</span>')+'<span><b>'+esc(i.n)+'</b><small>'+esc(meta)+'</small></span></span>'+(bond?"":'<span class="p" data-px="'+esc(i.n)+'">'+px(i)+'</span>')+'<span class="badge '+(i.c==null?"":i.c>=0?"up":"dn")+'">'+(i.c==null?(i.quoteStatus==="unavailable"?"Offline":i.providerSymbol?"—":"New"):(i.c>=0?"+":"")+i.c.toFixed(2)+"%")+'</span></div>'
+ return '<div class="row" role="button" tabindex="0" data-open="'+esc(i.n)+'"><span class="nm"><button class="star'+(isFav(i.n)?" on":"")+'" data-fav="'+esc(i.n)+'" aria-label="Favorite">'+(isFav(i.n)?"★":"☆")+'</button>'+(plainAsset?"":marketIcon(i,'coin','--ac:'+i.col))+'<span><b>'+esc(i.n)+'</b><small>'+esc(meta)+'</small></span></span>'+(bond?"":'<span class="p" data-px="'+esc(i.n)+'">'+px(i)+'</span>')+'<span class="badge '+(i.c==null?"":i.c>=0?"up":"dn")+'">'+(i.c==null?(i.quoteStatus==="unavailable"?"Offline":i.providerSymbol?"—":"New"):(i.c>=0?"+":"")+i.c.toFixed(2)+"%")+'</span></div>'
 }
 function home(){
  var fv=st.ht==="Favorites",hm=fv?"All":st.hm,list=items.filter(function(i){return hm==="All"||i.m===hm});
