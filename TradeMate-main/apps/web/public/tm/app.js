@@ -1031,23 +1031,31 @@ var EMB={"USDC":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADim
 var CG={BTC:"bitcoin",ETH:"ethereum",SOL:"solana",BNB:"binancecoin",XRP:"ripple",DOGE:"dogecoin",USDC:"usd-coin",ADA:"cardano",TRX:"tron",TON:"the-open-network",AVAX:"avalanche-2",DOT:"polkadot",LINK:"chainlink",POL:"matic-network",LTC:"litecoin",BCH:"bitcoin-cash",XLM:"stellar",ATOM:"cosmos",NEAR:"near",UNI:"uniswap",SHIB:"shiba-inu",DAI:"dai",ETC:"ethereum-classic"},
  SUP={BTC:19.8e6,ETH:120.7e6,SOL:470e6,BNB:145e6,XRP:58e9,DOGE:146e9,USDC:60e9},
  BR={BTC:["#f7931a","₿"],ETH:["#627eea","Ξ"],SOL:["#14f195","◎"],BNB:["#f3ba2f","B"],XRP:["#2b3138","✕"],DOGE:["#c2a633","Ð"],USDT:["#26a17b","U"],USDC:["#2775ca","U"],ADA:["#0033ad","A"],TRX:["#ef0027","T"],TON:["#0098ea","T"],AVAX:["#e84142","A"],DOT:["#e6007a","D"],LINK:["#2a5ada","L"],POL:["#8247e5","P"],LTC:["#345d9d","L"],BCH:["#0ac18e","B"],XLM:["#14b6e7","X"],ATOM:["#2e3148","A"],NEAR:["#00c08b","N"],UNI:["#ff007a","U"],SHIB:["#e42d04","S"],DAI:["#f5ac37","D"],ETC:["#328332","E"]},
- FLAG={USD:"🇺🇸",NGN:"🇳🇬",EUR:"🇪🇺",GBP:"🇬🇧",GHS:"🇬🇭",KES:"🇰🇪"},LOGOS=Object.assign({},EMB);
+ FLAG={USD:"🇺🇸",NGN:"🇳🇬",EUR:"🇪🇺",GBP:"🇬🇧",GHS:"🇬🇭",KES:"🇰🇪",AUD:"🇦🇺",JPY:"🇯🇵",CHF:"🇨🇭",CAD:"🇨🇦",NZD:"🇳🇿",ZAR:"🇿🇦"},LOGOS=Object.assign({},EMB);
 items.forEach(function(i){if(i.m==="Crypto"){var b=i.n.split("/")[0];i.cap=i.p*SUP[b]}});
-var FC={USD:"us",NGN:"ng",EUR:"eu",GBP:"gb",GHS:"gh",KES:"ke"};
+var FC={USD:"us",NGN:"ng",EUR:"eu",GBP:"gb",GHS:"gh",KES:"ke",AUD:"au",JPY:"jp",CHF:"ch",CAD:"ca",NZD:"nz",ZAR:"za"};
 function nx(i){var l=(i.dataset.s||"").split("|");l.shift();if(l.length&&l[0]){i.dataset.s=l.join("|");i.src=l[0]}else i.remove()}
-function chainImg(cls,urls,alt){urls=urls.filter(Boolean);return '<img class="'+cls+'" data-s="'+urls.join("|")+'" src="'+urls[0]+'" alt="'+(alt||"")+'" referrerpolicy="no-referrer" onerror="nx(this)">'}
+function chainImg(cls,urls,alt){urls=urls.filter(Boolean);return urls.length?'<img class="'+cls+'" data-s="'+urls.join("|")+'" src="'+urls[0]+'" alt="'+(alt||"")+'" referrerpolicy="no-referrer" onerror="nx(this)">':""}
 function flag(c,cls){var k=FC[c];return k?chainImg(cls,["https://flagcdn.com/w80/"+k+".png","https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/flags/4x3/"+k+".svg"]):""}
+function assetBadge(label,bg,fg,urls){return '<span class="lgb" style="background:'+bg+';color:'+fg+'"><b>'+esc(label)+'</b>'+chainImg("lgi",urls||[],label)+'</span>'}
 function lg(i){var a=i.n.split("/"),y=a[0].toLowerCase();
  if(i.assetClass){
   var g=i.assetClass;
-  var indexBrands={"S&P 500":"spglobal.com","Dow Jones":"spglobal.com","Nasdaq Composite":"nasdaq.com","FTSE 100":"lseg.com","DAX 40":"deutsche-boerse.com","CAC 40":"euronext.com","Nikkei 225":"nikkei.com","Hang Seng":"hsi.com.hk","Euro Stoxx 50":"stoxx.com","Nifty 50":"niftyindices.com"};
-  var equityBrands={"Apple":"apple.com","Microsoft":"microsoft.com","NVIDIA":"nvidia.com","Amazon":"amazon.com","Alphabet":"abc.xyz","Meta Platforms":"about.meta.com","Tesla":"tesla.com","Berkshire Hathaway B":"berkshirehathaway.com","JPMorgan Chase":"jpmorganchase.com","Broadcom":"broadcom.com"};
-  var fundBrands={"20+ Year Treasury ETF":"ishares.com","7-10 Year Treasury ETF":"ishares.com","1-3 Year Treasury ETF":"ishares.com","US Treasury Bond ETF":"ishares.com","US TIPS ETF":"ishares.com","Intermediate Treasury ETF":"vanguard.com"};
-  if(g==="Stock Indices"){var domain=indexBrands[i.n];return '<span class="lgb" style="background:#fff">'+(domain?chainImg("lgi",["https://logo.clearbit.com/"+domain],""):'<b>'+esc(i.k)+'</b>')+'</span>'}
-  if(g==="Equities"){var ed=equityBrands[i.n];return '<span class="lgb" style="background:#fff">'+(ed?chainImg("lgi",["https://logo.clearbit.com/"+ed],""):'<b>'+esc(i.k)+'</b>')+'</span>'}
-  if(g==="Bonds & Treasuries"){var fd=fundBrands[i.n];return '<span class="lgb" style="background:#fff">'+(fd?chainImg("lgi",["https://logo.clearbit.com/"+fd],""):'<b>US</b>')+'</span>'}
+  if(g==="Stock Indices"){
+   var indexMarks={"S&P 500":["SPX","#173b70","#fff"],"Dow Jones":["DJI","#183a5b","#fff"],"Nasdaq Composite":["IXIC","#0756a5","#fff"],"FTSE 100":["UK 100","#164078","#fff"],"DAX 40":["DAX","#e8bd32","#171717"],"CAC 40":["CAC","#2452a4","#fff"],"Nikkei 225":["N225","#bc2534","#fff"],"Hang Seng":["HSI","#bd2636","#fff"],"Euro Stoxx 50":["SX5E","#174b91","#fff"],"Nifty 50":["NIFTY","#e87924","#fff"]};
+   var im=indexMarks[i.n]||[i.k||"IDX","#263746","#fff"];return assetBadge(im[0],im[1],im[2]);
+  }
+  if(g==="Equities"){
+   var equityMarks={"Apple":["A","#111111","#fff",["https://cdn.simpleicons.org/apple/ffffff"]],"Microsoft":["M","#f3f5f7","#555",["https://cdn.simpleicons.org/microsoft"]],"NVIDIA":["N","#76b900","#fff",["https://cdn.simpleicons.org/nvidia/ffffff"]],"Amazon":["a","#111111","#fff",["https://cdn.simpleicons.org/amazon/ffffff"]],"Alphabet":["G","#fff","#4285f4",["https://cdn.simpleicons.org/google"]],"Meta Platforms":["∞","#0866ff","#fff",["https://cdn.simpleicons.org/meta/ffffff"]],"Tesla":["T","#e82127","#fff",["https://cdn.simpleicons.org/tesla/ffffff"]],"Berkshire Hathaway B":["BH","#27384a","#fff",[]],"JPMorgan Chase":["JPM","#174b82","#fff",[]],"Broadcom":["AVGO","#c91e32","#fff",[]]};
+   var em=equityMarks[i.n]||[i.k||"EQ","#27384a","#fff",[]];return assetBadge(em[0],em[1],em[2],em[3]);
+  }
+  if(g==="Bonds & Treasuries"){
+   var bondMarks={"13-Week US Treasury":["13W","#173e66","#fff"],"5-Year US Treasury":["5Y","#173e66","#fff"],"10-Year US Treasury":["10Y","#173e66","#fff"],"30-Year US Treasury":["30Y","#173e66","#fff"],"20+ Year Treasury ETF":["20+","#263f68","#fff"],"7-10 Year Treasury ETF":["7–10","#263f68","#fff"],"1-3 Year Treasury ETF":["1–3","#263f68","#fff"],"US Treasury Bond ETF":["UST","#263f68","#fff"],"US TIPS ETF":["TIPS","#263f68","#fff"],"Intermediate Treasury ETF":["INT","#263f68","#fff"]};
+   var bm=bondMarks[i.n]||["US","#263f68","#fff"];return assetBadge(bm[0],bm[1],bm[2]);
+  }
   var symbols={"Gold":"Au","Silver":"Ag","WTI Crude Oil":"WTI","Brent Crude Oil":"Brent","Natural Gas":"NG","Copper":"Cu","Wheat":"W","Corn":"C","Soybeans":"S","Coffee":"KC"};
-  return '<span class="lgb" style="background:#17232d;color:#f5c46b;font-weight:800">'+esc(symbols[i.n]||i.k||"•")+'</span>';
+  var commodityColors={"Gold":"#8b6519","Silver":"#66717d","WTI Crude Oil":"#263746","Brent Crude Oil":"#263746","Natural Gas":"#275c82","Copper":"#9a542d","Wheat":"#a17a32","Corn":"#b18b24","Soybeans":"#53713a","Coffee":"#6b4431"};
+  return assetBadge(symbols[i.n]||i.k||"•",commodityColors[i.n]||"#263746","#fff");
  }
  if(i.m==="Crypto"){var b=BR[a[0]];return '<span class="lgb" style="background:'+b[0]+';color:'+(a[0]==="SOL"||a[0]==="BNB"?"#111":"#fff")+'">'+b[1]+'</span>'+chainImg("lgi",[LOGOS[a[0]],"https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/svg/color/"+y+".svg","https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/svg/color/"+y+".svg","https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@master/svg/color/"+y+".svg"])}
  if(i.m==="Forex")return '<span class="lgb" style="background:#16222a;font-size:1.05em">'+(FLAG[a[0]]||"")+flag(a[0],"fl")+'</span><span class="lgq">'+(FLAG[a[1]]||"")+flag(a[1],"fl")+'</span>';
