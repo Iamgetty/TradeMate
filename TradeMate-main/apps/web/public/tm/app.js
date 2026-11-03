@@ -1085,7 +1085,7 @@ function topbar(){return '<div class="top"><button class="avb" data-pg="profile"
 function rowH(i){
  var plainAsset=["Stock Indices","Commodities","Equities","Bonds & Treasuries"].indexOf(i.assetClass)>=0;
  var bond=i.assetClass==="Bonds & Treasuries";
- var meta=bond?"24H":i.quoteStatus?(i.quoteStatus==="live"?"LIVE":i.quoteStatus==="delayed"?"DELAYED":"UNAVAILABLE")+(i.quoteTime?" · "+new Date(i.quoteTime).toLocaleTimeString():""):(i.providerSymbol?"Awaiting public quote"+(i.unit?" · "+i.unit:""):val(i)||(i.assetClass||i.m));
+ var meta=bond?"24H":i.quoteStatus?(i.quoteStatus==="live"?"LIVE":i.quoteStatus==="delayed"?"DELAYED":i.quoteStatus==="cached"?"SNAPSHOT":"UNAVAILABLE")+(i.quoteTime?" · "+new Date(i.quoteTime).toLocaleTimeString():""):(i.providerSymbol?"Awaiting public quote"+(i.unit?" · "+i.unit:""):val(i)||(i.assetClass||i.m));
  return '<div class="row" role="button" tabindex="0" data-open="'+esc(i.n)+'"><span class="nm"><button class="star'+(isFav(i.n)?" on":"")+'" data-fav="'+esc(i.n)+'" aria-label="Favorite">'+(isFav(i.n)?"★":"☆")+'</button>'+(plainAsset?"":'<span class="coin" style="--ac:'+i.col+'">'+lg(i)+'</span>')+'<span><b>'+esc(i.n)+'</b><small>'+esc(meta)+'</small></span></span>'+(bond?"":'<span class="p" data-px="'+esc(i.n)+'">'+px(i)+'</span>')+'<span class="badge '+(i.c==null?"":i.c>=0?"up":"dn")+'">'+(i.c==null?(i.quoteStatus==="unavailable"?"Offline":i.providerSymbol?"—":"New"):(i.c>=0?"+":"")+i.c.toFixed(2)+"%")+'</span></div>'
 }
 function home(){
@@ -1333,7 +1333,7 @@ function trade(){
  if(it.assetClass){
   var status=it.quoteStatus==="live"?"Live public quote":it.quoteStatus==="delayed"?"Delayed public quote":it.quoteStatus==="cached"?"Last saved public quote":it.quoteStatus==="unavailable"?"Public quote unavailable":"Awaiting public quote";
   var unit=it.unit||"USD";
-  return h+'<div class="tpx"><b>'+px(it)+'</b><span>'+esc(unit)+'</span></div><div class="card" style="margin:8px 16px"><b>'+status+'</b><p style="color:var(--mut);margin:6px 0 0">'+esc(it.assetClass)+' · '+(it.quoteTime?"Updated "+new Date(it.quoteTime).toLocaleString():"No quote timestamp yet")+'</p></div><p class="fine">Reference pricing from the public market-quote provider. This instrument is grouped under the Forex marketplace; executable order-book and trade feeds are not connected for this asset class.</p>';
+  return h+'<div class="tpx"><b>'+px(it)+'</b><span>'+esc(unit)+'</span></div><div class="card" style="margin:8px 16px"><b>'+status+'</b><p style="color:var(--mut);margin:6px 0 0">'+esc(it.assetClass)+' · '+(it.quoteTime?"Updated "+new Date(it.quoteTime).toLocaleString():"No quote timestamp yet")+(it.snapshotAt?" · Snapshot saved "+new Date(it.snapshotAt).toLocaleString():"")+'</p></div><p class="fine">Reference pricing from the public market-quote provider. This instrument is grouped under the Forex marketplace; executable order-book and trade feeds are not connected for this asset class.</p>';
  }
  if(fxm){
   return h+'<div class="empty"><b>Indicative FX reference rates only</b>Currency conversion references are available in Markets → Forex → Currency Pairs. Live provider bid/ask execution data is not connected. TradeMate does not execute ordinary buy/sell orders here, and no synthetic spread is shown.</div>';
