@@ -1401,10 +1401,20 @@ function portfolio(){
  [["Funding","wallet"],["Fiat","brief"],["Contracts","box"]].filter(function(x){return st.wt==="Overview"||st.wt===x[0]}).map(function(x){return '<button class="pfr" '+(x[0]==="Contracts"?'data-f="Contracts"':'data-pg="acct" data-arg="'+x[0]+'"')+'><span>'+ic(x[1],"width:20px;height:20px;color:var(--am)")+x[0]+'</span><em>'+(st.hide?"***":"—")+ic("chev","width:16px;height:16px")+'</em></button>'}).join("")+
  '<p class="fine">Balances, deposits and withdrawals are not connected yet. Nothing here is a confirmed blockchain balance.</p>'}
 var TABS=[["Home","home"],["Markets","mkts"],["Trade","trade"],["Feed","feedback"],["Portfolio","wallet"]];
+var feedRequestId=0,feedRequestController=null,feedRequestPromise=null;
 function loadFeed(force){
- if(!CONNECTED){st.feedError='Sign in to view the community Feed.';return}
- if(st.feedLoading||(!force&&st.feedLoaded))return;st.feedLoading=true;st.feedError='';
- api('GET','/feed/posts?limit=40').then(function(d){st.feedPosts=(d.posts||[]).map(function(p){return {id:p.id,type:p.post_type==='feedback'?'Feedback':p.post_type==='announcement'?'Announcements':'Posts',author:p.author_name,title:p.title||'',body:p.body,attachments:p.attachments||[],time:fmtT(p.created_at),comments:p.comment_count||0,reactions:p.reaction_count||0,reshares:p.reshare_count||0,pinned:p.pinned}});st.feedLoaded=true}).catch(function(e){st.feedError=e.message}).finally(function(){st.feedLoading=false;if(st.tab==='Feed')draw();if(document.getElementById('tlView'))tlRender()});
+ if(!CONNECTED){st.feedLoading=false;st.feedError='Sign in to view the community Feed.';return Promise.resolve([])}
+ if(st.feedLoading&&!force)return feedRequestPromise||Promise.resolve(st.feedPosts||[]);
+ if(!force&&st.feedLoaded)return Promise.resolve(st.feedPosts||[]);
+ if(force&&feedRequestController){feedRequestController.abort();feedRequestController=null}
+ var requestId=++feedRequestId,controller=typeof AbortController!=="undefined"?new AbortController():null,timer,timedOut=false;
+ st.feedLoading=true;st.feedError='';
+ var timeoutPromise=new Promise(function(_,reject){timer=setTimeout(function(){timedOut=true;if(controller)controller.abort();reject(new Error("FEED_TIMEOUT"))},12000)});
+ var request=Promise.race([api("GET","/feed/posts?limit=40",null,controller?{signal:controller.signal}:undefined),timeoutPromise])
+  .then(function(d){if(requestId!==feedRequestId)return st.feedPosts||[];st.feedPosts=(d.posts||[]).map(function(p){return {id:p.id,type:p.post_type==="feedback"?"Feedback":p.post_type==="announcement"?"Announcements":"Posts",author:p.author_name,author_user_id:p.author_user_id||null,title:p.title||"",body:p.body,attachments:p.attachments||[],time:fmtT(p.created_at),comments:p.comment_count||0,reactions:p.reaction_count||0,reshares:p.reshare_count||0,pinned:p.pinned}});st.feedLoaded=true;return st.feedPosts})
+  .catch(function(e){if(requestId!==feedRequestId)return st.feedPosts||[];st.feedError=timedOut?"The Feed request timed out. Check your connection and try again.":(e&&e.message||"Could not load the Feed.");return []})
+  .finally(function(){clearTimeout(timer);if(requestId!==feedRequestId)return;feedRequestController=null;feedRequestPromise=null;st.feedLoading=false;if(st.tab==="Feed")draw();if(document.getElementById("tlView"))tlRender()});
+ feedRequestController=controller;feedRequestPromise=request;return request;
 }
 var feedDraftFiles=[],feedRecorder=null,feedRecordStream=null,feedRecordChunks=[];
 function closeFeedComposer(){
