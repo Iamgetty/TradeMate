@@ -1491,7 +1491,30 @@ function addFeedDraftFile(file){
  feedDraftFiles.push(file);renderFeedDraftFiles();
 }
 function readFeedFile(file){
- return new Promise(function(resolve,reject){var reader=new FileReader();reader.onload=function(){resolve({name:file.name,type:String(file.type||"").toLowerCase().split(";")[0],data:reader.result})};reader.onerror=reject;reader.readAsDataURL(file)});
+ return new Promise(function(resolve,reject){
+  var mime=String(file.type||"").toLowerCase().split(";")[0],reader=new FileReader();
+  reader.onload=function(){
+   var original=reader.result,plain={name:file.name,type:mime,data:original};
+   if(!/^image\\/(?:jpeg|png|webp)$/.test(mime)){resolve(plain);return}
+   var im=new Image();
+   im.onload=function(){
+    var largest=Math.max(im.naturalWidth||im.width,im.naturalHeight||im.height);
+    if(!largest||largest<=1280){resolve(plain);return}
+    try{
+     var scale=1280/largest,c=document.createElement("canvas");
+     c.width=Math.max(1,Math.round((im.naturalWidth||im.width)*scale));
+     c.height=Math.max(1,Math.round((im.naturalHeight||im.height)*scale));
+     var ctx=c.getContext("2d");if(!ctx){resolve(plain);return}
+     ctx.drawImage(im,0,0,c.width,c.height);
+     var resized=c.toDataURL(mime,mime==="image/png"?undefined:.82);
+     if(resized.slice(0, mime.length+5)!=="data:"+mime+";"){resolve(plain);return}
+     resolve({name:file.name,type:mime,data:resized});
+    }catch(e){resolve(plain)}
+   };
+   im.onerror=function(){resolve(plain)};im.src=original;
+  };
+  reader.onerror=reject;reader.readAsDataURL(file);
+ });
 }
 /* ===== Feed v2: floating action, options sheet, public timeline, composer ===== */
 var TLK="tm.tl.v1",TL={who:null,tab:"Posts",preview:false,profile:null,profileId:null},tlDraftLink=null,tlLinkTab="Markets";
