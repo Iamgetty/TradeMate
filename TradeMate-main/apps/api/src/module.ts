@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { Pool } from 'pg';
 import { createRlsAwarePool } from './database-context';
-import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPostBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
+import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -2350,6 +2350,8 @@ class CommunityFeedController {
       `SELECT p.id, p.author_user_id, p.post_type, p.title, p.body, p.pinned, p.created_at,
               COALESCE(u.display_name, 'TradeMate Team') AS author_name,
               (SELECT count(*)::int FROM feed_comments c WHERE c.post_id = p.id AND c.status = 'published') AS comment_count,
+              (SELECT count(*)::int FROM feed_post_reactions r WHERE r.post_id = p.id) AS reaction_count,
+              (SELECT count(*)::int FROM feed_post_reshares rs WHERE rs.post_id = p.id) AS reshare_count,
               COALESCE((SELECT json_agg(json_build_object('id', a.id, 'file_name', a.file_name, 'content_type', a.content_type, 'byte_size', a.byte_size) ORDER BY a.created_at)
                         FROM feed_attachments a WHERE a.post_id = p.id), '[]'::json) AS attachments
        FROM feed_posts p LEFT JOIN users u ON u.id = p.author_user_id
@@ -2468,6 +2470,67 @@ class CommunityFeedController {
     );
     if (!result.rowCount) throw new NotFoundException('Published post not found.');
     return { comment: { ...result.rows[0], author_name: 'You' } };
+  }
+
+  @Post('posts/:id/reactions')
+  async react(@Param('id') id: string, @Req() request: Request, @Body() body: { emoji?: string }) {
+    parseUuidParam(id); parseBody(feedReactionBodySchema, body);
+    const userId = await this.currentUser(request);
+    const found = await databasePool!.query("SELECT id FROM feed_posts WHERE id = $1 AND status = 'published'", [id]);
+    if (!found.rowCount) throw new NotFoundException('Published post not found.');
+    await databasePool!.query(
+      'INSERT INTO feed_post_reactions (post_id, user_id, emoji) VALUES ($1, $2, $3) ON CONFLICT (post_id, user_id) DO UPDATE SET emoji = EXCLUDED.emoji, created_at = now()',
+      [id, userId, body.emoji],
+    );
+    const totals = await databasePool!.query('SELECT count(*)::int AS reaction_count FROM feed_post_reactions WHERE post_id = $1', [id]);
+    return { success: true, emoji: body.emoji, reaction_count: totals.rows[0].reaction_count };
+  }
+
+  @Delete('posts/:id/reactions')
+  async removeReaction(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id); const userId = await this.currentUser(request);
+    await databasePool!.query('DELETE FROM feed_post_reactions WHERE post_id = $1 AND user_id = $2', [id, userId]);
+    return { success: true };
+  }
+
+  @Patch('posts/:id/pin')
+  async pinPost(@Param('id') id: string, @Req() request: Request, @Body() body: { pinned?: boolean }) {
+    parseUuidParam(id); parseBody(feedPinBodySchema, body);
+    const userId = await this.currentUser(request);
+    const result = await databasePool!.query(
+      "UPDATE feed_posts SET pinned = $3, updated_at = now() WHERE id = $1 AND author_user_id = $2 AND status = 'published' RETURNING id, pinned",
+      [id, userId, body.pinned],
+    );
+    if (!result.rowCount) throw new NotFoundException('Post not found or you are not its owner.');
+    await databasePool!.query(
+      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'feed.post.pin_changed', 'feed_post', $2, $3::jsonb)",
+      [userId, id, JSON.stringify({ pinned: body.pinned })],
+    );
+    return { post: result.rows[0] };
+  }
+
+  @Post('posts/:id/reshare')
+  async reshare(@Param('id') id: string, @Req() request: Request, @Body() body: { note?: string }) {
+    parseUuidParam(id); parseBody(feedReshareBodySchema, body);
+    const userId = await this.currentUser(request);
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const original = await client.query("SELECT id FROM feed_posts WHERE id = $1 AND status = 'published' FOR SHARE", [id]);
+      if (!original.rowCount) throw new NotFoundException('Published post not found.');
+      const saved = await client.query(
+        'INSERT INTO feed_post_reshares (post_id, user_id, note) VALUES ($1, $2, $3) ON CONFLICT (post_id, user_id) DO UPDATE SET note = EXCLUDED.note, created_at = now() RETURNING id, post_id, note, created_at',
+        [id, userId, body.note || ''],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'feed.post.reshared', 'feed_post', $2, $3::jsonb)",
+        [userId, id, JSON.stringify({ reshare_id: saved.rows[0].id })],
+      );
+      const totals = await client.query('SELECT count(*)::int AS reshare_count FROM feed_post_reshares WHERE post_id = $1', [id]);
+      await client.query('COMMIT');
+      return { reshare: saved.rows[0], reshare_count: totals.rows[0].reshare_count };
+    } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
+    finally { client.release(); }
   }
 
   @Post('reports')
