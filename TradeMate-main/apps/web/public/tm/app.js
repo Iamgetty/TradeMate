@@ -5,6 +5,8 @@
  * OPTIONAL SERVER:  <script>window.TM_CONFIG={api:"https://your-server/api"}</script>  BEFORE app.js
  * Without a server the app runs in local mode: data stays on this device (localStorage).
  */
+(function(){try{var t=localStorage.getItem("tm_theme");document.documentElement.style.background={dark:"#050505",light:"#f5f5f5",purple:"#07050f"}[t]||"#050505"}catch(e){}})();
+
 (function(){
 var d=document,h=d.head;
 var tmT0="dark";try{tmT0=localStorage.getItem("tm_theme")==="light"?"light":"dark"}catch(e){}
@@ -1203,7 +1205,7 @@ function markets(categoryPage){
   return hero+find+groups+sorts+count+body;
  }
  var movers=mkMix(8);
- var trend=movers.length?'<div class="mk-sec"><h2>Trending now</h2><small>Across all marketplaces</small></div><div class="mk-list"><div class="thead"><span>Name</span><span>Price</span><span>24h</span></div>'+movers.map(mixRow).join("")+'</div>':"";
+ var trend=movers.length?'<div class="mk-sec"><h2>Trending now</h2><small>Across all marketplaces</small></div><div class="mk-list mk-trend"><div class="thead"><span>Name</span><span>24h</span></div>'+movers.map(mixRow).join("")+'</div>':"";
  return '<div class="mk-livebar"><span class="mk-live'+(st.live?" on":"")+'"><i></i>'+(st.live?"Live":"Syncing")+'</span></div>'+trendBanner()+'<div class="mk-sec"><h2>Marketplaces</h2><small>Tap to explore</small></div><div class="mk-grid">'+ORD.map(mkTile).join("")+'</div>'+trend}
 setInterval(function(){var g=st.fxGroup;if(st.tab==="Markets"&&st.mm==="Forex"&&g&&g!=="Currency Pairs"&&!MARKET_QUOTE_STATE.loading){MARKET_QUOTE_STATE.last=0;loadMarketQuotes(g,items.filter(function(i){return i.m==="Forex"&&i.assetClass===g&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)}))}},60000);
 var marketFeed={symbol:"",socket:null,futuresBookSocket:null,futuresTradeSocket:null,status:"idle",provider:"binance",quote:"USDT",bids:[],asks:[],trades:[],last:0,drawTimer:null,retryTimer:null,timeoutTimer:null,recoveryTimer:null,attempt:0};
@@ -1491,10 +1493,10 @@ function tlRender(){var el=document.getElementById("tlView");if(!el)return;var s
  else{var m=[];posts.forEach(function(p){(p.attachments||[]).forEach(function(a){if(String(a.content_type||"").indexOf("image/")===0)m.push(tlAtt(p,a))})});h+=m.length?'<div class="tl-grid">'+m.map(function(u){return '<a target="_blank" rel="noopener" href="'+esc(u)+'" style="background-image:url('+esc(u)+')"></a>'}).join('')+'</div>':'<div class="tl-empty"><b>No photos yet</b>Photos from posts appear here.</div>'}
  h+='</div>';el.innerHTML=h;el.scrollTop=sc}
 function tlOpen(who,userId){tlCss();TL.who=who===undefined?null:who;TL.tab="Posts";TL.preview=false;TL.profile=null;TL.profileId=TL.who===null?st.me.id:(userId||null);if(TL.who!==null&&!TL.profileId){var match=(st.feedPosts||[]).filter(function(p){return p.author===TL.who&&p.author_user_id})[0];if(match)TL.profileId=match.author_user_id}tlClose("tlMenu");var el=document.getElementById("tlView");if(!el){el=document.createElement("div");el.id="tlView";document.body.appendChild(el)}tlRender();loadFeed(false).then(function(posts){if(TL.who!==null&&!TL.profileId){var found=(posts||[]).filter(function(p){return p.author===TL.who&&p.author_user_id})[0];if(found)TL.profileId=found.author_user_id}if(TL.profileId)tlLoadProfile(TL.profileId)})}
-function tlEditSheet(){var P=tlP();tlSheet("tlEdit",'<h3 style="font-size:19px;margin:0 0 12px">Edit profile</h3><div class="tl-ed" id="tlEC" style="'+(P.cover?'background-image:url('+P.cover+')':'')+'"><button class="c" data-tl-cover>'+tlI("cam")+'Cover</button><div class="a" id="tlEA" style="'+(st.me.photo?'background-image:url('+st.me.photo+')':'')+'">'+(st.me.photo?'':esc(String(st.me.nick||"M").charAt(0).toUpperCase()))+'</div><button class="v" data-tl-av>'+tlI("cam")+'Photo</button></div>'
+function tlEditSheet(){var P=tlP();tlSheet("tlEdit",'<h3 style="font-size:19px;margin:0 0 12px">Edit profile</h3><div class="tl-sc"><div class="tl-ed" id="tlEC" style="'+(P.cover?'background-image:url('+P.cover+')':'')+'"><button class="c" data-tl-cover>'+tlI("cam")+'Cover</button><div class="a" id="tlEA" style="'+(st.me.photo?'background-image:url('+st.me.photo+')':'')+'">'+(st.me.photo?'':esc(String(st.me.nick||"M").charAt(0).toUpperCase()))+'</div><button class="v" data-tl-av>'+tlI("cam")+'Photo</button></div>'
  +'<label class="tl-fld"><span>Nickname</span><input id="tlE-nick" maxlength="24" value="'+esc(st.me.nick||"")+'"><div class="err"></div></label><label class="tl-fld"><span>Bio<em id="tlE-n">'+(P.bio||"").length+'/160</em></span><textarea id="tlE-bio" rows="3" maxlength="160" placeholder="What do you trade or offer?">'+esc(P.bio||"")+'</textarea></label>'
  +'<label class="tl-fld"><span>Instagram</span><input id="tlE-ig" placeholder="username or link" autocapitalize="none" value="'+esc(P.ig||"")+'"><div class="err"></div></label><label class="tl-fld"><span>X</span><input id="tlE-x" placeholder="username or link" autocapitalize="none" value="'+esc(P.x||"")+'"><div class="err"></div></label><label class="tl-fld"><span>Website</span><input id="tlE-web" placeholder="yourwebsite.com" autocapitalize="none" value="'+esc(P.web||"")+'"><div class="err"></div></label>'
- +'<div class="tl-acts" style="margin:6px 0 0"><button class="tl-b" data-tl-close="tlEdit">Cancel</button><button class="tl-b p" data-tl-save-edit>Save</button></div>');
+ +'</div><div class="tl-acts" style="margin:6px 0 0"><button class="tl-b" data-tl-close="tlEdit">Cancel</button><button class="tl-b p" data-tl-save-edit>Save</button></div>');
  var b=document.getElementById("tlE-bio");b.addEventListener("input",function(){document.getElementById("tlE-n").textContent=b.value.length+"/160"})}
 function tlSaveEdit(){var g=function(i){return document.getElementById(i)},bad=false;function chk(id,val,msg){var f=g(id).parentNode;f.classList.toggle("bad",val===null);f.querySelector(".err").textContent=val===null?msg:"";if(val===null)bad=true;return val}
  var nick=g("tlE-nick").value.trim();if(!nick){chk("tlE-nick",null,"Enter a nickname.")}else chk("tlE-nick","");
@@ -2152,7 +2154,7 @@ var _a8=act;act=function(n,a,el){
 /* Without TM_CONFIG the app runs in local mode (data stays on this device).                       */
 var TMCFG=window.TM_CONFIG||{},CONNECTED=!!TMCFG.api,KEY="tm.live.v2";
 /* Prevent the authenticated shell from flashing before cookie-session validation. */
-var AUTH_GATE_STYLE=null;if(CONNECTED){AUTH_GATE_STYLE=document.createElement("style");AUTH_GATE_STYLE.id="tm-auth-gate";AUTH_GATE_STYLE.textContent="#app,#nav,#pg,#sbar,#sscrim,#shandle{visibility:hidden!important}";document.head.appendChild(AUTH_GATE_STYLE)}
+var AUTH_GATE_STYLE=null;if(CONNECTED){AUTH_GATE_STYLE=document.createElement("style");AUTH_GATE_STYLE.id="tm-auth-gate";AUTH_GATE_STYLE.textContent="#app,#nav,#nav *,#pg,#sbar,#sscrim,#shandle{visibility:hidden!important}";document.head.appendChild(AUTH_GATE_STYLE)}
 function releaseAuthGate(){if(AUTH_GATE_STYLE){AUTH_GATE_STYLE.remove();AUTH_GATE_STYLE=null}}
 var CSYM={NGN:"₦",USD:"$",EUR:"€",GBP:"£",GHS:"₵",KES:"KSh"},PER={"Per month":" /mo","Per year":" /yr","Per night":" /night"};
 var ISO={"Nigeria":"NG","Ghana":"GH","Kenya":"KE","South Africa":"ZA","Uganda":"UG","Tanzania":"TZ","Rwanda":"RW","Ethiopia":"ET","Egypt":"EG","Morocco":"MA","Senegal":"SN","Côte d’Ivoire":"CI","Cameroon":"CM","Zambia":"ZM","Zimbabwe":"ZW","United States":"US","Canada":"CA","United Kingdom":"GB","Ireland":"IE","Germany":"DE","France":"FR","Spain":"ES","Italy":"IT","Netherlands":"NL","Portugal":"PT","Turkey":"TR","United Arab Emirates":"AE","Saudi Arabia":"SA","Qatar":"QA","India":"IN","Pakistan":"PK","Bangladesh":"BD","China":"CN","Japan":"JP","South Korea":"KR","Singapore":"SG","Malaysia":"MY","Indonesia":"ID","Philippines":"PH","Thailand":"TH","Vietnam":"VN","Australia":"AU","New Zealand":"NZ","Brazil":"BR","Mexico":"MX","Argentina":"AR","Colombia":"CO","Chile":"CL"},CNAME={};
@@ -2439,3 +2441,38 @@ R.addEventListener("click",function(e){if(e.target.closest("[data-about]")){show
 if(CONNECTED){host.style.visibility="hidden";api("GET","/auth/me").then(function(r){window.applyUser(r.user);host.style.display="none";try{window.draw();navH()}catch(e){}releaseAuthGate()}).catch(function(){resetSession();st.stack=[];st.tab="Home";try{window.openLanding()}catch(e){host.style.display="block";show("land")}releaseAuthGate()}).then(function(){host.style.visibility="";if(window.tmReveal)window.tmReveal()})}else if(window.tmReveal)window.tmReveal();
 })();
 
+/* ---- TradeMate polish layer v83: small, additive, theme-aware (existing --vars; no colour or layout changes elsewhere) ---- */
+;(function(){try{if(document.getElementById("tm-polish"))return;var s=document.createElement("style");s.id="tm-polish";s.textContent=`html{-webkit-text-size-adjust:100%;text-rendering:optimizeLegibility;-webkit-tap-highlight-color:transparent}
+body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;font-kerning:normal}
+svg{shape-rendering:geometricPrecision}
+.cell,.bk,.up,.dn,[class*=price],[class*=amt]{font-variant-numeric:tabular-nums}
+::selection{background:color-mix(in srgb,var(--am) 32%,transparent)}
+input,textarea,select{caret-color:var(--am)}
+button:active,.btn:active,.pill:active,.ib:active{scale:.97}
+:focus-visible{outline:2px solid var(--am);outline-offset:3px}
+.bk .h{gap:8px;align-items:end}.bk .h span{min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.25}.bk .h.r span:first-child{padding-left:6px}
+html[data-theme="light"] small:not(.up):not(.dn):not(.pos):not(.neg){color:#62626a!important}
+/* Markets > Trending now: name + 24h only */
+.mk-trend .thead,.mk-trend .row{grid-template-columns:minmax(0,1fr) 92px}.mk-trend .row>.p{display:none}.mk-trend .nm small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Edit profile: compact, centered card. Fields scroll in their own area; Save/Cancel stay in a separate footer */
+#tlEdit.tl-scrim{align-items:center;padding:16px;padding-top:max(16px,env(safe-area-inset-top,0px));padding-bottom:max(16px,env(safe-area-inset-bottom,0px))}
+#tlEdit .tl-sheet{display:flex;flex-direction:column;overflow:hidden;max-width:400px;max-height:calc(100dvh - 32px);padding:16px 16px 14px;border:1px solid var(--line);border-radius:26px;box-shadow:0 24px 60px #0007;animation:tlpop .28s cubic-bezier(.2,.8,.2,1) both}
+@keyframes tlpop{from{opacity:0;transform:translateY(10px) scale(.97)}}
+#tlEdit .tl-grab{display:none}
+#tlEdit h3{margin:0 0 10px!important;flex:none}
+#tlEdit .tl-sc{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;margin:0 -6px;padding:0 6px}
+#tlEdit .tl-ed{height:84px;margin-bottom:40px;border-radius:16px}
+#tlEdit .tl-ed .a{width:64px;height:64px;border-radius:22px;bottom:-32px;font-size:24px}
+#tlEdit .tl-ed button{padding:6px 10px;font-size:11.5px}#tlEdit .tl-ed button.v{left:60px;bottom:-26px}
+#tlEdit .tl-fld{margin-bottom:8px}#tlEdit .tl-fld>span{font-size:12px;margin-bottom:4px}
+#tlEdit .tl-fld input,#tlEdit .tl-fld textarea{padding:9px 13px;font-size:15px;border-radius:14px}
+#tlEdit .tl-fld input{height:42px}#tlEdit .tl-fld textarea{height:68px;min-height:0;resize:none}
+#tlEdit .tl-acts{flex:none;margin:10px 0 0!important;padding-top:12px;border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+#tlEdit .tl-b{padding-top:11px;padding-bottom:11px}
+/* Profile page footer: two separate, compact buttons */
+.pfoot{gap:10px;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));align-items:center;border-top:1px solid var(--line);background:var(--bg)}
+.pfoot>span[style*="width:1px"]{display:none}
+.pfoot .lr{flex:1;min-height:0!important;height:36px;padding:0 12px!important;font-size:13px!important;font-weight:600;letter-spacing:.01em;gap:7px;border-radius:12px!important;border:1px solid var(--line)!important;background:var(--s2);color:var(--txt)}
+.pfoot .lr svg{width:14px!important;height:14px!important;color:var(--mut)}.pfoot .lr:first-child svg{color:var(--am)}
+.pfoot .lr:active{scale:.97}
+@media(max-width:899px){*{scrollbar-width:none}*::-webkit-scrollbar{display:none}}`;document.head.appendChild(s)}catch(e){}})();
