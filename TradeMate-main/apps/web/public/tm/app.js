@@ -1277,24 +1277,24 @@ function tmConnectCentral(symbol){
    },
    onUpdate:function(d){
     if(tmFeedSymbol!==symbol)return;
-    var key="TradeMate:aggregated";
+    var key="TradeMate:aggregated",previous=tmFeeds[key]||{};
     tmFeeds={};
     tmFeeds[key]={
      venue:"TradeMate",market:"aggregated",
      status:d.feedsLive>0?"live":"connecting",
-     bids:(d.bids||[]).map(function(x){return {p:+x.price,q:+x.size}}),
-     asks:(d.asks||[]).map(function(x){return {p:+x.price,q:+x.size}}),
-     trades:(d.trades||[]).map(function(x){return {
+     bids:d.bids&&d.bids.length?d.bids.map(function(x){return {p:+x.price,q:+x.size}}):(previous.bids||[]),
+     asks:d.asks&&d.asks.length?d.asks.map(function(x){return {p:+x.price,q:+x.size}}):(previous.asks||[]),
+     trades:d.trades&&d.trades.length?d.trades.map(function(x){return {
       id:x.id||x.ts+":"+x.price,
       p:+x.price,q:+x.qty,time:+x.ts,
       side:String(x.side).toLowerCase()==="buy"?"BUY":"SELL",
       venue:x.exchange,market:x.market
-     }}),
-     bookAt:d.booksCombined?d.ts:0,tradeAt:d.trades&&d.trades.length?d.ts:0,
+     }}):(previous.trades||[]),
+     bookAt:d.booksCombined?d.ts:(previous.bookAt||0),tradeAt:d.trades&&d.trades.length?d.ts:(previous.tradeAt||0),
      sockets:[]
     };
     tmFeedStatusCount={live:d.feedsLive||0,total:d.feedsTotal||0,books:d.booksCombined||0};
-    tmSaveSnapshot(symbol);
+    if((d.bids&&d.bids.length)||(d.asks&&d.asks.length)||(d.trades&&d.trades.length))tmSaveSnapshot(symbol);
     scheduleMarketDraw();
    }
   });
