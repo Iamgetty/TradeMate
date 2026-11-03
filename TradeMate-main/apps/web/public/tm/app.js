@@ -1068,15 +1068,40 @@ function lg(i){var a=i.n.split("/"),y=a[0].toLowerCase();
 function money(n){return n>=1e12?"$"+(n/1e12).toFixed(2)+"T":n>=1e9?"$"+(n/1e9).toFixed(2)+"B":n>=1e6?"$"+(n/1e6).toFixed(2)+"M":"$"+fx2(n,n<100?2:0)}
 function val(i){if(i.m==="Crypto")return i.cap?"MCap "+money(i.cap):"";if(i.m==="Forex"||typeof i.p==="number")return "";
  var n=pnum(i.p),s=psym(i.p),u=s==="$"?null:s==="Ξ"?n*byName("ETH/USDT").p:s==="₦"?n/byName("USD/NGN").p:null;return u==null?"":"≈ "+money(u)}
+var TM_FX_SNAPSHOT_KEY="tm.fx.reference.snapshot.v1",TM_FX_SNAPSHOT_MAX_AGE=14*24*60*60*1000;
+function tmApplyFxRates(rates,status,rateTimestamp,savedAt){
+ if(!rates||typeof rates!=="object")return false;
+ var stamp=rateTimestamp||new Date().toISOString(),updated=false;
+ items.filter(function(i){return i.m==="Forex"&&!i.assetClass&&i.n.indexOf("/")>0}).forEach(function(it){
+  var pair=it.n.split("/"),base=pair[0],quote=pair[1],b=base==="USD"?1:Number(rates[base]),q=quote==="USD"?1:Number(rates[quote]);
+  if(b>0&&q>0&&Number.isFinite(q/b)){it.p=q/b;it.quoteTime=stamp;if(status==="cached"){it.quoteStatus="cached";it.snapshotAt=savedAt||Date.now()}else{delete it.quoteStatus;delete it.snapshotAt}updated=true}
+ });
+ return updated;
+}
+function tmRestoreFxSnapshot(){
+ try{
+  var raw=localStorage.getItem(TM_FX_SNAPSHOT_KEY);if(!raw)return false;
+  var saved=JSON.parse(raw),data=saved&&saved.data;
+  if(!data||!data.rates||!saved.savedAt||Date.now()-Number(saved.savedAt)>TM_FX_SNAPSHOT_MAX_AGE)return false;
+  return tmApplyFxRates(data.rates,"cached",data.rateTimestamp,Number(saved.savedAt));
+ }catch(e){return false}
+}
+function tmSaveFxSnapshot(data){
+ try{
+  if(!data||!data.rates||typeof data.rates!=="object")return;
+  localStorage.setItem(TM_FX_SNAPSHOT_KEY,JSON.stringify({savedAt:Date.now(),data:{rates:data.rates,rateTimestamp:data.time_last_update_utc||new Date().toISOString()}}));
+ }catch(e){}
+}
+tmRestoreFxSnapshot();
 function liveRefresh(){
  if(document.hidden||["Home","Markets","Trade","Portfolio","P2P"].indexOf(st.tab)<0)return;
  var updated=false;
  var coins=fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids="+Object.keys(CG).map(function(k){return CG[k]}).join(",")+"&price_change_percentage=24h").then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){
   d.forEach(function(c){var k=Object.keys(CG).filter(function(x){return CG[x]===c.id})[0],it=k&&byName(k+"/USDT");if(!it||!(c.current_price>0))return;it.p=c.current_price;it.c=c.price_change_percentage_24h_in_currency!=null?c.price_change_percentage_24h_in_currency:(c.price_change_percentage_24h||0);if(c.market_cap)it.cap=c.market_cap;if(c.image&&!EMB[k])LOGOS[k]=c.image});st.live=true;updated=true
  }).catch(function(){});
- var fx=fetch("https://open.er-api.com/v6/latest/USD").then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){var rates=d&&d.rates;if(!rates)return;
-  items.filter(function(i){return i.m==="Forex"}).forEach(function(it){var pair=it.n.split("/"),base=pair[0],quote=pair[1],b=base==="USD"?1:rates[base],q=quote==="USD"?1:rates[quote];if(b>0&&q>0)it.p=q/b});st.live=true;updated=true
- }).catch(function(){});
+ var fx=fetch("https://open.er-api.com/v6/latest/USD").then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){var rates=d&&d.rates;if(!rates)throw new Error("FX rates unavailable");
+  tmSaveFxSnapshot(d);if(tmApplyFxRates(rates,"indicative",d.time_last_update_utc||new Date().toISOString())){st.live=true;updated=true}
+ }).catch(function(){if(tmRestoreFxSnapshot())updated=true});
  Promise.all([coins,fx]).then(function(){if(updated)softDraw()})
 }
 function softDraw(){if(["Home","Markets","Trade","Portfolio","P2P"].indexOf(st.tab)<0)return;var a=document.activeElement;if(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName))return;draw()}
@@ -1315,7 +1340,7 @@ function tmBooks(it,dp){if(!document.getElementById("tm-book-standby-style")){va
 function trade(){
  var it=items[st.tp],cr=it.m==="Crypto",fxm=it.m==="Forex"&&!it.assetClass;
  if(it.assetClass&&it.quoteStatus!=="live"&&it.quoteStatus!=="delayed")tmRestoreQuoteSnapshot(it);
- var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose market"><span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span><b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?"FOREX · INDICATIVE":it.assetClass?(it.quoteStatus==="live"?"LIVE QUOTE":it.quoteStatus==="delayed"?"DELAYED QUOTE":it.quoteStatus==="unavailable"?"QUOTE UNAVAILABLE":"PUBLIC QUOTE"):"TRADEMATE")+'</span></div>';
+ var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose market"><span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span><b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?(it.quoteStatus==="cached"?"FOREX · SNAPSHOT":"FOREX · INDICATIVE"):it.assetClass?(it.quoteStatus==="live"?"LIVE QUOTE":it.quoteStatus==="delayed"?"DELAYED QUOTE":it.quoteStatus==="unavailable"?"QUOTE UNAVAILABLE":"PUBLIC QUOTE"):"TRADEMATE")+'</span></div>';
  if(cr){
   ensureMultiFeeds(it);
   var dp=it.p<1?6:it.p<20?4:2,stamp=tmStatus();
@@ -1336,7 +1361,8 @@ function trade(){
   return h+'<div class="tpx"><b>'+px(it)+'</b><span>'+esc(unit)+'</span></div><div class="card" style="margin:8px 16px"><b>'+status+'</b><p style="color:var(--mut);margin:6px 0 0">'+esc(it.assetClass)+' · '+(it.quoteTime?"Updated "+new Date(it.quoteTime).toLocaleString():"No quote timestamp yet")+(it.snapshotAt?" · Snapshot saved "+new Date(it.snapshotAt).toLocaleString():"")+'</p></div><p class="fine">Reference pricing from the public market-quote provider. This instrument is grouped under the Forex marketplace; executable order-book and trade feeds are not connected for this asset class.</p>';
  }
  if(fxm){
-  return h+'<div class="empty"><b>Indicative FX reference rates only</b>Currency conversion references are available in Markets → Forex → Currency Pairs. Live provider bid/ask execution data is not connected. TradeMate does not execute ordinary buy/sell orders here, and no synthetic spread is shown.</div>';
+  var fxCached=it.quoteStatus==="cached";
+  return h+(typeof it.p==="number"?'<div class="tpx"><b>'+px(it)+'</b><span>Indicative reference rate</span></div>':"")+'<div class="empty"><b>'+(fxCached?"Last saved indicative FX rate":"Indicative FX reference rates only")+'</b>'+(fxCached&&it.quoteTime?"Snapshot from "+new Date(it.quoteTime).toLocaleString():"Currency conversion references are available in Markets → Forex → Currency Pairs.")+' Live provider bid/ask execution data is not connected. TradeMate does not execute ordinary buy/sell orders here, and no synthetic spread is shown.</div>';
  }
  var kind=it.m==="Services"?"service":it.m==="B2B"?"b2b":null;
  if(kind)loadInternalTrades(kind);
