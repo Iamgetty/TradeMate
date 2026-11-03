@@ -1437,15 +1437,16 @@ var feedRequestId=0,feedRequestController=null,feedRequestPromise=null;
 function loadFeed(force){
  if(!CONNECTED){st.feedLoading=false;st.feedError='Sign in to view the community Feed.';return Promise.resolve([])}
  if(st.feedLoading&&!force)return feedRequestPromise||Promise.resolve(st.feedPosts||[]);
+ if(!force&&st.feedError)return Promise.resolve(st.feedPosts||[]);
  if(!force&&st.feedLoaded)return Promise.resolve(st.feedPosts||[]);
  if(force&&feedRequestController){feedRequestController.abort();feedRequestController=null}
- var requestId=++feedRequestId,controller=typeof AbortController!=="undefined"?new AbortController():null,timer,timedOut=false;
+ var requestId=++feedRequestId,controller=typeof AbortController!=="undefined"?new AbortController():null,timer,timedOut=false,feedDataChanged=false,hadFeedError=!!st.feedError,hadNoPosts=!(st.feedPosts||[]).length;
  st.feedLoading=true;st.feedError='';
  var timeoutPromise=new Promise(function(_,reject){timer=setTimeout(function(){timedOut=true;if(controller)controller.abort();reject(new Error("FEED_TIMEOUT"))},12000)});
  var request=Promise.race([api("GET","/feed/posts?limit=40",null,controller?{signal:controller.signal}:undefined),timeoutPromise])
-  .then(function(d){if(requestId!==feedRequestId)return st.feedPosts||[];st.feedPosts=(d.posts||[]).map(function(p){return {id:p.id,type:p.post_type==="feedback"?"Feedback":p.post_type==="announcement"?"Announcements":"Posts",author:p.author_name,author_user_id:p.author_user_id||null,title:p.title||"",body:p.body,attachments:p.attachments||[],time:fmtT(p.created_at),comments:p.comment_count||0,reactions:p.reaction_count||0,reshares:p.reshare_count||0,pinned:p.pinned}});st.feedLoaded=true;return st.feedPosts})
+  .then(function(d){if(requestId!==feedRequestId)return st.feedPosts||[];var nextPosts=(d.posts||[]).map(function(p){return {id:p.id,type:p.post_type==="feedback"?"Feedback":p.post_type==="announcement"?"Announcements":"Posts",author:p.author_name,author_user_id:p.author_user_id||null,title:p.title||"",body:p.body,attachments:p.attachments||[],time:fmtT(p.created_at),comments:p.comment_count||0,reactions:p.reaction_count||0,reshares:p.reshare_count||0,pinned:p.pinned}});if(JSON.stringify(nextPosts)!==JSON.stringify(st.feedPosts||[])){st.feedPosts=nextPosts;feedDataChanged=true}st.feedLoaded=true;return st.feedPosts})
   .catch(function(e){if(requestId!==feedRequestId)return st.feedPosts||[];st.feedError=timedOut?"The Feed request timed out. Check your connection and try again.":(e&&e.message||"Could not load the Feed.");return []})
-  .finally(function(){clearTimeout(timer);if(requestId!==feedRequestId)return;feedRequestController=null;feedRequestPromise=null;st.feedLoading=false;if(st.tab==="Feed")draw();if(document.getElementById("tlView"))tlRender()});
+  .finally(function(){clearTimeout(timer);if(requestId!==feedRequestId)return;feedRequestController=null;feedRequestPromise=null;st.feedLoading=false;if(st.tab==="Feed")draw();if(document.getElementById("tlView")&&(feedDataChanged||hadFeedError||hadNoPosts||!!st.feedError))tlRender()});
  feedRequestController=controller;feedRequestPromise=request;return request;
 }
 var feedDraftFiles=[],feedRecorder=null,feedRecordStream=null,feedRecordChunks=[];
@@ -1483,7 +1484,30 @@ function addFeedDraftFile(file){
  feedDraftFiles.push(file);renderFeedDraftFiles();
 }
 function readFeedFile(file){
- return new Promise(function(resolve,reject){var reader=new FileReader();reader.onload=function(){resolve({name:file.name,type:String(file.type||"").toLowerCase().split(";")[0],data:reader.result})};reader.onerror=reject;reader.readAsDataURL(file)});
+ return new Promise(function(resolve,reject){
+  var mime=String(file.type||"").toLowerCase().split(";")[0],reader=new FileReader();
+  reader.onload=function(){
+   var original=reader.result,plain={name:file.name,type:mime,data:original};
+   if(!/^image\/(?:jpeg|png|webp)$/.test(mime)){resolve(plain);return}
+   var im=new Image();
+   im.onload=function(){
+    var largest=Math.max(im.naturalWidth||im.width,im.naturalHeight||im.height);
+    if(!largest||largest<=1280){resolve(plain);return}
+    try{
+     var scale=1280/largest,c=document.createElement("canvas");
+     c.width=Math.max(1,Math.round((im.naturalWidth||im.width)*scale));
+     c.height=Math.max(1,Math.round((im.naturalHeight||im.height)*scale));
+     var ctx=c.getContext("2d");if(!ctx){resolve(plain);return}
+     ctx.drawImage(im,0,0,c.width,c.height);
+     var resized=c.toDataURL(mime,mime==="image/png"?undefined:.82);
+     if(resized.slice(0, mime.length+6)!=="data:"+mime+";"){resolve(plain);return}
+     resolve({name:file.name,type:mime,data:resized});
+    }catch(e){resolve(plain)}
+   };
+   im.onerror=function(){resolve(plain)};im.src=original;
+  };
+  reader.onerror=reject;reader.readAsDataURL(file);
+ });
 }
 /* ===== Feed v2: floating action, options sheet, public timeline, composer ===== */
 var TLK="tm.tl.v1",TL={who:null,tab:"Posts",preview:false},tlDraftLink=null,tlLinkTab="Markets";
@@ -1520,7 +1544,7 @@ function tlCss(){if(document.getElementById("tlStyles"))return;var s=document.cr
 ".tl-hls{display:flex;gap:14px;overflow-x:auto;padding:2px 18px 4px;scrollbar-width:none}.tl-hls::-webkit-scrollbar{display:none}.tl-hl{flex:none;width:66px;text-align:center}.tl-hl .r{width:66px;height:66px;border-radius:50%;padding:2.5px;background:var(--grad);display:block}.tl-hl .r i{display:grid;place-items:center;width:100%;height:100%;border-radius:50%;border:2.5px solid var(--bg);background:var(--s2) center/cover;font:800 20px Inter,sans-serif;font-style:normal}.tl-hl.add .r{background:var(--line)}.tl-hl.add i{color:var(--am)}.tl-hl span{display:block;margin-top:6px;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
 ".tl-tabs{display:flex;margin:22px 18px 0;border-bottom:1px solid var(--line)}.tl-tabs button{flex:1;padding:12px;font-weight:800;color:var(--mut);position:relative;text-align:center}.tl-tabs button.on{color:var(--txt)}.tl-tabs button.on:after{content:'';position:absolute;left:25%;right:25%;bottom:-1px;height:3px;border-radius:3px;background:var(--grad)}",
 ".tl-card{margin:12px 18px 0;padding:14px;border-radius:20px;background:var(--s1);border:1px solid var(--line)}.tl-card .m{display:flex;gap:8px;align-items:center;color:var(--mut);font-size:11px}.tl-card .m em{font-style:normal;padding:3px 8px;border-radius:8px;background:var(--s3);color:var(--am);font-weight:800}.tl-card h3{font-size:15px;margin-top:8px}.tl-card img{display:block;width:100%;max-height:300px;object-fit:cover;border-radius:14px;margin-top:8px}.tl-card .f{display:flex;gap:14px;align-items:center;margin-top:10px;color:var(--mut);font-size:12px}.tl-card .f button{display:inline-flex;gap:5px;align-items:center;font-weight:700}.tl-card .f svg{width:16px;height:16px}",
-".tl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin:12px 18px 0}.tl-grid a{aspect-ratio:1;background:var(--s2) center/cover;border-radius:6px;display:block}",
+".tl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin:12px 18px 0}.tl-grid a{aspect-ratio:1;background:var(--s2);border-radius:6px;display:block;overflow:hidden}.tl-grid a img{width:100%;height:100%;object-fit:cover;display:block}",
 ".tl-chip{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;margin-top:8px;border-radius:14px;background:var(--s2);border:1px solid var(--line)}.tl-chip>svg:first-child{color:var(--am);width:18px}.tl-chip span{flex:1;min-width:0}.tl-chip small{display:block;color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.06em}.tl-chip b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tl-chip>svg:last-child{width:16px;color:var(--mut)}",
 ".tl-prev{margin:12px 18px 0;padding:10px 12px;border-radius:14px;background:#fb77011f;border:1px solid #fb770155;color:var(--am);font-size:12px;font-weight:700;display:flex;align-items:center;gap:8px}.tl-prev button{margin-left:auto;font-weight:800;text-decoration:underline}",
 ".tl-empty{margin:22px 18px 0;padding:30px 18px;text-align:center;border:1.5px dashed var(--line);border-radius:20px;color:var(--mut)}.tl-empty b{display:block;color:var(--txt);font-size:15px;margin-bottom:6px}.tl-empty .tl-b{margin:14px auto 0;max-width:200px}",
@@ -1542,7 +1566,7 @@ function tlSheet(id,html){tlClose(id);var w=document.createElement("div");w.id=i
 function tlMenu(){tlCss();tlSheet("tlMenu",'<h3 style="font-size:19px;margin:0 2px 4px">Share on TradeMate</h3><p style="margin:0 2px 14px;color:var(--mut)">What would you like to do?</p><button class="tl-opt" data-tl-go="timeline"><span class="ico">'+avHTML(48,16)+'</span><span><b>My timeline</b><small>Your public profile, highlights and posts</small></span>'+tlI("chev")+'</button><button class="tl-opt" data-tl-go="post"><span class="ico">'+tlI("pen")+'</span><span><b>Create post</b><small>Update, feedback, photos or a voice note</small></span>'+tlI("chev")+'</button><button class="tl-x" data-tl-close="tlMenu" aria-label="Close">'+tlI("close")+'</button>')}
 
 function tlCard(p,owner){var s=tlSplit(p.body),imgs=(p.attachments||[]).filter(function(a){return String(a.content_type||"").indexOf("image/")===0}),aud=(p.attachments||[]).filter(function(a){return String(a.content_type||"").indexOf("audio/")===0});
- return '<article class="tl-card"><div class="m"><em>'+esc(p.type==="Posts"?"Post":p.type==="Feedback"?"Feedback":"Announcement")+'</em>'+esc(p.time)+'</div>'+(p.title?'<h3>'+esc(p.title)+'</h3>':'')+'<p style="white-space:pre-wrap;margin:8px 0 0">'+esc(s.text)+'</p>'+tlChip(s.k,s.n)+imgs.slice(0,1).map(function(a){return '<img loading="lazy" src="'+esc(tlAtt(p,a))+'" alt="">'}).join('')+aud.map(function(a){return '<audio controls preload="none" style="width:100%;margin-top:8px" src="'+esc(tlAtt(p,a))+'"></audio>'}).join('')+feedActionsHTML(p,owner)+'</article>'}
+ return '<article class="tl-card"><div class="m"><em>'+esc(p.type==="Posts"?"Post":p.type==="Feedback"?"Feedback":"Announcement")+'</em>'+esc(p.time)+'</div>'+(p.title?'<h3>'+esc(p.title)+'</h3>':'')+'<p style="white-space:pre-wrap;margin:8px 0 0">'+esc(s.text)+'</p>'+tlChip(s.k,s.n)+imgs.slice(0,1).map(function(a){return '<img loading="lazy" decoding="async" src="'+esc(tlAtt(p,a))+'" alt="">'}).join('')+aud.map(function(a){return '<audio controls preload="none" style="width:100%;margin-top:8px" src="'+esc(tlAtt(p,a))+'"></audio>'}).join('')+feedActionsHTML(p,owner)+'</article>'}
 
 function tlRender(){var el=document.getElementById("tlView");if(!el)return;var sc=el.scrollTop,isMe=TL.who===null,owner=isMe&&!TL.preview,P=tlP(),name=isMe?(st.me.nick||st.me.name||"Member"):TL.who,posts=tlPostsOf(isMe?null:TL.who),h="";
  var av=isMe?avHTML(86,29):'<span class="ini">'+esc(String(name).charAt(0).toUpperCase())+'</span>',following=P.following.indexOf(TL.who)>=0;
@@ -1555,8 +1579,9 @@ function tlRender(){var el=document.getElementById("tlView");if(!el)return;var s
  if(isMe&&(owner||P.hl.length)){h+='<div class="tl-sec">Highlights<small>'+(owner?'Pinned for visitors':'')+'</small></div><div class="tl-hls">'+(owner?'<button class="tl-hl add" data-tl-hl-add><span class="r"><i>'+tlI("plus")+'</i></span><span>New</span></button>':'')+P.hl.map(function(x){return '<button class="tl-hl" data-tl-hl="'+esc(x.id)+'"><span class="r"><i style="'+(x.img?'background-image:url('+esc(x.img)+')':'')+'">'+(x.img?'':esc(String(x.title).charAt(0).toUpperCase()))+'</i></span><span>'+esc(x.title)+'</span></button>'}).join('')+'</div>'}
  h+='<div class="tl-tabs"><button class="'+(TL.tab==="Posts"?"on":"")+'" data-tl-tab="Posts">Posts</button><button class="'+(TL.tab==="Media"?"on":"")+'" data-tl-tab="Media">Media</button></div>';
  if(st.feedLoading&&!posts.length)h+='<div class="tl-empty">Loading…</div>';
+ else if(st.feedError&&!posts.length)h+='<div class="tl-empty"><b>Timeline unavailable</b>'+esc(st.feedError)+'<button class="tl-b p" data-act="feed-refresh">Try again</button></div>';
  else if(TL.tab==="Posts"){h+=posts.length?posts.map(function(p){return tlCard(p,owner)}).join(''):'<div class="tl-empty"><b>'+(isMe?'Your timeline is ready':'No posts yet')+'</b>'+(isMe?'Share your first update, a market view or feedback. It shows here for everyone.':'This member has not posted yet.')+(owner?'<button class="tl-b p" data-tl-go="post">'+tlI("pen")+'Create your first post</button>':'')+'</div>'}
- else{var m=[];posts.forEach(function(p){(p.attachments||[]).forEach(function(a){if(String(a.content_type||"").indexOf("image/")===0)m.push(tlAtt(p,a))})});h+=m.length?'<div class="tl-grid">'+m.map(function(u){return '<a target="_blank" rel="noopener" href="'+esc(u)+'" style="background-image:url('+esc(u)+')"></a>'}).join('')+'</div>':'<div class="tl-empty"><b>No photos yet</b>Photos from posts appear here.</div>'}
+ else{var m=[];posts.forEach(function(p){(p.attachments||[]).forEach(function(a){if(String(a.content_type||"").indexOf("image/")===0)m.push(tlAtt(p,a))})});h+=m.length?'<div class="tl-grid">'+m.map(function(u){return '<a target="_blank" rel="noopener" href="'+esc(u)+'"><img loading="lazy" decoding="async" src="'+esc(u)+'" alt=""></a>'}).join('')+'</div>':'<div class="tl-empty"><b>No photos yet</b>Photos from posts appear here.</div>'}
  h+='</div>';el.innerHTML=h;el.scrollTop=sc}
 function tlOpen(who){tlCss();document.body.classList.add("tm-timeline-open");TL.who=who===undefined?null:who;TL.tab="Posts";TL.preview=false;tlClose("tlMenu");var el=document.getElementById("tlView");if(!el){el=document.createElement("div");el.id="tlView";document.body.appendChild(el)}tlRender();loadFeed(false)}
 function tlEditSheet(){var P=tlP();tlSheet("tlEdit",'<h3 style="font-size:19px;margin:0 0 12px">Edit profile</h3><div class="tl-ed" id="tlEC" style="'+(P.cover?'background-image:url('+P.cover+')':'')+'"><button class="c" data-tl-cover>'+tlI("cam")+'Cover</button><div class="a" id="tlEA" style="'+(st.me.photo?'background-image:url('+st.me.photo+')':'')+'">'+(st.me.photo?'':esc(String(st.me.nick||"M").charAt(0).toUpperCase()))+'</div><button class="v" data-tl-av>'+tlI("cam")+'Photo</button></div>'
@@ -1625,7 +1650,7 @@ function feed(){
  else if(st.feedError&&!rows.length)html+='<div class="empty"><b>Feed unavailable</b>'+esc(st.feedError)+'<button class="btn sm" data-act="feed-refresh">Try again</button></div>';
  else if(st.feedError)html+='<div class="fine" role="status">'+esc(st.feedError)+' <button class="btn sm" data-act="feed-refresh">Retry</button></div>';
  if(!shown.length&&!st.feedLoading&&!st.feedError)html+='<div class="empty"><b>No posts yet</b>Be the first to share an update or feedback.</div>';
- else if(shown.length)html+=shown.map(function(p){return '<article class="card" style="margin:10px 16px"><button type="button" class="tl-au" data-tl-user="'+esc(p.author||'')+'" style="display:block;font-weight:800">'+esc(p.author||'TradeMate member')+'</button><small>'+esc(p.type)+' · '+esc(p.time)+'</small>'+(p.title?'<h3>'+esc(p.title)+'</h3>':'')+tlBodyHTML(p.body)+(p.attachments||[]).map(function(a){var url=TMCFG.api+'/feed/posts/'+encodeURIComponent(p.id)+'/attachments/'+encodeURIComponent(a.id),mime=String(a.content_type||"").toLowerCase();if(mime.indexOf("audio/")===0)return '<div class="sub"><audio controls preload="none" src="'+esc(url)+'"></audio><small>'+esc(a.file_name)+'</small></div>';if(mime.indexOf("image/")===0)return '<p><a target="_blank" rel="noopener" href="'+esc(url)+'"><img src="'+esc(url)+'" alt="'+esc(a.file_name)+'" style="display:block;max-width:100%;max-height:320px;object-fit:contain;border-radius:10px"></a></p>';return '<p><a target="_blank" rel="noopener" href="'+esc(url)+'">'+esc(a.file_name)+'</a></p>'}).join('')+feedActionsHTML(p,!!(st.me.id&&p.author_user_id===st.me.id))+'</article>'}).join('');
+ else if(shown.length)html+=shown.map(function(p){return '<article class="card" style="margin:10px 16px"><button type="button" class="tl-au" data-tl-user="'+esc(p.author||'')+'" style="display:block;font-weight:800">'+esc(p.author||'TradeMate member')+'</button><small>'+esc(p.type)+' · '+esc(p.time)+'</small>'+(p.title?'<h3>'+esc(p.title)+'</h3>':'')+tlBodyHTML(p.body)+(p.attachments||[]).map(function(a){var url=TMCFG.api+'/feed/posts/'+encodeURIComponent(p.id)+'/attachments/'+encodeURIComponent(a.id),mime=String(a.content_type||"").toLowerCase();if(mime.indexOf("audio/")===0)return '<div class="sub"><audio controls preload="none" src="'+esc(url)+'"></audio><small>'+esc(a.file_name)+'</small></div>';if(mime.indexOf("image/")===0)return '<p><a target="_blank" rel="noopener" href="'+esc(url)+'"><img src="'+esc(url)+'" alt="'+esc(a.file_name)+'" loading="lazy" decoding="async" style="display:block;max-width:100%;max-height:320px;object-fit:contain;border-radius:10px"></a></p>';return '<p><a target="_blank" rel="noopener" href="'+esc(url)+'">'+esc(a.file_name)+'</a></p>'}).join('')+feedActionsHTML(p,!!(st.me.id&&p.author_user_id===st.me.id))+'</article>'}).join('');
  return html+tlFab()+'<p class="fine">Posts and comments are shared through TradeMate accounts. Announcements are published by moderators.</p>';
 }
 

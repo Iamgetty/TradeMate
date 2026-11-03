@@ -2459,7 +2459,6 @@ class CommunityFeedController {
     parseUuidParam(id);
     parseBody(feedCommentBodySchema, body);
     const userId = await this.currentUser(request);
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid post id.');
     const content = typeof body?.body === 'string' ? body.body.trim() : '';
     if (content.length < 1 || content.length > 2000) throw new BadRequestException('Comments must be between 1 and 2,000 characters.');
     const result = await databasePool!.query(
