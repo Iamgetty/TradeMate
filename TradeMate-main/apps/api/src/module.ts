@@ -2482,7 +2482,8 @@ class CommunityFeedController {
       'INSERT INTO feed_post_reactions (post_id, user_id, emoji) VALUES ($1, $2, $3) ON CONFLICT (post_id, user_id) DO UPDATE SET emoji = EXCLUDED.emoji, created_at = now()',
       [id, userId, body.emoji],
     );
-    return { success: true, emoji: body.emoji };
+    const totals = await databasePool!.query('SELECT count(*)::int AS reaction_count FROM feed_post_reactions WHERE post_id = $1', [id]);
+    return { success: true, emoji: body.emoji, reaction_count: totals.rows[0].reaction_count };
   }
 
   @Delete('posts/:id/reactions')
@@ -2525,8 +2526,9 @@ class CommunityFeedController {
         "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'feed.post.reshared', 'feed_post', $2, $3::jsonb)",
         [userId, id, JSON.stringify({ reshare_id: saved.rows[0].id })],
       );
+      const totals = await client.query('SELECT count(*)::int AS reshare_count FROM feed_post_reshares WHERE post_id = $1', [id]);
       await client.query('COMMIT');
-      return { reshare: saved.rows[0] };
+      return { reshare: saved.rows[0], reshare_count: totals.rows[0].reshare_count };
     } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
     finally { client.release(); }
   }
