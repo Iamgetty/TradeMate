@@ -1420,12 +1420,12 @@ function loadFeed(force){
  if(st.feedLoading&&!force)return feedRequestPromise||Promise.resolve(st.feedPosts||[]);
  if(!force&&st.feedLoaded)return Promise.resolve(st.feedPosts||[]);
  if(force&&feedRequestController){feedRequestController.abort();feedRequestController=null}
- var requestId=++feedRequestId,controller=typeof AbortController!=="undefined"?new AbortController():null;
+ var requestId=++feedRequestId,controller=typeof AbortController!=="undefined"?new AbortController():null,timer,timedOut=false;
  st.feedLoading=true;st.feedError="";
- var timer=setTimeout(function(){if(controller)controller.abort()},12000);
- var request=api("GET","/feed/posts?limit=40",null,controller?{signal:controller.signal}:undefined)
+ var timeoutPromise=new Promise(function(_,reject){timer=setTimeout(function(){timedOut=true;if(controller)controller.abort();reject(new Error("FEED_TIMEOUT"))},12000)});
+ var request=Promise.race([api("GET","/feed/posts?limit=40",null,controller?{signal:controller.signal}:undefined),timeoutPromise])
   .then(function(d){if(requestId!==feedRequestId)return st.feedPosts||[];st.feedPosts=(d.posts||[]).map(function(p){return {id:p.id,type:p.post_type==="feedback"?"Feedback":p.post_type==="announcement"?"Announcements":"Posts",author:p.author_name,author_user_id:p.author_user_id||null,title:p.title||"",body:p.body,attachments:p.attachments||[],time:fmtT(p.created_at),comments:p.comment_count||0,reactions:p.reaction_count||0,reshares:p.reshare_count||0,pinned:p.pinned}});st.feedLoaded=true;return st.feedPosts})
-  .catch(function(e){if(requestId!==feedRequestId)return st.feedPosts||[];st.feedError=controller&&controller.signal.aborted?"The Feed request timed out. Check your connection and try again.":(e&&e.message||"Could not load the Feed.");return []})
+  .catch(function(e){if(requestId!==feedRequestId)return st.feedPosts||[];st.feedError=timedOut?"The Feed request timed out. Check your connection and try again.":(e&&e.message||"Could not load the Feed.");return []})
   .finally(function(){clearTimeout(timer);if(requestId!==feedRequestId)return;feedRequestController=null;feedRequestPromise=null;st.feedLoading=false;if(st.tab==="Feed")draw();if(document.getElementById("tlView"))tlRender()});
  feedRequestController=controller;feedRequestPromise=request;return request;
 }
