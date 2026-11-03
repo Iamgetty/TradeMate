@@ -217,6 +217,18 @@ export const feedCommentBodySchema = z.object({
   body: z.string().trim().min(1).max(2000),
 }).strict();
 
+export const feedReactionBodySchema = z.object({
+  emoji: z.enum(['👍','❤️','😂','😮','😢','🔥']),
+}).strict();
+
+export const feedPinBodySchema = z.object({
+  pinned: z.boolean(),
+}).strict();
+
+export const feedReshareBodySchema = z.object({
+  note: z.string().trim().max(500).optional(),
+}).strict();
+
 export const feedReportBodySchema = z.object({
   postId: z.string().uuid().optional(),
   commentId: z.string().uuid().optional(),
