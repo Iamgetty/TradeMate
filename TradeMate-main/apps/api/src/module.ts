@@ -2350,6 +2350,8 @@ class CommunityFeedController {
       `SELECT p.id, p.author_user_id, p.post_type, p.title, p.body, p.pinned, p.created_at,
               COALESCE(u.display_name, 'TradeMate Team') AS author_name,
               (SELECT count(*)::int FROM feed_comments c WHERE c.post_id = p.id AND c.status = 'published') AS comment_count,
+              (SELECT count(*)::int FROM feed_post_reactions r WHERE r.post_id = p.id) AS reaction_count,
+              (SELECT count(*)::int FROM feed_post_reshares rs WHERE rs.post_id = p.id) AS reshare_count,
               COALESCE((SELECT json_agg(json_build_object('id', a.id, 'file_name', a.file_name, 'content_type', a.content_type, 'byte_size', a.byte_size) ORDER BY a.created_at)
                         FROM feed_attachments a WHERE a.post_id = p.id), '[]'::json) AS attachments
        FROM feed_posts p LEFT JOIN users u ON u.id = p.author_user_id
