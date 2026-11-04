@@ -283,6 +283,7 @@ const server = http.createServer((req, res) => {
     return sendJson(res, 200, { ok: true, feeds: feedsInfo(), books: books.size, mt5Quotes: mt5QuoteStore.size });
   }
   if (req.method === 'GET' && req.url === '/mt5/quotes') {
+    if (!authorizedMt5Request(req)) return sendJson(res, 401, { error: 'Unauthorized' });
     return sendJson(res, 200, { source: 'exness_mt5', quotes: mt5QuoteStore.snapshot(), fetchedAt: new Date().toISOString() });
   }
   if (req.method === 'POST' && req.url === '/mt5/quotes') {
@@ -362,7 +363,7 @@ setInterval(() => {
     const key = c.watch || '';
     if (!cache.has(key)) {
       cache.set(key, JSON.stringify({
-        ts: now, feeds, mt5Quotes: mt5QuoteStore.snapshot(now),
+        ts: now, feeds,
         books: list.map(({ bids, asks, ...slim }) => (key && slim.base === key ? { ...slim, bids, asks } : slim)),
         trades: key ? trades.filter((t) => t.base === key) : [],
       }));
