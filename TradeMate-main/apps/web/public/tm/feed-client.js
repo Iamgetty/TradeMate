@@ -106,6 +106,8 @@
         booksCombined: fresh.length,                  // "N exchange books combined"
         feedsLive: Number.isFinite(msg.feeds.live) ? msg.feeds.live : 0, // "N/M FEEDS LIVE"
         feedsTotal: Number.isFinite(msg.feeds.total) ? msg.feeds.total : 0,
+        fxQuotes: Array.isArray(msg.fxQuotes) ? msg.fxQuotes : [],
+        fxStatus: msg.fxStatus || { state: 'unavailable', provider: 'OANDA' },
         ts: msg.ts,
       });
     }
