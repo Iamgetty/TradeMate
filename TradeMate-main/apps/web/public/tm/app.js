@@ -1095,17 +1095,15 @@ function tmSaveFxSnapshot(data){
   localStorage.setItem(TM_FX_SNAPSHOT_KEY,JSON.stringify({savedAt:Date.now(),data:{rates:data.rates,rateTimestamp:data.time_last_update_utc||new Date().toISOString()}}));
  }catch(e){}
 }
-tmRestoreFxSnapshot();
+// Forex reference prices are supplied by the Twelve Data backend feed.
 function liveRefresh(){
  if(document.hidden||["Home","Markets","Trade","Portfolio","P2P"].indexOf(st.tab)<0)return;
  var updated=false;
  var coins=fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids="+Object.keys(CG).map(function(k){return CG[k]}).join(",")+"&price_change_percentage=24h").then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){
   d.forEach(function(c){var k=Object.keys(CG).filter(function(x){return CG[x]===c.id})[0],it=k&&byName(k+"/USDT");if(!it||!(c.current_price>0))return;it.p=c.current_price;it.c=c.price_change_percentage_24h_in_currency!=null?c.price_change_percentage_24h_in_currency:(c.price_change_percentage_24h||0);if(c.market_cap)it.cap=c.market_cap;if(c.image&&!EMB[k])LOGOS[k]=c.image});st.live=true;updated=true
  }).catch(function(){});
- var fx=fetch("https://open.er-api.com/v6/latest/USD").then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){var rates=d&&d.rates;if(!rates)throw new Error("FX rates unavailable");
-  tmSaveFxSnapshot(d);if(tmApplyFxRates(rates,"indicative",d.time_last_update_utc||new Date().toISOString())){st.live=true;updated=true}
- }).catch(function(){if(tmRestoreFxSnapshot())updated=true});
- Promise.all([coins,fx]).then(function(){if(updated)softDraw()})
+
+ Promise.all([coins]).then(function(){if(updated)softDraw()})
 }
 function softDraw(){if(["Home","Markets","Trade","Portfolio","P2P"].indexOf(st.tab)<0)return;var a=document.activeElement;if(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName))return;draw()}
 /* ---------- views ---------- */
@@ -1152,7 +1150,7 @@ var FOREX_GROUPS=["Currency Pairs","Stock Indices","Commodities","Equities","Bon
 function loadMarketQuotes(market,list){
  var allowed=["Stock Indices","Commodities","Equities","Bonds & Treasuries"];
  if(allowed.indexOf(market)<0||!TMCFG.api)return;
- var rows=list.filter(function(i){return i.assetClass===market&&i.providerSymbol});
+ var rows=list.filter(function(i){return i.assetClass===market&&i.providerSymbol&&i.quoteProvider!=="Twelve Data Basic"});
  rows.forEach(function(i){if(!i.quoteStatus||i.quoteStatus==="unavailable")tmRestoreQuoteSnapshot(i)});
  var key=market+":"+rows.map(function(i){return i.providerSymbol}).join(",");
  if(!rows.length||MARKET_QUOTE_STATE.loading||(MARKET_QUOTE_STATE.key===key&&Date.now()-MARKET_QUOTE_STATE.last<45000))return;
@@ -1340,41 +1338,50 @@ function ensureMultiFeeds(it){var symbol=String(it.n||"").replace(/[^a-z0-9]/gi,
 function tmTape(){var a=[];Object.keys(tmFeeds).forEach(function(k){a=a.concat(tmFeeds[k].trades||[])});return a.sort(function(x,y){return y.time-x.time}).slice(0,80)}
 function tmStatus(){return tmFeedStatusCount.total?tmFeedStatusCount.live+"/"+tmFeedStatusCount.total+" FEEDS LIVE":"CONNECTING TO EXCHANGES"}
 function tmBooks(it,dp){if(!document.getElementById("tm-book-standby-style")){var stl=document.createElement("style");stl.id="tm-book-standby-style";stl.textContent="@keyframes tmBookPulse{0%,100%{opacity:.25;transform:scaleY(.65)}50%{opacity:1;transform:scaleY(1)}}.tm-book-standby{grid-column:1/-1;min-height:190px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--mut);text-align:center}.tm-book-standby .bars{display:flex;align-items:center;gap:6px;height:30px}.tm-book-standby i{display:block;width:5px;border-radius:8px;background:var(--am);animation:tmBookPulse .8s ease-in-out infinite}.tm-book-standby i:nth-child(1){height:12px;animation-delay:0s}.tm-book-standby i:nth-child(2){height:22px;animation-delay:.12s}.tm-book-standby i:nth-child(3){height:30px;animation-delay:.24s}.tm-book-standby i:nth-child(4){height:18px;animation-delay:.36s}.tm-book-standby i:nth-child(5){height:25px;animation-delay:.48s}.tm-book-standby small{font-size:12px}";document.head.appendChild(stl)}var bids={},asks={},sources=0;Object.keys(tmFeeds).forEach(function(k){var f=tmFeeds[k];if(f.bookAt&&(f.bids.length||f.asks.length))sources++;f.bids.forEach(function(x){var p=Number(x.p),q=Number(x.q);if(p>0&&q>0){var key=p.toFixed(dp);bids[key]=(bids[key]||0)+q}});f.asks.forEach(function(x){var p=Number(x.p),q=Number(x.q);if(p>0&&q>0){var key=p.toFixed(dp);asks[key]=(asks[key]||0)+q}})});var bb=Object.keys(bids).map(function(p){return {p:+p,q:bids[p]}}).sort(function(a,b){return b.p-a.p}).slice(0,20),aa=Object.keys(asks).map(function(p){return {p:+p,q:asks[p]}}).sort(function(a,b){return a.p-b.p}).slice(0,20),rows="";for(var i=0;i<Math.max(bb.length,aa.length);i++){var b=bb[i],a=aa[i];rows+='<div class="cell b"><i class="d" style="width:'+(b?Math.min(100,Math.max(3,b.q/(bb[0]?bb[0].q:b.q)*100)):0)+'%"></i><span>'+(b?fx2(b.q,6):"—")+'</span><span>'+(b?fx2(b.p,dp):"—")+'</span></div><div class="cell a"><i class="d" style="width:'+(a?Math.min(100,Math.max(3,a.q/(aa[0]?aa[0].q:a.q)*100)):0)+'%"></i><span>'+(a?fx2(a.p,dp):"—")+'</span><span>'+(a?fx2(a.q,6):"—")+'</span></div>'}return '<div class="bk"><div class="h"><span>Total bid size ('+esc(it.n.split("/")[0])+')</span><span>Bid price (USDT)</span></div><div class="h r"><span>Ask price (USDT)</span><span>Total ask size ('+esc(it.n.split("/")[0])+')</span></div>'+(rows||'<div class="tm-book-standby"><div class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><b>Market feed on standby</b><small>Syncing live order-book depth from connected exchanges</small></div>')+'</div><p class="fine">'+sources+' exchange books combined into one aggregated order book. Quantities at matching prices are added together.</p>'}
-// OANDA OTC account pricing. This is a bid/ask quote stream, not an exchange order book.
-var fxFeedSocket=null,fxFeedQuotes={},fxFeedStatus={state:"connecting",provider:"OANDA"};
+// Forex reference prices are supplied by the Twelve Data Basic feed.
+var fxFeedSocket=null,fxFeedQuotes={},fxFeedStatus={state:"connecting",provider:"Twelve Data",plan:"Basic"};
 function ensureFXFeed(){
  if(fxFeedSocket)return;
- if(typeof createFeedClient!=="function"){fxFeedStatus={state:"unavailable",provider:"OANDA",error:"Feed client unavailable"};return}
+ if(typeof createFeedClient!=="function"){fxFeedStatus={state:"unavailable",provider:"Twelve Data",plan:"Basic",error:"Feed client unavailable"};return}
  try{
   fxFeedSocket=createFeedClient({
    url:"wss://exchange-feed.onrender.com",base:"EUR",quote:"USD",markets:["spot"],
-   onStatus:function(connected){if(!connected&&fxFeedStatus.state==="live")fxFeedStatus.state="reconnecting";scheduleMarketDraw()},
+   onStatus:function(connected){if(!connected&&(fxFeedStatus.state==="live"||fxFeedStatus.state==="available"||fxFeedStatus.state==="refreshing"))fxFeedStatus.state="reconnecting";scheduleMarketDraw()},
    onUpdate:function(data){
     fxFeedQuotes={};
     (data.fxQuotes||[]).forEach(function(q){if(q&&q.instrument)fxFeedQuotes[q.instrument]=q});
-    fxFeedStatus=data.fxStatus||{state:"unavailable",provider:"OANDA"};
+    fxFeedStatus=data.fxStatus||{state:"unavailable",provider:"Twelve Data",plan:"Basic"};
+    items.filter(function(i){return i.m==="Forex"&&!i.assetClass&&i.n.indexOf("/")>0}).forEach(function(it){
+     var q=fxFeedQuotes[it.n.replace("/","_")];
+     if(q&&Number(q.mid)>0){it.p=Number(q.mid);it.quoteTime=q.time||null;it.quoteStatus="delayed";it.quoteProvider="Twelve Data Basic";it.c=null}
+     else{it.p=null;it.quoteTime=null;it.quoteStatus="unavailable";it.quoteProvider="Twelve Data Basic";it.c=null}
+    });
+    items.filter(function(i){return i.assetClass==="Equities"&&["AAPL","MSFT","NVDA","AMZN"].indexOf(i.providerSymbol)>=0}).forEach(function(it){
+     var q=fxFeedQuotes[it.providerSymbol];
+     if(q&&Number(q.mid)>0){it.p=Number(q.mid);it.quoteTime=q.time||null;it.quoteStatus="delayed";it.quoteProvider="Twelve Data Basic";it.quoteCurrency="USD";it.c=null}
+     else{it.p=null;it.quoteTime=null;it.quoteStatus="unavailable";it.quoteProvider="Twelve Data Basic";it.c=null}
+    });
     scheduleMarketDraw();
    }
   });
- }catch(e){fxFeedStatus={state:"unavailable",provider:"OANDA",error:e.message||"Feed unavailable"}}
+ }catch(e){fxFeedStatus={state:"unavailable",provider:"Twelve Data",plan:"Basic",error:e.message||"Feed unavailable"}}
 }
 function fxQuotePanel(pair){
  if(!pair||pair.length!==7||pair.charAt(3)!=="/")return "";
  ensureFXFeed();
  var instrument=pair.replace("/","_"),q=fxFeedQuotes[instrument],state=fxFeedStatus.state||"connecting";
- var age=q&&q.time?Date.now()-Date.parse(q.time):Infinity,stale=!Number.isFinite(age)||age>30000;
- var message=state==="not_configured"?"OANDA credentials are not configured on the feed service.":state==="error"?"OANDA feed error: "+(fxFeedStatus.error||"connection failed"):state==="live"&&!q?"This pair is not available in the connected OANDA account.":q&&stale?"The last quote is stale; waiting for a fresh update.":"Waiting for account-authorized OANDA prices…";
- var shell='<section style="margin:12px 16px;padding:14px;border:1px solid #326b5c;border-radius:14px;background:#14251f;display:grid;gap:8px"><small style="font:700 9px monospace;letter-spacing:.12em;color:#65d9c5">OANDA ACCOUNT PRICING · OTC</small>';
+ var age=q&&q.time?Date.now()-Date.parse(q.time):Infinity,stale=!Number.isFinite(age)||age>45*60*1000;
+ var message=state==="not_configured"?"The Twelve Data API key is not configured on the feed service.":state==="error"?"Twelve Data error: "+(fxFeedStatus.error||"request failed"):!q?"This pair is outside the 8-pair Basic-plan watchlist.":stale?"The last reference price is stale; waiting for the next refresh.":"Waiting for the next reference-price update…";
+ var shell='<section style="margin:12px 16px;padding:14px;border:1px solid #326b5c;border-radius:14px;background:#14251f;display:grid;gap:8px"><small style="font:700 9px monospace;letter-spacing:.12em;color:#65d9c5">TWELVE DATA BASIC · REFERENCE PRICE ONLY</small>';
  if(!q||stale)return shell+'<b>'+esc(pair)+'</b><span style="font-size:12px;color:var(--mut)">'+esc(message)+'</span></section>';
- var dp=pair.indexOf("JPY")>=0?3:5,bid=q.bid==null?"—":fx2(q.bid,dp),ask=q.ask==null?"—":fx2(q.ask,dp);
- var levels=function(rows){return (rows||[]).slice(0,3).map(function(x){return '<div style="display:flex;justify-content:space-between;gap:8px;font-size:11px"><b>'+fx2(x.price,dp)+'</b><span>'+Number(x.liquidity).toLocaleString()+'</span></div>'}).join("")||'<small>Unavailable</small>'};
- return shell+'<b style="font-size:17px">'+esc(pair)+' <span class="up">'+bid+'</span> / <span class="dn">'+ask+'</span></b><span style="font-size:11px;color:var(--mut)">Spread '+(q.spread==null?"—":fx2(q.spread,dp))+' · Mid '+(q.mid==null?"—":fx2(q.mid,dp))+' · '+(q.tradeable?"Tradeable":"Not tradeable")+'</span><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div><small style="color:var(--mut)">BID · PRICE / LIQUIDITY</small>'+levels(q.bids)+'</div><div><small style="color:var(--mut)">ASK · PRICE / LIQUIDITY</small>'+levels(q.asks)+'</div></div><small style="color:var(--mut)">Updated '+new Date(q.time).toLocaleTimeString()+'</small></section>';
+ var dp=pair.indexOf("JPY")>=0?3:5;
+ return shell+'<b style="font-size:19px">'+esc(pair)+' <span>'+fx2(Number(q.mid),dp)+'</span></b><span style="font-size:11px;color:var(--mut)">Indicative reference price · no bid/ask, spread, liquidity or execution quote</span><small style="color:var(--mut)">Last updated '+new Date(q.time).toLocaleTimeString()+' · refreshes about every 30 minutes</small></section>';
 }
 function trade(){
  var it=items[st.tp],cr=it.m==="Crypto",fxm=it.m==="Forex"&&!it.assetClass;
  if(it.assetClass&&it.quoteStatus!=="live"&&it.quoteStatus!=="delayed")tmRestoreQuoteSnapshot(it);
  if(fxm)ensureFXFeed();
- var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose market">'+(isPlainAsset(it)?"":'<span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span>')+'<b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?(fxFeedStatus.state==="live"?"OANDA LIVE":"OANDA "+String(fxFeedStatus.state||"CONNECTING").toUpperCase()):it.assetClass?(it.quoteStatus==="live"?"LIVE QUOTE":it.quoteStatus==="delayed"?"DELAYED QUOTE":it.quoteStatus==="unavailable"?"QUOTE UNAVAILABLE":"PUBLIC QUOTE"):"TRADEMATE")+'</span></div>';
+ var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose market">'+(isPlainAsset(it)?"":'<span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span>')+'<b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?(fxFeedStatus.state==="available"||fxFeedStatus.state==="refreshing"?"TWELVE DATA BASIC":"TWELVE DATA "+String(fxFeedStatus.state||"CONNECTING").toUpperCase()):it.assetClass?(it.quoteProvider==="Twelve Data Basic"?"TWELVE DATA BASIC":it.quoteStatus==="live"?"LIVE QUOTE":it.quoteStatus==="delayed"?"DELAYED QUOTE":it.quoteStatus==="unavailable"?"QUOTE UNAVAILABLE":"PUBLIC QUOTE"):"TRADEMATE")+'</span></div>';
  if(cr){
   ensureMultiFeeds(it);
   var dp=it.p<1?6:it.p<20?4:2,stamp=tmStatus();
@@ -1390,9 +1397,9 @@ function trade(){
   return h+head+cachedNote+body+'<p class="fine">Live public exchange reference data only. Order book shows available price levels; Trades shows recent executions. TradeMate business agreements are negotiated separately through Contracts. '+stamp+'.</p>';
  }
  if(it.assetClass){
-  var status=it.quoteStatus==="live"?"Live public quote":it.quoteStatus==="delayed"?"Delayed public quote":it.quoteStatus==="cached"?"Last saved public quote":it.quoteStatus==="unavailable"?"Public quote unavailable":"Awaiting public quote";
+  var status=it.quoteProvider==="Twelve Data Basic"?(it.quoteStatus==="delayed"?"Twelve Data Basic · periodic reference price":it.quoteStatus==="unavailable"?"Twelve Data Basic · quote unavailable":"Twelve Data Basic · awaiting quote"):(it.quoteStatus==="live"?"Live public quote":it.quoteStatus==="delayed"?"Delayed public quote":it.quoteStatus==="cached"?"Last saved public quote":it.quoteStatus==="unavailable"?"Public quote unavailable":"Awaiting public quote");
   var unit=it.unit||"USD";
-  return h+'<div class="tpx"><b>'+px(it)+'</b><span>'+esc(unit)+'</span></div><div class="card" style="margin:8px 16px"><b>'+status+'</b><p style="color:var(--mut);margin:6px 0 0">'+esc(it.assetClass)+' · '+(it.quoteTime?"Updated "+new Date(it.quoteTime).toLocaleString():"No quote timestamp yet")+(it.snapshotAt?" · Snapshot saved "+new Date(it.snapshotAt).toLocaleString():"")+'</p></div><p class="fine">Reference pricing from the public market-quote provider. This instrument is grouped under the Forex marketplace; executable order-book and trade feeds are not connected for this asset class.</p>';
+  return h+'<div class="tpx"><b>'+px(it)+'</b><span>'+esc(unit)+'</span></div><div class="card" style="margin:8px 16px"><b>'+status+'</b><p style="color:var(--mut);margin:6px 0 0">'+esc(it.assetClass)+' · '+(it.quoteTime?"Updated "+new Date(it.quoteTime).toLocaleString():"No quote timestamp yet")+(it.snapshotAt?" · Snapshot saved "+new Date(it.snapshotAt).toLocaleString():"")+'</p></div><p class="fine">'+(it.quoteProvider==="Twelve Data Basic"?"Twelve Data Basic reference price, refreshed periodically. No bid/ask, order-book liquidity or execution feed is provided.":"Reference pricing from the public market-quote provider.")+' This instrument is grouped under the Forex marketplace; executable order-book and trade feeds are not connected for this asset class.</p>';
  }
  if(fxm){
   var fxCached=it.quoteStatus==="cached";

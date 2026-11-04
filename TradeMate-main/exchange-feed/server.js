@@ -266,7 +266,8 @@ const OANDA_WANTED = [
   'EUR_CAD', 'AUD_CAD', 'AUD_NZD', 'USD_ZAR', 'USD_NGN', 'EUR_NGN', 'GBP_NGN', 'USD_GHS', 'USD_KES',
 ];
 const fxQuotes = new Map();
-const fxStatus = { state: process.env.OANDA_ACCOUNT_ID && process.env.OANDA_API_TOKEN ? 'connecting' : 'not_configured', provider: 'OANDA', environment: process.env.OANDA_ENVIRONMENT === 'live' ? 'live' : 'practice', error: null, instruments: 0, updatedAt: null };
+const useTwelveData = !!process.env.TWELVE_DATA_API_KEY;
+const fxStatus = { state: useTwelveData ? 'connecting' : (process.env.OANDA_ACCOUNT_ID && process.env.OANDA_API_TOKEN ? 'connecting' : 'not_configured'), provider: useTwelveData ? 'Twelve Data' : 'OANDA', plan: useTwelveData ? 'Basic' : null, quoteType: useTwelveData ? 'reference_only' : 'account_otc', refreshMinutes: useTwelveData ? 30 : null, error: null, instruments: 0, updatedAt: null };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function runOandaPricing() {
@@ -339,7 +340,64 @@ async function runOandaPricing() {
     await sleep(5000);
   }
 }
-runOandaPricing();
+const TWELVE_DATA_WANTED = [
+  { symbol: 'EUR/USD', instrument: 'EUR_USD', assetClass: 'Forex' },
+  { symbol: 'GBP/USD', instrument: 'GBP_USD', assetClass: 'Forex' },
+  { symbol: 'USD/JPY', instrument: 'USD_JPY', assetClass: 'Forex' },
+  { symbol: 'USD/CHF', instrument: 'USD_CHF', assetClass: 'Forex' },
+  { symbol: 'AAPL', instrument: 'AAPL', assetClass: 'Equities' },
+  { symbol: 'MSFT', instrument: 'MSFT', assetClass: 'Equities' },
+  { symbol: 'NVDA', instrument: 'NVDA', assetClass: 'Equities' },
+  { symbol: 'AMZN', instrument: 'AMZN', assetClass: 'Equities' },
+];
+async function runTwelveDataPricing() {
+  const apiKey = process.env.TWELVE_DATA_API_KEY;
+  if (!apiKey) return;
+  const refreshInterval = 30 * 60 * 1000;
+  while (true) {
+    const cycleStarted = Date.now();
+    fxStatus.state = fxQuotes.size ? 'refreshing' : 'connecting';
+    fxStatus.error = null;
+    let successful = 0;
+    let lastError = null;
+    for (let i = 0; i < TWELVE_DATA_WANTED.length; i++) {
+      const item = TWELVE_DATA_WANTED[i];
+      try {
+        const url = new URL('https://api.twelvedata.com/price');
+        url.searchParams.set('symbol', item.symbol);
+        url.searchParams.set('apikey', apiKey);
+        const response = await fetch(url, { headers: { Accept: 'application/json' } });
+        const payload = await response.json().catch(() => ({}));
+        const price = Number(payload && payload.price);
+        if (!response.ok || !Number.isFinite(price) || price <= 0) {
+          const detail = payload && payload.message ? String(payload.message).slice(0, 180) : '';
+          throw new Error('Twelve Data request failed (' + response.status + ')' + (detail ? ': ' + detail : ''));
+        }
+        const parts = item.symbol.split('/');
+        const timestamp = new Date().toISOString();
+        fxQuotes.set(item.instrument, {
+          instrument: item.instrument, symbol: item.symbol, base: parts[0] || null, quote: parts[1] || null,
+          assetClass: item.assetClass, bid: null, ask: null, spread: null, mid: price, price,
+          bids: [], asks: [], tradeable: false, status: 'reference_only',
+          quoteType: 'reference_only', time: timestamp, provider: 'Twelve Data',
+        });
+        successful++;
+        fxStatus.updatedAt = timestamp;
+      } catch (error) {
+        lastError = error.message || 'Twelve Data request failed';
+        console.error('[twelvedata-basic] ' + item.symbol + ': ' + lastError);
+      }
+      if (i < TWELVE_DATA_WANTED.length - 1) await sleep(8500);
+    }
+    fxStatus.instruments = fxQuotes.size;
+    fxStatus.state = successful || fxQuotes.size ? 'available' : 'error';
+    fxStatus.error = successful ? null : lastError;
+    console.log('[twelvedata-basic] refreshed ' + successful + '/' + TWELVE_DATA_WANTED.length + ' mixed FX/equity reference prices');
+    await sleep(Math.max(1000, refreshInterval - (Date.now() - cycleStarted)));
+  }
+}
+
+if (useTwelveData) runTwelveDataPricing(); else runOandaPricing();
 
 // ---- Server for your app ----------------------------------------------------
 const feedsInfo = () => {
