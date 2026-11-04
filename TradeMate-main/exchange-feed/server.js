@@ -288,14 +288,17 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/mt5/quotes') {
     if (!authorizedMt5Request(req)) return sendJson(res, 401, { error: 'Unauthorized' });
     let body = '';
+    let tooLarge = false;
     req.on('data', (chunk) => {
+      if (tooLarge) return;
       body += chunk;
       if (Buffer.byteLength(body) > 65536) {
-        sendJson(res, 413, { error: 'Payload too large' });
-        req.destroy();
+        tooLarge = true;
+        body = '';
       }
     });
     req.on('end', () => {
+      if (tooLarge) return sendJson(res, 413, { error: 'Payload too large' });
       try {
         const payload = JSON.parse(body);
         const accepted = mt5QuoteStore.upsertBatch(payload.quotes);
