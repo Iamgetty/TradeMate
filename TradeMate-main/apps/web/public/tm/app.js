@@ -1377,6 +1377,18 @@ function applyMt5MarketQuotes(quotes,enabled){
   it.p=price;it.c=null;it.quoteStatus="live";it.quoteProvider="Exness MT5";it.quoteTime=q.timestamp;it.quoteBid=Number(q.bid)>0?Number(q.bid):null;it.quoteAsk=Number(q.ask)>0?Number(q.ask):null;it.mt5Symbol=q.symbol;it.mt5InstrumentType=q.instrumentType;
  });
 }
+function expireMt5MarketQuotes(){
+ var changed=false;
+ Object.keys(mt5FeedQuotes).forEach(function(key){if(!mt5QuoteIsFresh(mt5FeedQuotes[key]))delete mt5FeedQuotes[key]});
+ items.forEach(function(it){
+  if(it.quoteProvider==="Exness MT5"&&!mt5QuoteIsFresh(it)){
+   if(it.p!==null||it.quoteStatus!=="unavailable")changed=true;
+   it.p=null;it.c=null;it.quoteTime=null;it.quoteStatus="unavailable";it.quoteBid=null;it.quoteAsk=null;
+  }
+ });
+ if(changed)scheduleMarketDraw();
+}
+setInterval(expireMt5MarketQuotes,1000);
 function ensureFXFeed(){
  if(fxFeedSocket)return;
  if(typeof createFeedClient!=="function"){fxFeedStatus={state:"unavailable",provider:"Market feed",error:"Feed client unavailable"};return}
