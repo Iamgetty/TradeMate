@@ -1,0 +1,8 @@
+[
+  {"mt5_symbol":"EURUSDm","symbol":"EURUSD","instrumentType":"forex"},
+  {"mt5_symbol":"GBPUSDm","symbol":"GBPUSD","instrumentType":"forex"},
+  {"mt5_symbol":"USDJPYm","symbol":"USDJPY","instrumentType":"forex"},
+  {"mt5_symbol":"XAUUSDm","symbol":"XAUUSD","instrumentType":"metal"},
+  {"mt5_symbol":"US500m","symbol":"US500","instrumentType":"index_cfd"},
+  {"mt5_symbol":"AAPLm","symbol":"AAPL","instrumentType":"equity_cfd"}
+]
