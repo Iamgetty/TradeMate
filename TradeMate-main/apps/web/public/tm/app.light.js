@@ -1240,7 +1240,7 @@ function markets(categoryPage){
   var sorts=sortable?'<div class="sub mk-chips mk-sorts" role="group" aria-label="Sort list">'+[["def","Default"],["up","Top gainers"],["dn","Top losers"],["az","A–Z"]].map(function(s){return '<button class="'+(MKSORT===s[0]?"on":"")+'" data-mk-sort="'+s[0]+'" aria-pressed="'+(MKSORT===s[0])+'">'+s[1]+'</button>'}).join("")+'</div>':"";
   var count=st.q&&list.length?'<div class="mk-count"><b>'+list.length+'</b> result'+(list.length===1?"":"s")+' for “'+esc(st.q)+'”</div>':"";
   var canList=st.mode==="Seller"&&["Services","Real Estate","Software","B2B"].indexOf(st.mm)>=0;
-  var bondMarket=st.mm==="Bonds & Treasuries";
+  var bondMarket=st.mm==="Bonds & Treasuries"||(st.mm==="Forex"&&fxGroup==="Bonds & Treasuries");
   var body=list.length?'<div class="mk-list'+(bondMarket?' mk-bonds':'')+'"><div class="thead"><span>Name</span>'+(bondMarket?'<span>24H</span>':'<span>Price</span><span>24h</span>')+'</div>'+list.map(rowH).join("")+'</div>':(st.q?mkEmpty("search","No matches","Nothing matches “"+esc(st.q)+"”. Try a different search.",'<button class="btn sm" data-mk-clear>Clear search</button>'):mkEmpty(MI[st.mm]||"mkts",esc(meta.e||"Nothing here yet"),esc(meta.m||"Listings published by TradeMate members will appear here."),canList?'<button class="btn sm" data-f="Add Contract">Add Contract</button>':'<button class="btn sm" data-market-back>Explore other markets</button>'));
   return hero+find+groups+sorts+count+body;
  }
