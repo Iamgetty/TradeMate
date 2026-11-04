@@ -2,7 +2,7 @@
 
 // Read-only MT5 quote cache. This module never connects to a broker terminal
 // and has no order/deal functionality.
-const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const MAX_AGE_MS = 60 * 1000; // reject quotes older than one minute at ingestion
 const MAX_FUTURE_SKEW_MS = 60 * 1000;
 const MAX_QUOTES_PER_BATCH = 100;
 
