@@ -18,6 +18,7 @@ test('rejects inverted prices, invalid timestamps and unsupported types', () => 
   assert.throws(() => normalizeQuote({ ...valid, bid: 1.09 }, now), /Bid exceeds ask/);
   assert.throws(() => normalizeQuote({ ...valid, timestamp: 'bad' }, now), /timestamp/);
   assert.throws(() => normalizeQuote({ ...valid, timestamp: now + 120000 }, now), /timestamp/);
+  assert.throws(() => normalizeQuote({ ...valid, timestamp: now - 61000 }, now), /timestamp/);
   assert.throws(() => normalizeQuote({ ...valid, instrumentType: 'equity' }, now), /instrument type/);
 });
 
