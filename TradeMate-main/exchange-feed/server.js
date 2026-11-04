@@ -8,6 +8,9 @@
 
 const http = require('http');
 const WebSocket = require('ws');
+const crypto = require('crypto');
+const { createMt5QuoteStore } = require('./mt5-quotes');
+const mt5QuoteStore = createMt5QuoteStore();
 
 const PORT = process.env.PORT || 3000;
 const PUSH_MS = 1000;   // update rate to your app
@@ -264,9 +267,46 @@ const feedsInfo = () => {
   return { live: Object.values(status).filter(Boolean).length, total: feedStatus.size, status };
 };
 
+function sendJson(res, status, body) {
+  res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+  res.end(JSON.stringify(body));
+}
+function authorizedMt5Request(req) {
+  const expected = process.env.MT5_INGEST_TOKEN || '';
+  const supplied = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  if (!expected || !supplied) return false;
+  const a = Buffer.from(expected), b = Buffer.from(supplied);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ ok: true, feeds: feedsInfo(), books: books.size }));
+  if (req.method === 'GET' && req.url === '/health') {
+    return sendJson(res, 200, { ok: true, feeds: feedsInfo(), books: books.size, mt5Quotes: mt5QuoteStore.size });
+  }
+  if (req.method === 'GET' && req.url === '/mt5/quotes') {
+    return sendJson(res, 200, { source: 'exness_mt5', quotes: mt5QuoteStore.snapshot(), fetchedAt: new Date().toISOString() });
+  }
+  if (req.method === 'POST' && req.url === '/mt5/quotes') {
+    if (!authorizedMt5Request(req)) return sendJson(res, 401, { error: 'Unauthorized' });
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
+      if (Buffer.byteLength(body) > 65536) {
+        sendJson(res, 413, { error: 'Payload too large' });
+        req.destroy();
+      }
+    });
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body);
+        const accepted = mt5QuoteStore.upsertBatch(payload.quotes);
+        sendJson(res, 202, { accepted, source: 'exness_mt5' });
+      } catch (error) {
+        sendJson(res, 400, { error: error.message || 'Invalid quote payload' });
+      }
+    });
+    return;
+  }
+  return sendJson(res, 404, { error: 'Not found' });
 });
 const wss = new WebSocket.Server({ server });
 
@@ -319,7 +359,7 @@ setInterval(() => {
     const key = c.watch || '';
     if (!cache.has(key)) {
       cache.set(key, JSON.stringify({
-        ts: now, feeds,
+        ts: now, feeds, mt5Quotes: mt5QuoteStore.snapshot(now),
         books: list.map(({ bids, asks, ...slim }) => (key && slim.base === key ? { ...slim, bids, asks } : slim)),
         trades: key ? trades.filter((t) => t.base === key) : [],
       }));
