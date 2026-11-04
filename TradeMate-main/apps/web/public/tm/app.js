@@ -1183,7 +1183,7 @@ function mkTile(t,k){
 }
 function mkMix(max){
  var pools={},order=ORD.slice();
- items.forEach(function(i){if(order.indexOf(i.m)<0)return;(pools[i.m]=pools[i.m]||[]).push(i)});
+ items.forEach(function(i){if(order.indexOf(i.m)<0||!hasCurrentMarketFeed(i))return;(pools[i.m]=pools[i.m]||[]).push(i)});
  ["Crypto","Forex"].forEach(function(t){if(pools[t])pools[t]=pools[t].filter(function(i){return typeof i.c==="number"&&typeof i.p==="number"}).sort(function(a,b){return Math.abs(b.c)-Math.abs(a.c)})});
  var seen={};
  pools.NFTs=(NFTLIVE||[]).filter(function(i){var k=String(i.collectionSlug||i.collection||i.n||"").toLowerCase();if(!k||seen[k])return false;seen[k]=1;return true}).slice(0,3);
