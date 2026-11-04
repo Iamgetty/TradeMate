@@ -340,7 +340,16 @@ async function runOandaPricing() {
     await sleep(5000);
   }
 }
-const TWELVE_DATA_WANTED = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'USD/CAD', 'NZD/USD', 'EUR/GBP'];
+const TWELVE_DATA_WANTED = [
+  { symbol: 'EUR/USD', instrument: 'EUR_USD', assetClass: 'Forex' },
+  { symbol: 'GBP/USD', instrument: 'GBP_USD', assetClass: 'Forex' },
+  { symbol: 'USD/JPY', instrument: 'USD_JPY', assetClass: 'Forex' },
+  { symbol: 'USD/CHF', instrument: 'USD_CHF', assetClass: 'Forex' },
+  { symbol: 'AAPL', instrument: 'AAPL', assetClass: 'Equities' },
+  { symbol: 'MSFT', instrument: 'MSFT', assetClass: 'Equities' },
+  { symbol: 'NVDA', instrument: 'NVDA', assetClass: 'Equities' },
+  { symbol: 'AMZN', instrument: 'AMZN', assetClass: 'Equities' },
+];
 async function runTwelveDataPricing() {
   const apiKey = process.env.TWELVE_DATA_API_KEY;
   if (!apiKey) return;
@@ -352,10 +361,10 @@ async function runTwelveDataPricing() {
     let successful = 0;
     let lastError = null;
     for (let i = 0; i < TWELVE_DATA_WANTED.length; i++) {
-      const pair = TWELVE_DATA_WANTED[i];
+      const item = TWELVE_DATA_WANTED[i];
       try {
         const url = new URL('https://api.twelvedata.com/price');
-        url.searchParams.set('symbol', pair);
+        url.searchParams.set('symbol', item.symbol);
         url.searchParams.set('apikey', apiKey);
         const response = await fetch(url, { headers: { Accept: 'application/json' } });
         const payload = await response.json().catch(() => ({}));
@@ -364,25 +373,26 @@ async function runTwelveDataPricing() {
           const detail = payload && payload.message ? String(payload.message).slice(0, 180) : '';
           throw new Error('Twelve Data request failed (' + response.status + ')' + (detail ? ': ' + detail : ''));
         }
-        const [base, quote] = pair.split('/');
+        const parts = item.symbol.split('/');
         const timestamp = new Date().toISOString();
-        fxQuotes.set(pair.replace('/', '_'), {
-          instrument: pair.replace('/', '_'), base, quote, bid: null, ask: null, spread: null,
-          mid: price, price, bids: [], asks: [], tradeable: false, status: 'reference_only',
+        fxQuotes.set(item.instrument, {
+          instrument: item.instrument, symbol: item.symbol, base: parts[0] || null, quote: parts[1] || null,
+          assetClass: item.assetClass, bid: null, ask: null, spread: null, mid: price, price,
+          bids: [], asks: [], tradeable: false, status: 'reference_only',
           quoteType: 'reference_only', time: timestamp, provider: 'Twelve Data',
         });
         successful++;
         fxStatus.updatedAt = timestamp;
       } catch (error) {
         lastError = error.message || 'Twelve Data request failed';
-        console.error('[twelvedata-fx] ' + pair + ': ' + lastError);
+        console.error('[twelvedata-basic] ' + item.symbol + ': ' + lastError);
       }
       if (i < TWELVE_DATA_WANTED.length - 1) await sleep(8500);
     }
     fxStatus.instruments = fxQuotes.size;
     fxStatus.state = successful || fxQuotes.size ? 'available' : 'error';
     fxStatus.error = successful ? null : lastError;
-    console.log('[twelvedata-fx] refreshed ' + successful + '/' + TWELVE_DATA_WANTED.length + ' reference prices');
+    console.log('[twelvedata-basic] refreshed ' + successful + '/' + TWELVE_DATA_WANTED.length + ' mixed FX/equity reference prices');
     await sleep(Math.max(1000, refreshInterval - (Date.now() - cycleStarted)));
   }
 }
