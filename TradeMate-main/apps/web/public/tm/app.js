@@ -1347,7 +1347,7 @@ function tmBooks(it,dp){if(!document.getElementById("tm-book-standby-style")){va
 // FX and MT5 quotes arrive through the shared market socket. MT5 remains permission-gated.
 var fxFeedSocket=null,fxFeedQuotes={},spotMarketQuotes={},fxFeedStatus={state:"connecting",provider:"Market feed"},mt5FeedQuotes={},mt5PublicBroadcastEnabled=false;
 var MARKET_QUOTE_MAX_AGE_MS=24*60*60*1000;
-function quoteTimestampMs(value){var n=typeof value==="number"?value:Date.parse(value);if(Number.isFinite(n)&&n>0&&n<1e12)n*=1000;return n}
+function quoteTimestampMs(value){var raw=String(value==null?"":value),n=typeof value==="number"?value:/^\\d{10,13}$/.test(raw)?Number(raw):Date.parse(value);if(Number.isFinite(n)&&n>0&&n<1e12)n*=1000;return n}
 function hasCurrentMarketFeed(it){
  if(!it)return false;
  if(it.quoteProvider==="Exness MT5")return it.quoteStatus==="live"&&mt5QuoteIsFresh(mt5FeedQuotes[mt5SymbolKey(it.mt5Symbol||it.providerSymbol||it.n.replace("/",""))]);
