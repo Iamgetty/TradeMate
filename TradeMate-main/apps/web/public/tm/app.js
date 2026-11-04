@@ -1346,7 +1346,7 @@ function ensureFXFeed(){
  try{
   fxFeedSocket=createFeedClient({
    url:"wss://exchange-feed.onrender.com",base:"EUR",quote:"USD",markets:["spot"],
-   onStatus:function(connected){if(!connected&&fxFeedStatus.state==="live")fxFeedStatus.state="reconnecting";scheduleMarketDraw()},
+   onStatus:function(connected){if(!connected&&(fxFeedStatus.state==="live"||fxFeedStatus.state==="available"||fxFeedStatus.state==="refreshing"))fxFeedStatus.state="reconnecting";scheduleMarketDraw()},
    onUpdate:function(data){
     fxFeedQuotes={};
     (data.fxQuotes||[]).forEach(function(q){if(q&&q.instrument)fxFeedQuotes[q.instrument]=q});
