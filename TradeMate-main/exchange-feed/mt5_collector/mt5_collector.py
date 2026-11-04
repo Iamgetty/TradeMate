@@ -27,6 +27,7 @@ TOKEN = os.getenv("MT5_INGEST_TOKEN", "")
 POLL_SECONDS = max(1.0, float(os.getenv("MT5_POLL_SECONDS", "1")))
 BATCH_SECONDS = max(1.0, float(os.getenv("MT5_BATCH_SECONDS", "2")))
 CSV_PATH = Path(os.getenv("MT5_CSV_PATH", str(Path.home() / "Downloads" / "exness_mt5_live_quotes.csv")))
+MAX_QUOTE_AGE_SECONDS = max(1, int(os.getenv("MT5_MAX_QUOTE_AGE_SECONDS", "60")))
 
 
 def load_symbols():
@@ -72,10 +73,10 @@ def write_csv(quotes):
             ).isoformat()
             writer.writerow([
                 quote["sourceSymbol"],
-                quote["bid"] or 0,
-                quote["ask"] or 0,
-                quote["last"] or 0,
-                quote.get("volume", 0),
+                quote["bid"] if quote["bid"] is not None else "",
+                quote["ask"] if quote["ask"] is not None else "",
+                quote["last"] if quote["last"] is not None else "",
+                quote.get("volume") if quote.get("volume") is not None else "",
                 timestamp,
             ])
 
@@ -100,6 +101,7 @@ def main():
                 print("WARNING: symbol unavailable in Market Watch:", item["mt5_symbol"])
 
         print("MT5 read-only bridge running for", len(symbols), "configured symbols.")
+        print("Ignoring ticks older than", MAX_QUOTE_AGE_SECONDS, "seconds.")
         print("Press Ctrl+C to stop. No orders will be submitted.")
         last_send = 0.0
         backoff = 2.0
@@ -114,6 +116,9 @@ def main():
                 tick = mt5.symbol_info_tick(item["mt5_symbol"])
                 if tick is None or not tick.time_msc:
                     continue
+                quote_age = time.time() - (tick.time_msc / 1000)
+                if quote_age < -5 or quote_age > MAX_QUOTE_AGE_SECONDS:
+                    continue
                 bid = float(tick.bid) if tick.bid and tick.bid > 0 else None
                 ask = float(tick.ask) if tick.ask and tick.ask > 0 else None
                 last = float(tick.last) if tick.last and tick.last > 0 else None
@@ -127,7 +132,7 @@ def main():
                     "ask": ask,
                     "last": last,
                     "timestamp": int(tick.time_msc),
-                    "volume": int(tick.volume),
+                    "volume": int(tick.volume) if tick.volume and tick.volume > 0 else None,
                 })
 
             now = time.monotonic()
