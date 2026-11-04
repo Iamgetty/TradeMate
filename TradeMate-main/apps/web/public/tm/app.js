@@ -1160,7 +1160,7 @@ function loadMarketQuotes(market,list){
  MARKET_QUOTE_STATE.key=key;MARKET_QUOTE_STATE.loading=true;
  fetch(TMCFG.api+"/market/quotes?symbols="+encodeURIComponent(rows.map(function(i){return i.providerSymbol}).join(",")),{credentials:"include",cache:"no-store"})
  .then(function(r){if(!r.ok)throw new Error("Market quote service unavailable");return r.json()})
- .then(function(d){(d.quotes||[]).forEach(function(q){MARKET_QUOTES[q.symbol]=q;var it=rows.filter(function(x){return x.providerSymbol===q.symbol})[0];if(it){it.quoteStatus=q.status;it.quoteTime=q.marketTime;it.quoteCurrency=q.currency;if(q.status!=="unavailable"&&typeof q.price==="number"){it.p=q.price;it.c=typeof q.changePercent==="number"?q.changePercent:null;tmSaveQuoteSnapshot(it,q)}else if(!tmRestoreQuoteSnapshot(it)){it.quoteStatus="unavailable"}}});MARKET_QUOTE_STATE.last=Date.now();MARKET_QUOTE_STATE.error="";})
+ .then(function(d){(d.quotes||[]).forEach(function(q){MARKET_QUOTES[q.symbol]=q;var it=rows.filter(function(x){return x.providerSymbol===q.symbol})[0];if(it){it.quoteStatus=q.status;it.quoteTime=q.marketTime;it.quoteCurrency=q.currency;if(q.status!=="unavailable"&&typeof q.price==="number"){it.p=q.price;it.c=typeof q.changePercent==="number"?q.changePercent:null;tmSaveQuoteSnapshot(it,q)}else{it.p=null;it.c=null;it.quoteStatus="unavailable";it.quoteTime=null}}});MARKET_QUOTE_STATE.last=Date.now();MARKET_QUOTE_STATE.error="";})
  .catch(function(){MARKET_QUOTE_STATE.error="Market quotes are temporarily unavailable.";rows.forEach(function(i){i.p=null;i.c=null;i.quoteTime=null;i.quoteStatus="unavailable"})})
  .finally(function(){MARKET_QUOTE_STATE.loading=false;var active=st.mm==="Forex"?st.fxGroup:"",activeRows=items.filter(function(i){return i.m==="Forex"&&i.assetClass===active&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)}),activeKey=active+":"+activeRows.map(function(i){return i.providerSymbol}).join(",");if(st.tab==="Markets"&&active&&active!=="Currency Pairs"&&activeKey!==MARKET_QUOTE_STATE.key)loadMarketQuotes(active,activeRows);else if(st.tab==="Markets"&&st.mm===market)softDraw()});
 }
@@ -1412,6 +1412,18 @@ function expireMt5MarketQuotes(){
  if(changed)scheduleMarketDraw();
 }
 setInterval(expireMt5MarketQuotes,1000);
+function expireNonMt5MarketQuotes(){
+ var changed=false,now=Date.now();
+ items.forEach(function(it){
+  if(it.quoteProvider==="Exness MT5")return;
+  var t=quoteTimestampMs(it.quoteTime),limit=it.m==="Crypto"&&!it.assetClass?6000:it.m==="Forex"&&!it.assetClass?45*60*1000:MARKET_QUOTE_MAX_AGE_MS;
+  if((it.quoteStatus==="live"||it.quoteStatus==="delayed")&&(!Number.isFinite(t)||now-t>limit)){
+   it.p=null;it.c=null;it.quoteTime=null;it.quoteStatus="unavailable";changed=true;
+  }
+ });
+ if(changed)scheduleMarketDraw();
+}
+setInterval(expireNonMt5MarketQuotes,5000);
 function ensureFXFeed(){
  if(fxFeedSocket)return;
  if(typeof createFeedClient!=="function"){fxFeedStatus={state:"unavailable",provider:"Market feed",error:"Feed client unavailable"};return}
