@@ -363,7 +363,7 @@ setInterval(() => {
     const key = c.watch || '';
     if (!cache.has(key)) {
       cache.set(key, JSON.stringify({
-        ts: now, feeds,
+        ts: now, feeds, mt5Quotes: mt5QuoteStore.snapshot(now),
         books: list.map(({ bids, asks, ...slim }) => (key && slim.base === key ? { ...slim, bids, asks } : slim)),
         trades: key ? trades.filter((t) => t.base === key) : [],
       }));
