@@ -107,6 +107,11 @@
         feedsLive: Number.isFinite(msg.feeds.live) ? msg.feeds.live : 0, // "N/M FEEDS LIVE"
         feedsTotal: Number.isFinite(msg.feeds.total) ? msg.feeds.total : 0,
         fxQuotes: Array.isArray(msg.fxQuotes) ? msg.fxQuotes : [],
+        // Expose fresh spot best-bid/ask/last data for the market catalogue.
+        marketQuotes: Array.isArray(msg.books) ? msg.books.filter((b) => b && b.market === 'spot' && !b.stale).map((b) => ({
+          base: b.base, quote: b.quote, bid: b.bid, ask: b.ask, last: b.last,
+          exchange: b.exchange, market: b.market,
+        })) : [],
         mt5Quotes: Array.isArray(msg.mt5Quotes) ? msg.mt5Quotes : [],
         mt5PublicBroadcastEnabled: msg.mt5PublicBroadcastEnabled === true,
         fxStatus: msg.fxStatus || { state: 'unavailable', provider: 'OANDA' },
