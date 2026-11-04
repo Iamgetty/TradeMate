@@ -1150,7 +1150,7 @@ var FOREX_GROUPS=["Currency Pairs","Stock Indices","Commodities","Equities","Bon
 function loadMarketQuotes(market,list){
  var allowed=["Stock Indices","Commodities","Equities","Bonds & Treasuries"];
  if(allowed.indexOf(market)<0||!TMCFG.api)return;
- var rows=list.filter(function(i){return i.assetClass===market&&i.providerSymbol});
+ var rows=list.filter(function(i){return i.assetClass===market&&i.providerSymbol&&i.quoteProvider!=="Twelve Data Basic"});
  rows.forEach(function(i){if(!i.quoteStatus||i.quoteStatus==="unavailable")tmRestoreQuoteSnapshot(i)});
  var key=market+":"+rows.map(function(i){return i.providerSymbol}).join(",");
  if(!rows.length||MARKET_QUOTE_STATE.loading||(MARKET_QUOTE_STATE.key===key&&Date.now()-MARKET_QUOTE_STATE.last<45000))return;
@@ -1353,8 +1353,13 @@ function ensureFXFeed(){
     fxFeedStatus=data.fxStatus||{state:"unavailable",provider:"Twelve Data",plan:"Basic"};
     items.filter(function(i){return i.m==="Forex"&&!i.assetClass&&i.n.indexOf("/")>0}).forEach(function(it){
      var q=fxFeedQuotes[it.n.replace("/","_")];
-     if(q&&Number(q.mid)>0){it.p=Number(q.mid);it.quoteTime=q.time||null;it.quoteStatus="delayed";it.c=null}
-     else{it.p=null;it.quoteTime=null;it.quoteStatus="unavailable";it.c=null}
+     if(q&&Number(q.mid)>0){it.p=Number(q.mid);it.quoteTime=q.time||null;it.quoteStatus="delayed";it.quoteProvider="Twelve Data Basic";it.c=null}
+     else{it.p=null;it.quoteTime=null;it.quoteStatus="unavailable";it.quoteProvider="Twelve Data Basic";it.c=null}
+    });
+    items.filter(function(i){return i.assetClass==="Equities"&&["AAPL","MSFT","NVDA","AMZN"].indexOf(i.providerSymbol)>=0}).forEach(function(it){
+     var q=fxFeedQuotes[it.providerSymbol];
+     if(q&&Number(q.mid)>0){it.p=Number(q.mid);it.quoteTime=q.time||null;it.quoteStatus="delayed";it.quoteProvider="Twelve Data Basic";it.quoteCurrency="USD";it.c=null}
+     else{it.p=null;it.quoteTime=null;it.quoteStatus="unavailable";it.quoteProvider="Twelve Data Basic";it.c=null}
     });
     scheduleMarketDraw();
    }
@@ -1376,7 +1381,7 @@ function trade(){
  var it=items[st.tp],cr=it.m==="Crypto",fxm=it.m==="Forex"&&!it.assetClass;
  if(it.assetClass&&it.quoteStatus!=="live"&&it.quoteStatus!=="delayed")tmRestoreQuoteSnapshot(it);
  if(fxm)ensureFXFeed();
- var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose market">'+(isPlainAsset(it)?"":'<span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span>')+'<b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?(fxFeedStatus.state==="available"||fxFeedStatus.state==="refreshing"?"TWELVE DATA BASIC":"TWELVE DATA "+String(fxFeedStatus.state||"CONNECTING").toUpperCase()):it.assetClass?(it.quoteStatus==="live"?"LIVE QUOTE":it.quoteStatus==="delayed"?"DELAYED QUOTE":it.quoteStatus==="unavailable"?"QUOTE UNAVAILABLE":"PUBLIC QUOTE"):"TRADEMATE")+'</span></div>';
+ var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose market">'+(isPlainAsset(it)?"":'<span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span>')+'<b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?(fxFeedStatus.state==="available"||fxFeedStatus.state==="refreshing"?"TWELVE DATA BASIC":"TWELVE DATA "+String(fxFeedStatus.state||"CONNECTING").toUpperCase()):it.assetClass?(it.quoteProvider==="Twelve Data Basic"?"TWELVE DATA BASIC":it.quoteStatus==="live"?"LIVE QUOTE":it.quoteStatus==="delayed"?"DELAYED QUOTE":it.quoteStatus==="unavailable"?"QUOTE UNAVAILABLE":"PUBLIC QUOTE"):"TRADEMATE")+'</span></div>';
  if(cr){
   ensureMultiFeeds(it);
   var dp=it.p<1?6:it.p<20?4:2,stamp=tmStatus();
@@ -1392,9 +1397,9 @@ function trade(){
   return h+head+cachedNote+body+'<p class="fine">Live public exchange reference data only. Order book shows available price levels; Trades shows recent executions. TradeMate business agreements are negotiated separately through Contracts. '+stamp+'.</p>';
  }
  if(it.assetClass){
-  var status=it.quoteStatus==="live"?"Live public quote":it.quoteStatus==="delayed"?"Delayed public quote":it.quoteStatus==="cached"?"Last saved public quote":it.quoteStatus==="unavailable"?"Public quote unavailable":"Awaiting public quote";
+  var status=it.quoteProvider==="Twelve Data Basic"?(it.quoteStatus==="delayed"?"Twelve Data Basic · periodic reference price":it.quoteStatus==="unavailable"?"Twelve Data Basic · quote unavailable":"Twelve Data Basic · awaiting quote"):(it.quoteStatus==="live"?"Live public quote":it.quoteStatus==="delayed"?"Delayed public quote":it.quoteStatus==="cached"?"Last saved public quote":it.quoteStatus==="unavailable"?"Public quote unavailable":"Awaiting public quote");
   var unit=it.unit||"USD";
-  return h+'<div class="tpx"><b>'+px(it)+'</b><span>'+esc(unit)+'</span></div><div class="card" style="margin:8px 16px"><b>'+status+'</b><p style="color:var(--mut);margin:6px 0 0">'+esc(it.assetClass)+' · '+(it.quoteTime?"Updated "+new Date(it.quoteTime).toLocaleString():"No quote timestamp yet")+(it.snapshotAt?" · Snapshot saved "+new Date(it.snapshotAt).toLocaleString():"")+'</p></div><p class="fine">Reference pricing from the public market-quote provider. This instrument is grouped under the Forex marketplace; executable order-book and trade feeds are not connected for this asset class.</p>';
+  return h+'<div class="tpx"><b>'+px(it)+'</b><span>'+esc(unit)+'</span></div><div class="card" style="margin:8px 16px"><b>'+status+'</b><p style="color:var(--mut);margin:6px 0 0">'+esc(it.assetClass)+' · '+(it.quoteTime?"Updated "+new Date(it.quoteTime).toLocaleString():"No quote timestamp yet")+(it.snapshotAt?" · Snapshot saved "+new Date(it.snapshotAt).toLocaleString():"")+'</p></div><p class="fine">'+(it.quoteProvider==="Twelve Data Basic"?"Twelve Data Basic reference price, refreshed periodically. No bid/ask, order-book liquidity or execution feed is provided.":"Reference pricing from the public market-quote provider.")+' This instrument is grouped under the Forex marketplace; executable order-book and trade feeds are not connected for this asset class.</p>';
  }
  if(fxm){
   var fxCached=it.quoteStatus==="cached";
