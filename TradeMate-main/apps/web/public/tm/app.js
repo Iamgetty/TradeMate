@@ -1340,9 +1340,40 @@ function ensureMultiFeeds(it){var symbol=String(it.n||"").replace(/[^a-z0-9]/gi,
 function tmTape(){var a=[];Object.keys(tmFeeds).forEach(function(k){a=a.concat(tmFeeds[k].trades||[])});return a.sort(function(x,y){return y.time-x.time}).slice(0,80)}
 function tmStatus(){return tmFeedStatusCount.total?tmFeedStatusCount.live+"/"+tmFeedStatusCount.total+" FEEDS LIVE":"CONNECTING TO EXCHANGES"}
 function tmBooks(it,dp){if(!document.getElementById("tm-book-standby-style")){var stl=document.createElement("style");stl.id="tm-book-standby-style";stl.textContent="@keyframes tmBookPulse{0%,100%{opacity:.25;transform:scaleY(.65)}50%{opacity:1;transform:scaleY(1)}}.tm-book-standby{grid-column:1/-1;min-height:190px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--mut);text-align:center}.tm-book-standby .bars{display:flex;align-items:center;gap:6px;height:30px}.tm-book-standby i{display:block;width:5px;border-radius:8px;background:var(--am);animation:tmBookPulse .8s ease-in-out infinite}.tm-book-standby i:nth-child(1){height:12px;animation-delay:0s}.tm-book-standby i:nth-child(2){height:22px;animation-delay:.12s}.tm-book-standby i:nth-child(3){height:30px;animation-delay:.24s}.tm-book-standby i:nth-child(4){height:18px;animation-delay:.36s}.tm-book-standby i:nth-child(5){height:25px;animation-delay:.48s}.tm-book-standby small{font-size:12px}";document.head.appendChild(stl)}var bids={},asks={},sources=0;Object.keys(tmFeeds).forEach(function(k){var f=tmFeeds[k];if(f.bookAt&&(f.bids.length||f.asks.length))sources++;f.bids.forEach(function(x){var p=Number(x.p),q=Number(x.q);if(p>0&&q>0){var key=p.toFixed(dp);bids[key]=(bids[key]||0)+q}});f.asks.forEach(function(x){var p=Number(x.p),q=Number(x.q);if(p>0&&q>0){var key=p.toFixed(dp);asks[key]=(asks[key]||0)+q}})});var bb=Object.keys(bids).map(function(p){return {p:+p,q:bids[p]}}).sort(function(a,b){return b.p-a.p}).slice(0,20),aa=Object.keys(asks).map(function(p){return {p:+p,q:asks[p]}}).sort(function(a,b){return a.p-b.p}).slice(0,20),rows="";for(var i=0;i<Math.max(bb.length,aa.length);i++){var b=bb[i],a=aa[i];rows+='<div class="cell b"><i class="d" style="width:'+(b?Math.min(100,Math.max(3,b.q/(bb[0]?bb[0].q:b.q)*100)):0)+'%"></i><span>'+(b?fx2(b.q,6):"—")+'</span><span>'+(b?fx2(b.p,dp):"—")+'</span></div><div class="cell a"><i class="d" style="width:'+(a?Math.min(100,Math.max(3,a.q/(aa[0]?aa[0].q:a.q)*100)):0)+'%"></i><span>'+(a?fx2(a.p,dp):"—")+'</span><span>'+(a?fx2(a.q,6):"—")+'</span></div>'}return '<div class="bk"><div class="h"><span>Total bid size ('+esc(it.n.split("/")[0])+')</span><span>Bid price (USDT)</span></div><div class="h r"><span>Ask price (USDT)</span><span>Total ask size ('+esc(it.n.split("/")[0])+')</span></div>'+(rows||'<div class="tm-book-standby"><div class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><b>Market feed on standby</b><small>Syncing live order-book depth from connected exchanges</small></div>')+'</div><p class="fine">'+sources+' exchange books combined into one aggregated order book. Quantities at matching prices are added together.</p>'}
+// OANDA OTC account pricing. This is a bid/ask quote stream, not an exchange order book.
+var fxFeedSocket=null,fxFeedQuotes={},fxFeedStatus={state:"connecting",provider:"OANDA"};
+function ensureFXFeed(){
+ if(fxFeedSocket)return;
+ if(typeof createFeedClient!=="function"){fxFeedStatus={state:"unavailable",provider:"OANDA",error:"Feed client unavailable"};return}
+ try{
+  fxFeedSocket=createFeedClient({
+   url:"wss://exchange-feed.onrender.com",base:"EUR",quote:"USD",markets:["spot"],
+   onStatus:function(connected){if(!connected&&fxFeedStatus.state==="live")fxFeedStatus.state="reconnecting";scheduleMarketDraw()},
+   onUpdate:function(data){
+    fxFeedQuotes={};
+    (data.fxQuotes||[]).forEach(function(q){if(q&&q.instrument)fxFeedQuotes[q.instrument]=q});
+    fxFeedStatus=data.fxStatus||{state:"unavailable",provider:"OANDA"};
+    scheduleMarketDraw();
+   }
+  });
+ }catch(e){fxFeedStatus={state:"unavailable",provider:"OANDA",error:e.message||"Feed unavailable"}}
+}
+function fxQuotePanel(pair){
+ if(!/^[A-Z]{3}\\/[A-Z]{3}$/.test(pair||""))return "";
+ ensureFXFeed();
+ var instrument=pair.replace("/","_"),q=fxFeedQuotes[instrument],state=fxFeedStatus.state||"connecting";
+ var age=q&&q.time?Date.now()-Date.parse(q.time):Infinity,stale=!Number.isFinite(age)||age>30000;
+ var message=state==="not_configured"?"OANDA credentials are not configured on the feed service.":state==="error"?"OANDA feed error: "+(fxFeedStatus.error||"connection failed"):state==="live"&&!q?"This pair is not available in the connected OANDA account.":q&&stale?"The last quote is stale; waiting for a fresh update.":"Waiting for account-authorized OANDA prices…";
+ var shell='<section style="margin:12px 16px;padding:14px;border:1px solid #326b5c;border-radius:14px;background:#14251f;display:grid;gap:8px"><small style="font:700 9px monospace;letter-spacing:.12em;color:#65d9c5">OANDA ACCOUNT PRICING · OTC</small>';
+ if(!q||stale)return shell+'<b>'+esc(pair)+'</b><span style="font-size:12px;color:var(--mut)">'+esc(message)+'</span></section>';
+ var dp=pair.indexOf("JPY")>=0?3:5,bid=q.bid==null?"—":fx2(q.bid,dp),ask=q.ask==null?"—":fx2(q.ask,dp);
+ var levels=function(rows){return (rows||[]).slice(0,3).map(function(x){return '<div style="display:flex;justify-content:space-between;gap:8px;font-size:11px"><b>'+fx2(x.price,dp)+'</b><span>'+Number(x.liquidity).toLocaleString()+'</span></div>'}).join("")||'<small>Unavailable</small>'};
+ return shell+'<b style="font-size:17px">'+esc(pair)+' <span class="up">'+bid+'</span> / <span class="dn">'+ask+'</span></b><span style="font-size:11px;color:var(--mut)">Spread '+(q.spread==null?"—":fx2(q.spread,dp))+' · Mid '+(q.mid==null?"—":fx2(q.mid,dp))+' · '+(q.tradeable?"Tradeable":"Not tradeable")+'</span><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div><small style="color:var(--mut)">BID · PRICE / LIQUIDITY</small>'+levels(q.bids)+'</div><div><small style="color:var(--mut)">ASK · PRICE / LIQUIDITY</small>'+levels(q.asks)+'</div></div><small style="color:var(--mut)">Updated '+new Date(q.time).toLocaleTimeString()+'</small></section>';
+}
 function trade(){
  var it=items[st.tp],cr=it.m==="Crypto",fxm=it.m==="Forex"&&!it.assetClass;
  if(it.assetClass&&it.quoteStatus!=="live"&&it.quoteStatus!=="delayed")tmRestoreQuoteSnapshot(it);
+ if(fxm)ensureFXFeed();
  var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose market">'+(isPlainAsset(it)?"":'<span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span>')+'<b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?(it.quoteStatus==="cached"?"FOREX · SNAPSHOT":"FOREX · INDICATIVE"):it.assetClass?(it.quoteStatus==="live"?"LIVE QUOTE":it.quoteStatus==="delayed"?"DELAYED QUOTE":it.quoteStatus==="unavailable"?"QUOTE UNAVAILABLE":"PUBLIC QUOTE"):"TRADEMATE")+'</span></div>';
  if(cr){
   ensureMultiFeeds(it);
@@ -1365,7 +1396,7 @@ function trade(){
  }
  if(fxm){
   var fxCached=it.quoteStatus==="cached";
-  return h+(typeof it.p==="number"?'<div class="tpx"><b>'+px(it)+'</b><span>Indicative reference rate</span></div>':"")+'<div class="empty"><b>'+(fxCached?"Last saved indicative FX rate":"Indicative FX reference rates only")+'</b>'+(fxCached&&it.quoteTime?"Snapshot from "+new Date(it.quoteTime).toLocaleString():"Currency conversion references are available in Markets → Forex → Currency Pairs.")+' Live provider bid/ask execution data is not connected. TradeMate does not execute ordinary buy/sell orders here, and no synthetic spread is shown.</div>';
+  return h+fxQuotePanel(it.n)+(typeof it.p==="number"?'<div class="tpx"><b>'+px(it)+'</b><span>Indicative reference rate</span></div>':"")+'<div class="empty"><b>'+(fxCached?"Last saved indicative FX rate":"Indicative FX reference rates only")+'</b>'+(fxCached&&it.quoteTime?"Snapshot from "+new Date(it.quoteTime).toLocaleString():"Currency conversion references are available in Markets → Forex → Currency Pairs.")+' Live provider bid/ask execution data is not connected. TradeMate does not execute ordinary buy/sell orders here, and no synthetic spread is shown.</div>';
  }
  var kind=it.m==="Services"?"service":it.m==="B2B"?"b2b":null;
  if(kind)loadInternalTrades(kind);
