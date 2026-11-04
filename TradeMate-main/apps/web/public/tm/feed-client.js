@@ -63,7 +63,7 @@
         symbol: `${o.base}/${o.quote}`,
         bids: [], asks: [], bestBid: null, bestAsk: null, mid: null, spread: null,
         last: null, trades: [], booksCombined: 0,
-        feedsLive: 0, feedsTotal: 0, fxQuotes: [], mt5Quotes: [], mt5PublicBroadcastEnabled: false, ts: Date.now(),
+        feedsLive: 0, feedsTotal: 0, fxQuotes: [], marketQuotes: [], mt5Quotes: [], mt5PublicBroadcastEnabled: false, ts: Date.now(),
       });
     }
 
