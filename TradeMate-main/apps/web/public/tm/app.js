@@ -1484,7 +1484,7 @@ function fxQuotePanel(pair){
 }
 function trade(){
  var it=items[st.tp],cr=it.m==="Crypto"&&!it.assetClass,fxm=it.m==="Forex"&&!it.assetClass;
- if(it.assetClass&&it.quoteProvider!=="Exness MT5"&&it.quoteStatus!=="live"&&it.quoteStatus!=="delayed")tmRestoreQuoteSnapshot(it);
+ 
  if(fxm)ensureFXFeed();
  var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose market">'+(isPlainAsset(it)?"":'<span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span>')+'<b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?(it.quoteProvider==="Exness MT5"?"EXNESS MT5":String(fxFeedStatus.provider||"MARKET FEED").toUpperCase()+" "+String(fxFeedStatus.state||"CONNECTING").toUpperCase()):it.assetClass?(it.quoteProvider==="Twelve Data Basic"?"TWELVE DATA BASIC":it.quoteStatus==="live"?"LIVE QUOTE":it.quoteStatus==="delayed"?"DELAYED QUOTE":it.quoteStatus==="unavailable"?"QUOTE UNAVAILABLE":"PUBLIC QUOTE"):"TRADEMATE")+'</span></div>';
  if(cr){
@@ -2358,7 +2358,7 @@ document.addEventListener("click",function(e){var c=e.target.closest("[data-nft-
 /* ---------- trade: market picker sheet ---------- */
 function closePair(){var e=document.getElementById("psheet");if(e)e.remove()}
 function openPair(){closePair();var cur=items[st.tp],h='';
- ORD.forEach(function(m){var g=items.filter(function(i){return i.m===m});if(!g.length)return;
+ ORD.forEach(function(m){var g=items.filter(function(i){return i.m===m&&hasCurrentMarketFeed(i)});if(!g.length)return;
   h+='<div class="sec">'+esc(m).toUpperCase()+'</div>'+g.map(function(i){var on=i===cur;return '<button class="prow'+(on?' on':'')+'" data-act="pairpick" data-arg="'+items.indexOf(i)+'">'+(isPlainAsset(i)?"":'<span class="coin sm" style="--ac:'+i.col+'">'+lg(i)+'</span>')+'<span class="pn">'+esc(i.n)+'</span><span class="pp">'+px(i)+'</span>'+(on?ic("check","width:16px;height:16px;color:#ff9f2e"):'<span style="width:16px"></span>')+'</button>'}).join("")});
  var d=document.createElement("div");d.id="psheet";d.className="psheet";
  d.innerHTML='<div class="pback" data-act="pairclose"></div><div class="ppanel"><div class="phd"><b>Select market</b><button data-act="pairclose" aria-label="Close">'+ic("close","width:18px;height:18px")+'</button></div><div class="psl">'+h+'</div></div>';
@@ -2381,7 +2381,7 @@ window.addEventListener("resize",navH);window.addEventListener("load",navH);
 
 /* ---------- signed-out page ---------- */
 function showOut(){var o=document.getElementById("out");if(o)o.remove();
- var nm=esc(st.me.nick||"friend"),T=["BTC/USDT","ETH/USDT","USD/NGN"].map(byName).filter(Boolean);
+ ensureFXFeed();var nm=esc(st.me.nick||"friend"),T=["BTC/USDT","ETH/USDT","USD/NGN"].map(byName).filter(hasCurrentMarketFeed);
  var rows=T.map(function(i,k){return '<div class="so-t" style="animation-delay:'+(.5+k*.12)+'s">'+(isPlainAsset(i)?"":'<span class="coin sm" style="--ac:'+i.col+';width:36px;height:36px;border-radius:12px">'+lg(i)+'</span>')+'<div><b>'+esc(i.n)+'</b><small>'+(val(i)||i.m)+'</small></div><div style="flex:none;text-align:right"><strong data-px="'+esc(i.n)+'">'+px(i)+'</strong>'+chg(i.c)+'</div></div>'}).join("");
  var d=document.createElement("div");d.id="out";d.setAttribute("role","dialog");d.setAttribute("aria-label","Signed out");
  d.innerHTML='<div class="grid-bg"></div><div class="w">'+
