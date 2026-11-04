@@ -15,10 +15,27 @@ py -m venv .venv
 py -m pip install -r requirements.txt
 ```
 
-Edit `symbols.json` to match the exact symbols in your MT5 Market Watch. Keep the `symbol` field as the normalized TradeMate symbol; `mt5_symbol` must exactly match the broker's symbol (including suffixes such as m).
+Create the working symbol list from the supplied template, then edit it only if your broker uses different names:
 
-## Configure and run
-Set the HTTPS URL of the test exchange-feed service and the same secret configured on that service:
+```powershell
+Copy-Item .\symbols.example.json .\symbols.json
+```
+
+Keep the `symbol` field as the normalized TradeMate symbol; `mt5_symbol` must exactly match the broker's symbol (including suffixes such as m).
+
+## First run: local CSV only
+
+Do not configure an endpoint or token yet. Run:
+
+```powershell
+py .\mt5_collector.py
+```
+
+The collector will read ticks from the logged-in desktop MT5 terminal and refresh `%USERPROFILE%\Downloads\exness_mt5_live_quotes.csv`. It will not send data anywhere. Stop with Ctrl+C.
+
+## Optional: send to a test feed later
+
+Only after a test feed is deployed and its secret is configured, set the HTTPS URL and matching secret:
 
 ```powershell
 $env:TRADEMATE_MT5_ENDPOINT = "https://YOUR-TEST-FEED-HOST"
@@ -26,7 +43,7 @@ $env:MT5_INGEST_TOKEN = "YOUR_LONG_RANDOM_SECRET"
 py .\mt5_collector.py
 ```
 
-Stop with Ctrl+C. The script reads ticks only and never sends orders. Do not put secrets in symbols.json or commit them to GitHub.
+Do not put secrets in symbols.json or commit them to GitHub.
 
 ## Safety notes
 - Use a test/staging feed first, not production.
