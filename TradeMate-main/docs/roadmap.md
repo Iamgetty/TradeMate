@@ -114,3 +114,81 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 - RLS must not be bulk-enabled until runtime roles, tenant/user context, transaction boundaries and connection-pool behaviour are tested.
 - No security phase is considered complete based only on code being committed; require passing tests, deployment verification and recorded evidence.
 
+
+
+## Engineering architecture and production-readiness programme
+
+These five workstreams are committed roadmap items. They are planned work, not claims that the work is already complete. Preserve existing product behaviour while making incremental, reviewable changes; avoid broad rewrites and regression-prone duplication.
+
+### E1 — Frontend architecture and legacy/Next.js boundaries
+
+**Status: audit and incremental remediation outstanding.**
+
+- Map the current frontend entry points and responsibilities across the Next.js pages and the legacy JavaScript application bundle.
+- Define and document clear ownership boundaries for routing, state, API access, shared components and feature behaviour.
+- Prevent duplicate implementations of the same feature across Next.js and the legacy app.
+- Move functionality incrementally behind agreed boundaries only when tests and parity checks protect existing behaviour.
+- Add or maintain regression coverage for navigation, feed/timeline scrolling, market views, responsive layouts and other critical user journeys before refactoring affected areas.
+- Do not replace the legacy bundle wholesale until feature parity, migration sequencing and rollback are demonstrated.
+
+**Completion evidence:** documented frontend map and boundaries, no unintended duplicate feature ownership, passing build and regression tests, and verified production behaviour for each migrated slice.
+
+### E2 — Backend maintainability and NestJS module decomposition
+
+**Status: gradual decomposition outstanding.**
+
+- Inventory the responsibilities and dependencies concentrated in the large NestJS `module.ts` implementation.
+- Gradually separate Authentication/Identity, Marketplace/Listings, Contracts, P2P, Feed and Moderation into focused NestJS modules.
+- Define explicit providers, exports, dependency direction and authorization boundaries; avoid circular dependencies and duplicate service logic.
+- Preserve existing API routes, request/response contracts, database semantics and permissions during extraction.
+- Extract one bounded area at a time, with unit/integration tests and build checks before proceeding to the next area.
+
+**Completion evidence:** focused modules with documented ownership and dependencies, no accidental API or permission changes, passing API build and integration tests.
+
+### E3 — Production database security and RLS
+
+**Status: in progress; production role cutover and RLS activation remain outstanding.**
+
+- Create separate Render-managed runtime (`trademate_app`), migration (`trademate_migrator`) and scoped worker (`trademate_worker`) credentials.
+- Configure the API runtime, migration runner and worker to use their respective secret database URLs; keep credentials out of source control and chat.
+- Run the reviewed role/grant bootstrap only after the split-URL deployment path is ready, then verify effective grants and runtime behaviour.
+- Complete the sensitive-table and query-path inventory, including login/registration/TOTP bootstrap, workers, webhooks, organization membership and system operations.
+- Expand and test RLS policies for cross-user and cross-organization isolation, anonymous/public reads, missing context denial, worker permissions and connection-pool reuse.
+- Enable RLS and FORCE RLS in production only after the complete policy set and all relevant application paths pass review and integration tests.
+- Verify append-only audit permissions and ensure the runtime role cannot perform schema changes.
+
+**Release gate:** no production RLS rollout until role separation, auth-bootstrap behaviour, tenant/user context, transaction boundaries and pool isolation have passing evidence and a rollback plan.
+
+### E4 — Documentation accuracy and contributor setup
+
+**Status: audit/update outstanding.**
+
+- Rewrite `README-LOCAL-SETUP.md` so it describes the current TradeMate application rather than the obsolete initial landing-page foundation.
+- Document the current authentication, marketplace, contracts, feed and other implemented capabilities accurately; distinguish implemented, partially implemented and planned functionality.
+- Verify prerequisites, environment variables, database migration steps, local web/API/exchange-feed startup, test/build commands and troubleshooting guidance against the current repository.
+- Never include real credentials, production secrets or misleading example values.
+- Cross-check the root README and architecture/security documentation so contributors receive consistent setup instructions.
+
+**Completion evidence:** a new contributor can follow the documented setup on a clean environment, and all commands and environment-variable names are verified against the current code and Render configuration.
+
+### E5 — Render deployment verification and operational readiness
+
+**Status: live verification programme outstanding; deployment state must be checked per service.**
+
+- Verify all three Render Blueprint services independently: API, web application and exchange-feed.
+- Confirm each service's latest deployment is live on the intended commit, not merely that a deployment was triggered.
+- Check startup/runtime logs, health endpoints, required environment configuration, service-to-service connectivity and relevant data freshness.
+- Run smoke tests across the web app, API and exchange-feed integration; verify critical user journeys against the deployed environment.
+- Record the checked commit, deployment ID, verification time, test evidence and any outstanding incident for each service.
+- Recheck all three services after changes that affect shared contracts, environment variables, database access or service dependencies.
+
+**Completion evidence:** all three services independently report healthy/live on the intended revision, smoke tests pass, and deployment evidence is recorded. A successful GitHub CI run alone does not count as production verification.
+
+### Execution order and change-control rules
+
+1. Continue the production-security work in E3, beginning with the Render-managed credential setup and split database URLs; do not activate RLS prematurely.
+2. Complete E5 service-by-service verification so the production baseline is known and regressions can be detected.
+3. Update E4 contributor documentation to match the actual code and verified deployment configuration.
+4. Complete the E1 frontend boundary audit, then migrate incrementally.
+5. Complete the E2 NestJS module decomposition incrementally, preserving API and authorization compatibility.
+6. For every workstream, use small pull requests, run the relevant CI checks, inspect the diff, and verify production only where deployment is required. Do not mark an item complete based solely on code being committed.
