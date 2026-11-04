@@ -1043,6 +1043,7 @@ function nx(i){var l=(i.dataset.s||"").split("|");l.shift();if(l.length&&l[0]){i
 function chainImg(cls,urls,alt){urls=urls.filter(Boolean);return urls.length?'<img class="'+cls+'" data-s="'+urls.join("|")+'" src="'+urls[0]+'" alt="'+(alt||"")+'" referrerpolicy="no-referrer" onerror="nx(this)">':""}
 function flag(c,cls){var k=FC[c];return k?chainImg(cls,["https://flagcdn.com/w80/"+k+".png","https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/flags/4x3/"+k+".svg"]):""}
 function assetBadge(label,bg,fg,urls){return '<span class="lgb" style="background:'+bg+';color:'+fg+'"><b>'+esc(label)+'</b>'+chainImg("lgi",urls||[],label)+'</span>'}
+function isPlainAsset(i){return !!(i&&["Stock Indices","Commodities","Equities","Bonds & Treasuries"].indexOf(i.assetClass)>=0)}
 function lg(i){var a=i.n.split("/"),y=a[0].toLowerCase();
  if(i.assetClass){
   var g=i.assetClass;
@@ -1120,7 +1121,7 @@ function home(){
  if(fv)list=st.favs.map(byName).filter(Boolean);
  
  var body;
- if(fv&&list.length)body='<div class="favs">'+list.slice(0,8).map(function(i){return '<div class="fav" role="button" tabindex="0" data-open="'+esc(i.n)+'" style="--ac:'+i.col+'"><button class="ck" data-fav="'+esc(i.n)+'" aria-label="Remove favorite">'+ic("check")+'</button><div class="fh"><span class="coin sm" style="--ac:'+i.col+'">'+lg(i)+'</span><b>'+esc(i.n)+'</b></div><div class="fp"><span class="px" data-px="'+esc(i.n)+'">'+px(i)+'</span>'+(i.c==null?'<small class="mt">'+i.m+'</small>':chg(i.c))+'</div></div>'}).join("")+'</div>';
+ if(fv&&list.length)body='<div class="favs">'+list.slice(0,8).map(function(i){return '<div class="fav" role="button" tabindex="0" data-open="'+esc(i.n)+'" style="--ac:'+i.col+'"><button class="ck" data-fav="'+esc(i.n)+'" aria-label="Remove favorite">'+ic("check")+'</button><div class="fh">'+(isPlainAsset(i)?"":'<span class="coin sm" style="--ac:'+i.col+'">'+lg(i)+'</span>')+'<b>'+esc(i.n)+'</b></div><div class="fp"><span class="px" data-px="'+esc(i.n)+'">'+px(i)+'</span>'+(i.c==null?'<small class="mt">'+i.m+'</small>':chg(i.c))+'</div></div>'}).join("")+'</div>';
  else if(!list.length)body='<div class="empty"><b>'+(fv?"No favorites yet":"Nothing here yet")+'</b>'+(fv?"Tap the star on any item in Markets to keep it here.":"Only real listings and live market data appear in this list.")+'</div>';
  else body='<div class="thead"><span>Name</span><span>Price</span><span>24h</span></div>'+list.map(rowH).join("");
  return topbar()+'<div class="grid">'+HOMEF().map(function(o){return '<button class="opt" data-f="'+o[0]+'" style="--h:'+(HUE[o[0]]||"#ffb02e")+'">'+(o[0]==="Promotions"?'<span class="tag">HOT</span>':(o[0]==="Add Contract"||o[0]==="Create order")?'<span class="tag">NEW</span>':"")+'<span class="tile'+(o[0]==="Add Contract"||o[0]==="Create order"||o[0]==="Conversations"?" hl":"")+'">'+ic(o[1])+'</span>'+o[0]+'</button>'}).join("")+'</div>'+
@@ -1342,7 +1343,7 @@ function tmBooks(it,dp){if(!document.getElementById("tm-book-standby-style")){va
 function trade(){
  var it=items[st.tp],cr=it.m==="Crypto",fxm=it.m==="Forex"&&!it.assetClass;
  if(it.assetClass&&it.quoteStatus!=="live"&&it.quoteStatus!=="delayed")tmRestoreQuoteSnapshot(it);
- var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose market"><span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span><b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?(it.quoteStatus==="cached"?"FOREX · SNAPSHOT":"FOREX · INDICATIVE"):it.assetClass?(it.quoteStatus==="live"?"LIVE QUOTE":it.quoteStatus==="delayed"?"DELAYED QUOTE":it.quoteStatus==="unavailable"?"QUOTE UNAVAILABLE":"PUBLIC QUOTE"):"TRADEMATE")+'</span></div>';
+ var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose market">'+(isPlainAsset(it)?"":'<span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span>')+'<b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?(it.quoteStatus==="cached"?"FOREX · SNAPSHOT":"FOREX · INDICATIVE"):it.assetClass?(it.quoteStatus==="live"?"LIVE QUOTE":it.quoteStatus==="delayed"?"DELAYED QUOTE":it.quoteStatus==="unavailable"?"QUOTE UNAVAILABLE":"PUBLIC QUOTE"):"TRADEMATE")+'</span></div>';
  if(cr){
   ensureMultiFeeds(it);
   var dp=it.p<1?6:it.p<20?4:2,stamp=tmStatus();
@@ -1722,7 +1723,7 @@ var BN={i:0,hold:0};
 function bnChips(cls){
  var all=items.filter(function(i){return i.m===cls}),mv=all.filter(function(i){return typeof i.c==="number"}).sort(function(a,b){return Math.abs(b.c)-Math.abs(a.c)}).slice(0,3);
  all.forEach(function(i){if(mv.length<3&&mv.indexOf(i)<0)mv.push(i)});
- return '<div class="tbn-list">'+mv.map(function(i){var c=i.c==null?"":'<small class="'+(i.c>=0?"up":"dn")+'">'+(i.c>=0?"+":"")+i.c.toFixed(2)+'%</small>';return '<button class="tbn-chip" data-open="'+esc(i.n)+'"><span class="coin" style="--ac:'+i.col+'">'+lg(i)+'</span><b>'+esc(i.n)+'</b>'+c+'</button>'}).join("")+'</div>'
+ return '<div class="tbn-list">'+mv.map(function(i){var c=i.c==null?"":'<small class="'+(i.c>=0?"up":"dn")+'">'+(i.c>=0?"+":"")+i.c.toFixed(2)+'%</small>';return '<button class="tbn-chip" data-open="'+esc(i.n)+'">'+(isPlainAsset(i)?"":'<span class="coin" style="--ac:'+i.col+'">'+lg(i)+'</span>')+'<b>'+esc(i.n)+'</b>'+c+'</button>'}).join("")+'</div>'
 }
 function bnSlide(tag,h,p,tail){return '<div class="tbn-s"><div class="tbn-copy"><span class="tbn-tag">'+tag+'</span><h2>'+h+'</h2><p>'+p+'</p></div>'+tail+'</div>'}
 function trendBanner(){
@@ -2151,7 +2152,7 @@ function findDeal(id){return st.deals.filter(function(d){return d.id===id})[0]}
 function safe(){return '<div class="card" style="display:flex;gap:10px;align-items:flex-start;margin:10px 16px"><span style="color:var(--am)">'+ic("shield")+'</span><p style="margin:0;font-size:11.5px">Keep contract discussions and agreed terms inside TradeMate. Do not treat a chat as an accepted contract.</p></div>'}
 PG.listing=function(n){var it=byName(n);if(!it)return hdr("Listing");var M=metaOf(it),s=sellerOf(it),acts=M.opts.map(function(t,i){return '<button class="btn'+(i?" o":"")+'" style="flex:1" data-pg="'+(t==="contract"?"contractf":t==="buy"?"buy":t==="bid"?"bid":"orderf")+'" data-arg="'+esc(n)+'">'+lblOf(it,t)+'</button>'}).join("");
  return hdr(it.m,{right:'<button class="rt" data-fav="'+esc(n)+'" aria-label="Favorite">'+(isFav(n)?"★":"☆")+'</button>'})+
- '<div class="card" style="margin-top:4px"><div style="display:flex;gap:12px;align-items:center"><span class="coin" style="--ac:'+it.col+';width:46px;height:46px;font-size:18px;border-radius:14px">'+lg(it)+'</span><div style="min-width:0"><h2 style="font-size:17px">'+esc(it.n)+'</h2><span class="pill2" style="margin-top:6px">'+it.m+'</span>'+(val(it)?'<small class="valn">'+val(it)+'</small>':'')+'</div></div>'+
+ '<div class="card" style="margin-top:4px"><div style="display:flex;gap:12px;align-items:center">'+(isPlainAsset(it)?"":'<span class="coin" style="--ac:'+it.col+';width:46px;height:46px;font-size:18px;border-radius:14px">'+lg(it)+'</span>')+'<div style="min-width:0"><h2 style="font-size:17px">'+esc(it.n)+'</h2><span class="pill2" style="margin-top:6px">'+it.m+'</span>'+(val(it)?'<small class="valn">'+val(it)+'</small>':'')+'</div></div>'+
  '<div style="font:700 26px Bricolage Grotesque,sans-serif;margin:16px 0 8px">'+px(it)+'</div><div style="display:flex;gap:6px;flex-wrap:wrap">'+M.opts.map(function(t){return '<span class="pill2 warn">'+(t==="contract"?"Contract proposals":"Contact")+'</span>'}).join("")+'</div></div>'+
  '<div class="sec">ALPHA</div><div class="lr" style="cursor:default"><span class="lic" style="color:#111;background:var(--am)">'+s.charAt(0)+'</span><span class="t">'+s+'<small>Published TradeMate offer</small></span><button class="btn sm o" data-pc="chat" data-arg="'+esc(n)+'">'+ic("feedback","width:15px;height:15px")+' Chat</button></div>'+
  '<div class="sec">DETAILS</div>'+detsOf(it).map(function(d){return '<div class="lr" style="cursor:default;padding:13px 16px"><span class="t" style="color:var(--mut);font-weight:500">'+d[0]+'</span><em style="color:#fff;font-weight:600">'+d[1]+'</em></div>'}).join("")+
@@ -2214,7 +2215,7 @@ document.addEventListener("click",function(e){var c=e.target.closest("[data-nft-
 function closePair(){var e=document.getElementById("psheet");if(e)e.remove()}
 function openPair(){closePair();var cur=items[st.tp],h='';
  ORD.forEach(function(m){var g=items.filter(function(i){return i.m===m});if(!g.length)return;
-  h+='<div class="sec">'+esc(m).toUpperCase()+'</div>'+g.map(function(i){var on=i===cur;return '<button class="prow'+(on?' on':'')+'" data-act="pairpick" data-arg="'+items.indexOf(i)+'"><span class="coin sm" style="--ac:'+i.col+'">'+lg(i)+'</span><span class="pn">'+esc(i.n)+'</span><span class="pp">'+px(i)+'</span>'+(on?ic("check","width:16px;height:16px;color:#ff9f2e"):'<span style="width:16px"></span>')+'</button>'}).join("")});
+  h+='<div class="sec">'+esc(m).toUpperCase()+'</div>'+g.map(function(i){var on=i===cur;return '<button class="prow'+(on?' on':'')+'" data-act="pairpick" data-arg="'+items.indexOf(i)+'">'+(isPlainAsset(i)?"":'<span class="coin sm" style="--ac:'+i.col+'">'+lg(i)+'</span>')+'<span class="pn">'+esc(i.n)+'</span><span class="pp">'+px(i)+'</span>'+(on?ic("check","width:16px;height:16px;color:#ff9f2e"):'<span style="width:16px"></span>')+'</button>'}).join("")});
  var d=document.createElement("div");d.id="psheet";d.className="psheet";
  d.innerHTML='<div class="pback" data-act="pairclose"></div><div class="ppanel"><div class="phd"><b>Select market</b><button data-act="pairclose" aria-label="Close">'+ic("close","width:18px;height:18px")+'</button></div><div class="psl">'+h+'</div></div>';
  document.body.appendChild(d);var o=d.querySelector(".prow.on"),l=d.querySelector(".psl");if(o&&l)l.scrollTop=Math.max(0,o.offsetTop-90)}
@@ -2237,7 +2238,7 @@ window.addEventListener("resize",navH);window.addEventListener("load",navH);
 /* ---------- signed-out page ---------- */
 function showOut(){var o=document.getElementById("out");if(o)o.remove();
  var nm=esc(st.me.nick||"friend"),T=["BTC/USDT","ETH/USDT","USD/NGN"].map(byName).filter(Boolean);
- var rows=T.map(function(i,k){return '<div class="so-t" style="animation-delay:'+(.5+k*.12)+'s"><span class="coin sm" style="--ac:'+i.col+';width:36px;height:36px;border-radius:12px">'+lg(i)+'</span><div><b>'+esc(i.n)+'</b><small>'+(val(i)||i.m)+'</small></div><div style="flex:none;text-align:right"><strong data-px="'+esc(i.n)+'">'+px(i)+'</strong>'+chg(i.c)+'</div></div>'}).join("");
+ var rows=T.map(function(i,k){return '<div class="so-t" style="animation-delay:'+(.5+k*.12)+'s">'+(isPlainAsset(i)?"":'<span class="coin sm" style="--ac:'+i.col+';width:36px;height:36px;border-radius:12px">'+lg(i)+'</span>')+'<div><b>'+esc(i.n)+'</b><small>'+(val(i)||i.m)+'</small></div><div style="flex:none;text-align:right"><strong data-px="'+esc(i.n)+'">'+px(i)+'</strong>'+chg(i.c)+'</div></div>'}).join("");
  var d=document.createElement("div");d.id="out";d.setAttribute("role","dialog");d.setAttribute("aria-label","Signed out");
  d.innerHTML='<div class="grid-bg"></div><div class="w">'+
  '<div class="so-bar"><div class="so-brand"><span class="so-lt">'+ic("swap")+'</span><div><b>trademate</b><small>THE OPEN MARKET</small></div></div><button class="so-li" data-act="outin">Log in</button></div>'+
