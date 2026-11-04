@@ -11,6 +11,9 @@ const WebSocket = require('ws');
 const crypto = require('crypto');
 const { createMt5QuoteStore } = require('./mt5-quotes');
 const mt5QuoteStore = createMt5QuoteStore();
+// Public MT5 broadcasting stays disabled until broker redistribution permission is confirmed.
+const mt5RedistributionPermissionConfirmed = process.env.MT5_REDISTRIBUTION_PERMISSION_CONFIRMED === 'true';
+const mt5PublicBroadcastEnabled = process.env.MT5_PUBLIC_BROADCAST_ENABLED === 'true' && mt5RedistributionPermissionConfirmed;
 
 const PORT = process.env.PORT || 3000;
 const PUSH_MS = 1000;   // update rate to your app
@@ -422,7 +425,7 @@ function authorizedMt5Request(req) {
 }
 const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/health') {
-    return sendJson(res, 200, { ok: true, feeds: feedsInfo(), books: books.size, mt5Quotes: mt5QuoteStore.size, fx: { ...fxStatus, quotes: fxQuotes.size } });
+    return sendJson(res, 200, { ok: true, feeds: feedsInfo(), books: books.size, mt5Quotes: mt5QuoteStore.size, mt5PublicBroadcastEnabled, mt5RedistributionPermissionConfirmed, fx: { ...fxStatus, quotes: fxQuotes.size } });
   }
   if (req.method === 'GET' && req.url === '/mt5/quotes') {
     if (!authorizedMt5Request(req)) return sendJson(res, 401, { error: 'Unauthorized' });
@@ -507,6 +510,7 @@ setInterval(() => {
       cache.set(key, JSON.stringify({
         // MT5 quotes remain behind the authenticated REST endpoint until redistribution is approved.
         ts: now, feeds, fxStatus: { ...fxStatus }, fxQuotes: [...fxQuotes.values()],
+        mt5PublicBroadcastEnabled, mt5Quotes: mt5PublicBroadcastEnabled ? mt5QuoteStore.snapshot(now) : [],
         books: list.map(({ bids, asks, ...slim }) => (key && slim.base === key ? { ...slim, bids, asks } : slim)),
         trades: key ? trades.filter((t) => t.base === key) : [],
       }));

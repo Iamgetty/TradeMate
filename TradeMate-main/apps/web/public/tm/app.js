@@ -1115,8 +1115,10 @@ function rowH(i){
  return '<div class="row" role="button" tabindex="0" data-open="'+esc(i.n)+'"><span class="nm"><button class="star'+(isFav(i.n)?" on":"")+'" data-fav="'+esc(i.n)+'" aria-label="Favorite">'+(isFav(i.n)?"★":"☆")+'</button>'+(plainAsset?"":'<span class="coin" style="--ac:'+i.col+'">'+lg(i)+'</span>')+'<span><b>'+esc(i.n)+'</b><small>'+esc(meta)+'</small></span></span>'+(bond?"":'<span class="p" data-px="'+esc(i.n)+'">'+px(i)+'</span>')+'<span class="badge '+(i.c==null?"":i.c>=0?"up":"dn")+'">'+(i.c==null?(i.quoteStatus==="unavailable"?"Offline":i.providerSymbol?"—":"New"):(i.c>=0?"+":"")+i.c.toFixed(2)+"%")+'</span></div>'
 }
 function home(){
- var fv=st.ht==="Favorites",hm=fv?"All":st.hm,list=items.filter(function(i){return hm==="All"||i.m===hm});
- if(fv)list=st.favs.map(byName).filter(Boolean);
+ var fv=st.ht==="Favorites",hm=fv?"All":st.hm;
+ ensureFXFeed();
+ var list=items.filter(function(i){return (hm==="All"||i.m===hm)&&hasCurrentMarketFeed(i)});
+ if(fv)list=st.favs.map(byName).filter(hasCurrentMarketFeed);
  
  var body;
  if(fv&&list.length)body='<div class="favs">'+list.slice(0,8).map(function(i){return '<div class="fav" role="button" tabindex="0" data-open="'+esc(i.n)+'" style="--ac:'+i.col+'"><button class="ck" data-fav="'+esc(i.n)+'" aria-label="Remove favorite">'+ic("check")+'</button><div class="fh">'+(isPlainAsset(i)?"":'<span class="coin sm" style="--ac:'+i.col+'">'+lg(i)+'</span>')+'<b>'+esc(i.n)+'</b></div><div class="fp"><span class="px" data-px="'+esc(i.n)+'">'+px(i)+'</span>'+(i.c==null?'<small class="mt">'+i.m+'</small>':chg(i.c))+'</div></div>'}).join("")+'</div>';
@@ -1147,19 +1149,20 @@ function tmQuoteSnapshotKey(it){return TM_QUOTE_SNAPSHOT_PREFIX+encodeURICompone
 function tmSaveQuoteSnapshot(it,q){try{if(!it||!q||!(Number(q.price)>0))return;var payload={price:Number(q.price),changePercent:Number.isFinite(Number(q.changePercent))?Number(q.changePercent):null,currency:q.currency||it.quoteCurrency||it.unit||"USD",marketTime:q.marketTime||it.quoteTime||null,exchange:q.exchange||null};localStorage.setItem(tmQuoteSnapshotKey(it),JSON.stringify({savedAt:Date.now(),data:payload}))}catch(e){}}
 function tmRestoreQuoteSnapshot(it){try{if(!it)return false;var raw=localStorage.getItem(tmQuoteSnapshotKey(it));if(!raw)return false;var saved=JSON.parse(raw),data=saved&&saved.data;if(!data||!(Number(data.price)>0)||!saved.savedAt||Date.now()-Number(saved.savedAt)>30*24*60*60*1000)return false;it.p=Number(data.price);it.c=Number.isFinite(Number(data.changePercent))?Number(data.changePercent):it.c;it.quoteStatus="cached";it.quoteTime=data.marketTime||null;it.quoteCurrency=data.currency||it.unit||"USD";it.snapshotAt=Number(saved.savedAt);return true}catch(e){return false}}
 var FOREX_GROUPS=["Currency Pairs","Stock Indices","Commodities","Equities","Bonds & Treasuries"];
+var CRYPTO_GROUPS=["Spot Markets","Crypto CFDs"];
 function loadMarketQuotes(market,list){
  var allowed=["Stock Indices","Commodities","Equities","Bonds & Treasuries"];
  if(allowed.indexOf(market)<0||!TMCFG.api)return;
- var rows=list.filter(function(i){return i.assetClass===market&&i.providerSymbol&&i.quoteProvider!=="Twelve Data Basic"});
- rows.forEach(function(i){if(!i.quoteStatus||i.quoteStatus==="unavailable")tmRestoreQuoteSnapshot(i)});
+ var rows=list.filter(function(i){return i.assetClass===market&&i.providerSymbol&&i.quoteProvider!=="Twelve Data Basic"&&!(i.quoteProvider==="Exness MT5"&&i.quoteStatus==="live"&&mt5QuoteIsFresh(i))});
+ rows.forEach(function(i){if(i.quoteStatus==="cached"||!i.quoteStatus||i.quoteStatus==="unavailable"){i.p=null;i.c=null;i.quoteTime=null;i.quoteStatus="unavailable"}});
  var key=market+":"+rows.map(function(i){return i.providerSymbol}).join(",");
  if(!rows.length||MARKET_QUOTE_STATE.loading||(MARKET_QUOTE_STATE.key===key&&Date.now()-MARKET_QUOTE_STATE.last<45000))return;
  MARKET_QUOTE_STATE.key=key;MARKET_QUOTE_STATE.loading=true;
  fetch(TMCFG.api+"/market/quotes?symbols="+encodeURIComponent(rows.map(function(i){return i.providerSymbol}).join(",")),{credentials:"include",cache:"no-store"})
  .then(function(r){if(!r.ok)throw new Error("Market quote service unavailable");return r.json()})
- .then(function(d){(d.quotes||[]).forEach(function(q){MARKET_QUOTES[q.symbol]=q;var it=rows.filter(function(x){return x.providerSymbol===q.symbol})[0];if(it){it.quoteStatus=q.status;it.quoteTime=q.marketTime;it.quoteCurrency=q.currency;if(q.status!=="unavailable"&&typeof q.price==="number"){it.p=q.price;it.c=typeof q.changePercent==="number"?q.changePercent:null;tmSaveQuoteSnapshot(it,q)}else if(!tmRestoreQuoteSnapshot(it)){it.quoteStatus="unavailable"}}});MARKET_QUOTE_STATE.last=Date.now();MARKET_QUOTE_STATE.error="";})
- .catch(function(){MARKET_QUOTE_STATE.error="Market quotes are temporarily unavailable.";rows.forEach(function(i){if(!tmRestoreQuoteSnapshot(i))i.quoteStatus="unavailable"})})
- .finally(function(){MARKET_QUOTE_STATE.loading=false;var active=st.mm==="Forex"?st.fxGroup:"",activeRows=items.filter(function(i){return i.m==="Forex"&&i.assetClass===active&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)}),activeKey=active+":"+activeRows.map(function(i){return i.providerSymbol}).join(",");if(st.tab==="Markets"&&active&&active!=="Currency Pairs"&&activeKey!==MARKET_QUOTE_STATE.key)loadMarketQuotes(active,activeRows);else if(st.tab==="Markets"&&st.mm===market&&active===market)softDraw()});
+ .then(function(d){(d.quotes||[]).forEach(function(q){MARKET_QUOTES[q.symbol]=q;var it=rows.filter(function(x){return x.providerSymbol===q.symbol})[0];if(it){it.quoteStatus=q.status;it.quoteTime=q.marketTime;it.quoteCurrency=q.currency;if(q.status!=="unavailable"&&typeof q.price==="number"){it.p=q.price;it.c=typeof q.changePercent==="number"?q.changePercent:null;tmSaveQuoteSnapshot(it,q)}else{it.p=null;it.c=null;it.quoteStatus="unavailable";it.quoteTime=null}}});MARKET_QUOTE_STATE.last=Date.now();MARKET_QUOTE_STATE.error="";})
+ .catch(function(){MARKET_QUOTE_STATE.error="Market quotes are temporarily unavailable.";rows.forEach(function(i){i.p=null;i.c=null;i.quoteTime=null;i.quoteStatus="unavailable"})})
+ .finally(function(){MARKET_QUOTE_STATE.loading=false;var active=st.mm==="Forex"?st.fxGroup:"",activeRows=items.filter(function(i){return i.m==="Forex"&&i.assetClass===active&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)}),activeKey=active+":"+activeRows.map(function(i){return i.providerSymbol}).join(",");if(st.tab==="Markets"&&active&&active!=="Currency Pairs"&&activeKey!==MARKET_QUOTE_STATE.key)loadMarketQuotes(active,activeRows);else if(st.tab==="Markets"&&st.mm===market)softDraw()});
 }
 /* ===================== MARKETPLACE REDESIGN HELPERS ===================== */
 var MKSORT="def";
@@ -1180,7 +1183,7 @@ function mkTile(t,k){
 }
 function mkMix(max){
  var pools={},order=ORD.slice();
- items.forEach(function(i){if(order.indexOf(i.m)<0)return;(pools[i.m]=pools[i.m]||[]).push(i)});
+ items.forEach(function(i){if(order.indexOf(i.m)<0||!hasCurrentMarketFeed(i))return;(pools[i.m]=pools[i.m]||[]).push(i)});
  ["Crypto","Forex"].forEach(function(t){if(pools[t])pools[t]=pools[t].filter(function(i){return typeof i.c==="number"&&typeof i.p==="number"}).sort(function(a,b){return Math.abs(b.c)-Math.abs(a.c)})});
  var seen={};
  pools.NFTs=(NFTLIVE||[]).filter(function(i){var k=String(i.collectionSlug||i.collection||i.n||"").toLowerCase();if(!k||seen[k])return false;seen[k]=1;return true}).slice(0,3);
@@ -1227,8 +1230,11 @@ function markets(categoryPage){
  if(st.mm==="Forex"||st.mm==="Crypto"||st.mm==="NFTs")st.q="";
  if(st.mm==="NFTs")loadLiveNFTs(st.q||NFTCOLLECTION);
  var fxGroup=st.mm==="Forex"?(st.fxGroup||"Currency Pairs"):"";
- var list=st.mm==="NFTs"?NFTLIVE:items.filter(function(i){return i.m===st.mm&&(st.mm!=="Forex"||((i.assetClass||"Currency Pairs")===fxGroup))&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)});
- if(st.mm==="Forex"&&fxGroup!=="Currency Pairs")loadMarketQuotes(fxGroup,list);
+ var cryptoGroup=st.mm==="Crypto"?(st.cryptoGroup||"Spot Markets"):"";
+ if(st.mm==="Forex"||st.mm==="Crypto")ensureFXFeed();
+ var rawList=st.mm==="NFTs"?NFTLIVE:items.filter(function(i){return i.m===st.mm&&(st.mm!=="Forex"||((i.assetClass||"Currency Pairs")===fxGroup))&&(st.mm!=="Crypto"||(cryptoGroup==="Crypto CFDs"?i.assetClass==="Crypto CFDs":!i.assetClass))&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)});
+ if(st.mm==="Forex"&&fxGroup!=="Currency Pairs")loadMarketQuotes(fxGroup,rawList);
+ var list=st.mm==="NFTs"?rawList:rawList.filter(hasCurrentMarketFeed);
  if(st.mm==="NFTs"){
   var choices=[["azuki","Azuki"],["bored ape yacht club","Bored Ape Yacht Club"],["pudgy penguins","Pudgy Penguins"],["cryptopunks","CryptoPunks"],["doodles","Doodles"],["clone x","Clone X"],["art","Art NFTs"]],chains=[["ethereum","Ethereum"],["polygon","Polygon"],["arbitrum","Arbitrum"],["optimism","Optimism"],["base","Base"],["avalanche","Avalanche"],["zora","Zora"],["blast","Blast"]];
    return nftHub(list,chains);
@@ -1236,13 +1242,13 @@ function markets(categoryPage){
  var meta=MK_META[st.mm]||{};
  if(categoryPage){
   var title=st.mm==="Forex"?fxGroup:st.mm,live=(st.mm==="Crypto"||st.mm==="Forex");
-  var total=items.filter(function(i){return i.m===st.mm&&(st.mm!=="Forex"||((i.assetClass||"Currency Pairs")===fxGroup))}).length;
+  var total=list.length;
   var sortable=list.length>1&&list.some(function(i){return typeof i.c==="number"});
   if(sortable&&MKSORT!=="def"){var nv=function(x,dv){return typeof x==="number"?x:dv};list=list.slice().sort(MKSORT==="up"?function(a,b){return nv(b.c,-1e9)-nv(a.c,-1e9)}:MKSORT==="dn"?function(a,b){return nv(a.c,1e9)-nv(b.c,1e9)}:function(a,b){return String(a.n).localeCompare(String(b.n))})}
   var u=meta.u||"listings";
   var hero='<section class="mk-hero"><span class="mk-hero-ico">'+ic(MI[st.mm]||"mkts")+'</span><div class="mk-hero-tx"><h1>'+esc(meta.t||title)+'</h1><p>'+esc(meta.d||"")+'</p></div><div class="mk-hero-st"><b>'+total+'</b><small>'+esc(total===1?u.replace(/s$/,""):u)+'</small>'+(live?'<span class="mk-live'+(st.live?" on":"")+'"><i></i>'+(st.live?"Live":"Syncing")+'</span>':"")+'</div></section>';
   var find=(st.mm==="Forex"||st.mm==="Crypto")?"":'<div class="mk-find"><label class="srch mk-srch">'+ic("search")+'<input id="mq" value="'+esc(st.q)+'" placeholder="Search '+esc(title)+'" aria-label="Search this market" autocomplete="off" spellcheck="false">'+(st.q?'<button type="button" class="mk-clear" data-mk-clear aria-label="Clear search">'+ic("close")+'</button>':"")+'</label></div>';
-  var groups=st.mm==="Forex"?'<div class="sub fx-groups mk-chips">'+FOREX_GROUPS.map(function(g){return '<button class="'+(fxGroup===g?"on":"")+'" data-fxgroup="'+g+'">'+g+'</button>'}).join("")+'</div>':"";
+  var groups=st.mm==="Forex"?'<div class="sub fx-groups mk-chips">'+FOREX_GROUPS.map(function(g){return '<button class="'+(fxGroup===g?"on":"")+'" data-fxgroup="'+g+'">'+g+'</button>'}).join("")+'</div>':st.mm==="Crypto"?'<div class="sub fx-groups mk-chips">'+CRYPTO_GROUPS.map(function(g){return '<button class="'+(cryptoGroup===g?"on":"")+'" data-cryptogroup="'+g+'">'+g+'</button>'}).join("")+'</div>':"";
   var sorts=sortable?'<div class="sub mk-chips mk-sorts" role="group" aria-label="Sort list">'+[["def","Default"],["up","Top gainers"],["dn","Top losers"],["az","A–Z"]].map(function(s){return '<button class="'+(MKSORT===s[0]?"on":"")+'" data-mk-sort="'+s[0]+'" aria-pressed="'+(MKSORT===s[0])+'">'+s[1]+'</button>'}).join("")+'</div>':"";
   var count=st.q&&list.length?'<div class="mk-count"><b>'+list.length+'</b> result'+(list.length===1?"":"s")+' for “'+esc(st.q)+'”</div>':"";
   var canList=st.mode==="Seller"&&["Services","Real Estate","Software","B2B"].indexOf(st.mm)>=0;
@@ -1266,7 +1272,7 @@ function activateBybit(symbol,category){category=category||"spot";if(marketFeed.
 function activateBinanceFutures(symbol){if(marketFeed.symbol!==symbol)return;closeMarketSocket();clearMarketFeedTimers();resetMarketLevels();marketFeed.provider="binance-futures";marketFeed.quote="USDT";marketFeed.status="connecting";scheduleMarketDraw();var book,trade;try{book=new WebSocket("wss://fstream.binance.com/public/ws/"+symbol+"@depth20@100ms");trade=new WebSocket("wss://fstream.binance.com/market/ws/"+symbol+"@aggTrade")}catch(e){closeMarketSocket();activateCoinbase(symbol);return}marketFeed.futuresBookSocket=book;marketFeed.futuresTradeSocket=trade;marketFeed.timeoutTimer=setTimeout(function(){if(marketFeed.futuresBookSocket!==book&&marketFeed.futuresTradeSocket!==trade)return;closeMarketSocket();marketFeed.status="unavailable";scheduleMarketDraw();activateCoinbase(symbol)},10000);function got(){marketFeed.last=Date.now();marketFeed.status="live";if(marketFeed.timeoutTimer){clearTimeout(marketFeed.timeoutTimer);marketFeed.timeoutTimer=null}scheduleMarketDraw()}book.onmessage=function(ev){if(marketFeed.futuresBookSocket!==book)return;try{var d=JSON.parse(ev.data);if(d.bids&&d.asks){marketFeed.bids=d.bids.slice(0,20).map(function(x){return {p:+x[0],q:+x[1]}}).filter(function(x){return x.p>0&&x.q>0});marketFeed.asks=d.asks.slice(0,20).map(function(x){return {p:+x[0],q:+x[1]}}).filter(function(x){return x.p>0&&x.q>0});got()}}catch(e){}};trade.onmessage=function(ev){if(marketFeed.futuresTradeSocket!==trade)return;try{var d=JSON.parse(ev.data);if(d.e==="aggTrade"&&+d.p>0&&+d.q>0){marketFeed.trades.unshift({id:d.a,p:+d.p,q:+d.q,time:+(d.T||d.E),side:d.m?"SELL":"BUY"});marketFeed.trades=marketFeed.trades.slice(0,40);var it=items.filter(function(x){return x.m==="Crypto"&&x.n.replace("/","")===String(d.s||"").toUpperCase()})[0];if(it)it.p=+d.p;got()}}catch(e){}};book.onerror=trade.onerror=function(){if(marketFeed.futuresBookSocket===book||marketFeed.futuresTradeSocket===trade){closeMarketSocket();activateCoinbase(symbol)}};book.onclose=trade.onclose=function(){if(marketFeed.futuresBookSocket===book||marketFeed.futuresTradeSocket===trade){closeMarketSocket();if(marketFeed.status!=="live")activateCoinbase(symbol);else retryMarketFeed(symbol)}}}
 function openMarketFeed(symbol){if(marketFeed.symbol!==symbol)return;clearMarketFeedTimers();var host=marketFeedHosts[marketFeed.attempt%marketFeedHosts.length],url=host+"/stream?streams="+symbol+"@depth20@100ms/"+symbol+"@trade";marketFeed.provider="binance";marketFeed.quote="USDT";marketFeed.status=marketFeed.attempt?"reconnecting":"connecting";scheduleMarketDraw();var ws;try{ws=new WebSocket(url)}catch(e){marketFeed.attempt++;if(marketFeed.attempt<2)openMarketFeed(symbol);else activateBybit(symbol);return}marketFeed.socket=ws;marketFeed.timeoutTimer=setTimeout(function(){if(marketFeed.socket!==ws)return;closeMarketSocket();marketFeed.attempt++;if(marketFeed.attempt<2)openMarketFeed(symbol);else activateBybit(symbol)},8000);ws.onopen=function(){if(marketFeed.socket!==ws)return;marketFeed.status="connecting";scheduleMarketDraw()};ws.onmessage=function(ev){if(marketFeed.socket!==ws)return;try{var msg=JSON.parse(ev.data),d=msg.data||msg;if(d.bids&&d.asks){marketFeed.bids=d.bids.slice(0,20).map(function(x){return {p:+x[0],q:+x[1]}});marketFeed.asks=d.asks.slice(0,20).map(function(x){return {p:+x[0],q:+x[1]}})}if(d.e==="trade"&&+d.p>0&&+d.q>0){marketFeed.trades.unshift({id:d.t,p:+d.p,q:+d.q,time:+(d.T||d.E),side:d.m?"SELL":"BUY"});marketFeed.trades=marketFeed.trades.slice(0,40);var it=items.filter(function(x){return x.m==="Crypto"&&x.n.replace("/","")===String(d.s||"")})[0];if(it)it.p=+d.p}if((d.bids&&d.asks)||(d.e==="trade"&&+d.p>0&&+d.q>0)){marketFeed.last=Date.now();marketFeed.status="live";if(marketFeed.timeoutTimer){clearTimeout(marketFeed.timeoutTimer);marketFeed.timeoutTimer=null}marketFeed.attempt=0;scheduleMarketDraw()}}catch(e){}};ws.onerror=function(){if(marketFeed.socket===ws)try{ws.close()}catch(e){}};ws.onclose=function(){if(marketFeed.socket!==ws)return;marketFeed.socket=null;marketFeed.attempt++;if(marketFeed.attempt<2)openMarketFeed(symbol);else activateBybit(symbol)}}
 function ensureCryptoFeed(it){var symbol=String(it.n||"").replace("/","").toLowerCase();if(!/^[a-z0-9]{5,20}$/.test(symbol)){stopMarketFeed();marketFeed.status="unavailable";return}if(marketFeed.symbol===symbol&&marketFeed.socket&&[WebSocket.OPEN,WebSocket.CONNECTING].includes(marketFeed.socket.readyState))return;if(marketFeed.symbol===symbol&&(marketFeed.retryTimer||marketFeed.recoveryTimer))return;stopMarketFeed();marketFeed.symbol=symbol;marketFeed.status="connecting";openMarketFeed(symbol)}
-function scheduleMarketDraw(){if(marketFeed.drawTimer)return;marketFeed.drawTimer=setTimeout(function(){marketFeed.drawTimer=null;if(st.tab==="Trade")softDraw()},350)}
+function scheduleMarketDraw(){if(marketFeed.drawTimer)return;marketFeed.drawTimer=setTimeout(function(){marketFeed.drawTimer=null;if(st.tab==="Trade"||st.tab==="Markets"||st.tab==="Home")softDraw()},350)}
 /* Independent public feeds: exchange books stay separate; executions share a labelled tape. */
 var tmFeeds={},tmFeedSymbol="",tmMarketSocket=null,tmMarketReconnect=null,tmFeedStatusCount={live:0,total:0,books:0},tmSnapshotAt=0,tmSnapshotSymbol="";
 function tmSnapshotKey(symbol){return "tm.market.snapshot.v1."+symbol}
@@ -1338,11 +1344,89 @@ function ensureMultiFeeds(it){var symbol=String(it.n||"").replace(/[^a-z0-9]/gi,
 function tmTape(){var a=[];Object.keys(tmFeeds).forEach(function(k){a=a.concat(tmFeeds[k].trades||[])});return a.sort(function(x,y){return y.time-x.time}).slice(0,80)}
 function tmStatus(){return tmFeedStatusCount.total?tmFeedStatusCount.live+"/"+tmFeedStatusCount.total+" FEEDS LIVE":"CONNECTING TO EXCHANGES"}
 function tmBooks(it,dp){if(!document.getElementById("tm-book-standby-style")){var stl=document.createElement("style");stl.id="tm-book-standby-style";stl.textContent="@keyframes tmBookPulse{0%,100%{opacity:.25;transform:scaleY(.65)}50%{opacity:1;transform:scaleY(1)}}.tm-book-standby{grid-column:1/-1;min-height:190px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--mut);text-align:center}.tm-book-standby .bars{display:flex;align-items:center;gap:6px;height:30px}.tm-book-standby i{display:block;width:5px;border-radius:8px;background:var(--am);animation:tmBookPulse .8s ease-in-out infinite}.tm-book-standby i:nth-child(1){height:12px;animation-delay:0s}.tm-book-standby i:nth-child(2){height:22px;animation-delay:.12s}.tm-book-standby i:nth-child(3){height:30px;animation-delay:.24s}.tm-book-standby i:nth-child(4){height:18px;animation-delay:.36s}.tm-book-standby i:nth-child(5){height:25px;animation-delay:.48s}.tm-book-standby small{font-size:12px}";document.head.appendChild(stl)}var bids={},asks={},sources=0;Object.keys(tmFeeds).forEach(function(k){var f=tmFeeds[k];if(f.bookAt&&(f.bids.length||f.asks.length))sources++;f.bids.forEach(function(x){var p=Number(x.p),q=Number(x.q);if(p>0&&q>0){var key=p.toFixed(dp);bids[key]=(bids[key]||0)+q}});f.asks.forEach(function(x){var p=Number(x.p),q=Number(x.q);if(p>0&&q>0){var key=p.toFixed(dp);asks[key]=(asks[key]||0)+q}})});var bb=Object.keys(bids).map(function(p){return {p:+p,q:bids[p]}}).sort(function(a,b){return b.p-a.p}).slice(0,20),aa=Object.keys(asks).map(function(p){return {p:+p,q:asks[p]}}).sort(function(a,b){return a.p-b.p}).slice(0,20),rows="";for(var i=0;i<Math.max(bb.length,aa.length);i++){var b=bb[i],a=aa[i];rows+='<div class="cell b"><i class="d" style="width:'+(b?Math.min(100,Math.max(3,b.q/(bb[0]?bb[0].q:b.q)*100)):0)+'%"></i><span>'+(b?fx2(b.q,6):"—")+'</span><span>'+(b?fx2(b.p,dp):"—")+'</span></div><div class="cell a"><i class="d" style="width:'+(a?Math.min(100,Math.max(3,a.q/(aa[0]?aa[0].q:a.q)*100)):0)+'%"></i><span>'+(a?fx2(a.p,dp):"—")+'</span><span>'+(a?fx2(a.q,6):"—")+'</span></div>'}return '<div class="bk"><div class="h"><span>Total bid size ('+esc(it.n.split("/")[0])+')</span><span>Bid price (USDT)</span></div><div class="h r"><span>Ask price (USDT)</span><span>Total ask size ('+esc(it.n.split("/")[0])+')</span></div>'+(rows||'<div class="tm-book-standby"><div class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><b>Market feed on standby</b><small>Syncing live order-book depth from connected exchanges</small></div>')+'</div><p class="fine">'+sources+' exchange books combined into one aggregated order book. Quantities at matching prices are added together.</p>'}
-// Forex reference prices are supplied by the Twelve Data Basic feed.
-var fxFeedSocket=null,fxFeedQuotes={},fxFeedStatus={state:"connecting",provider:"Twelve Data",plan:"Basic"};
+// FX and MT5 quotes arrive through the shared market socket. MT5 remains permission-gated.
+var fxFeedSocket=null,fxFeedQuotes={},spotMarketQuotes={},fxFeedStatus={state:"connecting",provider:"Market feed"},mt5FeedQuotes={},mt5PublicBroadcastEnabled=false;
+var MARKET_QUOTE_MAX_AGE_MS=24*60*60*1000;
+function quoteTimestampMs(value){var raw=String(value==null?"":value),n=typeof value==="number"?value:/^\\d{10,13}$/.test(raw)?Number(raw):Date.parse(value);if(Number.isFinite(n)&&n>0&&n<1e12)n*=1000;return n}
+function hasCurrentMarketFeed(it){
+ if(!it)return false;
+ if(it.quoteProvider==="Exness MT5")return it.quoteStatus==="live"&&mt5QuoteIsFresh(mt5FeedQuotes[mt5SymbolKey(it.mt5Symbol||it.providerSymbol||it.n.replace("/",""))]);
+ if(it.m==="Forex"&&!it.assetClass){
+  var fq=fxFeedQuotes[it.n.replace("/","_")],ft=quoteTimestampMs(fq&&(fq.time||fq.timestamp));
+  return !!(fq&&Number(fq.mid)>0&&Number.isFinite(ft)&&Date.now()-ft>=-5000&&Date.now()-ft<=45*60*1000);
+ }
+ if(it.m==="Crypto"&&!it.assetClass){
+  var sq=spotMarketQuotes[it.n.toUpperCase()];
+  return !!(sq&&Number(sq.price)>0&&Date.now()-sq.receivedAt<=6000);
+ }
+ if(it.m==="Crypto"&&it.assetClass==="Crypto CFDs")return it.quoteStatus==="live"&&it.quoteProvider==="Exness MT5"&&mt5QuoteIsFresh(mt5FeedQuotes[mt5SymbolKey(it.mt5Symbol||it.providerSymbol||it.n.replace("/",""))]);
+ var t=quoteTimestampMs(it.quoteTime);
+ return !!((it.quoteStatus==="live"||it.quoteStatus==="delayed")&&Number(it.p)>0&&Number.isFinite(t)&&Date.now()-t>=-5000&&Date.now()-t<=MARKET_QUOTE_MAX_AGE_MS);
+}
+var MT5_PUBLIC_QUOTE_MAX_AGE_MS=15000;
+var MT5_CATEGORY_BY_TYPE={forex:"Currency Pairs",metal:"Commodities",index_cfd:"Stock Indices",equity_cfd:"Equities",commodity_cfd:"Commodities",bond_cfd:"Bonds & Treasuries",crypto_cfd:"Crypto CFDs"};
+var MT5_DISPLAY_NAMES={US500:"S&P 500",USTEC:"Nasdaq Composite",US30:"Dow Jones",DE30:"DAX 40",UK100:"FTSE 100",JP225:"Nikkei 225",HK50:"Hang Seng",FR40:"CAC 40",STOXX50:"Euro Stoxx 50",XAUUSD:"Gold",XAGUSD:"Silver",USOIL:"WTI Crude Oil",UKOIL:"Brent Crude Oil",XNGUSD:"Natural Gas",HG:"Copper",US3M:"13-Week US Treasury",US5Y:"5-Year US Treasury",US10Y:"10-Year US Treasury",US30Y:"30-Year US Treasury"};
+function mt5SymbolKey(value){return String(value||"").toUpperCase().replace(/[^A-Z0-9]/g,"")}
+function mt5QuoteIsFresh(q){var t=q&&Date.parse(q.quoteTime||q.timestamp);return !!(q&&Number.isFinite(t)&&Date.now()-t>=-5000&&Date.now()-t<=MT5_PUBLIC_QUOTE_MAX_AGE_MS)}
+function mt5QuotePrice(q){var bid=Number(q&&q.bid),ask=Number(q&&q.ask),last=Number(q&&q.last);if(bid>0&&ask>0&&ask>=bid)return (bid+ask)/2;if(last>0)return last;if(bid>0)return bid;if(ask>0)return ask;return null}
+function mt5NameForQuote(q){var key=mt5SymbolKey(q.symbol),known=MT5_DISPLAY_NAMES[key];if(known)return known;if(q.instrumentType==="forex"&&key.length===6)return key.slice(0,3)+"/"+key.slice(3);if(q.instrumentType==="crypto_cfd"&&key.length>3)return key.slice(0,-3)+"/"+key.slice(-3)+" (CFD)";return String(q.symbol||"MT5 instrument")}
+function mt5ItemForQuote(q){
+ var key=mt5SymbolKey(q.symbol),name=mt5NameForQuote(q),category=MT5_CATEGORY_BY_TYPE[q.instrumentType];
+ if(!category)return null;
+ var it=items.filter(function(x){return x.n===name||mt5SymbolKey(x.providerSymbol)===key||(!x.assetClass&&x.m==="Forex"&&mt5SymbolKey(x.n.replace("/",""))===key)})[0];
+ if(it){
+  var allowed=(q.instrumentType==="forex"?!it.assetClass&&it.m==="Forex":q.instrumentType==="crypto_cfd"?it.m==="Crypto"&&it.assetClass==="Crypto CFDs":it.assetClass===category);
+  if(!allowed)return null;
+  return it;
+ }
+ var market=q.instrumentType==="crypto_cfd"?"Crypto":"Forex";
+ it={n:name,m:market,assetClass:q.instrumentType==="forex"?null:category,p:null,c:null,k:q.instrumentType==="crypto_cfd"?"₿":(q.symbol||"MT5").slice(0,4),providerSymbol:q.symbol,mt5Symbol:q.symbol,unit:"USD",quoteCurrency:"USD",quoteStatus:"unavailable",quoteProvider:"Exness MT5",col:MC[category]||MC[market]};
+ if(q.instrumentType==="forex"){var pair=name.split("/");it.quoteCurrency=pair[1]||"USD";it.unit=it.quoteCurrency}
+ items.push(it);return it;
+}
+function applyMt5MarketQuotes(quotes,enabled){
+ mt5PublicBroadcastEnabled=enabled===true;
+ mt5FeedQuotes={};
+ var fresh=mt5PublicBroadcastEnabled&&Array.isArray(quotes)?quotes.filter(function(q){return q&&!q.stale&&mt5QuoteIsFresh(q)&&mt5QuotePrice(q)>0}):[];
+ fresh.forEach(function(q){mt5FeedQuotes[mt5SymbolKey(q.symbol)]=q});
+ items.forEach(function(it){
+  if(it.quoteProvider==="Exness MT5"&&!mt5FeedQuotes[mt5SymbolKey(it.mt5Symbol||it.providerSymbol||it.n.replace("/",""))]){
+   it.p=null;it.c=null;it.quoteTime=null;it.quoteStatus="unavailable";it.quoteProvider="Exness MT5";it.quoteBid=null;it.quoteAsk=null;
+  }
+ });
+ fresh.forEach(function(q){
+  var it=mt5ItemForQuote(q);if(!it)return;
+  var price=mt5QuotePrice(q);if(!(price>0))return;
+  it.p=price;it.c=null;it.quoteStatus="live";it.quoteProvider="Exness MT5";it.quoteTime=q.timestamp;it.quoteBid=Number(q.bid)>0?Number(q.bid):null;it.quoteAsk=Number(q.ask)>0?Number(q.ask):null;it.mt5Symbol=q.symbol;it.mt5InstrumentType=q.instrumentType;
+ });
+}
+function expireMt5MarketQuotes(){
+ var changed=false;
+ Object.keys(mt5FeedQuotes).forEach(function(key){if(!mt5QuoteIsFresh(mt5FeedQuotes[key]))delete mt5FeedQuotes[key]});
+ items.forEach(function(it){
+  if(it.quoteProvider==="Exness MT5"&&!mt5QuoteIsFresh(it)){
+   if(it.p!==null||it.quoteStatus!=="unavailable")changed=true;
+   it.p=null;it.c=null;it.quoteTime=null;it.quoteStatus="unavailable";it.quoteBid=null;it.quoteAsk=null;
+  }
+ });
+ if(changed)scheduleMarketDraw();
+}
+setInterval(expireMt5MarketQuotes,1000);
+function expireNonMt5MarketQuotes(){
+ var changed=false,now=Date.now();
+ items.forEach(function(it){
+  if(it.quoteProvider==="Exness MT5")return;
+  var t=quoteTimestampMs(it.quoteTime),limit=it.m==="Crypto"&&!it.assetClass?6000:it.m==="Forex"&&!it.assetClass?45*60*1000:MARKET_QUOTE_MAX_AGE_MS;
+  if((it.quoteStatus==="live"||it.quoteStatus==="delayed")&&(!Number.isFinite(t)||now-t>limit)){
+   it.p=null;it.c=null;it.quoteTime=null;it.quoteStatus="unavailable";changed=true;
+  }
+ });
+ if(changed)scheduleMarketDraw();
+}
+setInterval(expireNonMt5MarketQuotes,5000);
 function ensureFXFeed(){
  if(fxFeedSocket)return;
- if(typeof createFeedClient!=="function"){fxFeedStatus={state:"unavailable",provider:"Twelve Data",plan:"Basic",error:"Feed client unavailable"};return}
+ if(typeof createFeedClient!=="function"){fxFeedStatus={state:"unavailable",provider:"Market feed",error:"Feed client unavailable"};return}
  try{
   fxFeedSocket=createFeedClient({
    url:"wss://exchange-feed.onrender.com",base:"EUR",quote:"USD",markets:["spot"],
@@ -1350,38 +1434,59 @@ function ensureFXFeed(){
    onUpdate:function(data){
     fxFeedQuotes={};
     (data.fxQuotes||[]).forEach(function(q){if(q&&q.instrument)fxFeedQuotes[q.instrument]=q});
-    fxFeedStatus=data.fxStatus||{state:"unavailable",provider:"Twelve Data",plan:"Basic"};
+    spotMarketQuotes={};
+    var receivedAt=quoteTimestampMs(data.ts)||Date.now();
+    (data.marketQuotes||[]).forEach(function(q){
+     if(!q||q.market!=="spot"||!q.base||!q.quote)return;
+     var base=String(q.base).toUpperCase(),quote=String(q.quote).toUpperCase();
+     var bid=Number(q.bid),ask=Number(q.ask),last=Number(q.last),price=bid>0&&ask>0&&ask>=bid?(bid+ask)/2:last>0?last:bid>0?bid:ask>0?ask:null;
+     if(!(price>0))return;
+     var key=base+"/"+quote,prior=spotMarketQuotes[key];
+     if(!prior)spotMarketQuotes[key]={price:price,receivedAt:receivedAt,exchange:q.exchange||"Exchange"};
+     else{prior.price=(prior.price+price)/2;prior.exchange+=","+(q.exchange||"Exchange")}
+    });
+    items.filter(function(it){return it.m==="Crypto"&&!it.assetClass}).forEach(function(it){
+     var quote=spotMarketQuotes[it.n.toUpperCase()];
+     if(quote){it.p=quote.price;it.quoteStatus="live";it.quoteProvider=quote.exchange;it.quoteTime=new Date(receivedAt).toISOString()}
+     else{it.p=null;it.c=null;it.quoteStatus="unavailable";it.quoteTime=null;it.quoteProvider="Exchange feed"}
+    });
+    fxFeedStatus=data.fxStatus||{state:"unavailable",provider:"Market feed"};
     items.filter(function(i){return i.m==="Forex"&&!i.assetClass&&i.n.indexOf("/")>0}).forEach(function(it){
      var q=fxFeedQuotes[it.n.replace("/","_")];
-     if(q&&Number(q.mid)>0){it.p=Number(q.mid);it.quoteTime=q.time||null;it.quoteStatus="delayed";it.quoteProvider="Twelve Data Basic";it.c=null}
-     else{it.p=null;it.quoteTime=null;it.quoteStatus="unavailable";it.quoteProvider="Twelve Data Basic";it.c=null}
+     if(q&&Number(q.mid)>0){it.p=Number(q.mid);it.quoteTime=q.time||null;it.quoteStatus="delayed";it.quoteProvider=q.provider||fxFeedStatus.provider||"Market feed";it.c=null}
+     else if(it.quoteProvider!=="Exness MT5"){it.p=null;it.quoteTime=null;it.quoteStatus="unavailable";it.quoteProvider=fxFeedStatus.provider||"Market feed";it.c=null}
     });
-    items.filter(function(i){return i.assetClass==="Equities"&&["AAPL","MSFT","NVDA","AMZN"].indexOf(i.providerSymbol)>=0}).forEach(function(it){
+    items.filter(function(i){return i.assetClass==="Equities"&&["AAPL","MSFT","NVDA","AMZN"].indexOf(i.providerSymbol)>=0&&i.quoteProvider!=="Exness MT5"}).forEach(function(it){
      var q=fxFeedQuotes[it.providerSymbol];
-     if(q&&Number(q.mid)>0){it.p=Number(q.mid);it.quoteTime=q.time||null;it.quoteStatus="delayed";it.quoteProvider="Twelve Data Basic";it.quoteCurrency="USD";it.c=null}
-     else{it.p=null;it.quoteTime=null;it.quoteStatus="unavailable";it.quoteProvider="Twelve Data Basic";it.c=null}
+     if(q&&Number(q.mid)>0){it.p=Number(q.mid);it.quoteTime=q.time||null;it.quoteStatus="delayed";it.quoteProvider=q.provider||fxFeedStatus.provider||"Market feed";it.quoteCurrency="USD";it.c=null}
+     else if(it.quoteProvider!=="Exness MT5"){it.p=null;it.quoteTime=null;it.quoteStatus="unavailable";it.quoteProvider=fxFeedStatus.provider||"Market feed";it.c=null}
     });
+    applyMt5MarketQuotes(data.mt5Quotes,data.mt5PublicBroadcastEnabled);
     scheduleMarketDraw();
    }
   });
- }catch(e){fxFeedStatus={state:"unavailable",provider:"Twelve Data",plan:"Basic",error:e.message||"Feed unavailable"}}
+ }catch(e){fxFeedStatus={state:"unavailable",provider:"Market feed",error:e.message||"Feed unavailable"}}
 }
 function fxQuotePanel(pair){
  if(!pair||pair.length!==7||pair.charAt(3)!=="/")return "";
  ensureFXFeed();
- var instrument=pair.replace("/","_"),q=fxFeedQuotes[instrument],state=fxFeedStatus.state||"connecting";
+ var instrument=pair.replace("/","_"),q=fxFeedQuotes[instrument],state=fxFeedStatus.state||"connecting",marketItem=byName(pair);
+ if(marketItem&&marketItem.quoteProvider==="Exness MT5"&&marketItem.quoteStatus==="live"&&mt5QuoteIsFresh(marketItem)){
+  var mt5Bid=marketItem.quoteBid,mt5Ask=marketItem.quoteAsk;
+  return '<section style="margin:12px 16px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--s2);display:grid;gap:8px"><small style="font:700 9px monospace;letter-spacing:.12em;color:var(--am)">EXNESS MT5 · LIVE BROKER QUOTE</small><b style="font-size:19px">'+esc(pair)+' <span>'+fx2(marketItem.p,pair.indexOf("JPY")>=0?3:5)+'</span></b><span style="font-size:11px;color:var(--mut)">'+(mt5Bid&&mt5Ask?"Bid "+fx2(mt5Bid,5)+" · Ask "+fx2(mt5Ask,5):"Broker quote · no exchange order book")+'</span><small style="color:var(--mut)">Updated '+new Date(marketItem.quoteTime).toLocaleTimeString()+'</small></section>';
+ }
  var age=q&&q.time?Date.now()-Date.parse(q.time):Infinity,stale=!Number.isFinite(age)||age>45*60*1000;
- var message=state==="not_configured"?"The Twelve Data API key is not configured on the feed service.":state==="error"?"Twelve Data error: "+(fxFeedStatus.error||"request failed"):!q?"This pair is outside the 8-pair Basic-plan watchlist.":stale?"The last reference price is stale; waiting for the next refresh.":"Waiting for the next reference-price update…";
- var shell='<section style="margin:12px 16px;padding:14px;border:1px solid #326b5c;border-radius:14px;background:#14251f;display:grid;gap:8px"><small style="font:700 9px monospace;letter-spacing:.12em;color:#65d9c5">TWELVE DATA BASIC · REFERENCE PRICE ONLY</small>';
+ var provider=String((q&&q.provider)||fxFeedStatus.provider||"Market feed"),message=state==="not_configured"?"The market-data feed is not configured.":state==="error"?provider+" error: "+(fxFeedStatus.error||"request failed"):!q?"This pair is not currently covered by the selected feed.":stale?"The last reference price is stale; waiting for the next refresh.":"Waiting for the next reference-price update…";
+ var shell='<section style="margin:12px 16px;padding:14px;border:1px solid #326b5c;border-radius:14px;background:#14251f;display:grid;gap:8px"><small style="font:700 9px monospace;letter-spacing:.12em;color:#65d9c5">'+esc(provider.toUpperCase())+' · REFERENCE PRICE ONLY</small>';
  if(!q||stale)return shell+'<b>'+esc(pair)+'</b><span style="font-size:12px;color:var(--mut)">'+esc(message)+'</span></section>';
  var dp=pair.indexOf("JPY")>=0?3:5;
  return shell+'<b style="font-size:19px">'+esc(pair)+' <span>'+fx2(Number(q.mid),dp)+'</span></b><span style="font-size:11px;color:var(--mut)">Indicative reference price · no bid/ask, spread, liquidity or execution quote</span><small style="color:var(--mut)">Last updated '+new Date(q.time).toLocaleTimeString()+' · refreshes about every 30 minutes</small></section>';
 }
 function trade(){
- var it=items[st.tp],cr=it.m==="Crypto",fxm=it.m==="Forex"&&!it.assetClass;
- if(it.assetClass&&it.quoteStatus!=="live"&&it.quoteStatus!=="delayed")tmRestoreQuoteSnapshot(it);
+ var it=items[st.tp],cr=it.m==="Crypto"&&!it.assetClass,fxm=it.m==="Forex"&&!it.assetClass;
+ 
  if(fxm)ensureFXFeed();
- var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose market">'+(isPlainAsset(it)?"":'<span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span>')+'<b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?(fxFeedStatus.state==="available"||fxFeedStatus.state==="refreshing"?"TWELVE DATA BASIC":"TWELVE DATA "+String(fxFeedStatus.state||"CONNECTING").toUpperCase()):it.assetClass?(it.quoteProvider==="Twelve Data Basic"?"TWELVE DATA BASIC":it.quoteStatus==="live"?"LIVE QUOTE":it.quoteStatus==="delayed"?"DELAYED QUOTE":it.quoteStatus==="unavailable"?"QUOTE UNAVAILABLE":"PUBLIC QUOTE"):"TRADEMATE")+'</span></div>';
+ var h='<div class="thd"><button class="sel" data-act="pairopen" aria-label="Choose market">'+(isPlainAsset(it)?"":'<span class="coin sm" style="--ac:'+it.col+'">'+lg(it)+'</span>')+'<b>'+esc(it.n)+'</b>'+ic("chev","transform:rotate(90deg);width:14px;height:14px;color:var(--mut)")+'</button>'+chg(it.c)+'<span class="live"><i></i>'+ (cr?(tmStatus()):fxm?(it.quoteProvider==="Exness MT5"?"EXNESS MT5":String(fxFeedStatus.provider||"MARKET FEED").toUpperCase()+" "+String(fxFeedStatus.state||"CONNECTING").toUpperCase()):it.assetClass?(it.quoteProvider==="Twelve Data Basic"?"TWELVE DATA BASIC":it.quoteStatus==="live"?"LIVE QUOTE":it.quoteStatus==="delayed"?"DELAYED QUOTE":it.quoteStatus==="unavailable"?"QUOTE UNAVAILABLE":"PUBLIC QUOTE"):"TRADEMATE")+'</span></div>';
  if(cr){
   ensureMultiFeeds(it);
   var dp=it.p<1?6:it.p<20?4:2,stamp=tmStatus();
@@ -1397,9 +1502,9 @@ function trade(){
   return h+head+cachedNote+body+'<p class="fine">Live public exchange reference data only. Order book shows available price levels; Trades shows recent executions. TradeMate business agreements are negotiated separately through Contracts. '+stamp+'.</p>';
  }
  if(it.assetClass){
-  var status=it.quoteProvider==="Twelve Data Basic"?(it.quoteStatus==="delayed"?"Twelve Data Basic · periodic reference price":it.quoteStatus==="unavailable"?"Twelve Data Basic · quote unavailable":"Twelve Data Basic · awaiting quote"):(it.quoteStatus==="live"?"Live public quote":it.quoteStatus==="delayed"?"Delayed public quote":it.quoteStatus==="cached"?"Last saved public quote":it.quoteStatus==="unavailable"?"Public quote unavailable":"Awaiting public quote");
+  var status=it.quoteProvider==="Exness MT5"?(it.quoteStatus==="live"?"Exness MT5 · live broker quote": "Exness MT5 · quote unavailable"):it.quoteProvider==="Twelve Data Basic"?(it.quoteStatus==="delayed"?"Twelve Data Basic · periodic reference price":it.quoteStatus==="unavailable"?"Twelve Data Basic · quote unavailable":"Twelve Data Basic · awaiting quote"):(it.quoteStatus==="live"?"Live public quote":it.quoteStatus==="delayed"?"Delayed public quote":it.quoteStatus==="cached"?"Last saved public quote":it.quoteStatus==="unavailable"?"Public quote unavailable":"Awaiting public quote");
   var unit=it.unit||"USD";
-  return h+'<div class="tpx"><b>'+px(it)+'</b><span>'+esc(unit)+'</span></div><div class="card" style="margin:8px 16px"><b>'+status+'</b><p style="color:var(--mut);margin:6px 0 0">'+esc(it.assetClass)+' · '+(it.quoteTime?"Updated "+new Date(it.quoteTime).toLocaleString():"No quote timestamp yet")+(it.snapshotAt?" · Snapshot saved "+new Date(it.snapshotAt).toLocaleString():"")+'</p></div><p class="fine">'+(it.quoteProvider==="Twelve Data Basic"?"Twelve Data Basic reference price, refreshed periodically. No bid/ask, order-book liquidity or execution feed is provided.":"Reference pricing from the public market-quote provider.")+' This instrument is grouped under the Forex marketplace; executable order-book and trade feeds are not connected for this asset class.</p>';
+  return h+'<div class="tpx"><b>'+px(it)+'</b><span>'+esc(unit)+'</span></div><div class="card" style="margin:8px 16px"><b>'+status+'</b><p style="color:var(--mut);margin:6px 0 0">'+esc(it.assetClass)+' · '+(it.quoteTime?"Updated "+new Date(it.quoteTime).toLocaleString():"No quote timestamp yet")+(it.snapshotAt?" · Snapshot saved "+new Date(it.snapshotAt).toLocaleString():"")+'</p></div><p class="fine">'+(it.quoteProvider==="Exness MT5"?"Exness MT5 broker quote. This is a broker CFD/OTC quote, not an exchange order book or execution feed.":it.quoteProvider==="Twelve Data Basic"?"Twelve Data Basic reference price, refreshed periodically. No bid/ask, order-book liquidity or execution feed is provided.":"Reference pricing from the public market-quote provider.")+' This instrument is grouped under the Forex marketplace; executable order-book and trade feeds are not connected for this asset class.</p>';
  }
  if(fxm){
   var fxCached=it.quoteStatus==="cached";
@@ -1849,6 +1954,7 @@ document.addEventListener("click",function(e){var t=e.target;
  c=t.closest("[data-ht]");if(c){st.ht=c.dataset.ht;draw();return}
  c=t.closest("[data-hm]");if(c){st.hm=c.dataset.hm;draw();return}
  c=t.closest("[data-fxgroup]");if(c){st.fxGroup=c.dataset.fxgroup;st.q="";draw();return}
+ c=t.closest("[data-cryptogroup]");if(c){st.cryptoGroup=c.dataset.cryptogroup;st.q="";draw();return}
  c=t.closest("[data-mm]");if(c){if(c.dataset.mm==="P2P"){st.stack=[];pg("p2p");$("app").scrollTop=0;return}st.q="";if(c.dataset.mm==="NFTs"){st.stack=[];st.mm="NFTs";st.tab="Markets";draw();$("app").scrollTop=0}else{if(c.dataset.mm==="Forex")st.fxGroup="Currency Pairs";MKSORT="def";pg("marketCategory",c.dataset.mm)}return}
  c=t.closest("[data-market-back]");if(c){if(!st.stack.length&&st.mm==="NFTs"){st.mm="Services";st.q="";draw();$("app").scrollTop=0;return}back();return}
   c=t.closest("[data-nft-chain]");if(c){NFTCHAIN=c.dataset.nftChain;NFTLIVE=[];loadLiveNFTs(st.q||NFTCOLLECTION);draw();return}
@@ -2252,7 +2358,7 @@ document.addEventListener("click",function(e){var c=e.target.closest("[data-nft-
 /* ---------- trade: market picker sheet ---------- */
 function closePair(){var e=document.getElementById("psheet");if(e)e.remove()}
 function openPair(){closePair();var cur=items[st.tp],h='';
- ORD.forEach(function(m){var g=items.filter(function(i){return i.m===m});if(!g.length)return;
+ ORD.forEach(function(m){var g=items.filter(function(i){return i.m===m&&hasCurrentMarketFeed(i)});if(!g.length)return;
   h+='<div class="sec">'+esc(m).toUpperCase()+'</div>'+g.map(function(i){var on=i===cur;return '<button class="prow'+(on?' on':'')+'" data-act="pairpick" data-arg="'+items.indexOf(i)+'">'+(isPlainAsset(i)?"":'<span class="coin sm" style="--ac:'+i.col+'">'+lg(i)+'</span>')+'<span class="pn">'+esc(i.n)+'</span><span class="pp">'+px(i)+'</span>'+(on?ic("check","width:16px;height:16px;color:#ff9f2e"):'<span style="width:16px"></span>')+'</button>'}).join("")});
  var d=document.createElement("div");d.id="psheet";d.className="psheet";
  d.innerHTML='<div class="pback" data-act="pairclose"></div><div class="ppanel"><div class="phd"><b>Select market</b><button data-act="pairclose" aria-label="Close">'+ic("close","width:18px;height:18px")+'</button></div><div class="psl">'+h+'</div></div>';
@@ -2275,7 +2381,7 @@ window.addEventListener("resize",navH);window.addEventListener("load",navH);
 
 /* ---------- signed-out page ---------- */
 function showOut(){var o=document.getElementById("out");if(o)o.remove();
- var nm=esc(st.me.nick||"friend"),T=["BTC/USDT","ETH/USDT","USD/NGN"].map(byName).filter(Boolean);
+ ensureFXFeed();var nm=esc(st.me.nick||"friend"),T=["BTC/USDT","ETH/USDT","USD/NGN"].map(byName).filter(hasCurrentMarketFeed);
  var rows=T.map(function(i,k){return '<div class="so-t" style="animation-delay:'+(.5+k*.12)+'s">'+(isPlainAsset(i)?"":'<span class="coin sm" style="--ac:'+i.col+';width:36px;height:36px;border-radius:12px">'+lg(i)+'</span>')+'<div><b>'+esc(i.n)+'</b><small>'+(val(i)||i.m)+'</small></div><div style="flex:none;text-align:right"><strong data-px="'+esc(i.n)+'">'+px(i)+'</strong>'+chg(i.c)+'</div></div>'}).join("");
  var d=document.createElement("div");d.id="out";d.setAttribute("role","dialog");d.setAttribute("aria-label","Signed out");
  d.innerHTML='<div class="grid-bg"></div><div class="w">'+

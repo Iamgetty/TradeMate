@@ -89,6 +89,24 @@ jobs:
         working-directory: TradeMate-main/apps/web
         run: npm run build
 
+
+  exchange-feed:
+    name: Exchange feed and MT5 tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+      - name: Install exchange-feed dependencies
+        working-directory: TradeMate-main/exchange-feed
+        run: npm install --no-audit --no-fund
+      - name: Run exchange-feed and MT5 quote tests
+        working-directory: TradeMate-main/exchange-feed
+        run: npm test
+
   api:
     name: API TypeScript build
     runs-on: ubuntu-latest
