@@ -1147,6 +1147,7 @@ function tmQuoteSnapshotKey(it){return TM_QUOTE_SNAPSHOT_PREFIX+encodeURICompone
 function tmSaveQuoteSnapshot(it,q){try{if(!it||!q||!(Number(q.price)>0))return;var payload={price:Number(q.price),changePercent:Number.isFinite(Number(q.changePercent))?Number(q.changePercent):null,currency:q.currency||it.quoteCurrency||it.unit||"USD",marketTime:q.marketTime||it.quoteTime||null,exchange:q.exchange||null};localStorage.setItem(tmQuoteSnapshotKey(it),JSON.stringify({savedAt:Date.now(),data:payload}))}catch(e){}}
 function tmRestoreQuoteSnapshot(it){try{if(!it)return false;var raw=localStorage.getItem(tmQuoteSnapshotKey(it));if(!raw)return false;var saved=JSON.parse(raw),data=saved&&saved.data;if(!data||!(Number(data.price)>0)||!saved.savedAt||Date.now()-Number(saved.savedAt)>30*24*60*60*1000)return false;it.p=Number(data.price);it.c=Number.isFinite(Number(data.changePercent))?Number(data.changePercent):it.c;it.quoteStatus="cached";it.quoteTime=data.marketTime||null;it.quoteCurrency=data.currency||it.unit||"USD";it.snapshotAt=Number(saved.savedAt);return true}catch(e){return false}}
 var FOREX_GROUPS=["Currency Pairs","Stock Indices","Commodities","Equities","Bonds & Treasuries"];
+var CRYPTO_GROUPS=["Spot Markets","Crypto CFDs"];
 function loadMarketQuotes(market,list){
  var allowed=["Stock Indices","Commodities","Equities","Bonds & Treasuries"];
  if(allowed.indexOf(market)<0||!TMCFG.api)return;
@@ -1227,7 +1228,8 @@ function markets(categoryPage){
  if(st.mm==="Forex"||st.mm==="Crypto"||st.mm==="NFTs")st.q="";
  if(st.mm==="NFTs")loadLiveNFTs(st.q||NFTCOLLECTION);
  var fxGroup=st.mm==="Forex"?(st.fxGroup||"Currency Pairs"):"";
- var list=st.mm==="NFTs"?NFTLIVE:items.filter(function(i){return i.m===st.mm&&(st.mm!=="Forex"||((i.assetClass||"Currency Pairs")===fxGroup))&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)});
+ var cryptoGroup=st.mm==="Crypto"?(st.cryptoGroup||"Spot Markets"):"";
+ var list=st.mm==="NFTs"?NFTLIVE:items.filter(function(i){return i.m===st.mm&&(st.mm!=="Forex"||((i.assetClass||"Currency Pairs")===fxGroup))&&(st.mm!=="Crypto"||(cryptoGroup==="Crypto CFDs"?i.assetClass==="Crypto CFDs":!i.assetClass))&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)});
  if(st.mm==="Forex"&&fxGroup!=="Currency Pairs")loadMarketQuotes(fxGroup,list);
  if(st.mm==="NFTs"){
   var choices=[["azuki","Azuki"],["bored ape yacht club","Bored Ape Yacht Club"],["pudgy penguins","Pudgy Penguins"],["cryptopunks","CryptoPunks"],["doodles","Doodles"],["clone x","Clone X"],["art","Art NFTs"]],chains=[["ethereum","Ethereum"],["polygon","Polygon"],["arbitrum","Arbitrum"],["optimism","Optimism"],["base","Base"],["avalanche","Avalanche"],["zora","Zora"],["blast","Blast"]];
@@ -1236,13 +1238,13 @@ function markets(categoryPage){
  var meta=MK_META[st.mm]||{};
  if(categoryPage){
   var title=st.mm==="Forex"?fxGroup:st.mm,live=(st.mm==="Crypto"||st.mm==="Forex");
-  var total=items.filter(function(i){return i.m===st.mm&&(st.mm!=="Forex"||((i.assetClass||"Currency Pairs")===fxGroup))}).length;
+  var total=items.filter(function(i){return i.m===st.mm&&(st.mm!=="Forex"||((i.assetClass||"Currency Pairs")===fxGroup))&&(st.mm!=="Crypto"||(cryptoGroup==="Crypto CFDs"?i.assetClass==="Crypto CFDs":!i.assetClass))}).length;
   var sortable=list.length>1&&list.some(function(i){return typeof i.c==="number"});
   if(sortable&&MKSORT!=="def"){var nv=function(x,dv){return typeof x==="number"?x:dv};list=list.slice().sort(MKSORT==="up"?function(a,b){return nv(b.c,-1e9)-nv(a.c,-1e9)}:MKSORT==="dn"?function(a,b){return nv(a.c,1e9)-nv(b.c,1e9)}:function(a,b){return String(a.n).localeCompare(String(b.n))})}
   var u=meta.u||"listings";
   var hero='<section class="mk-hero"><span class="mk-hero-ico">'+ic(MI[st.mm]||"mkts")+'</span><div class="mk-hero-tx"><h1>'+esc(meta.t||title)+'</h1><p>'+esc(meta.d||"")+'</p></div><div class="mk-hero-st"><b>'+total+'</b><small>'+esc(total===1?u.replace(/s$/,""):u)+'</small>'+(live?'<span class="mk-live'+(st.live?" on":"")+'"><i></i>'+(st.live?"Live":"Syncing")+'</span>':"")+'</div></section>';
   var find=(st.mm==="Forex"||st.mm==="Crypto")?"":'<div class="mk-find"><label class="srch mk-srch">'+ic("search")+'<input id="mq" value="'+esc(st.q)+'" placeholder="Search '+esc(title)+'" aria-label="Search this market" autocomplete="off" spellcheck="false">'+(st.q?'<button type="button" class="mk-clear" data-mk-clear aria-label="Clear search">'+ic("close")+'</button>':"")+'</label></div>';
-  var groups=st.mm==="Forex"?'<div class="sub fx-groups mk-chips">'+FOREX_GROUPS.map(function(g){return '<button class="'+(fxGroup===g?"on":"")+'" data-fxgroup="'+g+'">'+g+'</button>'}).join("")+'</div>':"";
+  var groups=st.mm==="Forex"?'<div class="sub fx-groups mk-chips">'+FOREX_GROUPS.map(function(g){return '<button class="'+(fxGroup===g?"on":"")+'" data-fxgroup="'+g+'">'+g+'</button>'}).join("")+'</div>':st.mm==="Crypto"?'<div class="sub fx-groups mk-chips">'+CRYPTO_GROUPS.map(function(g){return '<button class="'+(cryptoGroup===g?"on":"")+'" data-cryptogroup="'+g+'">'+g+'</button>'}).join("")+'</div>':"";
   var sorts=sortable?'<div class="sub mk-chips mk-sorts" role="group" aria-label="Sort list">'+[["def","Default"],["up","Top gainers"],["dn","Top losers"],["az","A–Z"]].map(function(s){return '<button class="'+(MKSORT===s[0]?"on":"")+'" data-mk-sort="'+s[0]+'" aria-pressed="'+(MKSORT===s[0])+'">'+s[1]+'</button>'}).join("")+'</div>':"";
   var count=st.q&&list.length?'<div class="mk-count"><b>'+list.length+'</b> result'+(list.length===1?"":"s")+' for “'+esc(st.q)+'”</div>':"";
   var canList=st.mode==="Seller"&&["Services","Real Estate","Software","B2B"].indexOf(st.mm)>=0;
@@ -1902,7 +1904,7 @@ document.addEventListener("click",function(e){var t=e.target;
  c=t.closest("[data-open]");if(c){var oi=byName(c.dataset.open);if(oi&&oi.m!=="Crypto"&&oi.m!=="Forex"){pg("listing",oi.n);return}st.tp=items.findIndex(function(i){return i.n===c.dataset.open});st.tt="Order book";st.stack=[];st.tab="Trade";draw();$("app").scrollTop=0;return}
  c=t.closest("[data-ht]");if(c){st.ht=c.dataset.ht;draw();return}
  c=t.closest("[data-hm]");if(c){st.hm=c.dataset.hm;draw();return}
- c=t.closest("[data-fxgroup]");if(c){st.fxGroup=c.dataset.fxgroup;st.q="";draw();return}
+ c=t.closest("[data-fxgroup]");if(c){st.fxGroup=c.dataset.fxgroup;st.q="";draw();return}\n c=t.closest("[data-cryptogroup]");if(c){st.cryptoGroup=c.dataset.cryptogroup;st.q="";draw();return}
  c=t.closest("[data-mm]");if(c){if(c.dataset.mm==="P2P"){st.stack=[];pg("p2p");$("app").scrollTop=0;return}st.q="";if(c.dataset.mm==="NFTs"){st.stack=[];st.mm="NFTs";st.tab="Markets";draw();$("app").scrollTop=0}else{if(c.dataset.mm==="Forex")st.fxGroup="Currency Pairs";MKSORT="def";pg("marketCategory",c.dataset.mm)}return}
  c=t.closest("[data-market-back]");if(c){if(!st.stack.length&&st.mm==="NFTs"){st.mm="Services";st.q="";draw();$("app").scrollTop=0;return}back();return}
   c=t.closest("[data-nft-chain]");if(c){NFTCHAIN=c.dataset.nftChain;NFTLIVE=[];loadLiveNFTs(st.q||NFTCOLLECTION);draw();return}
