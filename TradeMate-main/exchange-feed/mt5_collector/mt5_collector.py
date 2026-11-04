@@ -81,10 +81,14 @@ def write_csv(quotes):
 
 
 def main():
-    if not ENDPOINT.startswith("https://"):
+    # Local CSV-only mode is the safe default for initial laptop verification.
+    # Remote posting is enabled only when an HTTPS endpoint and token are supplied.
+    if ENDPOINT and not ENDPOINT.startswith("https://"):
         raise ValueError("TRADEMATE_MT5_ENDPOINT must be an HTTPS URL")
-    if not TOKEN or len(TOKEN) < 32:
+    if ENDPOINT and (not TOKEN or len(TOKEN) < 32):
         raise ValueError("Set MT5_INGEST_TOKEN to the secure token configured on the server")
+    if not ENDPOINT:
+        print("CSV-only mode: no data will be sent to TradeMate.")
     symbols = load_symbols()
 
     if not mt5.initialize():
@@ -130,15 +134,18 @@ def main():
             if quotes and now - last_send >= BATCH_SECONDS:
                 write_csv(quotes)
                 print("Saved", len(quotes), "quotes to", CSV_PATH)
-                try:
-                    result = post_quotes(quotes)
-                    print("Accepted", result.get("accepted", 0), "quotes")
+                if not ENDPOINT:
                     last_send = now
-                    backoff = 2.0
-                except (urllib.error.URLError, TimeoutError, RuntimeError, ValueError) as exc:
-                    print("Ingestion error:", exc, "- retrying in", int(backoff), "seconds")
-                    time.sleep(backoff)
-                    backoff = min(backoff * 2, 60.0)
+                else:
+                    try:
+                        result = post_quotes(quotes)
+                        print("Accepted", result.get("accepted", 0), "quotes")
+                        last_send = now
+                        backoff = 2.0
+                    except (urllib.error.URLError, TimeoutError, RuntimeError, ValueError) as exc:
+                        print("Ingestion error:", exc, "- retrying in", int(backoff), "seconds")
+                        time.sleep(backoff)
+                        backoff = min(backoff * 2, 60.0)
             time.sleep(POLL_SECONDS)
     finally:
         mt5.shutdown()
