@@ -2184,7 +2184,7 @@ document.addEventListener("click",function(e){var c=e.target.closest("[data-nft-
  fr.readAsDataURL(f);t.value=""});
 /* ---- fixed screen: stop page drag / rubber-band, only inner scrollers move ---- */
 (function(){var sx=0,sy=0;
- function scroller(el){while(el&&el!==document.body){if(el.id==="app"||el.id==="out"||(el.classList&&(el.classList.contains("pbody")||el.classList.contains("psl")||el.classList.contains("pgs"))))return el;el=el.parentElement}return null}
+ function scroller(el){while(el&&el!==document.body){if(el.id==="app"||el.id==="out"||el.id==="tlView"||(el.classList&&(el.classList.contains("pbody")||el.classList.contains("psl")||el.classList.contains("pgs"))))return el;el=el.parentElement}return null}
  document.addEventListener("touchstart",function(e){sx=e.touches[0].clientX;sy=e.touches[0].clientY},{passive:true});
  document.addEventListener("touchmove",function(e){if(e.touches.length>1)return;if(e.target&&e.target.id==="lp")return;var dx=e.touches[0].clientX-sx,dy=e.touches[0].clientY-sy;
   if(Math.abs(dx)>Math.abs(dy))return;
