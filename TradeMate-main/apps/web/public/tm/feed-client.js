@@ -63,7 +63,7 @@
         symbol: `${o.base}/${o.quote}`,
         bids: [], asks: [], bestBid: null, bestAsk: null, mid: null, spread: null,
         last: null, trades: [], booksCombined: 0,
-        feedsLive: 0, feedsTotal: 0, fxQuotes: [], mt5Quotes: [], ts: Date.now(),
+        feedsLive: 0, feedsTotal: 0, fxQuotes: [], mt5Quotes: [], mt5PublicBroadcastEnabled: false, ts: Date.now(),
       });
     }
 
@@ -108,6 +108,7 @@
         feedsTotal: Number.isFinite(msg.feeds.total) ? msg.feeds.total : 0,
         fxQuotes: Array.isArray(msg.fxQuotes) ? msg.fxQuotes : [],
         mt5Quotes: Array.isArray(msg.mt5Quotes) ? msg.mt5Quotes : [],
+        mt5PublicBroadcastEnabled: msg.mt5PublicBroadcastEnabled === true,
         fxStatus: msg.fxStatus || { state: 'unavailable', provider: 'OANDA' },
         ts: msg.ts,
       });
