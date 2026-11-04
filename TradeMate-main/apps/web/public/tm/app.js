@@ -1154,15 +1154,15 @@ function loadMarketQuotes(market,list){
  var allowed=["Stock Indices","Commodities","Equities","Bonds & Treasuries"];
  if(allowed.indexOf(market)<0||!TMCFG.api)return;
  var rows=list.filter(function(i){return i.assetClass===market&&i.providerSymbol&&i.quoteProvider!=="Twelve Data Basic"&&!(i.quoteProvider==="Exness MT5"&&i.quoteStatus==="live"&&mt5QuoteIsFresh(i))});
- rows.forEach(function(i){if(!i.quoteStatus||i.quoteStatus==="unavailable")tmRestoreQuoteSnapshot(i)});
+ rows.forEach(function(i){if(i.quoteStatus==="cached"||!i.quoteStatus||i.quoteStatus==="unavailable"){i.p=null;i.c=null;i.quoteTime=null;i.quoteStatus="unavailable"}});
  var key=market+":"+rows.map(function(i){return i.providerSymbol}).join(",");
  if(!rows.length||MARKET_QUOTE_STATE.loading||(MARKET_QUOTE_STATE.key===key&&Date.now()-MARKET_QUOTE_STATE.last<45000))return;
  MARKET_QUOTE_STATE.key=key;MARKET_QUOTE_STATE.loading=true;
  fetch(TMCFG.api+"/market/quotes?symbols="+encodeURIComponent(rows.map(function(i){return i.providerSymbol}).join(",")),{credentials:"include",cache:"no-store"})
  .then(function(r){if(!r.ok)throw new Error("Market quote service unavailable");return r.json()})
  .then(function(d){(d.quotes||[]).forEach(function(q){MARKET_QUOTES[q.symbol]=q;var it=rows.filter(function(x){return x.providerSymbol===q.symbol})[0];if(it){it.quoteStatus=q.status;it.quoteTime=q.marketTime;it.quoteCurrency=q.currency;if(q.status!=="unavailable"&&typeof q.price==="number"){it.p=q.price;it.c=typeof q.changePercent==="number"?q.changePercent:null;tmSaveQuoteSnapshot(it,q)}else if(!tmRestoreQuoteSnapshot(it)){it.quoteStatus="unavailable"}}});MARKET_QUOTE_STATE.last=Date.now();MARKET_QUOTE_STATE.error="";})
- .catch(function(){MARKET_QUOTE_STATE.error="Market quotes are temporarily unavailable.";rows.forEach(function(i){if(!tmRestoreQuoteSnapshot(i))i.quoteStatus="unavailable"})})
- .finally(function(){MARKET_QUOTE_STATE.loading=false;var active=st.mm==="Forex"?st.fxGroup:"",activeRows=items.filter(function(i){return i.m==="Forex"&&i.assetClass===active&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)}),activeKey=active+":"+activeRows.map(function(i){return i.providerSymbol}).join(",");if(st.tab==="Markets"&&active&&active!=="Currency Pairs"&&activeKey!==MARKET_QUOTE_STATE.key)loadMarketQuotes(active,activeRows);else if(st.tab==="Markets"&&st.mm===market&&active===market)softDraw()});
+ .catch(function(){MARKET_QUOTE_STATE.error="Market quotes are temporarily unavailable.";rows.forEach(function(i){i.p=null;i.c=null;i.quoteTime=null;i.quoteStatus="unavailable"})})
+ .finally(function(){MARKET_QUOTE_STATE.loading=false;var active=st.mm==="Forex"?st.fxGroup:"",activeRows=items.filter(function(i){return i.m==="Forex"&&i.assetClass===active&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)}),activeKey=active+":"+activeRows.map(function(i){return i.providerSymbol}).join(",");if(st.tab==="Markets"&&active&&active!=="Currency Pairs"&&activeKey!==MARKET_QUOTE_STATE.key)loadMarketQuotes(active,activeRows);else if(st.tab==="Markets"&&st.mm===market)softDraw()});
 }
 /* ===================== MARKETPLACE REDESIGN HELPERS ===================== */
 var MKSORT="def";
@@ -1422,6 +1422,22 @@ function ensureFXFeed(){
    onUpdate:function(data){
     fxFeedQuotes={};
     (data.fxQuotes||[]).forEach(function(q){if(q&&q.instrument)fxFeedQuotes[q.instrument]=q});
+    spotMarketQuotes={};
+    var receivedAt=quoteTimestampMs(data.ts)||Date.now();
+    (data.marketQuotes||[]).forEach(function(q){
+     if(!q||q.market!=="spot"||!q.base||!q.quote)return;
+     var base=String(q.base).toUpperCase(),quote=String(q.quote).toUpperCase();
+     var bid=Number(q.bid),ask=Number(q.ask),last=Number(q.last),price=bid>0&&ask>0&&ask>=bid?(bid+ask)/2:last>0?last:bid>0?bid:ask>0?ask:null;
+     if(!(price>0))return;
+     var key=base+"/"+quote,prior=spotMarketQuotes[key];
+     if(!prior)spotMarketQuotes[key]={price:price,receivedAt:receivedAt,exchange:q.exchange||"Exchange"};
+     else{prior.price=(prior.price+price)/2;prior.exchange+=","+(q.exchange||"Exchange")}
+    });
+    items.filter(function(it){return it.m==="Crypto"&&!it.assetClass}).forEach(function(it){
+     var quote=spotMarketQuotes[it.n.toUpperCase()];
+     if(quote){it.p=quote.price;it.quoteStatus="live";it.quoteProvider=quote.exchange;it.quoteTime=new Date(receivedAt).toISOString()}
+     else{it.p=null;it.c=null;it.quoteStatus="unavailable";it.quoteTime=null;it.quoteProvider="Exchange feed"}
+    });
     fxFeedStatus=data.fxStatus||{state:"unavailable",provider:"Market feed"};
     items.filter(function(i){return i.m==="Forex"&&!i.assetClass&&i.n.indexOf("/")>0}).forEach(function(it){
      var q=fxFeedQuotes[it.n.replace("/","_")];
