@@ -363,7 +363,8 @@ setInterval(() => {
     const key = c.watch || '';
     if (!cache.has(key)) {
       cache.set(key, JSON.stringify({
-        ts: now, feeds, mt5Quotes: mt5QuoteStore.snapshot(now),
+        // MT5 quotes remain behind the authenticated REST endpoint until redistribution is approved.
+        ts: now, feeds,
         books: list.map(({ bids, asks, ...slim }) => (key && slim.base === key ? { ...slim, bids, asks } : slim)),
         trades: key ? trades.filter((t) => t.base === key) : [],
       }));
