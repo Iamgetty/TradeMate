@@ -2,7 +2,46 @@
   {"mt5_symbol":"EURUSDm","symbol":"EURUSD","instrumentType":"forex"},
   {"mt5_symbol":"GBPUSDm","symbol":"GBPUSD","instrumentType":"forex"},
   {"mt5_symbol":"USDJPYm","symbol":"USDJPY","instrumentType":"forex"},
+  {"mt5_symbol":"USDCHFm","symbol":"USDCHF","instrumentType":"forex"},
+  {"mt5_symbol":"USDCADm","symbol":"USDCAD","instrumentType":"forex"},
+  {"mt5_symbol":"AUDUSDm","symbol":"AUDUSD","instrumentType":"forex"},
+  {"mt5_symbol":"NZDUSDm","symbol":"NZDUSD","instrumentType":"forex"},
+  {"mt5_symbol":"EURGBPm","symbol":"EURGBP","instrumentType":"forex"},
+  {"mt5_symbol":"EURJPYm","symbol":"EURJPY","instrumentType":"forex"},
+  {"mt5_symbol":"GBPJPYm","symbol":"GBPJPY","instrumentType":"forex"},
+
   {"mt5_symbol":"XAUUSDm","symbol":"XAUUSD","instrumentType":"metal"},
+  {"mt5_symbol":"XAGUSDm","symbol":"XAGUSD","instrumentType":"metal"},
+
   {"mt5_symbol":"US500m","symbol":"US500","instrumentType":"index_cfd"},
-  {"mt5_symbol":"AAPLm","symbol":"AAPL","instrumentType":"equity_cfd"}
+  {"mt5_symbol":"USTECm","symbol":"USTEC","instrumentType":"index_cfd"},
+  {"mt5_symbol":"US30m","symbol":"US30","instrumentType":"index_cfd"},
+  {"mt5_symbol":"DE30m","symbol":"DE30","instrumentType":"index_cfd"},
+  {"mt5_symbol":"UK100m","symbol":"UK100","instrumentType":"index_cfd"},
+  {"mt5_symbol":"JP225m","symbol":"JP225","instrumentType":"index_cfd"},
+  {"mt5_symbol":"HK50m","symbol":"HK50","instrumentType":"index_cfd"},
+  {"mt5_symbol":"FR40m","symbol":"FR40","instrumentType":"index_cfd"},
+  {"mt5_symbol":"STOXX50m","symbol":"STOXX50","instrumentType":"index_cfd"},
+  {"mt5_symbol":"IN50m","symbol":"IN50","instrumentType":"index_cfd"},
+
+  {"mt5_symbol":"AAPLm","symbol":"AAPL","instrumentType":"equity_cfd"},
+  {"mt5_symbol":"MSFTm","symbol":"MSFT","instrumentType":"equity_cfd"},
+  {"mt5_symbol":"NVDAm","symbol":"NVDA","instrumentType":"equity_cfd"},
+  {"mt5_symbol":"GOOGLm","symbol":"GOOGL","instrumentType":"equity_cfd"},
+  {"mt5_symbol":"AMZNm","symbol":"AMZN","instrumentType":"equity_cfd"},
+  {"mt5_symbol":"METAm","symbol":"META","instrumentType":"equity_cfd"},
+  {"mt5_symbol":"TSLAm","symbol":"TSLA","instrumentType":"equity_cfd"},
+  {"mt5_symbol":"JPMm","symbol":"JPM","instrumentType":"equity_cfd"},
+
+  {"mt5_symbol":"USOILm","symbol":"USOIL","instrumentType":"commodity_cfd"},
+  {"mt5_symbol":"UKOILm","symbol":"UKOIL","instrumentType":"commodity_cfd"},
+  {"mt5_symbol":"XNGUSDm","symbol":"XNGUSD","instrumentType":"commodity_cfd"},
+
+  {"mt5_symbol":"BTCUSDm","symbol":"BTCUSD","instrumentType":"crypto_cfd"},
+  {"mt5_symbol":"ETHUSDm","symbol":"ETHUSD","instrumentType":"crypto_cfd"},
+  {"mt5_symbol":"XRPUSDm","symbol":"XRPUSD","instrumentType":"crypto_cfd"},
+  {"mt5_symbol":"LTCUSDm","symbol":"LTCUSD","instrumentType":"crypto_cfd"},
+  {"mt5_symbol":"BCHUSDm","symbol":"BCHUSD","instrumentType":"crypto_cfd"},
+  {"mt5_symbol":"LINKUSDm","symbol":"LINKUSD","instrumentType":"crypto_cfd"},
+  {"mt5_symbol":"AAVEUSDm","symbol":"AAVEUSD","instrumentType":"crypto_cfd"}
 ]
