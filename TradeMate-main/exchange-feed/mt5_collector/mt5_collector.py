@@ -4,6 +4,7 @@
 Requires a running, logged-in MT5 desktop terminal. This script only reads
 market ticks; it has no order/deal/trading functionality.
 """
+import csv
 import json
 import os
 import sys
@@ -11,6 +12,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from datetime import datetime, timezone
 
 try:
     import MetaTrader5 as mt5
@@ -24,6 +26,7 @@ ENDPOINT = os.getenv("TRADEMATE_MT5_ENDPOINT", "").rstrip("/")
 TOKEN = os.getenv("MT5_INGEST_TOKEN", "")
 POLL_SECONDS = max(1.0, float(os.getenv("MT5_POLL_SECONDS", "1")))
 BATCH_SECONDS = max(1.0, float(os.getenv("MT5_BATCH_SECONDS", "2")))
+CSV_PATH = Path(os.getenv("MT5_CSV_PATH", str(Path.home() / "Downloads" / "exness_mt5_live_quotes.csv")))
 
 
 def load_symbols():
@@ -55,6 +58,26 @@ def post_quotes(quotes):
         if response.status not in (200, 202):
             raise RuntimeError("Ingestion returned HTTP " + str(response.status))
         return json.loads(response.read().decode("utf-8"))
+
+
+def write_csv(quotes):
+    """Replace the local CSV with the latest available quote snapshot."""
+    CSV_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with CSV_PATH.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(["symbol", "bid", "ask", "last", "volume", "timestamp_utc"])
+        for quote in quotes:
+            timestamp = datetime.fromtimestamp(
+                quote["timestamp"] / 1000, timezone.utc
+            ).isoformat()
+            writer.writerow([
+                quote["sourceSymbol"],
+                quote["bid"] or 0,
+                quote["ask"] or 0,
+                quote["last"] or 0,
+                quote.get("volume", 0),
+                timestamp,
+            ])
 
 
 def main():
@@ -100,10 +123,13 @@ def main():
                     "ask": ask,
                     "last": last,
                     "timestamp": int(tick.time_msc),
+                    "volume": int(tick.volume),
                 })
 
             now = time.monotonic()
             if quotes and now - last_send >= BATCH_SECONDS:
+                write_csv(quotes)
+                print("Saved", len(quotes), "quotes to", CSV_PATH)
                 try:
                     result = post_quotes(quotes)
                     print("Accepted", result.get("accepted", 0), "quotes")
