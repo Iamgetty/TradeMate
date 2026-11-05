@@ -82,7 +82,7 @@ PR #22 is an audit source, not an integration target. Its original branch is sta
 
 ### Next execution order
 
-1. Reconcile the PR #22 auth/session and Feed validation fixes against current API schemas and tests; port only missing, safe changes.
+1. Complete review and CI/security verification of PR #79; merge only after explicit product-owner approval.
 2. Add recoverable states/retry handling for the silent core loaders, without changing established marketplace/NFT layout dimensions.
 3. Verify organization document transaction semantics and permissions with integration tests.
 4. Run the Services/B2B and contract lifecycle two-account acceptance matrix.
