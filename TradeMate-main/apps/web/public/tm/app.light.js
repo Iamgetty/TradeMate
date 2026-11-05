@@ -1143,13 +1143,13 @@ function loadLiveNFTs(query){
  },250);
 }
 function loadNFTCollections(force){
- if(NFTCOLLECTIONSCHAIN===NFTCHAIN&&NFTCOLLECTIONS.length&&!force)return;
+ if(NFTCOLLECTIONSCHAIN===NFTCHAIN&&!force)return;
  if(NFTCOLLECTIONSLOADING)return;
  NFTCOLLECTIONSLOADING=true;NFTERROR="";
  fetch("/api/nft-collections?chain="+encodeURIComponent(NFTCHAIN)+"&limit=48",{cache:"no-store"})
  .then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.message||"Could not load NFT collections");return d})})
  .then(function(d){NFTCOLLECTIONS=Array.isArray(d.collections)?d.collections:[];NFTCOLLECTIONSCHAIN=NFTCHAIN;NFTERROR=d.message||""})
- .catch(function(e){NFTCOLLECTIONS=[];NFTERROR=e.message||"Could not load NFT collections"})
+ .catch(function(e){NFTCOLLECTIONS=[];NFTCOLLECTIONSCHAIN=NFTCHAIN;NFTERROR=e.message||"Could not load NFT collections"})
  .finally(function(){NFTCOLLECTIONSLOADING=false;if(st.tab==="Markets"&&st.mm==="NFTs")softDraw()});
 }
 function loadNFTCollectionItems(collection){
