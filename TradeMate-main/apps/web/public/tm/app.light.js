@@ -1122,7 +1122,7 @@ function home(){
  '<div class="tabs"><button class="on" data-ht="Favorites">Favorites</button></div>'+
  (fv?'<div style="height:10px"></div>':'<div class="sub">'+["All"].concat(ORD).map(function(t){return '<button class="'+(hm===t?"on":"")+'" data-hm="'+t+'">'+t+'</button>'}).join("")+'</div>')+body}
 var NFTSORT="popular",NFTFAV={};try{NFTFAV=JSON.parse(localStorage.getItem("tm.nftfav")||"{}")}catch(e){NFTFAV={}}if(!NFTFAV||typeof NFTFAV!=="object"||Array.isArray(NFTFAV))NFTFAV={};
-var NFTLIVE=[],NFTLOADING=false,NFTQUERY="",NFTERROR="",NFTTIMER=null,NFTREQ=0,NFTCOLLECTION="azuki",NFTCHAIN="ethereum";var NFTSHOWN=false,NFTSTALE=false,NFTVIEW="collections",NFTCOLLECTIONS=[],NFTCOLLECTIONSCHAIN="",NFTCOLLECTIONSLOADING=false,NFTSELECTED=null;
+var NFTLIVE=[],NFTLOADING=false,NFTQUERY="",NFTERROR="",NFTTIMER=null,NFTREQ=0,NFTCOLLECTION="azuki",NFTCHAIN="ethereum";var NFTSHOWN=false,NFTSTALE=false,NFTVIEW="collections",NFTCOLLECTIONS=[],NFTCOLLECTIONSCHAIN="",NFTCOLLECTIONSLOADING=false,NFTSELECTED=null,NFTITEMSCOLLECTION="",NFTITEMSREQ=0;
 var NFT_SNAP="tm.nft.snapshot.v1.";
 function nftSnapKey(t){return NFT_SNAP+NFTCHAIN+"."+encodeURIComponent(String(t).toLowerCase())}
 function nftSnapSave(t,a){try{localStorage.setItem(nftSnapKey(t),JSON.stringify({savedAt:Date.now(),items:a}))}catch(e){}}
@@ -1153,13 +1153,13 @@ function loadNFTCollections(force){
  .finally(function(){NFTCOLLECTIONSLOADING=false;if(st.tab==="Markets"&&st.mm==="NFTs")softDraw()});
 }
 function loadNFTCollectionItems(collection){
- if(!collection||!collection.slug||NFTLOADING)return;
- NFTLOADING=true;NFTERROR="";NFTLIVE=[];
+ if(!collection||!collection.slug)return;
+ var req=++NFTITEMSREQ;NFTITEMSCOLLECTION=collection.slug;NFTLOADING=true;NFTERROR="";NFTLIVE=[];
  fetch("/api/nft-collection?slug="+encodeURIComponent(collection.slug)+"&chain="+encodeURIComponent(NFTCHAIN)+"&limit=24",{cache:"no-store"})
  .then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.message||"Could not load this collection");return d})})
- .then(function(d){NFTLIVE=(d.items||[]).map(function(n){return {n:n.name,m:"NFTs",p:typeof n.price==="number"?n.price:null,c:null,k:"NFT",h:0,col:MC.NFTs||"#8b7bff",image:n.image,collection:n.collection,collectionSlug:n.collectionSlug,contract:n.contract,tokenId:n.tokenId,currency:n.currency,marketplaceUrl:n.marketplaceUrl,chain:n.chain||NFTCHAIN,sales24h:null,volume24h:null}});NFTERROR=d.message||""})
- .catch(function(e){NFTLIVE=[];NFTERROR=e.message||"Could not load this collection"})
- .finally(function(){NFTLOADING=false;if(st.tab==="Markets"&&st.mm==="NFTs")softDraw()});
+ .then(function(d){if(req!==NFTITEMSREQ)return;NFTLIVE=(d.items||[]).map(function(n){return {n:n.name,m:"NFTs",p:typeof n.price==="number"?n.price:null,c:null,k:"NFT",h:0,col:MC.NFTs||"#8b7bff",image:n.image,collection:n.collection,collectionSlug:n.collectionSlug,contract:n.contract,tokenId:n.tokenId,currency:n.currency,marketplaceUrl:n.marketplaceUrl,chain:n.chain||NFTCHAIN,sales24h:null,volume24h:null}});NFTERROR=d.message||""})
+ .catch(function(e){if(req!==NFTITEMSREQ)return;NFTLIVE=[];NFTERROR=e.message||"Could not load this collection"})
+ .finally(function(){if(req!==NFTITEMSREQ)return;NFTLOADING=false;if(st.tab==="Markets"&&st.mm==="NFTs")softDraw()});
 }
 
 var MARKET_QUOTES={},MARKET_QUOTE_STATE={key:"",loading:false,last:0,error:""};
@@ -1258,7 +1258,7 @@ function nftHub(list,chains){
 }
 function markets(categoryPage){
  if(st.mm==="Forex"||st.mm==="Crypto"||st.mm==="NFTs")st.q="";
- if(st.mm==="NFTs"){if(NFTVIEW==="collections"&&!NFTSELECTED)loadNFTCollections();else if(NFTSELECTED&&(!NFTLIVE.length&&!NFTLOADING))loadNFTCollectionItems(NFTSELECTED);}
+ if(st.mm==="NFTs"){if(NFTVIEW==="collections"&&!NFTSELECTED)loadNFTCollections();else if(NFTSELECTED&&NFTITEMSCOLLECTION!==NFTSELECTED.slug&&!NFTLOADING)loadNFTCollectionItems(NFTSELECTED);else if(!NFTSELECTED&&NFTVIEW==="nfts")loadLiveNFTs(st.q||NFTCOLLECTION);}
  var fxGroup=st.mm==="Forex"?(st.fxGroup||"Currency Pairs"):"";
  var list=st.mm==="NFTs"?NFTLIVE:items.filter(function(i){return i.m===st.mm&&(st.mm!=="Forex"||((i.assetClass||"Currency Pairs")===fxGroup))&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)});
  if(st.mm==="Forex"&&fxGroup!=="Currency Pairs")loadMarketQuotes(fxGroup,list);
@@ -1841,7 +1841,7 @@ document.addEventListener("click",function(e){var t=e.target;
  c=t.closest("[data-fxgroup]");if(c){st.fxGroup=c.dataset.fxgroup;try{localStorage.setItem("tm_fx_group",st.fxGroup)}catch(e){}st.q="";draw();return}
  c=t.closest("[data-mm]");if(c){if(c.dataset.mm==="P2P"){st.stack=[];pg("p2p");$("app").scrollTop=0;return}st.q="";if(c.dataset.mm==="NFTs"){st.stack=[];st.mm="NFTs";st.tab="Markets";draw();$("app").scrollTop=0}else{if(c.dataset.mm==="Forex"){st.fxGroup="Currency Pairs";try{localStorage.setItem("tm_fx_group",st.fxGroup)}catch(e){}}MKSORT="def";pg("marketCategory",c.dataset.mm)}return}
  c=t.closest("[data-market-back]");if(c){if(!st.stack.length&&st.mm==="NFTs"){st.mm="Services";st.q="";draw();$("app").scrollTop=0;return}back();return}
-  c=t.closest("[data-nft-collection]");if(c){var slug=c.dataset.nftCollection;NFTSELECTED=NFTCOLLECTIONS.filter(function(x){return x.slug===slug})[0]||{slug:slug,name:slug};NFTVIEW="nfts";NFTLIVE=[];NFTLOADING=false;loadNFTCollectionItems(NFTSELECTED);draw();return}c=t.closest("[data-nft-collections-back]");if(c){NFTSELECTED=null;NFTVIEW="collections";NFTLIVE=[];NFTLOADING=false;loadNFTCollections();draw();return}c=t.closest("[data-nft-chain]");if(c){NFTCHAIN=c.dataset.nftChain;NFTQUERY="";NFTLIVE=[];NFTSELECTED=null;NFTVIEW="collections";NFTCOLLECTIONS=[];NFTCOLLECTIONSCHAIN="";NFTSHOWN=false;loadNFTCollections();draw();return}
+  c=t.closest("[data-nft-collection]");if(c){var slug=c.dataset.nftCollection;NFTSELECTED=NFTCOLLECTIONS.filter(function(x){return x.slug===slug})[0]||{slug:slug,name:slug};NFTVIEW="nfts";NFTITEMSREQ++;NFTITEMSCOLLECTION="";NFTLIVE=[];NFTLOADING=false;loadNFTCollectionItems(NFTSELECTED);draw();return}c=t.closest("[data-nft-collections-back]");if(c){NFTSELECTED=null;NFTVIEW="collections";NFTITEMSREQ++;NFTITEMSCOLLECTION="";NFTLIVE=[];NFTLOADING=false;loadNFTCollections();draw();return}c=t.closest("[data-nft-chain]");if(c){NFTCHAIN=c.dataset.nftChain;NFTQUERY="";NFTLIVE=[];NFTSELECTED=null;NFTITEMSREQ++;NFTITEMSCOLLECTION="";NFTVIEW="collections";NFTCOLLECTIONS=[];NFTCOLLECTIONSCHAIN="";NFTSHOWN=false;loadNFTCollections();draw();return}
   c=t.closest("[data-tt]");if(c){st.tt=c.dataset.tt;draw();return}
  c=t.closest("[data-marketfilter]");if(c){globalActivityCache.market=c.dataset.marketfilter;draw();return}
  c=t.closest("[data-side]");if(c){st.side=c.dataset.side;draw();return}
@@ -2216,7 +2216,7 @@ function scrolling(){return Date.now()-lastScroll<1200}
   if(!rm&&!document.hidden)requestAnimationFrame(f);else if(!rm)setTimeout(f,500)}
  f()})();
 /* ---- profile photo upload ---- */
-document.addEventListener("click",function(e){if(e.target.closest("[data-nft-explore]")){var g=document.querySelector(".nft-section-head");if(g)g.scrollIntoView({behavior:"smooth",block:"start"})}});document.addEventListener("change",function(e){var t=e.target;if(t&&t.id==="nftsort"){NFTSORT=t.value;draw();return}if(t&&t.id==="nftchain"){NFTCHAIN=t.value;NFTQUERY="";NFTLIVE=[];loadLiveNFTs(st.q||NFTCOLLECTION);draw();return}if(!t||t.id!=="photoin")return;var f=t.files&&t.files[0];if(!f)return;
+document.addEventListener("click",function(e){if(e.target.closest("[data-nft-explore]")){var g=document.querySelector(".nft-section-head");if(g)g.scrollIntoView({behavior:"smooth",block:"start"})}});document.addEventListener("change",function(e){var t=e.target;if(t&&t.id==="nftchain"){NFTCHAIN=t.value;NFTQUERY="";NFTLIVE=[];NFTSELECTED=null;NFTITEMSREQ++;NFTITEMSCOLLECTION="";NFTVIEW="collections";NFTCOLLECTIONS=[];NFTCOLLECTIONSCHAIN="";loadNFTCollections();draw();return}if(t&&t.id==="nftview"){NFTVIEW=t.value==="collections"?"collections":"nfts";NFTSELECTED=null;NFTITEMSREQ++;NFTITEMSCOLLECTION="";NFTLIVE=[];if(NFTVIEW==="collections")loadNFTCollections();else loadLiveNFTs(st.q||NFTCOLLECTION);draw();return}if(!t||t.id!=="photoin")return;var f=t.files&&t.files[0];if(!f)return;
  if(!/^image\//.test(f.type)){toast("Please choose an image");t.value="";return}
  var fr=new FileReader();fr.onerror=function(){toast("Could not read that photo")};
  fr.onload=function(){var im=new Image();im.onerror=function(){toast("Could not open that photo")};
