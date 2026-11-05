@@ -1177,9 +1177,29 @@ function loadNFTExploreItems(){
  var req=++NFTITEMSREQ,chain=NFTCHAIN,top=NFTCOLLECTIONS.slice(0,20).filter(function(c){return c&&c.slug});
  var snap=nftSnapLoad("explore-top20");if(snap){NFTLIVE=snap;NFTSTALE=true}
  NFTEXPLORECHAIN=chain;NFTEXPLORELOADING=true;NFTLOADING=true;NFTERROR="";
- var buckets=new Array(top.length),start=0;
- function fetchBatch(){var batch=top.slice(start,start+5),offset=start;start+=5;return Promise.all(batch.map(function(c,index){return fetch("/api/nft-collection?slug="+encodeURIComponent(c.slug)+"&chain="+encodeURIComponent(chain)+"&limit=4",{cache:"no-store"}).then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.message||"Collection request failed");return d})}).then(function(d){return (d.items||[]).map(function(n){return {n:n.name,m:"NFTs",p:typeof n.price==="number"?n.price:null,c:null,k:"NFT",h:0,col:MC.NFTs||"#8b7bff",image:n.image,collection:n.collection,collectionSlug:n.collectionSlug,contract:n.contract,tokenId:n.tokenId,currency:n.currency,marketplaceUrl:n.marketplaceUrl,chain:n.chain||chain,sales24h:n.sales24h,volume24h:n.volume24h,volume24hSymbol:n.volume24hSymbol}})}).catch(function(){return []}).then(function(items){buckets[offset+index]=items})})).then(function(){return start<top.length?fetchBatch():null})}
- fetchBatch().then(function(){if(req!==NFTITEMSREQ||chain!==NFTCHAIN)return;var mixed=[],max=0;buckets.forEach(function(a){max=Math.max(max,(a||[]).length)});for(var round=0;round<max;round++)for(var i=0;i<buckets.length;i++){var item=(buckets[i]||[])[round];if(item)mixed.push(item)}if(mixed.length){NFTLIVE=mixed;NFTSTALE=false;nftSnapSave("explore-top20",mixed)}else if(!NFTLIVE.length)NFTERROR="No NFTs were returned from the top 20 collections."}).catch(function(){if(req===NFTITEMSREQ)NFTERROR="Could not load NFTs from the top collections."}).finally(function(){if(req!==NFTITEMSREQ)return;NFTEXPLORELOADING=false;NFTLOADING=false;if(st.tab==="Markets"&&st.mm==="NFTs")softDraw()});
+ if(!top.length){NFTERROR="No top collections are available on this network yet.";NFTEXPLORELOADING=false;NFTLOADING=false;if(st.tab==="Markets"&&st.mm==="NFTs")softDraw();return}
+ var buckets=new Array(top.length),start=0,failed=0;
+ function fetchCollection(c){
+  var controller=typeof AbortController!=="undefined"?new AbortController():null;
+  var timer=setTimeout(function(){if(controller)controller.abort()},12000);
+  return fetch("/api/nft-collection?slug="+encodeURIComponent(c.slug)+"&chain="+encodeURIComponent(chain)+"&limit=4",{cache:"no-store",signal:controller?controller.signal:undefined})
+   .then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.message||"Collection request failed");return d})})
+   .then(function(d){return (Array.isArray(d.items)?d.items:[]).map(function(n){return {n:n.name,m:"NFTs",p:typeof n.price==="number"?n.price:null,c:null,k:"NFT",h:0,col:MC.NFTs||"#8b7bff",image:n.image,collection:n.collection,collectionSlug:n.collectionSlug,contract:n.contract,tokenId:n.tokenId,currency:n.currency,marketplaceUrl:n.marketplaceUrl,chain:n.chain||chain,sales24h:n.sales24h,volume24h:n.volume24h,volume24hSymbol:n.volume24hSymbol}})})
+   .catch(function(){failed++;return []})
+   .finally(function(){clearTimeout(timer)})
+ }
+ function fetchBatch(){
+  var batch=top.slice(start,start+5),offset=start;start+=5;
+  return Promise.all(batch.map(function(c,index){return fetchCollection(c).then(function(items){buckets[offset+index]=items})})).then(function(){return start<top.length?fetchBatch():null})
+ }
+ fetchBatch().then(function(){
+  if(req!==NFTITEMSREQ||chain!==NFTCHAIN)return;
+  var mixed=[],max=0;buckets.forEach(function(a){max=Math.max(max,(a||[]).length)});
+  for(var round=0;round<max;round++)for(var i=0;i<buckets.length;i++){var item=(buckets[i]||[])[round];if(item)mixed.push(item)}
+  if(mixed.length){NFTLIVE=mixed;NFTSTALE=false;NFTERROR=failed?"Some collections could not be reached; showing available NFTs.":"";nftSnapSave("explore-top20",mixed)}
+  else NFTERROR=failed?"NFTs could not be loaded from the top collections. Please try again.":"No NFTs are currently available in the top 20 collections on this network.";
+ }).catch(function(){if(req===NFTITEMSREQ)NFTERROR="Could not load NFTs from the top collections. Please try again."})
+ .finally(function(){if(req!==NFTITEMSREQ)return;NFTEXPLORELOADING=false;NFTLOADING=false;if(st.tab==="Markets"&&st.mm==="NFTs")softDraw()});
 }
 
 
