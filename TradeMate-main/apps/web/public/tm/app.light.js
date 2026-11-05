@@ -1243,8 +1243,7 @@ function nftHub(list,chains){
  var collectionCards=NFTCOLLECTIONS.map(function(c,k){
   var image=c.image?'<img src="'+esc(c.image)+'" alt="'+esc(c.name)+'" '+(k<12?'decoding="async"':'loading="lazy" decoding="async"')+'>' : '<div class="nft-art-empty">◈</div>';
   var volume=typeof c.volume24h==="number"?fx2(c.volume24h,1)+" "+esc(c.volume24hSymbol||"ETH"):"";
-  var trades=typeof c.sales24h==="number"?fmt(c.sales24h,0):"—";
-  return '<button type="button" class="nft-card nft-collection-card" data-nft-collection="'+esc(c.slug)+'" aria-label="Open '+esc(c.name)+' collection"><div class="nft-art">'+image+'</div><div class="nft-card-body"><h3>'+esc(c.name)+'</h3><div class="nft-stats"><div><small>24h Vol</small><b>'+volume+'</b></div><div><small>24h Trades</small><b>'+trades+'</b></div></div></div></button>';
+  return '<button type="button" class="nft-card nft-collection-card" data-nft-collection="'+esc(c.slug)+'" aria-label="Open '+esc(c.name)+' collection"><div class="nft-art">'+image+'</div><div class="nft-card-body"><h3>'+esc(c.name)+'</h3><div class="nft-stats"><div><small>24h Vol</small><b>'+volume+'</b></div></div></div></button>';
  }).join("");
  var sk=[0,1,2,3,4,5,6,7].map(function(){return '<article class="nft-card sk"><div class="nft-art"></div><div class="nft-card-body"><i></i><i></i><i></i></div></article>'}).join("");
  var body;
