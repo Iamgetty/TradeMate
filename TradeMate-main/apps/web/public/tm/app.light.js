@@ -1235,7 +1235,7 @@ function nftHub(list,chains){
  else if(NFTSORT==="sales")rows.sort(function(a,b){return nv(b.sales24h,-1)-nv(a.sales24h,-1)});
  function nftCard(i,k){
   var price=typeof i.p==="number"?fx2(i.p,i.p<1?4:2)+" "+esc(i.currency||"ETH"):"—";
-  var sales=typeof i.sales24h==="number"?fmt(i.sales24h,0):"—",volume=typeof i.volume24h==="number"?fx2(i.volume24h,1)+" "+esc(i.volume24hSymbol||i.currency||"ETH"):"—";
+  var sales=typeof i.sales24h==="number"?fmt(i.sales24h,0):"—",volume=typeof i.volume24h==="number"?fx2(i.volume24h,1)+" "+esc(i.volume24hSymbol||i.currency||"ETH"):"";
   var key=String(i.collectionSlug||i.collection||"")+":"+String(i.tokenId||i.n||""),fav=!!NFTFAV[key];
   var url=/^https:\/\//i.test(String(i.marketplaceUrl||""))?String(i.marketplaceUrl):"";
   return '<article class="nft-card" style="--i:'+Math.min(k,12)+'"><div class="nft-art">'+(i.image?'<img src="'+esc(i.image)+'" alt="'+esc(i.n)+'" '+(k<12?'decoding="async"':'loading="lazy" decoding="async"')+'>':'<div class="nft-art-empty">◈</div>')+'<button class="nft-fav'+(fav?" on":"")+'" data-nft-fav="'+esc(key)+'" aria-pressed="'+fav+'" aria-label="'+(fav?"Remove from favorites":"Add to favorites")+'">'+(fav?"♥":"♡")+'</button></div><div class="nft-card-body"><h3>'+esc(i.n)+'</h3><div class="nft-price-row"><b>'+price+'</b><span class="nft-change">● OpenSea</span></div><div class="nft-stats"><div><small>24h Vol</small><b>'+volume+'</b></div><div><small>Trades</small><b>'+sales+'</b></div></div>'+(url?'<a class="nft-view" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">View on marketplace ↗</a>':"")+'</div></article>';
@@ -1243,10 +1243,9 @@ function nftHub(list,chains){
  var collectionCards=NFTCOLLECTIONS.map(function(c,k){
   var image=c.image?'<img src="'+esc(c.image)+'" alt="'+esc(c.name)+'" '+(k<12?'decoding="async"':'loading="lazy" decoding="async"')+'>' : '<div class="nft-art-empty">◈</div>';
   var floor=typeof c.floorPrice==="number"?fx2(c.floorPrice,4)+" "+esc(c.floorSymbol||"ETH"):"—";
-  var volume=typeof c.volume24h==="number"?fx2(c.volume24h,1)+" "+esc(c.volume24hSymbol||"ETH"):"—";
+  var volume=typeof c.volume24h==="number"?fx2(c.volume24h,1)+" "+esc(c.volume24hSymbol||"ETH"):"";
   var trades=typeof c.sales24h==="number"?fmt(c.sales24h,0):"—";
-  var description=String(c.description||"").replace(/<[^>]*>/g," ").replace(/https?:\/\/\S+/gi,"").replace(/\bwww\.\S+/gi,"").replace(/\s+/g," ").trim().slice(0,90);
-  return '<button type="button" class="nft-card nft-collection-card" data-nft-collection="'+esc(c.slug)+'" aria-label="Open '+esc(c.name)+' collection"><div class="nft-art">'+image+'</div><div class="nft-card-body"><h3>'+esc(c.name)+'</h3><div class="nft-price-row"><b>Floor '+floor+'</b><span class="nft-change">Collection</span></div><div class="nft-stats"><div><small>24h Vol</small><b>'+volume+'</b></div><div><small>24h Trades</small><b>'+trades+'</b></div></div><div class="nft-collection-meta">'+(esc(description)||"Description unavailable")+'</div></div></button>';
+  return '<button type="button" class="nft-card nft-collection-card" data-nft-collection="'+esc(c.slug)+'" aria-label="Open '+esc(c.name)+' collection"><div class="nft-art">'+image+'</div><div class="nft-card-body"><h3>'+esc(c.name)+'</h3><div class="nft-price-row"><b>Floor '+floor+'</b><span class="nft-change">Collection</span></div><div class="nft-stats"><div><small>24h Vol</small><b>'+volume+'</b></div><div><small>24h Trades</small><b>'+trades+'</b></div></div></div></button>';
  }).join("");
  var sk=[0,1,2,3,4,5,6,7].map(function(){return '<article class="nft-card sk"><div class="nft-art"></div><div class="nft-card-body"><i></i><i></i><i></i></div></article>'}).join("");
  var body;
