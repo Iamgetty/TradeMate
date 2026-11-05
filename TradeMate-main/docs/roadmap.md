@@ -12,7 +12,7 @@ This roadmap records the current product direction. It is not a claim that each 
 
 ## Current implementation snapshot
 
-The following work is present on the working branch only; it has not been deployed to production.
+The following implementation is present in the merged application history and current production baseline to varying degrees. Deployment evidence and outstanding end-to-end verification are recorded separately below; code presence must not be treated as workflow acceptance.
 
 - **Product removal:** current Product category, product-cart UI and conventional marketplace transaction writes have been removed. Migration `009` converts legacy Product listing records to the explicit B2B type; historical migration files remain unchanged for reproducible database history.
 - **B2B:** API and database now use `b2b` as a distinct listing type rather than reusing `product`.
@@ -52,6 +52,41 @@ The following code changes are confirmed in the production web service deploymen
 - PR #77 (Crypto spot instrument visibility) merged as `db96ceabb21889a3fcd87d1fffdc8abcfee06f15`; Render deployment `dep-dbmdl2o473hc73e0hmd0` completed with status `live`.
 - NFT improvements in PRs #71–#75 are included in the production deployment ancestry.
 - For every subsequent change: run the relevant tests and security scans, inspect the final diff, obtain approval before merging, and verify Render reports `live`. A passing CI run alone does not mean production is updated.
+
+## Pre-P2P completion register — reconciliation baseline
+
+This register distinguishes source implementation from verified user workflows. A feature is not marked complete merely because a route or screen exists. The register is maintained against current `main`, with PR #16 as the historical integration milestone and PR #22 as a source-audit reference. PR #22 remains an unmerged draft and must not be merged as a stale branch.
+
+| Workstream | Current assessment | Evidence / remaining gate |
+|---|---|---|
+| Product/cart removal and B2B terminology | **Implemented; audit outstanding** | PR #16 integrated the contract-first scope and current roadmap records Product/cart removal and B2B as a distinct listing type. Still audit every navigation, search, API and write path for legacy checkout/order/bid behaviour. |
+| Services/B2B publishing and discovery | **Implemented in part; E2E unverified** | Current API/UI include organization-backed listing drafts, review submission and public discovery. Verify owner/admin permissions, moderation, edit/delete, empty/error states and two-account discovery in production. |
+| Contract lifecycle | **Implemented in part; E2E unverified** | Proposal, seller response, buyer cancellation, messages and dual fulfilment confirmation are present. Verify every transition, unauthorized cross-account access, retries, concurrency and persistence with two real accounts. |
+| Clients/Alpha modes | **Partially verified** | Both modes expose Contracts in the current product direction; internal Buyer/Seller roles remain for compatibility. Verify the same durable contract records and action permissions in both modes. |
+| Feed titles, attachments and voice notes | **Implemented in part; device QA outstanding** | Feed APIs support posts, attachments, comments and reports. Current API still requires a non-empty title while PR #22 identified that the composer treats the title as optional. Resolve this mismatch, then test uploads, playback, downloads, limits and mobile permission/failure states. |
+| Forex instruments and provider coverage | **Implemented in part; market QA outstanding** | Five groups and reference-quote routes exist; snapshot/MT5 restoration has production deployment evidence. Verify all instruments, freshness/expiry, offline restoration and feed recovery. |
+| Application-wide QA | **Outstanding** | Audit all tabs, detail pages, forms, filters, responsive breakpoints, accessibility, authorization boundaries, performance and recoverable errors. |
+| Litepaper / white paper | **Blocked on source documents** | No source documents were found in the available repository context. Do not invent or rewrite the original positioning without source material. |
+| 5 November marketplace follow-up | **Deployed; acceptance testing outstanding** | Crypto spot, Forex/MT5 snapshots and NFT Explore reliability changes have deployment evidence. Complete the recorded production acceptance checks across all three themes and preserve the agreed NFT control dimensions. |
+
+### PR #22 reconciliation against current main
+
+PR #22 is an audit source, not an integration target. Its original branch is stale; reconcile findings individually and port only missing fixes onto a fresh branch.
+
+- **Already present in current source:** organization profile-name update API; transactional organization-document upload; organization document ID validation.
+- **Not present in current source at this reconciliation:** authenticated password-change API and connected masked password form; Feed API still rejects an empty title although the audit found the composer submits it as optional.
+- **Still outstanding in current source:** logout fires the server request without waiting before local session reset; session bootstrap signs out on every `/auth/me` failure instead of distinguishing HTTP 401 from network/5xx failure.
+- **Reliability defect confirmed:** `loadMarket`, `loadMine`, `loadOrg`, `loadContracts`, `loadContractMessages`, `loadEnquiries` and `loadMsgs` swallow errors. Replace silent failure with explicit, recoverable loading/error states and retry actions.
+- **Historical audit items requiring fresh verification:** account profile fields/photos, follow/highlight workflows, organization image upload, OAuth/account linking, password reset, KYC, wallet/ledger, support/feedback/notification paths, promotion/referral workflows, Real Estate/Software contract coverage and local-only preferences. Do not assume the November 1 audit remains current; several backend connections have since been added.
+
+### Next execution order
+
+1. Reconcile the PR #22 auth/session and Feed validation fixes against current API schemas and tests; port only missing, safe changes.
+2. Add recoverable states/retry handling for the silent core loaders, without changing established marketplace/NFT layout dimensions.
+3. Verify organization document transaction semantics and permissions with integration tests.
+4. Run the Services/B2B and contract lifecycle two-account acceptance matrix.
+5. Complete Feed/mobile and Forex/Crypto/NFT production acceptance checks.
+6. Continue the S1 security gates in parallel, without enabling production RLS until role/context/pool-reuse tests pass.
 
 ## Pre-P2P completion
 
