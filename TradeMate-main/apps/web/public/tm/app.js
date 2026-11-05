@@ -1208,20 +1208,22 @@ var TM_QUOTE_SNAPSHOT_PREFIX="tm.market.quote.snapshot.v1.";
 function tmQuoteSnapshotKey(it){return TM_QUOTE_SNAPSHOT_PREFIX+encodeURIComponent(String(it.m||"market"))+"."+encodeURIComponent(String(it.n||"instrument"))}
 function tmSaveQuoteSnapshot(it,q){try{if(!it||!q||!(Number(q.price)>0))return;var payload={price:Number(q.price),changePercent:Number.isFinite(Number(q.changePercent))?Number(q.changePercent):null,currency:q.currency||it.quoteCurrency||it.unit||"USD",marketTime:q.marketTime||it.quoteTime||null,exchange:q.exchange||null};localStorage.setItem(tmQuoteSnapshotKey(it),JSON.stringify({savedAt:Date.now(),data:payload}))}catch(e){}}
 function tmRestoreQuoteSnapshot(it){try{if(!it)return false;var raw=localStorage.getItem(tmQuoteSnapshotKey(it));if(!raw)return false;var saved=JSON.parse(raw),data=saved&&saved.data;if(!data||!(Number(data.price)>0)||!saved.savedAt||Date.now()-Number(saved.savedAt)>30*24*60*60*1000)return false;it.p=Number(data.price);it.c=Number.isFinite(Number(data.changePercent))?Number(data.changePercent):it.c;it.quoteStatus="cached";it.quoteTime=data.marketTime||null;it.quoteCurrency=data.currency||it.unit||"USD";it.snapshotAt=Number(saved.savedAt);return true}catch(e){return false}}
+function tmRestoreAllQuoteSnapshots(){try{items.forEach(function(i){if(i.m==="Forex"&&i.providerSymbol&&(!i.quoteStatus||i.quoteStatus==="unavailable"))tmRestoreQuoteSnapshot(i)})}catch(e){}}
+tmRestoreAllQuoteSnapshots();
 var FOREX_GROUPS=["Currency Pairs","Stock Indices","Commodities","Equities","Bonds & Treasuries"];
 var CRYPTO_GROUPS=["Spot Markets","Crypto CFDs"];
 function loadMarketQuotes(market,list){
  var allowed=["Stock Indices","Commodities","Equities","Bonds & Treasuries"];
  if(allowed.indexOf(market)<0||!TMCFG.api)return;
  var rows=list.filter(function(i){return i.assetClass===market&&i.providerSymbol&&i.quoteProvider!=="Twelve Data Basic"&&!(i.quoteProvider==="Exness MT5"&&i.quoteStatus==="live"&&mt5QuoteIsFresh(i))});
- rows.forEach(function(i){if(i.quoteStatus==="cached"||!i.quoteStatus||i.quoteStatus==="unavailable"){i.p=null;i.c=null;i.quoteTime=null;i.quoteStatus="unavailable"}});
+ rows.forEach(function(i){if(!i.quoteStatus||i.quoteStatus==="unavailable")tmRestoreQuoteSnapshot(i)});
  var key=market+":"+rows.map(function(i){return i.providerSymbol}).join(",");
  if(!rows.length||MARKET_QUOTE_STATE.loading||(MARKET_QUOTE_STATE.key===key&&Date.now()-MARKET_QUOTE_STATE.last<45000))return;
  MARKET_QUOTE_STATE.key=key;MARKET_QUOTE_STATE.loading=true;
  fetch(TMCFG.api+"/market/quotes?symbols="+encodeURIComponent(rows.map(function(i){return i.providerSymbol}).join(",")),{credentials:"include",cache:"no-store"})
  .then(function(r){if(!r.ok)throw new Error("Market quote service unavailable");return r.json()})
- .then(function(d){(d.quotes||[]).forEach(function(q){MARKET_QUOTES[q.symbol]=q;var it=rows.filter(function(x){return x.providerSymbol===q.symbol})[0];if(it){it.quoteStatus=q.status;it.quoteTime=q.marketTime;it.quoteCurrency=q.currency;if(q.status!=="unavailable"&&typeof q.price==="number"){it.p=q.price;it.c=typeof q.changePercent==="number"?q.changePercent:null;tmSaveQuoteSnapshot(it,q)}else{it.p=null;it.c=null;it.quoteStatus="unavailable";it.quoteTime=null}}});MARKET_QUOTE_STATE.last=Date.now();MARKET_QUOTE_STATE.error="";})
- .catch(function(){MARKET_QUOTE_STATE.error="Market quotes are temporarily unavailable.";rows.forEach(function(i){i.p=null;i.c=null;i.quoteTime=null;i.quoteStatus="unavailable"})})
+ .then(function(d){(d.quotes||[]).forEach(function(q){MARKET_QUOTES[q.symbol]=q;var it=rows.filter(function(x){return x.providerSymbol===q.symbol})[0];if(it){it.quoteStatus=q.status;it.quoteTime=q.marketTime;it.quoteCurrency=q.currency;if(q.status!=="unavailable"&&typeof q.price==="number"){it.p=q.price;it.c=typeof q.changePercent==="number"?q.changePercent:null;tmSaveQuoteSnapshot(it,q)}else if(!tmRestoreQuoteSnapshot(it)){it.p=null;it.c=null;it.quoteStatus="unavailable";it.quoteTime=null}}});MARKET_QUOTE_STATE.last=Date.now();MARKET_QUOTE_STATE.error="";})
+ .catch(function(){MARKET_QUOTE_STATE.error="Market quotes are temporarily unavailable.";rows.forEach(function(i){if(!tmRestoreQuoteSnapshot(i)){i.p=null;i.c=null;i.quoteTime=null;i.quoteStatus="unavailable"}})})
  .finally(function(){MARKET_QUOTE_STATE.loading=false;var active=st.mm==="Forex"?st.fxGroup:"",activeRows=items.filter(function(i){return i.m==="Forex"&&i.assetClass===active&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)}),activeKey=active+":"+activeRows.map(function(i){return i.providerSymbol}).join(",");if(st.tab==="Markets"&&active&&active!=="Currency Pairs"&&activeKey!==MARKET_QUOTE_STATE.key)loadMarketQuotes(active,activeRows);else if(st.tab==="Markets"&&st.mm===market)softDraw()});
 }
 /* ===================== MARKETPLACE REDESIGN HELPERS ===================== */
@@ -1423,7 +1425,7 @@ var MARKET_QUOTE_MAX_AGE_MS=24*60*60*1000;
 function quoteTimestampMs(value){var raw=String(value==null?"":value),n=typeof value==="number"?value:/^\\d{10,13}$/.test(raw)?Number(raw):Date.parse(value);if(Number.isFinite(n)&&n>0&&n<1e12)n*=1000;return n}
 function hasCurrentMarketFeed(it){
  if(!it)return false;
- if(it.quoteProvider==="Exness MT5")return it.quoteStatus==="live"&&mt5QuoteIsFresh(mt5FeedQuotes[mt5SymbolKey(it.mt5Symbol||it.providerSymbol||it.n.replace("/",""))]);
+ if(it.quoteProvider==="Exness MT5")return (it.quoteStatus==="cached"&&Number(it.p)>0)||(it.quoteStatus==="live"&&mt5QuoteIsFresh(mt5FeedQuotes[mt5SymbolKey(it.mt5Symbol||it.providerSymbol||it.n.replace("/",""))]));
  if(it.m==="Forex"&&!it.assetClass){
   var fq=fxFeedQuotes[it.n.replace("/","_")],ft=quoteTimestampMs(fq&&(fq.time||fq.timestamp));
   return !!(fq&&Number(fq.mid)>0&&Number.isFinite(ft)&&Date.now()-ft>=-5000&&Date.now()-ft<=45*60*1000);
@@ -1433,6 +1435,7 @@ function hasCurrentMarketFeed(it){
   return !!(sq&&Number(sq.price)>0&&Date.now()-sq.receivedAt<=6000);
  }
  if(it.m==="Crypto"&&it.assetClass==="Crypto CFDs")return it.quoteStatus==="live"&&it.quoteProvider==="Exness MT5"&&mt5QuoteIsFresh(mt5FeedQuotes[mt5SymbolKey(it.mt5Symbol||it.providerSymbol||it.n.replace("/",""))]);
+ if(it.quoteStatus==="cached"&&Number(it.p)>0)return true;
  var t=quoteTimestampMs(it.quoteTime);
  return !!((it.quoteStatus==="live"||it.quoteStatus==="delayed")&&Number(it.p)>0&&Number.isFinite(t)&&Date.now()-t>=-5000&&Date.now()-t<=MARKET_QUOTE_MAX_AGE_MS);
 }
@@ -1463,21 +1466,22 @@ function applyMt5MarketQuotes(quotes,enabled){
  var fresh=mt5PublicBroadcastEnabled&&Array.isArray(quotes)?quotes.filter(function(q){return q&&!q.stale&&mt5QuoteIsFresh(q)&&mt5QuotePrice(q)>0}):[];
  fresh.forEach(function(q){mt5FeedQuotes[mt5SymbolKey(q.symbol)]=q});
  items.forEach(function(it){
-  if(it.quoteProvider==="Exness MT5"&&!mt5FeedQuotes[mt5SymbolKey(it.mt5Symbol||it.providerSymbol||it.n.replace("/",""))]){
+  if(it.quoteProvider==="Exness MT5"&&!mt5FeedQuotes[mt5SymbolKey(it.mt5Symbol||it.providerSymbol||it.n.replace("/",""))]&&!tmRestoreQuoteSnapshot(it)){
    it.p=null;it.c=null;it.quoteTime=null;it.quoteStatus="unavailable";it.quoteProvider="Exness MT5";it.quoteBid=null;it.quoteAsk=null;
   }
  });
  fresh.forEach(function(q){
   var it=mt5ItemForQuote(q);if(!it)return;
   var price=mt5QuotePrice(q);if(!(price>0))return;
-  it.p=price;it.c=null;it.quoteStatus="live";it.quoteProvider="Exness MT5";it.quoteTime=q.timestamp;it.quoteBid=Number(q.bid)>0?Number(q.bid):null;it.quoteAsk=Number(q.ask)>0?Number(q.ask):null;it.mt5Symbol=q.symbol;it.mt5InstrumentType=q.instrumentType;
+  it.p=price;it.c=null;it.quoteStatus="live";it.quoteProvider="Exness MT5";it.quoteTime=q.timestamp;it.quoteBid=Number(q.bid)>0?Number(q.bid):null;it.quoteAsk=Number(q.ask)>0?Number(q.ask):null;it.mt5Symbol=q.symbol;it.mt5InstrumentType=q.instrumentType;tmSaveQuoteSnapshot(it,{price:price,changePercent:it.c,currency:it.quoteCurrency||it.unit||"USD",marketTime:q.timestamp,exchange:"Exness MT5"});
  });
 }
 function expireMt5MarketQuotes(){
  var changed=false;
  Object.keys(mt5FeedQuotes).forEach(function(key){if(!mt5QuoteIsFresh(mt5FeedQuotes[key]))delete mt5FeedQuotes[key]});
  items.forEach(function(it){
-  if(it.quoteProvider==="Exness MT5"&&!mt5QuoteIsFresh(it)){
+  if(it.quoteProvider==="Exness MT5"&&it.quoteStatus!=="cached"&&!mt5QuoteIsFresh(it)){
+   if(tmRestoreQuoteSnapshot(it)){changed=true;return}
    if(it.p!==null||it.quoteStatus!=="unavailable")changed=true;
    it.p=null;it.c=null;it.quoteTime=null;it.quoteStatus="unavailable";it.quoteBid=null;it.quoteAsk=null;
   }
