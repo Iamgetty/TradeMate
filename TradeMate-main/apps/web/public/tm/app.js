@@ -1211,7 +1211,7 @@ function tmRestoreQuoteSnapshot(it){try{if(!it)return false;var raw=localStorage
 function tmRestoreAllQuoteSnapshots(){try{items.forEach(function(i){if(i.m==="Forex"&&i.providerSymbol&&(!i.quoteStatus||i.quoteStatus==="unavailable"))tmRestoreQuoteSnapshot(i)})}catch(e){}}
 tmRestoreAllQuoteSnapshots();
 var FOREX_GROUPS=["Currency Pairs","Stock Indices","Commodities","Equities","Bonds & Treasuries"];
-var CRYPTO_GROUPS=["Spot Markets","Crypto CFDs"];
+var CRYPTO_GROUPS=["Spot Markets"];
 function loadMarketQuotes(market,list){
  var allowed=["Stock Indices","Commodities","Equities","Bonds & Treasuries"];
  if(allowed.indexOf(market)<0||!TMCFG.api)return;
@@ -1307,7 +1307,7 @@ function markets(categoryPage){
  var fxGroup=st.mm==="Forex"?(st.fxGroup||"Currency Pairs"):"";
  var cryptoGroup=st.mm==="Crypto"?(st.cryptoGroup||"Spot Markets"):"";
  if(st.mm==="Forex"||st.mm==="Crypto")ensureFXFeed();
- var rawList=st.mm==="NFTs"?NFTLIVE:items.filter(function(i){return i.m===st.mm&&(st.mm!=="Forex"||((i.assetClass||"Currency Pairs")===fxGroup))&&(st.mm!=="Crypto"||(cryptoGroup==="Crypto CFDs"?i.assetClass==="Crypto CFDs":!i.assetClass))&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)});
+ var rawList=st.mm==="NFTs"?NFTLIVE:items.filter(function(i){return i.m===st.mm&&(st.mm!=="Forex"||((i.assetClass||"Currency Pairs")===fxGroup))&&(st.mm!=="Crypto"||!i.assetClass)&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)});
  if(st.mm==="Forex"&&fxGroup!=="Currency Pairs")loadMarketQuotes(fxGroup,rawList);
  var list=st.mm==="NFTs"?rawList:rawList.filter(hasCurrentMarketFeed);
  if(st.mm==="NFTs"){
