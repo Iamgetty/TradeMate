@@ -89,11 +89,14 @@ test('public profile validates field lengths, social handles and image formats',
   assert.equal(publicProfileBodySchema.safeParse({ profilePhotoData: 'javascript:alert(1)' }).success, false);
 });
 
-test('feed posts enforce content and attachment count limits', () => {
+test('feed posts allow optional titles while enforcing content and attachment limits', () => {
   const valid = { type: 'post', title: 'Trade update', body: 'A useful update', attachments: [] };
   assert.equal(feedPostBodySchema.safeParse(valid).success, true);
+  assert.equal(feedPostBodySchema.safeParse({ type: 'post', body: 'A useful update' }).success, true);
+  assert.equal(feedPostBodySchema.safeParse({ ...valid, title: '' }).success, true);
+  assert.equal(feedPostBodySchema.safeParse({ ...valid, title: 'x'.repeat(141) }).success, false);
+  assert.equal(feedPostBodySchema.safeParse({ ...valid, body: '' }).success, false);
   assert.equal(feedPostBodySchema.safeParse({ ...valid, attachments: Array(5).fill({ name: 'a', type: 'image/jpeg', data: 'YQ==' }) }).success, false);
-  assert.equal(feedPostBodySchema.safeParse({ ...valid, title: '' }).success, false);
 });
 
 test('support tickets enforce allowed categories and bounded content', () => {
