@@ -1122,7 +1122,7 @@ function home(){
  '<div class="tabs"><button class="on" data-ht="Favorites">Favorites</button></div>'+
  (fv?'<div style="height:10px"></div>':'<div class="sub">'+["All"].concat(ORD).map(function(t){return '<button class="'+(hm===t?"on":"")+'" data-hm="'+t+'">'+t+'</button>'}).join("")+'</div>')+body}
 var NFTSORT="popular",NFTFAV={};try{NFTFAV=JSON.parse(localStorage.getItem("tm.nftfav")||"{}")}catch(e){NFTFAV={}}if(!NFTFAV||typeof NFTFAV!=="object"||Array.isArray(NFTFAV))NFTFAV={};
-var NFTLIVE=[],NFTLOADING=false,NFTQUERY="",NFTERROR="",NFTTIMER=null,NFTREQ=0,NFTCOLLECTION="azuki",NFTCHAIN="ethereum";var NFTSHOWN=false,NFTSTALE=false,NFTVIEW="collections",NFTCOLLECTIONS=[],NFTCOLLECTIONSCHAIN="",NFTCOLLECTIONSLOADING=false,NFTSELECTED=null,NFTITEMSCOLLECTION="",NFTITEMSREQ=0;
+var NFTLIVE=[],NFTLOADING=false,NFTQUERY="",NFTERROR="",NFTTIMER=null,NFTREQ=0,NFTCOLLECTION="azuki",NFTCHAIN="ethereum";var NFTSHOWN=false,NFTSTALE=false,NFTVIEW="collections",NFTCOLLECTIONS=[],NFTCOLLECTIONSCHAIN="",NFTCOLLECTIONSLOADING=false,NFTSELECTED=null,NFTITEMSCOLLECTION="",NFTITEMSREQ=0,NFTEXPLORECHAIN="",NFTEXPLORELOADING=false;
 var NFT_SNAP="tm.nft.snapshot.v1.";
 function nftSnapKey(t){return NFT_SNAP+NFTCHAIN+"."+encodeURIComponent(String(t).toLowerCase())}
 function nftSnapSave(t,a){try{localStorage.setItem(nftSnapKey(t),JSON.stringify({savedAt:Date.now(),items:a}))}catch(e){}}
@@ -1165,6 +1165,17 @@ function loadNFTCollectionItems(collection){
  .catch(function(e){if(req!==NFTITEMSREQ)return;if(!NFTLIVE.length){var fallback=nftSnapLoad(snapKey);if(fallback)NFTLIVE=fallback}NFTERROR=e.message||"Could not load this collection"})
  .finally(function(){if(req!==NFTITEMSREQ)return;NFTLOADING=false;if(st.tab==="Markets"&&st.mm==="NFTs")softDraw()});
 }
+function loadNFTExploreItems(){
+ if(NFTCOLLECTIONSCHAIN!==NFTCHAIN||NFTCOLLECTIONSLOADING){loadNFTCollections();return}
+ if(NFTEXPLORECHAIN===NFTCHAIN&&(NFTEXPLORELOADING||NFTLIVE.length))return;
+ var req=++NFTITEMSREQ,chain=NFTCHAIN,top=NFTCOLLECTIONS.slice(0,20).filter(function(c){return c&&c.slug});
+ var snap=nftSnapLoad("explore-top20");if(snap){NFTLIVE=snap;NFTSTALE=true}
+ NFTEXPLORECHAIN=chain;NFTEXPLORELOADING=true;NFTLOADING=true;NFTERROR="";
+ var buckets=new Array(top.length),start=0;
+ function fetchBatch(){var batch=top.slice(start,start+5),offset=start;start+=5;return Promise.all(batch.map(function(c,index){return fetch("/api/nft-collection?slug="+encodeURIComponent(c.slug)+"&chain="+encodeURIComponent(chain)+"&limit=4",{cache:"no-store"}).then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.message||"Collection request failed");return d})}).then(function(d){return (d.items||[]).map(function(n){return {n:n.name,m:"NFTs",p:typeof n.price==="number"?n.price:null,c:null,k:"NFT",h:0,col:MC.NFTs||"#8b7bff",image:n.image,collection:n.collection,collectionSlug:n.collectionSlug,contract:n.contract,tokenId:n.tokenId,currency:n.currency,marketplaceUrl:n.marketplaceUrl,chain:n.chain||chain,sales24h:n.sales24h,volume24h:n.volume24h,volume24hSymbol:n.volume24hSymbol}})}).catch(function(){return []}).then(function(items){buckets[offset+index]=items})})).then(function(){return start<top.length?fetchBatch():null})}
+ fetchBatch().then(function(){if(req!==NFTITEMSREQ||chain!==NFTCHAIN)return;var mixed=[],max=0;buckets.forEach(function(a){max=Math.max(max,(a||[]).length)});for(var round=0;round<max;round++)for(var i=0;i<buckets.length;i++){var item=(buckets[i]||[])[round];if(item)mixed.push(item)}if(mixed.length){NFTLIVE=mixed;NFTSTALE=false;nftSnapSave("explore-top20",mixed)}else if(!NFTLIVE.length)NFTERROR="No NFTs were returned from the top 20 collections."}).catch(function(){if(req===NFTITEMSREQ)NFTERROR="Could not load NFTs from the top collections."}).finally(function(){if(req!==NFTITEMSREQ)return;NFTEXPLORELOADING=false;NFTLOADING=false;if(st.tab==="Markets"&&st.mm==="NFTs")softDraw()});
+}
+
 
 var MARKET_QUOTES={},MARKET_QUOTE_STATE={key:"",loading:false,last:0,error:""};
 var TM_QUOTE_SNAPSHOT_PREFIX="tm.market.quote.snapshot.v1.";
@@ -1263,7 +1274,7 @@ function nftHub(list,chains){
 }
 function markets(categoryPage){
  if(st.mm==="Forex"||st.mm==="Crypto"||st.mm==="NFTs")st.q="";
- if(st.mm==="NFTs"){if(NFTVIEW==="collections"&&!NFTSELECTED)loadNFTCollections();else if(NFTSELECTED&&NFTITEMSCOLLECTION!==NFTSELECTED.slug&&!NFTLOADING)loadNFTCollectionItems(NFTSELECTED);else if(!NFTSELECTED&&NFTVIEW==="nfts")loadLiveNFTs("NFT");}
+ if(st.mm==="NFTs"){if(NFTVIEW==="collections"&&!NFTSELECTED)loadNFTCollections();else if(NFTSELECTED&&NFTITEMSCOLLECTION!==NFTSELECTED.slug&&!NFTLOADING)loadNFTCollectionItems(NFTSELECTED);else if(!NFTSELECTED&&NFTVIEW==="nfts")loadNFTExploreItems();}
  var fxGroup=st.mm==="Forex"?(st.fxGroup||"Currency Pairs"):"";
  var list=st.mm==="NFTs"?NFTLIVE:items.filter(function(i){return i.m===st.mm&&(st.mm!=="Forex"||((i.assetClass||"Currency Pairs")===fxGroup))&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)});
  if(st.mm==="Forex"&&fxGroup!=="Currency Pairs")loadMarketQuotes(fxGroup,list);
