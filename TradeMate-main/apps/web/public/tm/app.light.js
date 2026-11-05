@@ -1746,8 +1746,8 @@ document.addEventListener("click",function(e){var t=e.target;if(!t||!t.closest)r
  var nf=t.closest("[data-nft-fav]");if(nf){e.preventDefault();var k=nf.dataset.nftFav,on;if(NFTFAV[k]){delete NFTFAV[k];on=false}else{NFTFAV[k]=1;on=true}try{localStorage.setItem("tm.nftfav",JSON.stringify(NFTFAV))}catch(x){}nf.classList.toggle("on",on);nf.setAttribute("aria-pressed",String(on));nf.setAttribute("aria-label",on?"Remove from favorites":"Add to favorites");nf.textContent=on?"♥":"♡";return}var sb=t.closest("[data-star]");if(sb){e.preventDefault();e.stopImmediatePropagation();var SS=sb.dataset.star==="nft"?NFTFAV:P2PFAV,sk=sb.dataset.key,son;if(SS[sk]){delete SS[sk];son=false}else{SS[sk]=1;son=true}try{localStorage.setItem(sb.dataset.star==="nft"?"tm.nftfav":"tm.p2pfav",JSON.stringify(SS))}catch(x){}sb.classList.toggle("on",son);sb.textContent=son?"★":"☆";return}
  if(t.closest("[data-side]"))setTimeout(function(){var b=document.querySelector('.pgs[data-id="p2p"] .bsp');if(b)b.classList.add("go")},0)});
 document.addEventListener("pointermove",function(e){if(e.pointerType!=="mouse"||!e.target.closest)return;var c=e.target.closest(".mk-card");if(!c)return;var r=c.getBoundingClientRect();c.style.setProperty("--mx",(e.clientX-r.left)+"px");c.style.setProperty("--my",(e.clientY-r.top)+"px")},{passive:true});
-function chipPos(root){var o={};if(root)root.querySelectorAll(".mk-chips").forEach(function(e,i){o[i+e.className]=e.scrollLeft});return o}
-function chipRestore(root,o){if(root)root.querySelectorAll(".mk-chips").forEach(function(e,i){var x=o[i+e.className];if(x)e.scrollLeft=x})}
+function chipPos(root){var o={};if(root)root.querySelectorAll(".mk-chips,.nft-network-row").forEach(function(e,i){o[i+e.className]=e.scrollLeft});return o}
+function chipRestore(root,o){if(root)root.querySelectorAll(".mk-chips,.nft-network-row").forEach(function(e,i){var x=o[i+e.className];if(x)e.scrollLeft=x})}
 function draw(){
  var v=st.tab==="Markets"&&st.mm==="NFTs"?markets(true):({Home:home,Markets:markets,Trade:trade,Feed:feed,Portfolio:portfolio}[st.tab]());
  var enter=st.tab!==st.last;st.last=st.tab;
