@@ -76,6 +76,14 @@
         feedsLive: msg.feeds.live,                    // "N/M FEEDS LIVE"
         feedsTotal: msg.feeds.total,
         fxQuotes: Array.isArray(msg.fxQuotes) ? msg.fxQuotes : [],
+        // Expose every fresh spot ticker to the marketplace list, not just
+        // the currently watched coin's order book.
+        marketQuotes: Array.isArray(msg.books) ? msg.books
+          .filter((b) => b && b.market === 'spot' && !b.stale)
+          .map((b) => ({
+            market: b.market, base: b.base, quote: b.quote,
+            bid: b.bid, ask: b.ask, last: b.last, exchange: b.exchange,
+          })) : [],
         fxStatus: msg.fxStatus || { state: 'unavailable', provider: 'OANDA' },
         ts: msg.ts,
       });
