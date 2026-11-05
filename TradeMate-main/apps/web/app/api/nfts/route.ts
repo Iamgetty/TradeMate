@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 
   const incoming = new URL(request.url);
   const search = incoming.searchParams.get('search')?.trim();
-  const supportedChains = ['ethereum', 'polygon', 'arbitrum', 'optimism', 'base', 'avalanche', 'blast'];
+  const supportedChains = ['ethereum', 'polygon', 'arbitrum', 'base', 'avalanche'];
   const requestedChain = incoming.searchParams.get('chain')?.trim().toLowerCase() || 'ethereum';
   const chain = supportedChains.indexOf(requestedChain) >= 0 ? requestedChain : 'ethereum';
   const limit = Math.min(Math.max(Number(incoming.searchParams.get('limit') || 24), 1), 48);
