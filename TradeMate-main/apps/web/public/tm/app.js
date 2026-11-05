@@ -1135,7 +1135,7 @@ function nftSnapKey(t){return NFT_SNAP+NFTCHAIN+"."+encodeURIComponent(String(t)
 function nftSnapSave(t,a){try{localStorage.setItem(nftSnapKey(t),JSON.stringify({savedAt:Date.now(),items:a}))}catch(e){}}
 function nftSnapLoad(t){try{var s=JSON.parse(localStorage.getItem(nftSnapKey(t))||"null");if(s&&s.items&&s.items.length&&Date.now()-s.savedAt<6048e5)return s.items}catch(e){}return null}
 function loadLiveNFTs(query){
- var term=(query||NFTCOLLECTION||"azuki").trim()||"azuki";
+ var term=(query||"NFT").trim()||"NFT";
  if(NFTQUERY===term&&(NFTLOADING||NFTLIVE.length))return;
  if(NFTTIMER)clearTimeout(NFTTIMER);
  if(!NFTLIVE.length){var sn=nftSnapLoad(term);if(sn){NFTLIVE=sn;NFTSTALE=true}}
@@ -1264,13 +1264,13 @@ function nftHub(list,chains){
  var title=collectionView?"Explore collections":(NFTSELECTED?NFTSELECTED.name:"Explore NFTs");
  var back='<button type="button" class="nft-back" data-nft-market-back aria-label="Back to Market">'+ic("left")+'</button>';
  return '<section class="nft-hub"><div class="nft-topline">'+back+'<b>NFTs</b><span class="nft-top-chain"><i></i>'+esc(curName)+'</span></div><div class="nft-controls-row">'+toolbar+(floorButton||"")+'</div>'+
- '<div class="nft-network-row">'+chains.map(function(c){return '<button class="nft-network-chip'+(NFTCHAIN===c[0]?' active':'')+'" data-nft-chain="'+c[0]+'">'+(CI[c[0]]||"◈")+' '+c[1]+'</button>'}).join("")+'</div>'+
+ (collectionView?'<div class="nft-network-row">'+chains.map(function(c){return '<button class="nft-network-chip'+(NFTCHAIN===c[0]?' active':'')+'" data-nft-chain="'+c[0]+'">'+(CI[c[0]]||"◈")+' '+c[1]+'</button>'}).join("")+'</div>':"")+
  '<div class="nft-section-head"><h2>'+esc(title)+'</h2><small>'+(collectionView?(NFTCOLLECTIONSLOADING?"Updating":NFTCOLLECTIONS.length+" collections"):(NFTLOADING?"Updating":rows.length+" NFTs"))+'</small></div>'+body+
  '<p class="nft-footnote">Collection and NFT data is loaded from OpenSea for the selected network.</p></section>';
 }
 function markets(categoryPage){
  if(st.mm==="Forex"||st.mm==="Crypto"||st.mm==="NFTs")st.q="";
- if(st.mm==="NFTs"){if(NFTVIEW==="collections"&&!NFTSELECTED)loadNFTCollections();else if(NFTSELECTED&&NFTITEMSCOLLECTION!==NFTSELECTED.slug&&!NFTLOADING)loadNFTCollectionItems(NFTSELECTED);else if(!NFTSELECTED&&NFTVIEW==="nfts")loadLiveNFTs(st.q||NFTCOLLECTION);}
+ if(st.mm==="NFTs"){if(NFTVIEW==="collections"&&!NFTSELECTED)loadNFTCollections();else if(NFTSELECTED&&NFTITEMSCOLLECTION!==NFTSELECTED.slug&&!NFTLOADING)loadNFTCollectionItems(NFTSELECTED);else if(!NFTSELECTED&&NFTVIEW==="nfts")loadLiveNFTs("NFT");}
  var fxGroup=st.mm==="Forex"?(st.fxGroup||"Currency Pairs"):"";
  var cryptoGroup=st.mm==="Crypto"?(st.cryptoGroup||"Spot Markets"):"";
  if(st.mm==="Forex"||st.mm==="Crypto")ensureFXFeed();
@@ -2378,7 +2378,7 @@ function scrolling(){return Date.now()-lastScroll<1200}
   if(!rm&&!document.hidden)requestAnimationFrame(f);else if(!rm)setTimeout(f,500)}
  f()})();
 /* ---- profile photo upload ---- */
-document.addEventListener("click",function(e){if(e.target.closest("[data-nft-explore]")){var g=document.querySelector(".nft-section-head");if(g)g.scrollIntoView({behavior:"smooth",block:"start"})}});document.addEventListener("change",function(e){var t=e.target;if(t&&t.id==="nftchain"){NFTCHAIN=t.value;NFTQUERY="";NFTLIVE=[];NFTSELECTED=null;NFTITEMSREQ++;NFTITEMSCOLLECTION="";NFTVIEW="collections";NFTCOLLECTIONS=[];NFTCOLLECTIONSCHAIN="";loadNFTCollections();draw();return}if(t&&t.id==="nftview"){NFTVIEW=t.value==="collections"?"collections":"nfts";NFTSELECTED=null;NFTITEMSREQ++;NFTITEMSCOLLECTION="";NFTLIVE=[];if(NFTVIEW==="collections")loadNFTCollections();else loadLiveNFTs(st.q||NFTCOLLECTION);draw();return}if(!t||t.id!=="photoin")return;var f=t.files&&t.files[0];if(!f)return;
+document.addEventListener("click",function(e){if(e.target.closest("[data-nft-explore]")){var g=document.querySelector(".nft-section-head");if(g)g.scrollIntoView({behavior:"smooth",block:"start"})}});document.addEventListener("change",function(e){var t=e.target;if(t&&t.id==="nftchain"){NFTCHAIN=t.value;NFTQUERY="";NFTLIVE=[];NFTSELECTED=null;NFTITEMSREQ++;NFTITEMSCOLLECTION="";NFTVIEW="collections";NFTCOLLECTIONS=[];NFTCOLLECTIONSCHAIN="";loadNFTCollections();draw();return}if(t&&t.id==="nftview"){NFTVIEW=t.value==="collections"?"collections":"nfts";NFTSELECTED=null;NFTITEMSREQ++;NFTITEMSCOLLECTION="";NFTLIVE=[];if(NFTVIEW==="collections")loadNFTCollections();else loadLiveNFTs("NFT");draw();return}if(!t||t.id!=="photoin")return;var f=t.files&&t.files[0];if(!f)return;
  if(!/^image\//.test(f.type)){toast("Please choose an image");t.value="";return}
  var fr=new FileReader();fr.onerror=function(){toast("Could not read that photo")};
  fr.onload=function(){var im=new Image();im.onerror=function(){toast("Could not open that photo")};
