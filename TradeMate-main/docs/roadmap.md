@@ -19,10 +19,39 @@ The following work is present on the working branch only; it has not been deploy
 - **Contracts:** persistent Services/B2B proposals, seller acceptance/decline, buyer cancellation, contract messages and dual fulfilment confirmation are implemented in the initial API/UI flow. No payment, escrow or e-signature is included. End-to-end QA remains.
 - **Feed:** required title, file attachments, voice-note recording, inline audio playback and image previews are implemented. Mobile-device and failure-state QA remains.
 - **Public profiles:** migration `019` has been applied to the live database (Database migrations workflow run 44 passed). Authenticated profile read/update endpoints, follow/unfollow endpoints, follow/unfollow audit events and frontend persistence for bio, social links, profile/cover photos and highlights are implemented. Feed responses expose author IDs and profile links now resolve by stable user ID. CI verifies the API build, web build/runtime syntax and clean-database migrations. Live end-to-end verification across two accounts and photo object-storage migration remain outstanding.
-- **Forex:** ten instruments are defined in each of the four requested groups, with a public quote route and no OANDA credentials. Live provider availability still needs verification.
+- **Forex foundation:** ten instruments are defined in each of the four requested groups, with a public quote route and no OANDA credentials. Live provider availability still needs verification.
 - **Clients/Alpha modes:** the user-facing modes are Clients and Alpha; both have a Contracts view, while enquiries remain a separate Conversations view. Internal Buyer/Seller role values remain unchanged for compatibility. Permission and full workflow QA remains.
 - **Validation:** the latest working-branch commit passed the web build, `node --check` for the served app script, API TypeScript build and clean PostgreSQL migration integration job. Live end-to-end and mobile testing remain outstanding.
 - **Documents:** no litepaper or white paper source files were found in the available TradeMate repositories. The future Product consideration is recorded here and in the README; the original documents are needed before updating them.
+
+## Production-deployed marketplace additions — 5 November 2026
+
+The following code changes are confirmed in the production web service deployment history through commit `db96ceabb21889a3fcd87d1fffdc8abcfee06f15` (PR #77). Deployment status was confirmed as `live`. This records deployment evidence, not a substitute for end-to-end user acceptance testing.
+
+### Crypto marketplace
+- Removed the **Crypto CFDs** marketplace filter/section; the marketplace is focused on spot instruments.
+- Fixed the exchange-feed client so fresh spot ticker data from the exchange-feed service is forwarded to the marketplace as `marketQuotes`.
+- Retained fresh-data filtering: stale or unavailable quotes are not fabricated or presented as live prices.
+- Follow-up QA: verify that available spot instruments actually render, update, and show sensible empty/error states in both themes.
+
+### Forex marketplace and MT5
+- Added startup restoration of saved quote snapshots for Forex instruments beyond currency pairs, so saved prices can display while live quotes are loading or unavailable.
+- Preserved the existing snapshot expiry rules and snapshot status indication.
+- Added persistence/restoration of fresh Exness MT5 quotes and fallback to saved snapshots when the live feed is unavailable.
+- Follow-up QA: verify each instrument group, snapshot age/expiry, feed recovery, and both themes under online/offline conditions.
+
+### NFT marketplace
+- Explore feed was changed to mix NFTs from the top 20 collections rather than limiting the display to one collection.
+- Corrected the Explore selector handler so the top-20 feed is used when the view changes.
+- Added timeout handling, independent request failure handling and partial-result rendering to prevent a stalled collection request from holding the entire Explore page in a loading state.
+- Added cooldowns and reduced OpenSea request volume, including lighter Explore requests, to limit repeated failing requests and retry loops.
+- Follow-up QA: verify actual mixed collection results, loading completion, collection navigation, network filtering and recovery from OpenSea/API failures. Preserve the established filter and button dimensions unless explicitly requested otherwise.
+
+### Deployment evidence and release discipline
+- PR #76 (Forex snapshot restoration) merged as `7fdbb006fa87ab0b041e3d7b8a452a2e91c85990`; its Render deployment completed successfully before being superseded by the later deployment.
+- PR #77 (Crypto spot instrument visibility) merged as `db96ceabb21889a3fcd87d1fffdc8abcfee06f15`; Render deployment `dep-dbmdl2o473hc73e0hmd0` completed with status `live`.
+- NFT improvements in PRs #71–#75 are included in the production deployment ancestry.
+- For every subsequent change: run the relevant tests and security scans, inspect the final diff, obtain approval before merging, and verify Render reports `live`. A passing CI run alone does not mean production is updated.
 
 ## Pre-P2P completion
 
@@ -34,6 +63,7 @@ The following work is present on the working branch only; it has not been deploy
 6. Verify Forex market groups and public quote availability for the requested top-ten indices, commodities, equities and bonds/treasuries.
 7. Audit every tab, detail view, form, filter, menu, responsive layout, authorization boundary and performance hotspot.
 8. Update the litepaper and white paper once their source documents are available in the repository.
+9. Complete the production verification tasks recorded under the 5 November 2026 marketplace additions above, including Crypto spot visibility, Forex/MT5 snapshot recovery and NFT Explore reliability, across both themes.
 
 ## Later-stage P2P
 
@@ -113,4 +143,3 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 - Complete S4 and S5 hardening and independent assurance before high-risk financial features go live.
 - RLS must not be bulk-enabled until runtime roles, tenant/user context, transaction boundaries and connection-pool behaviour are tested.
 - No security phase is considered complete based only on code being committed; require passing tests, deployment verification and recorded evidence.
-
