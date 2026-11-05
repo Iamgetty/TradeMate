@@ -85,7 +85,7 @@ export const publicProfileBodySchema = z.object({
 
 export const feedPostBodySchema = z.object({
   type: z.enum(['post', 'feedback']),
-  title: z.string().trim().min(1).max(140),
+  title: z.string().trim().max(140).optional(),
   body: z.string().trim().min(1).max(5000),
   attachments: z.array(z.object({
     name: z.string().trim().min(1).max(180),
