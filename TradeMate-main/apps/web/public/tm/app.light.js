@@ -1256,7 +1256,7 @@ function nftHub(list,chains){
  var floorButton=!collectionView&&NFTSELECTED&&typeof NFTSELECTED.floorPrice==="number"?'<div class="nft-floor-wrap"><div class="nft-floor-price" role="status" aria-label="Collection floor price"><span>FLOOR PRICE</span><b>'+fx2(NFTSELECTED.floorPrice,4)+' '+esc(NFTSELECTED.floorSymbol||"ETH")+'</b></div></div>':"";
  var title=collectionView?"Explore collections":(NFTSELECTED?NFTSELECTED.name:"Explore NFTs");
  var back='<button type="button" class="nft-back" data-nft-market-back aria-label="Back to Market">'+ic("left")+'</button>';
- return '<section class="nft-hub"><div class="nft-topline">'+back+'<b>NFTs</b><span class="nft-top-chain"><i></i>'+esc(curName)+'</span></div><div class="nft-controls-row">'+toolbar+(floorButton||"")+'</div>'
+ return '<section class="nft-hub"><div class="nft-topline">'+back+'<b>NFTs</b><span class="nft-top-chain"><i></i>'+esc(curName)+'</span></div><div class="nft-controls-row">'+toolbar+(floorButton||"")+'</div>'+
  '<div class="nft-network-row">'+chains.map(function(c){return '<button class="nft-network-chip'+(NFTCHAIN===c[0]?' active':'')+'" data-nft-chain="'+c[0]+'">'+(CI[c[0]]||"◈")+' '+c[1]+'</button>'}).join("")+'</div>'+
  '<div class="nft-section-head"><h2>'+esc(title)+'</h2><small>'+(collectionView?(NFTCOLLECTIONSLOADING?"Updating":NFTCOLLECTIONS.length+" collections"):(NFTLOADING?"Updating":rows.length+" NFTs"))+'</small></div>'+body+
  '<p class="nft-footnote">Collection and NFT data is loaded from OpenSea for the selected network.</p></section>';
