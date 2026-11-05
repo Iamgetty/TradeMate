@@ -35,13 +35,15 @@ export async function GET(request: Request) {
   const requestedChain = (incoming.searchParams.get('chain') || 'ethereum').trim().toLowerCase();
   const chain = SUPPORTED_CHAINS.includes(requestedChain) ? requestedChain : 'ethereum';
   const limit = Math.min(Math.max(Number(incoming.searchParams.get('limit') || 24), 1), 50);
+  const lite = incoming.searchParams.get('lite') === '1';
   if (!slug) return NextResponse.json({ configured: true, items: [], message: 'Choose a collection to view its NFTs.' }, { status: 400 });
 
   try {
     const params = new URLSearchParams({ limit: String(limit) });
     const response = await fetch(`https://api.opensea.io/api/v2/collection/${encodeURIComponent(slug)}/nfts?${params.toString()}`, {
       headers: { 'x-api-key': apiKey, accept: 'application/json' },
-      next: { revalidate: 60 }
+      next: { revalidate: 60 },
+      signal: AbortSignal.timeout(8000)
     });
     if (!response.ok) return NextResponse.json({ configured: true, items: [], message: `OpenSea returned status ${response.status} while loading this collection.` }, { status: response.status === 429 ? 429 : 502 });
 
@@ -52,18 +54,20 @@ export async function GET(request: Request) {
         try {
           const statsResponse = await fetch(`https://api.opensea.io/api/v2/collections/${encodeURIComponent(slug)}/stats`, {
             headers: { 'x-api-key': apiKey, accept: 'application/json' },
-            next: { revalidate: 300 }
+            next: { revalidate: 300 },
+            signal: AbortSignal.timeout(8000)
           });
           return statsResponse.ok ? await statsResponse.json() : null;
         } catch { return null; }
       })(),
       mapLimit(rawNfts, 4, async (nft: any) => {
         let listing: any = null;
-        try {
+        if (!lite) try {
           const tokenId = String(nft.identifier || nft.token_id || '');
           const listingResponse = await fetch(`https://api.opensea.io/api/v2/listings/collection/${encodeURIComponent(slug)}/nfts/${encodeURIComponent(tokenId)}/best`, {
             headers: { 'x-api-key': apiKey, accept: 'application/json' },
-            next: { revalidate: 30 }
+            next: { revalidate: 30 },
+            signal: AbortSignal.timeout(8000)
           });
           if (listingResponse.ok) listing = await listingResponse.json();
         } catch { /* Unlisted NFTs correctly retain a null price. */ }

@@ -1129,7 +1129,7 @@ function home(){
  '<div class="tabs"><button class="on" data-ht="Favorites">Favorites</button></div>'+
  (fv?'<div style="height:10px"></div>':'<div class="sub">'+["All"].concat(ORD).map(function(t){return '<button class="'+(hm===t?"on":"")+'" data-hm="'+t+'">'+t+'</button>'}).join("")+'</div>')+body}
 var NFTSORT="popular",NFTFAV={};try{NFTFAV=JSON.parse(localStorage.getItem("tm.nftfav")||"{}")}catch(e){NFTFAV={}}if(!NFTFAV||typeof NFTFAV!=="object"||Array.isArray(NFTFAV))NFTFAV={};
-var NFTLIVE=[],NFTLOADING=false,NFTQUERY="",NFTERROR="",NFTTIMER=null,NFTREQ=0,NFTCOLLECTION="azuki",NFTCHAIN="ethereum";var NFTSHOWN=false,NFTSTALE=false,NFTVIEW="collections",NFTCOLLECTIONS=[],NFTCOLLECTIONSCHAIN="",NFTCOLLECTIONSLOADING=false,NFTSELECTED=null,NFTITEMSCOLLECTION="",NFTITEMSREQ=0,NFTEXPLORECHAIN="",NFTEXPLORELOADING=false;
+var NFTLIVE=[],NFTLOADING=false,NFTQUERY="",NFTERROR="",NFTTIMER=null,NFTREQ=0,NFTCOLLECTION="azuki",NFTCHAIN="ethereum";var NFTSHOWN=false,NFTSTALE=false,NFTVIEW="collections",NFTCOLLECTIONS=[],NFTCOLLECTIONSCHAIN="",NFTCOLLECTIONSLOADING=false,NFTSELECTED=null,NFTITEMSCOLLECTION="",NFTITEMSREQ=0,NFTEXPLORECHAIN="",NFTEXPLORELOADING=false,NFTEXPLOREFAIL={};
 var NFT_SNAP="tm.nft.snapshot.v1.";
 function nftSnapKey(t){return NFT_SNAP+NFTCHAIN+"."+encodeURIComponent(String(t).toLowerCase())}
 function nftSnapSave(t,a){try{localStorage.setItem(nftSnapKey(t),JSON.stringify({savedAt:Date.now(),items:a}))}catch(e){}}
@@ -1173,16 +1173,16 @@ function loadNFTCollectionItems(collection){
 }
 function loadNFTExploreItems(){
  if(NFTCOLLECTIONSCHAIN!==NFTCHAIN||NFTCOLLECTIONSLOADING){loadNFTCollections();return}
- if(NFTEXPLORECHAIN===NFTCHAIN&&(NFTEXPLORELOADING||NFTLIVE.length))return;
+ if(NFTEXPLORECHAIN===NFTCHAIN&&(NFTEXPLORELOADING||NFTLIVE.length||Date.now()-(NFTEXPLOREFAIL[NFTCHAIN]||0)<60000))return;
  var req=++NFTITEMSREQ,chain=NFTCHAIN,top=NFTCOLLECTIONS.slice(0,20).filter(function(c){return c&&c.slug});
  var snap=nftSnapLoad("explore-top20");if(snap){NFTLIVE=snap;NFTSTALE=true}
  NFTEXPLORECHAIN=chain;NFTEXPLORELOADING=true;NFTLOADING=true;NFTERROR="";
- if(!top.length){NFTERROR="No top collections are available on this network yet.";NFTEXPLORELOADING=false;NFTLOADING=false;if(st.tab==="Markets"&&st.mm==="NFTs")softDraw();return}
+ if(!top.length){NFTEXPLOREFAIL[chain]=Date.now();NFTERROR="No top collections are available on this network yet.";NFTEXPLORELOADING=false;NFTLOADING=false;if(st.tab==="Markets"&&st.mm==="NFTs")softDraw();return}
  var buckets=new Array(top.length),start=0,failed=0;
  function fetchCollection(c){
   var controller=typeof AbortController!=="undefined"?new AbortController():null;
   var timer=setTimeout(function(){if(controller)controller.abort()},12000);
-  return fetch("/api/nft-collection?slug="+encodeURIComponent(c.slug)+"&chain="+encodeURIComponent(chain)+"&limit=4",{cache:"no-store",signal:controller?controller.signal:undefined})
+  return fetch("/api/nft-collection?slug="+encodeURIComponent(c.slug)+"&chain="+encodeURIComponent(chain)+"&limit=4&lite=1",{cache:"no-store",signal:controller?controller.signal:undefined})
    .then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.message||"Collection request failed");return d})})
    .then(function(d){return (Array.isArray(d.items)?d.items:[]).map(function(n){return {n:n.name,m:"NFTs",p:typeof n.price==="number"?n.price:null,c:null,k:"NFT",h:0,col:MC.NFTs||"#8b7bff",image:n.image,collection:n.collection,collectionSlug:n.collectionSlug,contract:n.contract,tokenId:n.tokenId,currency:n.currency,marketplaceUrl:n.marketplaceUrl,chain:n.chain||chain,sales24h:n.sales24h,volume24h:n.volume24h,volume24hSymbol:n.volume24hSymbol}})})
    .catch(function(){failed++;return []})
@@ -1190,15 +1190,15 @@ function loadNFTExploreItems(){
  }
  function fetchBatch(){
   var batch=top.slice(start,start+5),offset=start;start+=5;
-  return Promise.all(batch.map(function(c,index){return fetchCollection(c).then(function(items){buckets[offset+index]=items})})).then(function(){return start<top.length?fetchBatch():null})
+  return Promise.all(batch.map(function(c,index){return fetchCollection(c).then(function(items){buckets[offset+index]=items})})).then(function(){var m=[],mx=0;buckets.forEach(function(a){mx=Math.max(mx,(a||[]).length)});for(var r=0;r<mx;r++)for(var i=0;i<buckets.length;i++){var it=(buckets[i]||[])[r];if(it)m.push(it)}if(m.length&&req===NFTITEMSREQ&&chain===NFTCHAIN){NFTLIVE=m;NFTSTALE=false;NFTLOADING=false;NFTERROR=failed?"Some collections could not be reached; showing available NFTs.":"";nftSnapSave("explore-top20",m);if(st.tab==="Markets"&&st.mm==="NFTs")softDraw()}return start<top.length?fetchBatch():null})
  }
  fetchBatch().then(function(){
   if(req!==NFTITEMSREQ||chain!==NFTCHAIN)return;
   var mixed=[],max=0;buckets.forEach(function(a){max=Math.max(max,(a||[]).length)});
   for(var round=0;round<max;round++)for(var i=0;i<buckets.length;i++){var item=(buckets[i]||[])[round];if(item)mixed.push(item)}
   if(mixed.length){NFTLIVE=mixed;NFTSTALE=false;NFTERROR=failed?"Some collections could not be reached; showing available NFTs.":"";nftSnapSave("explore-top20",mixed)}
-  else NFTERROR=failed?"NFTs could not be loaded from the top collections. Please try again.":"No NFTs are currently available in the top 20 collections on this network.";
- }).catch(function(){if(req===NFTITEMSREQ)NFTERROR="Could not load NFTs from the top collections. Please try again."})
+  else{NFTEXPLOREFAIL[chain]=Date.now();NFTERROR=failed?"NFTs could not be loaded from the top collections. Please try again.":"No NFTs are currently available in the top 20 collections on this network.";}
+ }).catch(function(){if(req===NFTITEMSREQ){NFTEXPLOREFAIL[chain]=Date.now();NFTERROR="Could not load NFTs from the top collections. Please try again."}})
  .finally(function(){if(req!==NFTITEMSREQ)return;NFTEXPLORELOADING=false;NFTLOADING=false;if(st.tab==="Markets"&&st.mm==="NFTs")softDraw()});
 }
 
@@ -2044,7 +2044,7 @@ document.addEventListener("change",function(e){var t=e.target;
  if(t.id==="feedPostFiles"){Array.from(t.files||[]).forEach(addFeedDraftFile);t.value="";return}
  if(t.dataset&&t.dataset.k){st.fv[t.dataset.k]=t.value;if(t.classList.contains("so")){var o=t.parentNode.querySelector(".oth");if(o)o.style.display=/^Other/.test(t.value)?"block":"none"}return}
  if(t.dataset&&t.dataset.ck){var a=st.fv[t.dataset.ck]||(st.fv[t.dataset.ck]=[]),i=a.indexOf(t.value);if(t.checked&&i<0)a.push(t.value);if(!t.checked&&i>=0)a.splice(i,1);return}
- if(t.id==="nftchain"){NFTCHAIN=t.value;NFTLIVE=[];NFTSELECTED=null;NFTVIEW="collections";NFTCOLLECTIONS=[];NFTCOLLECTIONSCHAIN="";loadNFTCollections();draw();return}if(t.id==="nftview"){NFTVIEW=t.value==="collections"?"collections":"nfts";NFTSELECTED=null;NFTLIVE=[];if(NFTVIEW==="collections")loadNFTCollections();draw();return}if(t.id==="nftcollection"){NFTCOLLECTION=t.value;st.q="";NFTQUERY="";NFTLIVE=[];loadLiveNFTs(NFTCOLLECTION);draw()}else if(t.id==="pair"){st.tp=+t.value;draw()}else if(t.id==="coin"){st.coin=t.value;draw()}else if(t.id==="pay"){st.pay=t.value;draw()}else if(t.id==="fiat"){st.fiat=t.value;draw()}else if(t.dataset&&t.dataset.pref){var prefKey=t.dataset.pref;st.prefs[prefKey]=t.value;saveAccountPreferences((function(){var x={};x[prefKey]=t.value;return x})()).then(function(){toast("Saved")}).catch(function(){drawPage()})}});
+ if(t.id==="nftchain"){NFTCHAIN=t.value;NFTLIVE=[];NFTSELECTED=null;NFTVIEW="collections";NFTCOLLECTIONS=[];NFTCOLLECTIONSCHAIN="";loadNFTCollections();draw();return}if(t.id==="nftview"){NFTEXPLOREFAIL={};NFTVIEW=t.value==="collections"?"collections":"nfts";NFTSELECTED=null;NFTLIVE=[];if(NFTVIEW==="collections")loadNFTCollections();draw();return}if(t.id==="nftcollection"){NFTCOLLECTION=t.value;st.q="";NFTQUERY="";NFTLIVE=[];loadLiveNFTs(NFTCOLLECTION);draw()}else if(t.id==="pair"){st.tp=+t.value;draw()}else if(t.id==="coin"){st.coin=t.value;draw()}else if(t.id==="pay"){st.pay=t.value;draw()}else if(t.id==="fiat"){st.fiat=t.value;draw()}else if(t.dataset&&t.dataset.pref){var prefKey=t.dataset.pref;st.prefs[prefKey]=t.value;saveAccountPreferences((function(){var x={};x[prefKey]=t.value;return x})()).then(function(){toast("Saved")}).catch(function(){drawPage()})}});
 document.addEventListener("input",function(e){var t=e.target;
  if(t.dataset&&t.dataset.k){st.fv[t.dataset.k]=t.value;return}
  if(t.id==="amt"){st.amt=t.value;var p=t.selectionStart;draw();var n=$("amt");n.focus();n.setSelectionRange(p,p)}
