@@ -35,7 +35,7 @@ The current contract flow does not process payments, provide escrow, or constitu
 
 ## Feed post requirements
 
-The composer requires a title and body. It accepts up to four attachments, each up to 5 MB, including images, PDFs and audio. Voice notes can be recorded in the composer, uploaded as audio attachments and played inline in the Feed. Attachment downloads/previews are served by the API. Mobile browser microphone permissions and media support still require device-level QA.
+The composer supports an optional title and requires a body. It accepts up to four attachments, each up to 5 MB, including images, PDFs and audio. Voice notes can be recorded in the composer, uploaded as audio attachments and played inline in the Feed. Attachment downloads/previews are served by the API. Mobile browser microphone permissions and media support still require device-level QA.
 
 ## Forex reference data
 
