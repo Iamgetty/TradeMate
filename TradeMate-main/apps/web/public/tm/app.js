@@ -1021,7 +1021,7 @@ var st={theme:"dark",tab:"Home",ht:"Favorites",hm:"All",mm:"Services",fxGroup:"C
  me:{name:"",nick:"Member",av:0,uid:"",lvl:1,country:"Nigeria"},prefs:{orders:true,p2p:true,promos:false,news:true,cur:"NGN",market:"Services"},
  notifs:[],
  open:{}};
-st.tp=items.findIndex(function(i){return i.n==="BTC/USDT"});try{var savedTheme=localStorage.getItem("tm_theme");if(TM_THEMES[savedTheme])st.theme=savedTheme;tmApplyTheme(st.theme)}catch(e){}
+try{var savedFxGroup=localStorage.getItem("tm_fx_group");if(FOREX_GROUPS.indexOf(savedFxGroup)>=0)st.fxGroup=savedFxGroup}catch(e){}st.tp=items.findIndex(function(i){return i.n==="BTC/USDT"});try{var savedTheme=localStorage.getItem("tm_theme");if(TM_THEMES[savedTheme])st.theme=savedTheme;tmApplyTheme(st.theme)}catch(e){}
 var ads=[];
 function toast(t){var e=document.createElement("div");e.className="toast";e.textContent=t;document.body.appendChild(e);setTimeout(function(){e.remove()},2600)}
 function byName(n){return items.filter(function(i){return i.n===n})[0]}
@@ -1953,9 +1953,9 @@ document.addEventListener("click",function(e){var t=e.target;
  c=t.closest("[data-open]");if(c){var oi=byName(c.dataset.open);if(oi&&oi.m!=="Crypto"&&oi.m!=="Forex"){pg("listing",oi.n);return}st.tp=items.findIndex(function(i){return i.n===c.dataset.open});st.tt="Order book";st.stack=[];st.tab="Trade";draw();$("app").scrollTop=0;return}
  c=t.closest("[data-ht]");if(c){st.ht=c.dataset.ht;draw();return}
  c=t.closest("[data-hm]");if(c){st.hm=c.dataset.hm;draw();return}
- c=t.closest("[data-fxgroup]");if(c){st.fxGroup=c.dataset.fxgroup;st.q="";draw();return}
+ c=t.closest("[data-fxgroup]");if(c){st.fxGroup=c.dataset.fxgroup;try{localStorage.setItem("tm_fx_group",st.fxGroup)}catch(e){}st.q="";draw();return}
  c=t.closest("[data-cryptogroup]");if(c){st.cryptoGroup=c.dataset.cryptogroup;st.q="";draw();return}
- c=t.closest("[data-mm]");if(c){if(c.dataset.mm==="P2P"){st.stack=[];pg("p2p");$("app").scrollTop=0;return}st.q="";if(c.dataset.mm==="NFTs"){st.stack=[];st.mm="NFTs";st.tab="Markets";draw();$("app").scrollTop=0}else{if(c.dataset.mm==="Forex")st.fxGroup="Currency Pairs";MKSORT="def";pg("marketCategory",c.dataset.mm)}return}
+ c=t.closest("[data-mm]");if(c){if(c.dataset.mm==="P2P"){st.stack=[];pg("p2p");$("app").scrollTop=0;return}st.q="";if(c.dataset.mm==="NFTs"){st.stack=[];st.mm="NFTs";st.tab="Markets";draw();$("app").scrollTop=0}else{if(c.dataset.mm==="Forex"){st.fxGroup="Currency Pairs";try{localStorage.setItem("tm_fx_group",st.fxGroup)}catch(e){}}MKSORT="def";pg("marketCategory",c.dataset.mm)}return}
  c=t.closest("[data-market-back]");if(c){if(!st.stack.length&&st.mm==="NFTs"){st.mm="Services";st.q="";draw();$("app").scrollTop=0;return}back();return}
   c=t.closest("[data-nft-chain]");if(c){NFTCHAIN=c.dataset.nftChain;NFTLIVE=[];loadLiveNFTs(st.q||NFTCOLLECTION);draw();return}
   c=t.closest("[data-tt]");if(c){st.tt=c.dataset.tt;draw();return}
