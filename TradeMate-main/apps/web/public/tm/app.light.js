@@ -1171,7 +1171,7 @@ function loadNFTExploreItems(){
  var req=++NFTITEMSREQ,chain=NFTCHAIN,top=NFTCOLLECTIONS.slice(0,20).filter(function(c){return c&&c.slug});
  var snap=nftSnapLoad("explore-top20");if(snap){NFTLIVE=snap;NFTSTALE=true}
  NFTEXPLORECHAIN=chain;NFTEXPLORELOADING=true;NFTLOADING=true;NFTERROR="";
- if(!top.length){NFTERROR="No top collections are available on this network yet.";NFTEXPLORELOADING=false;NFTLOADING=false;if(st.tab==="Markets"&&st.mm==="NFTs")softDraw();return}
+ if(!top.length){NFTEXPLOREFAIL[chain]=Date.now();NFTERROR="No top collections are available on this network yet.";NFTEXPLORELOADING=false;NFTLOADING=false;if(st.tab==="Markets"&&st.mm==="NFTs")softDraw();return}
  var buckets=new Array(top.length),start=0,failed=0;
  function fetchCollection(c){
   var controller=typeof AbortController!=="undefined"?new AbortController():null;
