@@ -1893,16 +1893,18 @@ document.addEventListener("click",function(e){var t=e.target;if(!t||!t.closest)r
  var nf=t.closest("[data-nft-fav]");if(nf){e.preventDefault();var k=nf.dataset.nftFav,on;if(NFTFAV[k]){delete NFTFAV[k];on=false}else{NFTFAV[k]=1;on=true}try{localStorage.setItem("tm.nftfav",JSON.stringify(NFTFAV))}catch(x){}nf.classList.toggle("on",on);nf.setAttribute("aria-pressed",String(on));nf.setAttribute("aria-label",on?"Remove from favorites":"Add to favorites");nf.textContent=on?"♥":"♡";return}
  if(t.closest("[data-side]"))setTimeout(function(){var b=document.querySelector('.pgs[data-id="p2p"] .bsp');if(b)b.classList.add("go")},0)});
 document.addEventListener("pointermove",function(e){if(e.pointerType!=="mouse"||!e.target.closest)return;var c=e.target.closest(".mk-card");if(!c)return;var r=c.getBoundingClientRect();c.style.setProperty("--mx",(e.clientX-r.left)+"px");c.style.setProperty("--my",(e.clientY-r.top)+"px")},{passive:true});
+function chipPos(root){var o={};if(root)root.querySelectorAll(".mk-chips").forEach(function(e,i){o[i+e.className]=e.scrollLeft});return o}
+function chipRestore(root,o){if(root)root.querySelectorAll(".mk-chips").forEach(function(e,i){var x=o[i+e.className];if(x)e.scrollLeft=x})}
 function draw(){
  var v=st.tab==="Markets"&&st.mm==="NFTs"?markets(true):({Home:home,Markets:markets,Trade:trade,Feed:feed,Portfolio:portfolio}[st.tab]());
  var enter=st.tab!==st.last;st.last=st.tab;
- var _ap=$("app"),_sc=_ap.scrollTop;_ap.innerHTML='<div class="view'+(enter?" enter":"")+'">'+v+'</div>';if(!enter)_ap.scrollTop=_sc;bnGo(BN.i,false);
+ var _ap=$("app"),_sc=_ap.scrollTop,_cx=chipPos(_ap);_ap.innerHTML='<div class="view'+(enter?" enter":"")+'">'+v+'</div>';if(!enter){_ap.scrollTop=_sc;chipRestore(_ap,_cx)}bnGo(BN.i,false);
  $("nav").innerHTML=navHTML();$("sbar").innerHTML=sbarHTML();
  drawPage()}
 function drawPage(){var _n=$("nav"),_s=$("sbar");if(_n&&_s){_n.innerHTML=navHTML();_s.innerHTML=sbarHTML()}var top=st.stack[st.stack.length-1],el=$("pg"),old=el.querySelector(".pgs"),oldB=old&&old.querySelector(".pbody"),sc=oldB?oldB.scrollTop:(old?old.scrollTop:0),same=old&&old.dataset.id===(top&&top.id);
  if(!top){el.innerHTML="";stopCam();return}
- var b=PG[top.id];el.innerHTML='<div class="pgs" data-id="'+top.id+'"><div class="pgw">'+(b?b(top.a):"")+'</div></div>';
- if(same){var np=el.querySelector(".pgs"),nb=np.querySelector(".pbody");np.classList.add("na");(nb||np).scrollTop=sc}if(top.id!=="scan")stopCam();if(top.id==="scan")startCam()}
+ var b=PG[top.id],_cx=chipPos(el);el.innerHTML='<div class="pgs" data-id="'+top.id+'"><div class="pgw">'+(b?b(top.a):"")+'</div></div>';
+ if(same){var np=el.querySelector(".pgs"),nb=np.querySelector(".pbody");np.classList.add("na");chipRestore(np,_cx);(nb||np).scrollTop=sc}if(top.id!=="scan")stopCam();if(top.id==="scan")startCam()}
 function pg(id,a){st.stack.push({id:id,a:a});drawPage()}
 function back(){st.stack.pop();drawPage()}
 function feature(n,pre){var m={"Add Contract":function(){openWiz(pre?"c:"+pre:"pick")},"Create order":function(){openWiz(pre?"c:"+pre:"pick")},"Add company":"subacct",Organization:"subacct","Contract approvals":function(){loadMine().then(function(){pg("contractApprovals")})},"My orders":"conversations","Conversations":"conversations","Contracts":"contracts",Rewards:"rewards",Referral:"referral",Deposit:"deposit",Earn:"earn",Promotions:"promos",Announcements:"announce",Card:"card",Settings:function(){st.uc="Preference";pg("uc")},"Help Center":"help","Feedback Hub":"feedback",Learn:"learn","Affiliate Programs":"affiliate",More:"more",Feed:function(){st.stack=[];st.tab="Feed";draw();$("app").scrollTop=0},P2P:function(){st.stack=[];pg("p2p");$("app").scrollTop=0}};
