@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-const SUPPORTED_CHAINS = ['ethereum', 'polygon', 'arbitrum', 'optimism', 'base', 'avalanche', 'blast'];
+const SUPPORTED_CHAINS = ['ethereum', 'polygon', 'arbitrum', 'base', 'avalanche'];
 
 export async function GET(request: Request) {
   const apiKey = process.env.OPENSEA_API_KEY;
