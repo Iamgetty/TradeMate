@@ -14,8 +14,8 @@ export async function GET(request: Request) {
   const limit = Math.min(Math.max(Number(incoming.searchParams.get('limit') || 48), 1), 100);
 
   try {
-    const params = new URLSearchParams({ chain, limit: String(limit) });
-    const response = await fetch(`https://api.opensea.io/api/v2/collections?${params.toString()}`, {
+    const params = new URLSearchParams({ chains: chain, sort_by: 'seven_days_volume', limit: String(limit) });
+    const response = await fetch(`https://api.opensea.io/api/v2/collections/top?${params.toString()}`, {
       headers: { 'x-api-key': apiKey, accept: 'application/json' },
       cache: 'no-store'
     });
