@@ -1248,7 +1248,7 @@ function nftHub(list,chains){
   return '<article class="nft-card" style="--i:'+Math.min(k,12)+'"><div class="nft-art">'+(i.image?'<img src="'+esc(i.image)+'" alt="'+esc(i.n)+'" '+(k<12?'decoding="async"':'loading="lazy" decoding="async"')+'>':'<div class="nft-art-empty">◈</div>')+'<button class="nft-fav'+(fav?" on":"")+'" data-nft-fav="'+esc(key)+'" aria-pressed="'+fav+'" aria-label="'+(fav?"Remove from favorites":"Add to favorites")+'">'+(fav?"♥":"♡")+'</button></div><div class="nft-card-body"><h3>'+esc(i.n)+'</h3><div class="nft-price-row"><b>'+price+'</b><span class="nft-change">● OpenSea</span></div><div class="nft-stats"><div><small>24h Vol</small><b>'+volume+'</b></div><div><small>Trades</small><b>'+sales+'</b></div></div>'+(url?'<a class="nft-view" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">View on marketplace ↗</a>':"")+'</div></article>';
  }
  var collectionCards=NFTCOLLECTIONS.map(function(c,k){
-  var image=c.image?'<img src="'+esc(c.image)+'" alt="'+esc(c.name)+'" '+(k<12?'decoding="async"':'loading="lazy" decoding="async")+'>' : '<div class="nft-art-empty">◈</div>';
+  var image=c.image?'<img src="'+esc(c.image)+'" alt="'+esc(c.name)+'" '+(k<12?'decoding="async"':'loading="lazy" decoding="async"')+'>' : '<div class="nft-art-empty">◈</div>';
   var floor=typeof c.floorPrice==="number"?fx2(c.floorPrice,4)+" "+esc(c.floorSymbol||"ETH"):"—";
   var volume=typeof c.volume24h==="number"?fx2(c.volume24h,1)+" "+esc(c.volume24hSymbol||"ETH"):"—";
   var trades=typeof c.sales24h==="number"?fmt(c.sales24h,0):"—";
