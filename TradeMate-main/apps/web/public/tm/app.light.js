@@ -1234,7 +1234,7 @@ function nftHub(list,chains){
  if(NFTSORT==="price")rows.sort(function(a,b){return nv(a.p,1e18)-nv(b.p,1e18)});
  else if(NFTSORT==="sales")rows.sort(function(a,b){return nv(b.sales24h,-1)-nv(a.sales24h,-1)});
  function nftCard(i,k){
-  var price=typeof i.p==="number"?fx2(i.p,i.p<1?4:2)+" "+esc(i.currency||"ETH"):"—";
+  var price=typeof i.p==="number"?fx2(i.p,i.p<1?4:2)+" "+esc(i.currency||"ETH"):"";
   var sales=typeof i.sales24h==="number"?fmt(i.sales24h,0):"—",volume=typeof i.volume24h==="number"?fx2(i.volume24h,1)+" "+esc(i.volume24hSymbol||i.currency||"ETH"):"";
   var key=String(i.collectionSlug||i.collection||"")+":"+String(i.tokenId||i.n||""),fav=!!NFTFAV[key];
   var url=/^https:\/\//i.test(String(i.marketplaceUrl||""))?String(i.marketplaceUrl):"";
