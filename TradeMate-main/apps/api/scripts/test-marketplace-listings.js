@@ -55,7 +55,7 @@ async function main() {
     await app.listen(0, '127.0.0.1');
     const address = app.getHttpServer().address();
     const baseUrl = 'http://127.0.0.1:' + address.port;
-    const createDraft = (role, title) => fetch(baseUrl + '/api/market/listings', {
+    const createDraft = (role, title, quantityAvailable = null) => fetch(baseUrl + '/api/market/listings', {
       method: 'POST',
       headers: {
         cookie: 'trademate_session=' + encodeURIComponent(actors[role].token),
@@ -66,7 +66,7 @@ async function main() {
         description: 'Integration-test Services offer',
         listingType: 'service',
         price: '100.00',
-        quantityAvailable: null,
+        quantityAvailable,
       }),
     });
 
@@ -83,6 +83,14 @@ async function main() {
       );
       assert.equal(audit.rows[0].count, 1, 'successful draft creation must have exactly one audit event');
     }
+
+    const invalidServiceQuantity = await createDraft('owner', 'Invalid service quantity ' + suffix, 3);
+    assert.equal(invalidServiceQuantity.status, 400, 'service offers must reject inventory quantities during draft creation');
+    const invalidServiceRows = await rawPool.query(
+      "SELECT count(*)::int AS count FROM listings WHERE seller_organization_id = $1 AND title = $2",
+      [organizationId, 'Invalid service quantity ' + suffix],
+    );
+    assert.equal(invalidServiceRows.rows[0].count, 0, 'invalid service quantity must not create a draft');
 
     const outsider = await createDraft('outsider', 'Outsider draft ' + suffix);
     assert.equal(outsider.status, 400, 'an unrelated account must not create a draft in another organization');
