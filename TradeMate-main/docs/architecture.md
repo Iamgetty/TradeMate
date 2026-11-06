@@ -4,7 +4,7 @@
 - Public product name: TradeMate.
 - Tagline: “Trade Smart. Trade Direct.”
 - Product principle: global from inception. TradeMate is not a Nigeria-first product.
-- Do not display “by Nexora” or “by Deu Kleinz Technologies” in public product branding.
+- Approved public endorsement: **TradeMate by Metadusk**. TradeMate retains its independent product identity; Metadusk is the intended parent-company/ecosystem identity. See [docs/company-ecosystem.md](company-ecosystem.md) for the current ecosystem structure and legal-status caveats. Do not use the superseded Nexora parent identity or describe Deukleinz Technologies as the parent company.
 
 ## Global product strategy
 Build for international use from day one. No single country, currency, language, or user context should be assumed as the default.
