@@ -74,14 +74,14 @@ async function main() {
       await pool.query('INSERT INTO test_reject_auth_audit_events (event_type) VALUES ($1) ON CONFLICT (event_type) DO NOTHING', [event]);
       await pool.query(`
         CREATE OR REPLACE FUNCTION test_reject_auth_audit() RETURNS trigger
-        LANGUAGE plpgsql AS $
+        LANGUAGE plpgsql AS $audit$
         BEGIN
           IF EXISTS (SELECT 1 FROM test_reject_auth_audit_events WHERE event_type = NEW.event_type) THEN
             RAISE EXCEPTION 'forced auth audit failure';
           END IF;
           RETURN NEW;
         END;
-        $;
+        $audit$;
       `);
       await pool.query('DROP TRIGGER IF EXISTS test_reject_auth_audit_trigger ON audit_events');
       await pool.query('CREATE TRIGGER test_reject_auth_audit_trigger BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION test_reject_auth_audit()');
