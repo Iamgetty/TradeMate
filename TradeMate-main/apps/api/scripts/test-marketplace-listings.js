@@ -103,7 +103,7 @@ async function main() {
       CREATE OR REPLACE FUNCTION test_reject_listing_draft_audit() RETURNS trigger
       LANGUAGE plpgsql AS $$
       BEGIN
-        IF NEW.event_type IN ('listing.draft_created', 'listing.draft_updated', 'listing.draft_deleted', 'organization.updated') THEN
+        IF NEW.event_type IN ('listing.draft_created', 'listing.draft_updated', 'listing.draft_deleted', 'organization.updated', 'marketplace.enquiry_created') THEN
           RAISE EXCEPTION 'forced listing audit insert failure for rollback test';
         END IF;
         RETURN NEW;
@@ -167,7 +167,26 @@ async function main() {
     assert.equal(after.rows[0].count, before.rows[0].count,
       'draft rows must roll back when the matching audit insert fails');
 
-    console.log('Services/B2B organization profile and draft lifecycle authorization and atomic audit rollback integration tests passed.');
+    await rawPool.query("UPDATE listings SET status = 'published' WHERE id = $1", [createdDrafts.owner.id]);
+    const enquiryFailed = await fetch(baseUrl + '/api/market/enquiries', {
+      method: 'POST',
+      headers: {
+        cookie: 'trademate_session=' + encodeURIComponent(actors.outsider.token),
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        listingId: createdDrafts.owner.id,
+        message: 'Integration test enquiry for atomic audit rollback.',
+      }),
+    });
+    assert.equal(enquiryFailed.status, 500, 'forced audit failure must fail enquiry creation');
+    const enquiryRows = await rawPool.query(
+      'SELECT count(*)::int AS count FROM marketplace_enquiries WHERE listing_id = $1 AND buyer_user_id = $2',
+      [createdDrafts.owner.id, actors.outsider.userId],
+    );
+    assert.equal(enquiryRows.rows[0].count, 0, 'enquiry rows must roll back when the matching audit insert fails');
+
+    console.log('Services/B2B organization profile, draft lifecycle and enquiry authorization and atomic audit rollback integration tests passed.');
   } finally {
     if (triggerInstalled) {
       await rawPool.query('DROP TRIGGER IF EXISTS test_reject_listing_draft_audit_trigger ON audit_events').catch(() => undefined);
