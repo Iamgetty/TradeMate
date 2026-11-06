@@ -1437,63 +1437,42 @@ class EnquiriesController {
       throw new BadRequestException('Your enquiry must be between 5 and 2,000 characters.');
     }
 
-    const listing = await databasePool!.query(
-      `SELECT l.id, l.seller_organization_id, o.name AS seller_name
-       FROM listings l
-       JOIN organizations o ON o.id = l.seller_organization_id
-       WHERE l.id = $1 AND l.status = 'published' AND o.status = 'active'
-       LIMIT 1`,
-      [listingId],
-    );
-    if (!listing.rowCount) throw new NotFoundException('This listing is not available for enquiries.');
-    const target = listing.rows[0];
-    const sellerMembership = await databasePool!.query(
-      'SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1',
-      [target.seller_organization_id, userId],
-    );
-    if (sellerMembership.rowCount) throw new BadRequestException('You cannot send an enquiry about your own listing.');
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const listing = await client.query(
+        `SELECT l.id, l.seller_organization_id, o.name AS seller_name
+         FROM listings l
+         JOIN organizations o ON o.id = l.seller_organization_id
+         WHERE l.id = $1 AND l.status = 'published' AND o.status = 'active'
+         LIMIT 1
+         FOR SHARE OF l, o`,
+        [listingId],
+      );
+      if (!listing.rowCount) throw new NotFoundException('This listing is not available for enquiries.');
+      const target = listing.rows[0];
+      const sellerMembership = await client.query(
+        'SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1',
+        [target.seller_organization_id, userId],
+      );
+      if (sellerMembership.rowCount) throw new BadRequestException('You cannot send an enquiry about your own listing.');
 
-    const created = await databasePool!.query(
-      "INSERT INTO marketplace_enquiries (listing_id, buyer_user_id, message, status) VALUES ($1, $2, $3, 'open') RETURNING id, listing_id, buyer_user_id, message, status, created_at",
-      [listingId, userId, message],
-    );
-    await databasePool!.query(
-      "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, $2, 'marketplace.enquiry_created', 'enquiry', $3, $4::jsonb)",
-      [userId, target.seller_organization_id, created.rows[0].id, JSON.stringify({ listing_id: listingId })],
-    );
-    return { data: { ...created.rows[0], seller_name: target.seller_name }, message: 'Enquiry sent to the seller.' };
-  }
-
-  private async authorizedEnquiry(enquiryId: string, userId: string) {
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(enquiryId)) {
-      throw new BadRequestException('id must be a valid enquiry UUID.');
-    }
-    const result = await databasePool!.query(
-      `SELECT e.id, e.listing_id, e.buyer_user_id, e.message, e.status, e.created_at,
-              l.seller_organization_id, l.title AS listing_title, o.name AS seller_name, buyer.display_name AS buyer_name
-       FROM marketplace_enquiries e
-       JOIN listings l ON l.id = e.listing_id
-       JOIN organizations o ON o.id = l.seller_organization_id
-       JOIN users buyer ON buyer.id = e.buyer_user_id
-       WHERE e.id = $1
-         AND (e.buyer_user_id = $2 OR EXISTS (
-           SELECT 1 FROM organization_members om
-           WHERE om.organization_id = l.seller_organization_id AND om.user_id = $2
-         ))
-       LIMIT 1`,
-      [enquiryId, userId],
-    );
-    if (!result.rowCount) throw new NotFoundException('Enquiry not found.');
-    return result.rows[0];
-  }
-
-  @Get(':id/messages')
-  async messages(@Param('id') id: string, @Req() request: Request) {
-    parseUuidParam(id);
-    const userId = await this.authenticatedUser(request);
-    const enquiry = await this.authorizedEnquiry(id, userId);
-    await databasePool!.query(
-      `INSERT INTO enquiry_reads (enquiry_id, user_id, last_read_at)
+      const created = await client.query(
+        "INSERT INTO marketplace_enquiries (listing_id, buyer_user_id, message, status) VALUES ($1, $2, $3, 'open') RETURNING id, listing_id, buyer_user_id, message, status, created_at",
+        [listingId, userId, message],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, $2, 'marketplace.enquiry_created', 'enquiry', $3, $4::jsonb)",
+        [userId, target.seller_organization_id, created.rows[0].id, JSON.stringify({ listing_id: listingId })],
+      );
+      await client.query('COMMIT');
+      return { data: { ...created.rows[0], seller_name: target.seller_name }, message: 'Enquiry sent to the seller.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }ry_id, user_id, last_read_at)
        VALUES ($1, $2, now())
        ON CONFLICT (enquiry_id, user_id)
        DO UPDATE SET last_read_at = EXCLUDED.last_read_at`,
