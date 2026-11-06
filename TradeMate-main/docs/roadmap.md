@@ -82,8 +82,8 @@ PR #22 is an audit source, not an integration target. Its original branch is sta
 
 ### Next execution order
 
-1. Complete review and CI/security verification of PR #79; merge only after explicit product-owner approval.
-2. Verify the new recoverable states/retry handling for market listings, organization/documents, own offers, contracts and enquiry conversations through failure-injection tests, without changing established marketplace/NFT layout dimensions.
+1. CI and security verification for PR #79 are green on head `a754899e1745caa1f8e125d16d696fe8c11d079e` (run `42149544737`): all five jobs passed, including clean PostgreSQL migrations, organization-document rollback/permissions, contract lifecycle/concurrency, least-privilege roles, RLS isolation, immutable audit history and transaction-local identity/pool isolation. Review the final diff and obtain explicit product-owner approval before any merge; PR #79 remains open and unmerged.
+2. Verify the recoverable states/retry handling for market listings, organization/documents, own offers, contracts and enquiry conversations through failure-injection tests, without changing established marketplace/NFT layout dimensions. The current CI build is green, but those UI recovery paths still need failure-injection and mobile acceptance evidence.
 3. Add and run organization-document transaction rollback and owner/admin-versus-member authorization integration tests.
 4. Run the Services/B2B and contract lifecycle two-account acceptance matrix.
 5. Complete Feed/mobile and Forex/Crypto/NFT production acceptance checks.
