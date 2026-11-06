@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { Pool } from 'pg';
 import { createRlsAwarePool } from './database-context';
-import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
+import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -993,7 +993,7 @@ class OrganizationsController {
       await client.query('BEGIN');
       const member = await client.query('SELECT member_role FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
       if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
-      if (!['owner', 'admin'].includes(member.rows[0].member_role)) throw new ForbiddenException('Only organization owners and admins can upload verification documents.');
+      if (!organizationDocumentManagerRoleSchema.safeParse(member.rows[0].member_role).success) throw new ForbiddenException('Only organization owners and admins can upload verification documents.');
       const saved: Array<Record<string, unknown>> = [];
       for (const file of files) {
         const fileName = typeof file.fileName === 'string' ? file.fileName.trim().slice(0, 180) : '';
@@ -1030,7 +1030,7 @@ class OrganizationsController {
     const userId = await this.currentUser(request);
     const member = await databasePool!.query('SELECT member_role FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
     if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
-    if (!['owner', 'admin'].includes(member.rows[0].member_role)) throw new ForbiddenException('Only organization owners and admins can view verification documents.');
+    if (!organizationDocumentManagerRoleSchema.safeParse(member.rows[0].member_role).success) throw new ForbiddenException('Only organization owners and admins can view verification documents.');
     const result = await databasePool!.query(
       'SELECT id, file_name, mime_type, file_size, review_status, created_at FROM organization_documents WHERE organization_id = $1 ORDER BY created_at DESC',
       [id],
