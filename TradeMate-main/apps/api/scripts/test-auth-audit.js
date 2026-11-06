@@ -98,6 +98,15 @@ async function main() {
     const feedbackOk = await call('POST', '/api/support/feedback', { type: 'Idea', message: 'Audit success test feedback' });
     assert.equal(feedbackOk.status, 201, 'feedback submission must succeed when audit insert succeeds');
 
+    await installReject('profile.public_details_updated');
+    const publicProfileFailed = await call('PATCH', '/api/profiles/me', { bio: 'Must roll back' });
+    assert.equal(publicProfileFailed.status, 500, 'audit failure must fail public profile update');
+    let publicProfile = await pool.query('SELECT bio FROM user_profiles WHERE user_id=$1', [userId]);
+    assert.equal(publicProfile.rowCount, 0, 'public profile insert must roll back when audit insert fails');
+    await removeReject();
+    const publicProfileOk = await call('PATCH', '/api/profiles/me', { bio: 'Audit success profile' });
+    assert.equal(publicProfileOk.status, 200, 'public profile update must succeed when audit insert succeeds');
+
     await installReject('profile.followed');
     const followFailed = await call('POST', '/api/profiles/' + targetId + '/follow');
     assert.equal(followFailed.status, 500, 'audit failure must fail follow');
@@ -192,7 +201,7 @@ async function main() {
     assert.equal(sessionCheck.rowCount, 1, 'current session deletion must roll back when audit insert fails');
     await removeReject();
 
-    console.log('Auth audit atomicity passed: TOTP enable/disable and session revocation roll back when audit writes fail.');
+    console.log('Audit atomicity passed: account, profile, feedback, follow and feed changes roll back when audit writes fail.');
   } finally {
     if (triggerInstalled) {
       await pool.query('DROP TRIGGER IF EXISTS test_reject_auth_audit_trigger ON audit_events').catch(() => undefined);
