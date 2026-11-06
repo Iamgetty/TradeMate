@@ -919,15 +919,25 @@ class SupportController {
     const message = typeof body?.message === 'string' ? body.message.trim() : '';
     if (!['Idea', 'Bug', 'Complaint', 'Praise'].includes(type)) throw new BadRequestException('Choose a valid feedback type.');
     if (message.length < 3 || message.length > 10000) throw new BadRequestException('Feedback must be between 3 and 10,000 characters.');
-    const result = await databasePool!.query(
-      'INSERT INTO user_feedback (user_id, feedback_type, message) VALUES ($1,$2,$3) RETURNING id, feedback_type, message, status, created_at',
-      [userId, type, message],
-    );
-    await databasePool!.query(
-      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1,'feedback.submitted','user_feedback',$2,$3::jsonb)",
-      [userId, result.rows[0].id, JSON.stringify({ type })],
-    );
-    return { feedback: result.rows[0], message: 'Thank you. Your feedback has been submitted.' };
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        'INSERT INTO user_feedback (user_id, feedback_type, message) VALUES ($1,$2,$3) RETURNING id, feedback_type, message, status, created_at',
+        [userId, type, message],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1,'feedback.submitted','user_feedback',$2,$3::jsonb)",
+        [userId, result.rows[0].id, JSON.stringify({ type })],
+      );
+      await client.query('COMMIT');
+      return { feedback: result.rows[0], message: 'Thank you. Your feedback has been submitted.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
 
@@ -2412,17 +2422,27 @@ class PublicProfilesController {
     const userId = await this.currentUser(request);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid profile id.');
     if (id === userId) throw new BadRequestException('You cannot follow your own profile.');
-    const result = await databasePool!.query(
-      "INSERT INTO user_follows (follower_user_id, followed_user_id) SELECT $1, u.id FROM users u WHERE u.id=$2 AND u.status='active' ON CONFLICT DO NOTHING RETURNING followed_user_id",
-      [userId, id],
-    );
-    const exists = await databasePool!.query("SELECT 1 FROM users WHERE id=$1 AND status='active'", [id]);
-    if (!exists.rowCount) throw new NotFoundException('Profile not found.');
-    if (result.rowCount) await databasePool!.query(
-      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.followed', 'user', $2, '{}'::jsonb)",
-      [userId, id],
-    );
-    return { following: true };
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const exists = await client.query("SELECT 1 FROM users WHERE id=$1 AND status='active' FOR SHARE", [id]);
+      if (!exists.rowCount) throw new NotFoundException('Profile not found.');
+      const result = await client.query(
+        'INSERT INTO user_follows (follower_user_id, followed_user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING followed_user_id',
+        [userId, id],
+      );
+      if (result.rowCount) await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.followed', 'user', $2, '{}'::jsonb)",
+        [userId, id],
+      );
+      await client.query('COMMIT');
+      return { following: true };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Delete(':id/follow')
@@ -2430,15 +2450,25 @@ class PublicProfilesController {
     parseUuidParam(id);
     const userId = await this.currentUser(request);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid profile id.');
-    const removed = await databasePool!.query(
-      'DELETE FROM user_follows WHERE follower_user_id=$1 AND followed_user_id=$2 RETURNING followed_user_id',
-      [userId, id],
-    );
-    if (removed.rowCount) await databasePool!.query(
-      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.unfollowed', 'user', $2, '{}'::jsonb)",
-      [userId, id],
-    );
-    return { following: false };
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const removed = await client.query(
+        'DELETE FROM user_follows WHERE follower_user_id=$1 AND followed_user_id=$2 RETURNING followed_user_id',
+        [userId, id],
+      );
+      if (removed.rowCount) await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.unfollowed', 'user', $2, '{}'::jsonb)",
+        [userId, id],
+      );
+      await client.query('COMMIT');
+      return { following: false };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
 
@@ -2626,16 +2656,26 @@ class CommunityFeedController {
   async pinPost(@Param('id') id: string, @Req() request: Request, @Body() body: { pinned?: boolean }) {
     parseUuidParam(id); parseBody(feedPinBodySchema, body);
     const userId = await this.currentUser(request);
-    const result = await databasePool!.query(
-      "UPDATE feed_posts SET pinned = $3, updated_at = now() WHERE id = $1 AND author_user_id = $2 AND status = 'published' RETURNING id, pinned",
-      [id, userId, body.pinned],
-    );
-    if (!result.rowCount) throw new NotFoundException('Post not found or you are not its owner.');
-    await databasePool!.query(
-      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'feed.post.pin_changed', 'feed_post', $2, $3::jsonb)",
-      [userId, id, JSON.stringify({ pinned: body.pinned })],
-    );
-    return { post: result.rows[0] };
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        "UPDATE feed_posts SET pinned = $3, updated_at = now() WHERE id = $1 AND author_user_id = $2 AND status = 'published' RETURNING id, pinned",
+        [id, userId, body.pinned],
+      );
+      if (!result.rowCount) throw new NotFoundException('Post not found or you are not its owner.');
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'feed.post.pin_changed', 'feed_post', $2, $3::jsonb)",
+        [userId, id, JSON.stringify({ pinned: body.pinned })],
+      );
+      await client.query('COMMIT');
+      return { post: result.rows[0] };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Post('posts/:id/reshare')
@@ -2732,18 +2772,27 @@ class CommunityFeedController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const content = typeof body?.body === 'string' ? body.body.trim() : '';
     if (content.length < 1 || content.length > 5000) throw new BadRequestException('Announcements must be between 1 and 5,000 characters.');
-    const result = await databasePool.query(
-      `INSERT INTO feed_posts (author_user_id, post_type, body, pinned)
-       VALUES (NULL, 'announcement', $1, true)
-       RETURNING id, post_type, body, pinned, created_at`,
-      [content],
-    );
-    
-    await databasePool.query(
-      "INSERT INTO audit_events (event_type, entity_type, entity_id, metadata) VALUES ('feed.announcement.created', 'feed_post', $1, $2::jsonb)",
-      [result.rows[0].id, JSON.stringify({ reviewer_key_id: keyId })],
-    );
-    return { announcement: result.rows[0] };
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        `INSERT INTO feed_posts (author_user_id, post_type, body, pinned)
+         VALUES (NULL, 'announcement', $1, true)
+         RETURNING id, post_type, body, pinned, created_at`,
+        [content],
+      );
+      await client.query(
+        "INSERT INTO audit_events (event_type, entity_type, entity_id, metadata) VALUES ('feed.announcement.created', 'feed_post', $1, $2::jsonb)",
+        [result.rows[0].id, JSON.stringify({ reviewer_key_id: keyId })],
+      );
+      await client.query('COMMIT');
+      return { announcement: result.rows[0] };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
 
