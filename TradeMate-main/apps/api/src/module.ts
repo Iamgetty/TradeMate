@@ -1655,44 +1655,55 @@ class MarketplaceContractsController {
     const amountParts = amountText.split(".");
     const amountMinorUnits = (BigInt(amountParts[0]) * 100n + BigInt(((amountParts[1] || "") + "00").slice(0, 2))).toString();
 
-    const listing = await databasePool!.query(
-      `SELECT l.id, l.title, l.listing_type, l.seller_organization_id, l.currency_code,
-              l.status, o.status AS organization_status
-       FROM listings l
-       JOIN organizations o ON o.id = l.seller_organization_id
-       WHERE l.id = $1 AND l.status = 'published' AND o.status = 'active'
-         AND l.listing_type IN ('service', 'b2b')
-       LIMIT 1`,
-      [listingId],
-    );
-    if (!listing.rowCount) throw new NotFoundException('This published Services or B2B offer is not available for a contract.');
-    const offer = listing.rows[0];
-    const sellerMembership = await databasePool!.query(
-      'SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1',
-      [offer.seller_organization_id, buyerId],
-    );
-    if (sellerMembership.rowCount) throw new BadRequestException('You cannot propose a contract to your own business space.');
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const listing = await client.query(
+        `SELECT l.id, l.title, l.listing_type, l.seller_organization_id, l.currency_code,
+                l.status, o.status AS organization_status
+         FROM listings l
+         JOIN organizations o ON o.id = l.seller_organization_id
+         WHERE l.id = $1 AND l.status = 'published' AND o.status = 'active'
+           AND l.listing_type IN ('service', 'b2b')
+         LIMIT 1
+         FOR SHARE OF l, o`,
+        [listingId],
+      );
+      if (!listing.rowCount) throw new NotFoundException('This published Services or B2B offer is not available for a contract.');
+      const offer = listing.rows[0];
+      const sellerMembership = await client.query(
+        'SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1',
+        [offer.seller_organization_id, buyerId],
+      );
+      if (sellerMembership.rowCount) throw new BadRequestException('You cannot propose a contract to your own business space.');
 
-    const created = await databasePool!.query(
-      `INSERT INTO marketplace_contracts
-       (listing_id, buyer_user_id, seller_organization_id, title, scope, terms,
-        amount_minor_units, currency_code, requested_start_date, requested_completion_date, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'proposed')
-       RETURNING id, listing_id, buyer_user_id, seller_organization_id, title, scope, terms,
-                 amount_minor_units::text AS amount_minor_units, currency_code,
-                 requested_start_date, requested_completion_date, status, created_at`,
-      [listingId, buyerId, offer.seller_organization_id, offer.title, scope, terms,
-       String(amountMinorUnits), offer.currency_code, startDate, completionDate],
-    );
-    await databasePool!.query(
-      "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_proposed','contract',$3,$4::jsonb)",
-      [buyerId, offer.seller_organization_id, created.rows[0].id, JSON.stringify({ listing_id: listingId, listing_type: offer.listing_type })],
-    );
-    await databasePool!.query(
-      "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', 'New contract proposal', $1, 'doc' FROM organization_members om WHERE om.organization_id = $2 AND om.user_id <> $3 AND om.member_role IN ('owner','admin')",
-      ['A buyer sent a proposal for ' + offer.title + '.', offer.seller_organization_id, buyerId],
-    );
-    return { data: created.rows[0], message: 'Contract proposal sent to the business for review.' };
+      const created = await client.query(
+        `INSERT INTO marketplace_contracts
+         (listing_id, buyer_user_id, seller_organization_id, title, scope, terms,
+          amount_minor_units, currency_code, requested_start_date, requested_completion_date, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'proposed')
+         RETURNING id, listing_id, buyer_user_id, seller_organization_id, title, scope, terms,
+                   amount_minor_units::text AS amount_minor_units, currency_code,
+                   requested_start_date, requested_completion_date, status, created_at`,
+        [listingId, buyerId, offer.seller_organization_id, offer.title, scope, terms,
+         String(amountMinorUnits), offer.currency_code, startDate, completionDate],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_proposed','contract',$3,$4::jsonb)",
+        [buyerId, offer.seller_organization_id, created.rows[0].id, JSON.stringify({ listing_id: listingId, listing_type: offer.listing_type })],
+      );
+      await client.query(
+        "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', 'New contract proposal', $1, 'doc' FROM organization_members om WHERE om.organization_id = $2 AND om.user_id <> $3 AND om.member_role IN ('owner','admin')",
+        ['A buyer sent a proposal for ' + offer.title + '.', offer.seller_organization_id, buyerId],
+      );
+      await client.query('COMMIT');
+      return { data: created.rows[0], message: 'Contract proposal sent to the business for review.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Get('mine')
