@@ -90,7 +90,7 @@ PR #22 is an audit source, not an integration target. Its original branch is sta
 6. Run the complete Services/B2B and contract lifecycle two-account acceptance matrix, including publishing, moderation, public discovery, cross-account access and Clients/Alpha parity.
 7. Complete Feed/mobile and Forex/Crypto/NFT production acceptance checks.
 8. Continue the S1 security gates in parallel, without enabling production RLS until role/context/pool-reuse tests pass.
-9. **Auth/profile audit atomicity:** TOTP enable, TOTP disable, session revocation, profile display-name updates and account-preference updates now execute each state change and matching audit insert in one transaction. Session cookies are cleared only after the revocation transaction commits. The PostgreSQL-backed HTTP integration test injects audit-trigger failures and checks rollback for all five operations, then checks successful paths; the updated test must pass on the latest exact head before this item is marked verified.
+9. **Account, social and feed audit atomicity:** TOTP enable/disable, session revocation, profile display-name updates, account preferences, feedback submissions, follow/unfollow, feed pin changes and feed announcements now pair their state mutation with the audit insert in one transaction. Session cookies are cleared only after revocation commits. The PostgreSQL-backed HTTP integration test injects audit-trigger failures and verifies rollback plus successful paths for these operations; latest exact-head CI is still required before marking the coverage verified.
 
 ## Pre-P2P completion
 
