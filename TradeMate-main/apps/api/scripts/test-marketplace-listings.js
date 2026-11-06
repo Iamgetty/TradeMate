@@ -70,11 +70,13 @@ async function main() {
       }),
     });
 
+    const createdDrafts = {};
     for (const role of ['owner', 'admin', 'member']) {
       const response = await createDraft(role, 'Draft ' + role + ' ' + suffix);
       assert.equal(response.status, 201, role + ' organization member should be allowed to create a draft under the current membership policy');
       const payload = await response.json();
       assert.equal(payload.listing.status, 'draft');
+      createdDrafts[role] = payload.listing;
       const audit = await rawPool.query(
         "SELECT count(*)::int AS count FROM audit_events WHERE event_type = 'listing.draft_created' AND entity_id = $1",
         [payload.listing.id],
@@ -93,7 +95,7 @@ async function main() {
       CREATE OR REPLACE FUNCTION test_reject_listing_draft_audit() RETURNS trigger
       LANGUAGE plpgsql AS $$
       BEGIN
-        IF NEW.event_type = 'listing.draft_created' THEN
+        IF NEW.event_type IN ('listing.draft_created', 'listing.draft_updated', 'listing.draft_deleted') THEN
           RAISE EXCEPTION 'forced listing audit insert failure for rollback test';
         END IF;
         RETURN NEW;
@@ -107,6 +109,34 @@ async function main() {
     `);
     triggerInstalled = true;
 
+    const updateFailed = await fetch(baseUrl + '/api/market/listings/' + createdDrafts.owner.id, {
+      method: 'PATCH',
+      headers: {
+        cookie: 'trademate_session=' + encodeURIComponent(actors.owner.token),
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: 'Edited draft ' + suffix,
+        description: 'Integration-test Services offer',
+        listingType: 'service',
+        price: '100.00',
+        quantityAvailable: null,
+      }),
+    });
+    assert.equal(updateFailed.status, 500, 'forced audit failure must fail draft update');
+    const unchanged = await rawPool.query('SELECT title FROM listings WHERE id = $1', [createdDrafts.owner.id]);
+    assert.equal(unchanged.rows[0]?.title, createdDrafts.owner.title,
+      'draft edits must roll back when the matching audit insert fails');
+
+    const deleteFailed = await fetch(baseUrl + '/api/market/listings/' + createdDrafts.admin.id, {
+      method: 'DELETE',
+      headers: { cookie: 'trademate_session=' + encodeURIComponent(actors.admin.token) },
+    });
+    assert.equal(deleteFailed.status, 500, 'forced audit failure must fail draft deletion');
+    const retained = await rawPool.query('SELECT id FROM listings WHERE id = $1', [createdDrafts.admin.id]);
+    assert.equal(retained.rowCount, 1,
+      'draft deletion must roll back when the matching audit insert fails');
+
     const failed = await createDraft('owner', 'Rollback draft ' + suffix);
     assert.equal(failed.status, 500, 'forced audit failure must fail draft creation');
     const after = await rawPool.query(
@@ -116,7 +146,7 @@ async function main() {
     assert.equal(after.rows[0].count, before.rows[0].count,
       'draft rows must roll back when the matching audit insert fails');
 
-    console.log('Services/B2B draft membership authorization and atomic audit rollback integration tests passed.');
+    console.log('Services/B2B draft create, edit and delete authorization and atomic audit rollback integration tests passed.');
   } finally {
     if (triggerInstalled) {
       await rawPool.query('DROP TRIGGER IF EXISTS test_reject_listing_draft_audit_trigger ON audit_events').catch(() => undefined);
