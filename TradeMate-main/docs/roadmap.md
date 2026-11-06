@@ -82,13 +82,14 @@ PR #22 is an audit source, not an integration target. Its original branch is sta
 
 ### Next execution order
 
-1. Exact-head CI and security verification for PR #79 passed on documentation-only head `9c8d6ac1d82f2ae3e0f1fc3a2ee48755e0bbf6e0` (run `42150025018`): all five jobs passed. A subsequent Services/B2B atomicity change is now on head `a25ef00721c8360786ac12c9fa1895213cdc17a8`; its CI run `42150647225` is pending and must pass before this head is considered verified. Review the final diff and obtain explicit product-owner approval before any merge; PR #79 remains open and unmerged.
-2. Services/B2B draft creation now writes the listing and `listing.draft_created` audit event in one database transaction. A new PostgreSQL-backed HTTP integration test covers owner/admin/member draft creation, unrelated-account denial, successful audit creation and forced audit-write rollback; CI now runs it. This is code and test coverage added, not yet a passing test result until run `42150647225` completes.
+1. Exact-head CI and security verification for PR #79 passed on head `d7cedd40af38aca0d31cc1e05857adc42d8fdea1` (run `42150686046`): all five jobs passed, including API/web builds, Exchange Feed/MT5 tests, PostgreSQL migration integration, dependency audits, Semgrep SAST and secret scanning. Review the final diff and obtain explicit product-owner approval before any merge; PR #79 remains open and unmerged.
+2. Services/B2B draft creation now writes the listing and `listing.draft_created` audit event in one database transaction. A PostgreSQL-backed HTTP integration test covers owner/admin/member draft creation, unrelated-account denial, successful audit creation and forced audit-write rollback; the test passed in run `42150686046`.
 3. Current draft-creation policy permits any organization member (owner/admin/member) and denies unrelated accounts. This is recorded as the observed existing policy, not a new authorization decision. Product-owner confirmation is still needed before changing member publishing/submission permissions.
-4. Verify recoverable states/retry handling for market listings, organization/documents, own offers, contracts and enquiry conversations through browser failure-injection tests, without changing established marketplace/NFT layout dimensions. These UI recovery paths still need failure-injection and mobile acceptance evidence.
-5. Run the complete Services/B2B and contract lifecycle two-account acceptance matrix, including publishing, moderation, public discovery, cross-account access and Clients/Alpha parity.
-6. Complete Feed/mobile and Forex/Crypto/NFT production acceptance checks.
-7. Continue the S1 security gates in parallel, without enabling production RLS until role/context/pool-reuse tests pass.
+4. The organization lookup and listing-draft creation paths currently select the most recently created organization for a user. Multi-organization account behaviour is therefore not explicitly selectable in the current publishing flow; decide whether TradeMate supports multiple organizations per user and, if so, add explicit organization selection and authorization tests. Do not assume this is resolved by the single-organization flow.
+5. Verify recoverable states/retry handling for market listings, organization/documents, own offers, contracts and enquiry conversations through browser failure-injection tests, without changing established marketplace/NFT layout dimensions. These UI recovery paths still need failure-injection and mobile acceptance evidence.
+6. Run the complete Services/B2B and contract lifecycle two-account acceptance matrix, including publishing, moderation, public discovery, cross-account access and Clients/Alpha parity.
+7. Complete Feed/mobile and Forex/Crypto/NFT production acceptance checks.
+8. Continue the S1 security gates in parallel, without enabling production RLS until role/context/pool-reuse tests pass.
 
 ## Pre-P2P completion
 
