@@ -1213,29 +1213,39 @@ class PublicListingsController {
       if (!/^\d{1,12}$/.test(quantityText) || !Number.isSafeInteger(Number(quantityText))) throw new BadRequestException('Quantity must be a whole number, or leave it blank.');
       quantity = Number(quantityText);
     }
-    const updated = await databasePool.query(
-      `UPDATE listings l
-       SET title = $1, description = $2, listing_type = $3, price_minor_units = $4, quantity_available = $5, updated_at = now()
-       WHERE l.id = $6 AND l.status = 'draft'
-         AND EXISTS (
-           SELECT 1 FROM organization_members om
-           WHERE om.organization_id = l.seller_organization_id AND om.user_id = $7
-         )
-       RETURNING l.id, l.title, l.description, l.listing_type, l.price_minor_units::text AS price_minor_units,
-                 l.currency_code, l.country_code, l.quantity_available, l.status, l.created_at, l.updated_at`,
-      [title, description, listingType, priceMinorUnits, quantity, id, userId],
-    );
-    if (!updated.rowCount) {
-      const exists = await databasePool.query('SELECT status FROM listings WHERE id = $1', [id]);
-      if (!exists.rowCount) throw new NotFoundException('Offer not found.');
-      if (exists.rows[0].status !== 'draft') throw new ConflictException('Only draft offers can be edited.');
-      throw new NotFoundException('Offer not found in your business space.');
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const updated = await client.query(
+        `UPDATE listings l
+         SET title = $1, description = $2, listing_type = $3, price_minor_units = $4, quantity_available = $5, updated_at = now()
+         WHERE l.id = $6 AND l.status = 'draft'
+           AND EXISTS (
+             SELECT 1 FROM organization_members om
+             WHERE om.organization_id = l.seller_organization_id AND om.user_id = $7
+           )
+         RETURNING l.id, l.title, l.description, l.listing_type, l.price_minor_units::text AS price_minor_units,
+                   l.currency_code, l.country_code, l.quantity_available, l.status, l.created_at, l.updated_at`,
+        [title, description, listingType, priceMinorUnits, quantity, id, userId],
+      );
+      if (!updated.rowCount) {
+        const exists = await client.query('SELECT status FROM listings WHERE id = $1', [id]);
+        if (!exists.rowCount) throw new NotFoundException('Offer not found.');
+        if (exists.rows[0].status !== 'draft') throw new ConflictException('Only draft offers can be edited.');
+        throw new NotFoundException('Offer not found in your business space.');
+      }
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, (SELECT seller_organization_id FROM listings WHERE id = $3), 'listing.draft_updated', 'listing', $3, $2::jsonb)",
+        [userId, JSON.stringify({ listing_type: listingType }), id],
+      );
+      await client.query('COMMIT');
+      return { listing: updated.rows[0], message: 'Draft offer updated.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
     }
-    await databasePool.query(
-      "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) SELECT $1, l.seller_organization_id, 'listing.draft_updated', 'listing', l.id, $2::jsonb FROM listings l WHERE l.id = $3",
-      [userId, JSON.stringify({ listing_type: listingType }), id],
-    );
-    return { listing: updated.rows[0], message: 'Draft offer updated.' };
   }
 
   @Delete(':id')
@@ -1253,27 +1263,37 @@ class PublicListingsController {
     );
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const userId = session.rows[0].id as string;
-    const deleted = await databasePool.query(
-      `DELETE FROM listings l
-       WHERE l.id = $1 AND l.status = 'draft'
-         AND EXISTS (
-           SELECT 1 FROM organization_members om
-           WHERE om.organization_id = l.seller_organization_id AND om.user_id = $2
-         )
-       RETURNING l.id, l.seller_organization_id`,
-      [id, userId],
-    );
-    if (!deleted.rowCount) {
-      const exists = await databasePool.query('SELECT status FROM listings WHERE id = $1', [id]);
-      if (!exists.rowCount) throw new NotFoundException('Offer not found.');
-      if (exists.rows[0].status !== 'draft') throw new ConflictException('Only draft offers can be deleted.');
-      throw new NotFoundException('Offer not found in your business space.');
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const deleted = await client.query(
+        `DELETE FROM listings l
+         WHERE l.id = $1 AND l.status = 'draft'
+           AND EXISTS (
+             SELECT 1 FROM organization_members om
+             WHERE om.organization_id = l.seller_organization_id AND om.user_id = $2
+           )
+         RETURNING l.id, l.seller_organization_id`,
+        [id, userId],
+      );
+      if (!deleted.rowCount) {
+        const exists = await client.query('SELECT status FROM listings WHERE id = $1', [id]);
+        if (!exists.rowCount) throw new NotFoundException('Offer not found.');
+        if (exists.rows[0].status !== 'draft') throw new ConflictException('Only draft offers can be deleted.');
+        throw new NotFoundException('Offer not found in your business space.');
+      }
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, $2, 'listing.draft_deleted', 'listing', $3, '{}'::jsonb)",
+        [userId, deleted.rows[0].seller_organization_id, deleted.rows[0].id],
+      );
+      await client.query('COMMIT');
+      return { success: true, id: deleted.rows[0].id, message: 'Draft offer deleted.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
     }
-    await databasePool.query(
-      "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, $2, 'listing.draft_deleted', 'listing', $3, '{}'::jsonb)",
-      [userId, deleted.rows[0].seller_organization_id, deleted.rows[0].id],
-    );
-    return { success: true, id: deleted.rows[0].id, message: 'Draft offer deleted.' };
   }
 
   @Get(':id')
