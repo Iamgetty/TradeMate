@@ -990,6 +990,7 @@ class OrganizationsController {
     if (!files.length || files.length > 4) throw new BadRequestException('Select between 1 and 4 documents.');
     const client = await databasePool!.connect();
     try {
+      await client.query('BEGIN');
       const member = await client.query('SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
       if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
       const saved: Array<Record<string, unknown>> = [];
@@ -1012,7 +1013,11 @@ class OrganizationsController {
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'organization.documents_uploaded','organization',$2,$3::jsonb)",
         [userId, id, JSON.stringify({ count: saved.length })],
       );
+      await client.query('COMMIT');
       return { documents: saved };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
     } finally {
       client.release();
     }
