@@ -66,7 +66,7 @@ async function main() {
         description: 'Integration-test Services offer',
         listingType: 'service',
         price: '100.00',
-        quantityAvailable: '2',
+        quantityAvailable: null,
       }),
     });
 
@@ -95,7 +95,7 @@ async function main() {
       CREATE OR REPLACE FUNCTION test_reject_listing_draft_audit() RETURNS trigger
       LANGUAGE plpgsql AS $$
       BEGIN
-        IF NEW.event_type IN ('listing.draft_created', 'listing.draft_updated', 'listing.draft_deleted') THEN
+        IF NEW.event_type IN ('listing.draft_created', 'listing.draft_updated', 'listing.draft_deleted', 'organization.updated') THEN
           RAISE EXCEPTION 'forced listing audit insert failure for rollback test';
         END IF;
         RETURN NEW;
@@ -108,6 +108,19 @@ async function main() {
       FOR EACH ROW EXECUTE FUNCTION test_reject_listing_draft_audit();
     `);
     triggerInstalled = true;
+
+    const organizationUpdateFailed = await fetch(baseUrl + '/api/organizations/' + organizationId, {
+      method: 'PATCH',
+      headers: {
+        cookie: 'trademate_session=' + encodeURIComponent(actors.owner.token),
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ name: 'Changed organization ' + suffix }),
+    });
+    assert.equal(organizationUpdateFailed.status, 500, 'forced audit failure must fail organization profile update');
+    const organizationUnchanged = await rawPool.query('SELECT name FROM organizations WHERE id = $1', [organizationId]);
+    assert.equal(organizationUnchanged.rows[0]?.name, 'Listing integration ' + suffix,
+      'organization profile changes must roll back when the audit insert fails');
 
     const updateFailed = await fetch(baseUrl + '/api/market/listings/' + createdDrafts.owner.id, {
       method: 'PATCH',
@@ -146,7 +159,7 @@ async function main() {
     assert.equal(after.rows[0].count, before.rows[0].count,
       'draft rows must roll back when the matching audit insert fails');
 
-    console.log('Services/B2B draft create, edit and delete authorization and atomic audit rollback integration tests passed.');
+    console.log('Services/B2B organization profile and draft lifecycle authorization and atomic audit rollback integration tests passed.');
   } finally {
     if (triggerInstalled) {
       await rawPool.query('DROP TRIGGER IF EXISTS test_reject_listing_draft_audit_trigger ON audit_events').catch(() => undefined);
