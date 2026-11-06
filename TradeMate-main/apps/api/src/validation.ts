@@ -122,6 +122,8 @@ export const organizationNameBodySchema = z.object({
 
 const documentBase64Schema = z.string().min(1).max(7_000_000).regex(/^(?:data:[^,]+,)?[A-Za-z0-9+/]+=*$/);
 
+export const organizationDocumentManagerRoleSchema = z.enum(['owner', 'admin']);
+
 export const organizationDocumentsBodySchema = z.object({
   files: z.array(z.object({
     fileName: z.string().trim().min(1).max(180),
