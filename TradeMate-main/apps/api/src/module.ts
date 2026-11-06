@@ -1080,6 +1080,7 @@ class PublicListingsController {
     if (!Number.isSafeInteger(priceMinorUnits) || priceMinorUnits < 0) throw new BadRequestException('Enter a valid non-negative price.');
     let quantity: number | null = null;
     if (quantityText !== null) {
+      if (listingType === 'service') throw new BadRequestException('Service offers cannot have a quantity.');
       if (!/^\d{1,12}$/.test(quantityText) || !Number.isSafeInteger(Number(quantityText))) throw new BadRequestException('Quantity must be a whole number, or leave it blank.');
       quantity = Number(quantityText);
     }
