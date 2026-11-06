@@ -164,6 +164,79 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 2. Apply Zero Trust principles, service-to-service authentication, scoped authorization and auditable access.
 3. Configure and verify Cloudflare DNS, WAF, DDoS protections and security headers for production domains.
 4. Review secrets management, network exposure, backups, restore procedures, logging, alerting and incident response.
+5. Complete the planned cloud-platform migration described in **Cloud infrastructure migration programme** below. Render remains the current confirmed hosting/database platform until a migration is approved, executed and verified; the roadmap items below are future targets, not claims of current use.
+
+### Cloud infrastructure migration programme — planned, not yet deployed
+
+**Objective:** move TradeMate from its current Render-hosted application and managed PostgreSQL foundation to a production-grade cloud architecture with managed networking, database, caching/queues, real-time connectivity, CDN and operational controls. This work is planned for an upcoming migration. No AWS or GCP deployment, CloudFront distribution, dedicated WebSocket service, Redis deployment or queue-worker fleet is confirmed as active today.
+
+#### 1. Cloud provider decision and landing zone
+
+- Evaluate **AWS** and **Google Cloud Platform (GCP)** against total cost, regional availability/latency for TradeMate's users and providers, managed PostgreSQL compatibility, networking, security services, operational complexity, support and exit/migration costs.
+- Select one primary cloud provider for the initial migration. Do not deploy duplicate AWS and GCP production stacks without a documented multi-cloud requirement, resilience case and operating budget.
+- AWS target option: a managed landing zone with separate production/staging environments or accounts, IAM roles, VPC/private subnets, security groups, centralized audit logs, KMS, secrets management, budgets and policy guardrails.
+- GCP target option: an equivalent organization/folder/project structure, IAM, VPC/private networking, Cloud KMS, Secret Manager, centralized audit logs, budgets and policy guardrails.
+- Document the target architecture, regions, data residency, threat model, service ownership, recovery objectives (RPO/RTO), cost model and rollback strategy before provisioning.
+- Keep staging and production isolated. Never copy production secrets into staging or development.
+
+#### 2. Application hosting and service topology
+
+- Move the API, web frontend, exchange-feed service and background workers to managed compute on the selected cloud. Evaluate AWS ECS/Fargate or EKS and GCP Cloud Run or GKE; choose the least operationally complex option that meets scaling and networking requirements.
+- Keep independently scalable workloads separate: web/API, market/exchange feed, real-time gateway and asynchronous workers. Do not split into microservices solely for fashion; establish clear service boundaries and operational ownership first.
+- Add health/readiness checks, graceful shutdown, autoscaling limits, deployment rollbacks, resource limits, structured logs, distributed tracing and service-level dashboards.
+- Use private service-to-service networking wherever possible; expose only required public entry points through a controlled load balancer/API gateway.
+
+#### 3. Managed PostgreSQL migration
+
+- Plan migration from Render Managed PostgreSQL to **Amazon RDS for PostgreSQL/Aurora PostgreSQL** (AWS option) or **Cloud SQL for PostgreSQL** (GCP option).
+- Verify PostgreSQL version/extension compatibility, collation/time-zone behaviour, connection limits, TLS certificate validation, private connectivity, backups, point-in-time recovery, high availability, read replicas and maintenance windows.
+- Separate runtime, migration and worker database identities; enforce least privilege and validate RLS/tenant isolation and append-only audit permissions under the actual deployed roles.
+- Rehearse full backup/restore and data migration on a non-production copy. Measure migration duration, data consistency, application cutover and rollback.
+- Define a zero/low-downtime cutover plan, write-freeze or replication strategy as appropriate, post-cutover integrity checks and a tested rollback path. Do not retire the Render database until the new database is verified and an approved retention window has elapsed.
+
+#### 4. CDN, DNS and edge protection
+
+- Deploy **Amazon CloudFront** if AWS is selected, or the equivalent GCP Cloud CDN if GCP is selected, for static web assets and approved cacheable content.
+- Configure origin protection, TLS, cache policies, compression, immutable asset caching, invalidation strategy and correct cache-control headers. Never cache authenticated/private API responses or user-specific data publicly.
+- Use **Cloudflare** for authoritative DNS and, subject to the final architecture decision, WAF, DDoS mitigation, bot controls and edge security. Decide explicitly whether Cloudflare or the cloud CDN owns each caching/routing layer to avoid conflicting proxy, TLS and cache behaviour.
+- Verify DNS cutover, certificate renewal, origin lockdown, security headers, rate limits and recovery from CDN/WAF misconfiguration before production traffic is moved.
+
+#### 5. Dedicated real-time / WebSocket capability
+
+- Design and deploy a dedicated, horizontally scalable **WebSocket gateway/service** for live market quotes, notifications and other approved real-time updates; do not assume the existing exchange-feed process is itself a separately hosted WebSocket platform.
+- Evaluate AWS API Gateway WebSocket or an ALB-fronted ECS/Fargate service on AWS; evaluate an appropriate Cloud Run/GKE or managed gateway design on GCP, accounting for long-lived connection support and platform limits.
+- Define authenticated connection establishment, token/session expiry, per-channel authorization, tenant isolation, origin validation, connection quotas, heartbeat/ping-pong, reconnect/backoff, replay/resync and graceful draining.
+- Specify message schemas, event versioning, delivery guarantees, ordering expectations, backpressure, fan-out strategy and stale-data indicators. Do not present stale quotes as live.
+- Load-test concurrent connections, reconnect storms, fan-out latency, memory/CPU, regional failure and deployment draining before enabling production clients.
+
+#### 6. Redis-compatible cache and asynchronous queues/workers
+
+- Introduce managed Redis-compatible caching only for measured use cases such as short-lived quote/cache data, rate-limit counters, session coordination or ephemeral real-time fan-out. Evaluate **Amazon ElastiCache for Redis/Valkey** on AWS or **Google Cloud Memorystore** on GCP.
+- Treat Redis as a cache/coordination layer, not the source of truth for contracts, balances, audit history or financial records. Define TTLs, eviction policy, persistence/failover needs, encryption, private access and cache invalidation.
+- Add durable managed queues for retryable asynchronous work: evaluate Amazon SQS/SNS or EventBridge on AWS, and Pub/Sub or Cloud Tasks on GCP. Choose queue semantics per workload rather than forcing every event through Redis.
+- Create independently deployable background worker processes for notifications, email, media processing, market-data normalization, scheduled reconciliation and other approved jobs. Financial or security-sensitive jobs require idempotency, deduplication, bounded retries, dead-letter queues, replay controls and auditable outcomes.
+- Define message schemas/versioning, poison-message handling, visibility/acknowledgement timeouts, ordering requirements, rate limits, backpressure, queue-age alerts and graceful worker shutdown.
+- Add integration tests for duplicate delivery, worker crashes, retry exhaustion, dead-letter recovery and concurrent processing. Ensure a failed worker cannot silently lose or double-apply business actions.
+
+#### 7. Storage, secrets, observability and resilience
+
+- Evaluate S3 (AWS) or Cloud Storage (GCP) for private user uploads and generated assets, with least-privilege access, encryption, signed URLs, malware scanning, retention/deletion policies and lifecycle rules.
+- Move application secrets to AWS Secrets Manager/SSM Parameter Store or GCP Secret Manager; use workload identities/roles instead of long-lived static cloud credentials wherever possible. Rotate credentials and audit secret access.
+- Centralize metrics, logs, traces, alerting and audit events; establish dashboards and actionable alerts for API latency/errors, database saturation, WebSocket health, queue age/depth, worker failures, CDN/WAF events, market-feed freshness and spend anomalies.
+- Configure multi-zone availability where justified, encrypted backups, point-in-time recovery, tested restore drills, incident runbooks and documented RPO/RTO.
+- Apply infrastructure as code, environment parity, policy checks, image/dependency scanning and controlled promotion through staging to production.
+
+#### 8. Migration sequence and exit criteria
+
+1. Inventory current Render services, environment variables (names only; never export secret values), database extensions/data size, DNS/domains, file storage, scheduled jobs, network dependencies, CI/CD and current traffic/latency/cost baselines.
+2. Approve one cloud provider, target regions, service mapping, budget, security architecture, compliance/data-residency assessment and rollback plan.
+3. Build isolated cloud landing zones and non-production infrastructure using reviewed infrastructure-as-code; configure IAM, networking, secrets, logs, backups and CI/CD.
+4. Migrate and rehearse PostgreSQL, object storage and application services in staging; run schema/data integrity, RLS, authorization, performance, disaster-recovery and security tests.
+5. Add and load-test the dedicated WebSocket gateway, managed cache, durable queues and worker fleet; enable clients/workloads progressively behind feature flags.
+6. Conduct a production cutover only after explicit approval, successful rehearsal, verified backups, monitoring coverage, support/runbooks and a tested rollback path. No production cutover is authorized by this roadmap entry alone.
+7. Retain the old Render services/database during the agreed rollback window; decommission only after consistency, stability, backup retention and cost checks are signed off.
+
+**Migration acceptance gates:** no secrets in source control or build logs; private database/cache/queue access; TLS verification; least-privilege identities; tenant/RLS and audit-integrity tests; successful restore and rollback rehearsal; WebSocket load/reconnect tests; queue idempotency/dead-letter tests; CDN cache privacy tests; security scans; operational dashboards/alerts; cost budgets; and documented owner sign-off. Record actual provider, regions, service names, deployment IDs and verification evidence only after implementation.
 
 ### Phase S5 — Continuous assurance
 
