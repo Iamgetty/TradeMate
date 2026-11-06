@@ -13,6 +13,7 @@ const {
   publicProfileBodySchema,
   feedPostBodySchema,
   supportTicketBodySchema,
+  organizationDocumentManagerRoleSchema,
   organizationDocumentsBodySchema,
   listingBodySchema,
   enquiryCreateBodySchema,
@@ -108,7 +109,7 @@ test('support tickets enforce allowed categories and bounded content', () => {
   }).success, false);
 });
 
-test('organization document uploads enforce count, MIME and encoded size', () => {
+test('only organization owners and admins may manage verification documents', () => {\n  assert.equal(organizationDocumentManagerRoleSchema.safeParse('owner').success, true);\n  assert.equal(organizationDocumentManagerRoleSchema.safeParse('admin').success, true);\n  assert.equal(organizationDocumentManagerRoleSchema.safeParse('member').success, false);\n  assert.equal(organizationDocumentManagerRoleSchema.safeParse('OWNER').success, false);\n});\n\ntest('organization document uploads enforce count, MIME and encoded size', () => {
   const file = { fileName: 'certificate.pdf', mimeType: 'application/pdf', dataBase64: 'YQ==' };
   assert.equal(organizationDocumentsBodySchema.safeParse({ files: [file] }).success, true);
   assert.equal(organizationDocumentsBodySchema.safeParse({ files: [{ ...file, mimeType: 'text/html' }] }).success, false);
