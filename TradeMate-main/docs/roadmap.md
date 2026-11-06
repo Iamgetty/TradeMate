@@ -73,18 +73,18 @@ This register distinguishes source implementation from verified user workflows. 
 
 PR #22 is an audit source, not an integration target. Its original branch is stale; reconcile findings individually and port only missing fixes onto a fresh branch.
 
-- **Already present in current source:** organization profile-name update API; transactional organization-document upload; organization document ID validation.
+- **Already present in current source:** organization profile-name update API and organization document ID validation. The earlier audit incorrectly described document uploads as transactional: PR #79 adds an explicit transaction with rollback and restricts verification-document upload/viewing to organization owners/admins. Regression coverage and two-role endpoint verification remain required.
 - **Already present in current main (correction to the November 1 audit):** authenticated password change is implemented at `POST /auth/change-password`, with schema validation, current-password verification, session revocation and audit logging; the UI action is connected. The password inputs were not masked; this branch changes them to password inputs with appropriate autocomplete hints.
 - **Feed mismatch confirmed on current main and corrected on this branch:** the composer treats the title as optional, while the API schema/controller required a non-empty title. The schema and controller now accept an omitted or empty title while retaining the 140-character maximum.
 - **Session defects confirmed on current main and corrected on this branch:** connected logout now waits for server confirmation before clearing local state; session bootstrap now clears the session only on HTTP 401 and preserves cached state on transient network/API failures with a visible warning.
-- **Reliability defect confirmed:** `loadMarket`, `loadMine`, `loadOrg`, `loadContracts`, `loadContractMessages`, `loadEnquiries` and `loadMsgs` swallow errors. Replace silent failure with explicit, recoverable loading/error states and retry actions.
+- **Reliability fixes added in PR #79:** `loadMarket`, `loadMine`, `loadOrg`, `loadContracts`, `loadContractMessages`, `loadEnquiries` and `loadMsgs` now capture failures and expose retry/recovery UI in their affected screens. Verify the error and retry paths with API failure injection and mobile QA; do not mark complete until those tests pass.
 - **Historical audit items requiring fresh verification:** account profile fields/photos, follow/highlight workflows, organization image upload, OAuth/account linking, password reset, KYC, wallet/ledger, support/feedback/notification paths, promotion/referral workflows, Real Estate/Software contract coverage and local-only preferences. Do not assume the November 1 audit remains current; several backend connections have since been added.
 
 ### Next execution order
 
 1. Complete review and CI/security verification of PR #79; merge only after explicit product-owner approval.
-2. Add recoverable states/retry handling for the silent core loaders, without changing established marketplace/NFT layout dimensions.
-3. Verify organization document transaction semantics and permissions with integration tests.
+2. Verify the new recoverable states/retry handling for market listings, organization/documents, own offers, contracts and enquiry conversations through failure-injection tests, without changing established marketplace/NFT layout dimensions.
+3. Add and run organization-document transaction rollback and owner/admin-versus-member authorization integration tests.
 4. Run the Services/B2B and contract lifecycle two-account acceptance matrix.
 5. Complete Feed/mobile and Forex/Crypto/NFT production acceptance checks.
 6. Continue the S1 security gates in parallel, without enabling production RLS until role/context/pool-reuse tests pass.
