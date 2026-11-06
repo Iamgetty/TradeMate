@@ -225,6 +225,8 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 - Centralize metrics, logs, traces, alerting and audit events; establish dashboards and actionable alerts for API latency/errors, database saturation, WebSocket health, queue age/depth, worker failures, CDN/WAF events, market-feed freshness and spend anomalies.
 - Configure multi-zone availability where justified, encrypted backups, point-in-time recovery, tested restore drills, incident runbooks and documented RPO/RTO.
 - Apply infrastructure as code, environment parity, policy checks, image/dependency scanning and controlled promotion through staging to production.
+- Retain **GitHub Actions as the current CI/CD system** and extend it for the selected cloud: build and test immutable artifacts, scan dependencies/images and infrastructure plans, publish signed artifacts, deploy to staging, run smoke/integration/security gates, and promote the same artifact to production only after explicit approval. Use workload identity/OIDC where supported instead of long-lived cloud keys; protect deployment environments, require reviewed approvals, record provenance, and provide automated rollback/health verification.
+- Keep database migrations as a separately permissioned, auditable release stage; application runtime identities must not inherit migration privileges. Test migration compatibility and rollback/forward-fix procedures before production release.
 
 #### 8. Migration sequence and exit criteria
 
