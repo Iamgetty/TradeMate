@@ -87,6 +87,27 @@ async function main() {
     const completionId = await createContract();
     const outsiderRead = await call('outsider', 'GET', '/api/market/contracts/' + completionId);
     assert.equal(outsiderRead.status, 404, 'unrelated accounts must not read a contract');
+
+    const buyerMessage = await call('buyer', 'POST', '/api/market/contracts/' + completionId + '/messages', {
+      message: 'Please confirm the delivery milestones before we begin.',
+    });
+    assert.equal(buyerMessage.status, 201, 'the buyer must be able to message a pending contract');
+    const sellerMessageList = await call('owner', 'GET', '/api/market/contracts/' + completionId + '/messages');
+    assert.equal(sellerMessageList.status, 200, 'the seller must be able to read contract messages');
+    const sellerMessagePayload = await sellerMessageList.json();
+    assert.equal(sellerMessagePayload.data.messages.length, 1, 'the buyer message must be visible to the seller');
+    assert.equal(sellerMessagePayload.data.messages[0].message, 'Please confirm the delivery milestones before we begin.');
+
+    const memberMessage = await call('member', 'POST', '/api/market/contracts/' + completionId + '/messages', {
+      message: 'I am an organization member coordinating this service.',
+    });
+    assert.equal(memberMessage.status, 201, 'an authorized seller organization member must be able to participate in contract messages');
+    const outsiderMessages = await call('outsider', 'GET', '/api/market/contracts/' + completionId + '/messages');
+    assert.equal(outsiderMessages.status, 404, 'unrelated accounts must not read contract messages');
+    const buyerMessageList = await call('buyer', 'GET', '/api/market/contracts/' + completionId + '/messages');
+    assert.equal(buyerMessageList.status, 200);
+    const buyerMessagePayload = await buyerMessageList.json();
+    assert.equal(buyerMessagePayload.data.messages.length, 2, 'both parties must see the complete contract conversation');
     const buyerRespond = await respond('buyer', completionId, 'accept');
     assert.equal(buyerRespond.status, 404, 'buyer must not approve their own proposal');
     const memberRespond = await respond('member', completionId, 'accept');
@@ -104,6 +125,10 @@ async function main() {
     assert.equal(sellerConfirmed.status, 200);
     assert.equal((await sellerConfirmed.json()).data.status, 'completed',
       'both parties confirming must complete the contract');
+    const closedMessage = await call('buyer', 'POST', '/api/market/contracts/' + completionId + '/messages', {
+      message: 'This message must be rejected after completion.',
+    });
+    assert.equal(closedMessage.status, 409, 'completed contracts must reject new messages');
 
     const rejectedId = await createContract();
     const rejected = await respond('admin', rejectedId, 'reject');
