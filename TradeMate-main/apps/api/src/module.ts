@@ -283,15 +283,26 @@ class AuthController {
     const displayName = typeof body?.displayName === 'string' ? body.displayName.trim() : '';
     if (displayName.length < 2 || displayName.length > 24) throw new BadRequestException('Your nickname must be between 2 and 24 characters.');
     const userId = session.rows[0].id as string;
-    const updated = await databasePool.query(
-      'UPDATE users SET display_name = $1, updated_at = now() WHERE id = $2 RETURNING id, email, display_name, country_code',
-      [displayName, userId],
-    );
-    await databasePool.query(
-      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.display_name_updated', 'user', $1, '{}'::jsonb)",
-      [userId],
-    );
-    return { user: updated.rows[0] };
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const updated = await client.query(
+        'UPDATE users SET display_name = $1, updated_at = now() WHERE id = $2 RETURNING id, email, display_name, country_code',
+        [displayName, userId],
+      );
+      if (!updated.rowCount) throw new NotFoundException('User profile not found.');
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.display_name_updated', 'user', $1, '{}'::jsonb)",
+        [userId],
+      );
+      await client.query('COMMIT');
+      return { user: updated.rows[0] };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Post('change-password')
@@ -695,15 +706,25 @@ class PreferencesController {
       }
     }
     if (!Object.keys(update).length) throw new BadRequestException('No supported preferences were supplied.');
-    const result = await databasePool!.query(
-      'INSERT INTO user_preferences (user_id, preferences, updated_at) VALUES ($1, $2::jsonb, now()) ON CONFLICT (user_id) DO UPDATE SET preferences = user_preferences.preferences || EXCLUDED.preferences, updated_at = now() RETURNING preferences',
-      [userId, JSON.stringify(update)],
-    );
-    await databasePool!.query(
-      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'account.preferences_updated', 'user', $1, $2::jsonb)",
-      [userId, JSON.stringify({ keys: Object.keys(update) })],
-    );
-    return { preferences: { ...this.defaults(), ...result.rows[0].preferences } };
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        'INSERT INTO user_preferences (user_id, preferences, updated_at) VALUES ($1, $2::jsonb, now()) ON CONFLICT (user_id) DO UPDATE SET preferences = user_preferences.preferences || EXCLUDED.preferences, updated_at = now() RETURNING preferences',
+        [userId, JSON.stringify(update)],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'account.preferences_updated', 'user', $1, $2::jsonb)",
+        [userId, JSON.stringify({ keys: Object.keys(update) })],
+      );
+      await client.query('COMMIT');
+      return { preferences: { ...this.defaults(), ...result.rows[0].preferences } };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
 
