@@ -991,8 +991,9 @@ class OrganizationsController {
     const client = await databasePool!.connect();
     try {
       await client.query('BEGIN');
-      const member = await client.query('SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
+      const member = await client.query('SELECT member_role FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
       if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
+      if (!['owner', 'admin'].includes(member.rows[0].member_role)) throw new ForbiddenException('Only organization owners and admins can upload verification documents.');
       const saved: Array<Record<string, unknown>> = [];
       for (const file of files) {
         const fileName = typeof file.fileName === 'string' ? file.fileName.trim().slice(0, 180) : '';
@@ -1027,8 +1028,9 @@ class OrganizationsController {
   async organizationDocuments(@Req() request: Request, @Param('id') id: string) {
     parseUuidParam(id);
     const userId = await this.currentUser(request);
-    const member = await databasePool!.query('SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
+    const member = await databasePool!.query('SELECT member_role FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
     if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
+    if (!['owner', 'admin'].includes(member.rows[0].member_role)) throw new ForbiddenException('Only organization owners and admins can view verification documents.');
     const result = await databasePool!.query(
       'SELECT id, file_name, mime_type, file_size, review_status, created_at FROM organization_documents WHERE organization_id = $1 ORDER BY created_at DESC',
       [id],
