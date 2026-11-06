@@ -1770,7 +1770,7 @@ class MarketplaceContractsController {
       const status = body.decision === 'accept' ? 'accepted' : 'rejected';
       const updated = await client.query(
         `UPDATE marketplace_contracts
-         SET status = $2, accepted_by_user_id = CASE WHEN $2 = 'accepted' THEN $3 ELSE NULL END,
+         SET status = $2, accepted_by_user_id = CASE WHEN $2 = 'accepted' THEN $3::uuid ELSE NULL::uuid END,
              accepted_at = CASE WHEN $2 = 'accepted' THEN now() ELSE NULL END, updated_at = now()
          WHERE id = $1
          RETURNING id, status, accepted_by_user_id, accepted_at, updated_at`,
