@@ -1079,15 +1079,25 @@ class PublicListingsController {
     );
     if (!membership.rowCount) throw new BadRequestException('Create your business space before adding an offer.');
     const organization = membership.rows[0];
-    const created = await databasePool.query(
-      "INSERT INTO listings (seller_organization_id, title, description, listing_type, price_minor_units, currency_code, country_code, quantity_available, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'draft') RETURNING id, title, description, listing_type, price_minor_units::text AS price_minor_units, currency_code, country_code, quantity_available, status, created_at",
-      [organization.id, title, description, listingType, priceMinorUnits, organization.default_currency, organization.country_code, quantity],
-    );
-    await databasePool.query(
-      "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'listing.draft_created','listing',$3,$4::jsonb)",
-      [userId, organization.id, created.rows[0].id, JSON.stringify({ listing_type: listingType, business_status: organization.status })],
-    );
-    return { listing: created.rows[0], message: 'Offer saved as a draft. It is not publicly visible yet.' };
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const created = await client.query(
+        "INSERT INTO listings (seller_organization_id, title, description, listing_type, price_minor_units, currency_code, country_code, quantity_available, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'draft') RETURNING id, title, description, listing_type, price_minor_units::text AS price_minor_units, currency_code, country_code, quantity_available, status, created_at",
+        [organization.id, title, description, listingType, priceMinorUnits, organization.default_currency, organization.country_code, quantity],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'listing.draft_created','listing',$3,$4::jsonb)",
+        [userId, organization.id, created.rows[0].id, JSON.stringify({ listing_type: listingType, business_status: organization.status })],
+      );
+      await client.query('COMMIT');
+      return { listing: created.rows[0], message: 'Offer saved as a draft. It is not publicly visible yet.' };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Get('mine')
