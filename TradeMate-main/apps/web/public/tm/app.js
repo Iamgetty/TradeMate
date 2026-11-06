@@ -2561,8 +2561,8 @@ PC.contractCancel=function(id){api("PATCH","/market/contracts/"+id+"/cancel").th
 PC.contractConfirm=function(id){api("PATCH","/market/contracts/"+id+"/confirm-completion").then(function(){return loadContracts()}).then(drawPage).catch(fail)};
 PC.contractSend=function(id){var input=$("contractMessage"),message=input?(input.value||"").trim():"";if(!message)return;api("POST","/market/contracts/"+id+"/messages",{message:message}).then(function(){var c=findContract(id);if(c){c.messagesLoaded=false;return loadContractMessages(c)}return loadContracts()}).then(drawPage).catch(fail)};
 
-function loadEnquiries(){return api("GET","/market/enquiries/mine").then(function(r){var old={};st.deals.forEach(function(d){old[d.id]=d});
- st.deals=(r.data||[]).map(function(e){var d=dealFromEnq(e),o=old[d.id];if(o){d.msgs=o.msgs;d.loaded=o.loaded}return d});softDraw()}).catch(function(){})}
+function loadEnquiries(){st.enquiriesError="";return api("GET","/market/enquiries/mine").then(function(r){var old={};st.deals.forEach(function(d){old[d.id]=d});
+ st.deals=(r.data||[]).map(function(e){var d=dealFromEnq(e),o=old[d.id];if(o){d.msgs=o.msgs;d.loaded=o.loaded;d.messagesError=o.messagesError||""}return d});st.enquiriesError="";softDraw()}).catch(function(e){st.enquiriesError=e&&e.message?e.message:"Could not load conversations. Please try again.";var top=st.stack[st.stack.length-1];if(top&&(top.id==="conversations"||top.id==="deals"))drawPage();return null})}
 function toBottom(){var e=document.querySelector(".pgs");if(e)e.scrollTop=e.scrollHeight}
 function loadMsgs(d){return api("GET","/market/enquiries/"+d.eid+"/messages").then(function(r){
  var ms=(r.data.messages||[]).map(function(m){return {me:m.sender_user_id===st.me.id,t:m.message,time:fmtT(m.created_at)}}),grew=ms.length!==d.msgs.length||!d.loaded;
