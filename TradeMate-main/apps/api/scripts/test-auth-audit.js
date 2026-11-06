@@ -70,14 +70,18 @@ async function main() {
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
     const installReject = async (event) => {
+      await pool.query('CREATE TABLE IF NOT EXISTS test_reject_auth_audit_events (event_type text PRIMARY KEY)');
+      await pool.query('INSERT INTO test_reject_auth_audit_events (event_type) VALUES ($1) ON CONFLICT (event_type) DO NOTHING', [event]);
       await pool.query(`
         CREATE OR REPLACE FUNCTION test_reject_auth_audit() RETURNS trigger
-        LANGUAGE plpgsql AS $$
+        LANGUAGE plpgsql AS $
         BEGIN
-          IF NEW.event_type = '${event}' THEN RAISE EXCEPTION 'forced auth audit failure'; END IF;
+          IF EXISTS (SELECT 1 FROM test_reject_auth_audit_events WHERE event_type = NEW.event_type) THEN
+            RAISE EXCEPTION 'forced auth audit failure';
+          END IF;
           RETURN NEW;
         END;
-        $$;
+        $;
       `);
       await pool.query('DROP TRIGGER IF EXISTS test_reject_auth_audit_trigger ON audit_events');
       await pool.query('CREATE TRIGGER test_reject_auth_audit_trigger BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION test_reject_auth_audit()');
@@ -86,6 +90,7 @@ async function main() {
     const removeReject = async () => {
       await pool.query('DROP TRIGGER IF EXISTS test_reject_auth_audit_trigger ON audit_events');
       await pool.query('DROP FUNCTION IF EXISTS test_reject_auth_audit()');
+      await pool.query('DROP TABLE IF EXISTS test_reject_auth_audit_events');
       triggerInstalled = false;
     };
 
