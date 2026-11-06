@@ -63,6 +63,12 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: node scripts/test-marketplace-contracts.js
+      - name: Verify authentication audit atomicity and rollback
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+          TOTP_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        run: node scripts/test-auth-audit.js
       - name: Verify Services and B2B draft authorization and audit rollback
         working-directory: TradeMate-main/apps/api
         env:
