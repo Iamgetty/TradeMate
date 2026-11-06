@@ -1473,13 +1473,14 @@ class EnquiriesController {
     } finally {
       client.release();
     }
+  }
 
   private async authorizedEnquiry(enquiryId: string, userId: string) {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(enquiryId)) {
       throw new BadRequestException('id must be a valid enquiry UUID.');
     }
     const result = await databasePool!.query(
-      \`SELECT e.id, e.listing_id, e.buyer_user_id, e.message, e.status, e.created_at,
+      `SELECT e.id, e.listing_id, e.buyer_user_id, e.message, e.status, e.created_at,
               l.seller_organization_id, l.title AS listing_title, o.name AS seller_name, buyer.display_name AS buyer_name
        FROM marketplace_enquiries e
        JOIN listings l ON l.id = e.listing_id
@@ -1490,7 +1491,7 @@ class EnquiriesController {
            SELECT 1 FROM organization_members om
            WHERE om.organization_id = l.seller_organization_id AND om.user_id = $2
          ))
-       LIMIT 1\`,
+       LIMIT 1`,
       [enquiryId, userId],
     );
     if (!result.rowCount) throw new NotFoundException('Enquiry not found.');
@@ -1503,20 +1504,20 @@ class EnquiriesController {
     const userId = await this.authenticatedUser(request);
     const enquiry = await this.authorizedEnquiry(id, userId);
     await databasePool!.query(
-      \`INSERT INTO enquiry_reads (enquiry_id, user_id, last_read_at)
+      `INSERT INTO enquiry_reads (enquiry_id, user_id, last_read_at)
        VALUES ($1, $2, now())
        ON CONFLICT (enquiry_id, user_id)
-       DO UPDATE SET last_read_at = EXCLUDED.last_read_at\`,
+       DO UPDATE SET last_read_at = EXCLUDED.last_read_at`,
       [id, userId],
     );
     const replies = await databasePool!.query(
-      \`SELECT m.id, m.enquiry_id, m.sender_user_id, u.display_name AS sender_name,
+      `SELECT m.id, m.enquiry_id, m.sender_user_id, u.display_name AS sender_name,
               m.message, m.created_at
        FROM enquiry_messages m
        JOIN users u ON u.id = m.sender_user_id
        WHERE m.enquiry_id = $1
        ORDER BY m.created_at ASC, m.id ASC
-       LIMIT 500\`,
+       LIMIT 500`,
       [id],
     );
     return { data: { enquiry, messages: [{ id: 'initial-' + enquiry.id, sender_user_id: enquiry.buyer_user_id, sender_name: enquiry.buyer_name, message: enquiry.message, created_at: enquiry.created_at, initial: true }, ...replies.rows] } };
