@@ -116,7 +116,7 @@ async function main() {
     assert.ok(security.rows[0].totp_secret_encrypted, 'pending encrypted setup secret must remain available after rollback');
     await removeReject();
     const confirmOk = await call('POST', '/api/auth/2fa/confirm', { code: totp(secret) });
-    assert.equal(confirmOk.status, 200, 'TOTP enable must succeed when audit insert succeeds');
+    assert.equal(confirmOk.status, 201, 'TOTP enable must succeed when audit insert succeeds');
 
     await installReject('auth.totp_disabled');
     const disableFailed = await call('POST', '/api/auth/2fa/disable', { code: totp(secret) });
@@ -126,7 +126,7 @@ async function main() {
     assert.ok(security.rows[0].totp_secret_encrypted, 'encrypted TOTP secret must remain after failed disable');
     await removeReject();
     const disableOk = await call('POST', '/api/auth/2fa/disable', { code: totp(secret) });
-    assert.equal(disableOk.status, 200, 'TOTP disable must succeed when audit insert succeeds');
+    assert.equal(disableOk.status, 201, 'TOTP disable must succeed when audit insert succeeds');
 
     await installReject('auth.session_revoked');
     const revokeOther = await call('DELETE', '/api/auth/sessions/' + otherSession.rows[0].id);
