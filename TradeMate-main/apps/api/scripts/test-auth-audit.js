@@ -86,6 +86,24 @@ async function main() {
       triggerInstalled = false;
     };
 
+    await installReject('profile.display_name_updated');
+    const profileFailed = await call('PATCH', '/api/auth/profile', { displayName: 'Changed Name' });
+    assert.equal(profileFailed.status, 500, 'audit failure must fail display-name update');
+    let profile = await pool.query('SELECT display_name FROM users WHERE id = $1', [userId]);
+    assert.equal(profile.rows[0].display_name, 'Auth audit test', 'display-name update must roll back when audit insert fails');
+    await removeReject();
+    const profileOk = await call('PATCH', '/api/auth/profile', { displayName: 'Changed Name' });
+    assert.equal(profileOk.status, 200, 'display-name update must succeed when audit insert succeeds');
+
+    await installReject('account.preferences_updated');
+    const preferencesFailed = await call('PATCH', '/api/preferences', { cur: 'USD', news: false });
+    assert.equal(preferencesFailed.status, 500, 'audit failure must fail preference update');
+    let preferences = await pool.query('SELECT preferences FROM user_preferences WHERE user_id = $1', [userId]);
+    assert.equal(preferences.rowCount, 0, 'preference insert must roll back when audit insert fails');
+    await removeReject();
+    const preferencesOk = await call('PATCH', '/api/preferences', { cur: 'USD', news: false });
+    assert.equal(preferencesOk.status, 200, 'preference update must succeed when audit insert succeeds');
+
     const setup = await call('POST', '/api/auth/2fa/setup');
     assert.equal(setup.status, 201, 'authenticated user must be able to begin TOTP setup');
     const secret = (await setup.json()).secret;
