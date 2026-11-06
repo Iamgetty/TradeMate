@@ -63,6 +63,11 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: node scripts/test-marketplace-contracts.js
+      - name: Verify Services and B2B draft authorization and audit rollback
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-marketplace-listings.js
       - name: Verify least-privilege PostgreSQL roles and grants
         working-directory: TradeMate-main/apps/api
         env:
