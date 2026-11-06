@@ -33,6 +33,7 @@ function totp(secret, timestamp = Date.now()) {
 async function main() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required for auth audit integration tests.');
   if (!process.env.TOTP_ENCRYPTION_KEY) process.env.TOTP_ENCRYPTION_KEY = 'a'.repeat(64);
+  process.env.TRADEMATE_REVIEW_API_KEY = 'test-review-key-' + randomUUID();
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.PGSSLMODE === 'require' ? true : undefined, max: 3 });
   let app;
   let triggerInstalled = false;
@@ -43,6 +44,8 @@ async function main() {
       ['auth-audit-' + suffix + '@example.invalid', 'Auth audit test'],
     );
     const userId = user.rows[0].id;
+    const target = await pool.query("INSERT INTO users (email, display_name, status) VALUES ($1, $2, 'active') RETURNING id", ['auth-audit-target-' + suffix + '@example.invalid', 'Follow target']);
+    const targetId = target.rows[0].id;
     const currentToken = 'auth-audit-current-' + suffix;
     const otherToken = 'auth-audit-other-' + suffix;
     const currentSession = await pool.query(
@@ -60,10 +63,10 @@ async function main() {
     app.setGlobalPrefix('api');
     await app.listen(0, '127.0.0.1');
     const base = 'http://127.0.0.1:' + app.getHttpServer().address().port;
-    const call = (method, path, body) => fetch(base + path, {
+    const call = (method, path, body, extraHeaders = {}) => fetch(base + path, {
       method,
       headers: { cookie: 'trademate_session=' + encodeURIComponent(currentToken),
-        ...(body ? { 'content-type': 'application/json' } : {}) },
+        ...(body ? { 'content-type': 'application/json' } : {}), ...extraHeaders },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
     const installReject = async (event) => {
@@ -85,6 +88,55 @@ async function main() {
       await pool.query('DROP FUNCTION IF EXISTS test_reject_auth_audit()');
       triggerInstalled = false;
     };
+
+    await installReject('feedback.submitted');
+    const feedbackFailed = await call('POST', '/api/support/feedback', { type: 'Idea', message: 'Audit rollback test feedback' });
+    assert.equal(feedbackFailed.status, 500, 'audit failure must fail feedback submission');
+    let feedback = await pool.query('SELECT id FROM user_feedback WHERE user_id = $1', [userId]);
+    assert.equal(feedback.rowCount, 0, 'feedback insert must roll back when audit insert fails');
+    await removeReject();
+    const feedbackOk = await call('POST', '/api/support/feedback', { type: 'Idea', message: 'Audit success test feedback' });
+    assert.equal(feedbackOk.status, 201, 'feedback submission must succeed when audit insert succeeds');
+
+    await installReject('profile.followed');
+    const followFailed = await call('POST', '/api/profiles/' + targetId + '/follow');
+    assert.equal(followFailed.status, 500, 'audit failure must fail follow');
+    let follow = await pool.query('SELECT 1 FROM user_follows WHERE follower_user_id=$1 AND followed_user_id=$2', [userId, targetId]);
+    assert.equal(follow.rowCount, 0, 'follow insert must roll back when audit insert fails');
+    await removeReject();
+    const followOk = await call('POST', '/api/profiles/' + targetId + '/follow');
+    assert.equal(followOk.status, 201, 'follow must succeed when audit insert succeeds');
+
+    await installReject('profile.unfollowed');
+    const unfollowFailed = await call('DELETE', '/api/profiles/' + targetId + '/follow');
+    assert.equal(unfollowFailed.status, 500, 'audit failure must fail unfollow');
+    follow = await pool.query('SELECT 1 FROM user_follows WHERE follower_user_id=$1 AND followed_user_id=$2', [userId, targetId]);
+    assert.equal(follow.rowCount, 1, 'unfollow delete must roll back when audit insert fails');
+    await removeReject();
+    const unfollowOk = await call('DELETE', '/api/profiles/' + targetId + '/follow');
+    assert.equal(unfollowOk.status, 200, 'unfollow must succeed when audit insert succeeds');
+
+    const post = await pool.query(
+      "INSERT INTO feed_posts (author_user_id, post_type, body, pinned) VALUES ($1, 'post', 'Audit pin rollback test', false) RETURNING id",
+      [userId],
+    );
+    await installReject('feed.post.pin_changed');
+    const pinFailed = await call('PATCH', '/api/feed/posts/' + post.rows[0].id + '/pin', { pinned: true });
+    assert.equal(pinFailed.status, 500, 'audit failure must fail feed pin change');
+    let pin = await pool.query('SELECT pinned FROM feed_posts WHERE id=$1', [post.rows[0].id]);
+    assert.equal(pin.rows[0].pinned, false, 'feed pin change must roll back when audit insert fails');
+    await removeReject();
+    const pinOk = await call('PATCH', '/api/feed/posts/' + post.rows[0].id + '/pin', { pinned: true });
+    assert.equal(pinOk.status, 200, 'feed pin change must succeed when audit insert succeeds');
+
+    await installReject('feed.announcement.created');
+    const announcementFailed = await call('POST', '/api/feed/announcements', { body: 'Audit rollback announcement' }, { 'x-review-key': process.env.TRADEMATE_REVIEW_API_KEY });
+    assert.equal(announcementFailed.status, 500, 'audit failure must fail announcement creation');
+    let announcement = await pool.query("SELECT id FROM feed_posts WHERE post_type='announcement' AND body='Audit rollback announcement'");
+    assert.equal(announcement.rowCount, 0, 'announcement insert must roll back when audit insert fails');
+    await removeReject();
+    const announcementOk = await call('POST', '/api/feed/announcements', { body: 'Audit success announcement' }, { 'x-review-key': process.env.TRADEMATE_REVIEW_API_KEY });
+    assert.equal(announcementOk.status, 201, 'announcement creation must succeed when audit insert succeeds');
 
     await installReject('profile.display_name_updated');
     const profileFailed = await call('PATCH', '/api/auth/profile', { displayName: 'Changed Name' });
