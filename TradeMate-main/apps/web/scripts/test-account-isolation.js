@@ -100,4 +100,24 @@ function section(startText, endText) {
     "logout must invalidate the old session generation and abort its requests");
 })();
 
+
+(function logoutFailsClosedWithoutAbortingRevocation() {
+  const apiBlock = section("function api(", "\nfunction fail");
+  assert.match(apiBlock, /var accountToken=!\(options&&options\.detached\)&&st\.me&&st\.me\.id\?captureAccountRequest\(\):null/,
+    "detached logout requests must not be cancelled with account-scoped requests");
+  const logoutStart = source.indexOf('if(n==="logout"&&CONNECTED){');
+  assert.notEqual(logoutStart, -1, "connected logout must have a dedicated recovery flow");
+  const logoutEnd = source.indexOf("return}_lo(n,a,el)};", logoutStart);
+  assert.notEqual(logoutEnd, -1, "logout recovery wrapper must remain bounded");
+  const logout = source.slice(logoutStart, logoutEnd);
+  assert.match(logout, /api\("POST","\/auth\/logout",undefined,\{detached:true\}\)/,
+    "logout must use a detached request that survives local session reset");
+  assert.ok(logout.indexOf("resetSession();") < logout.indexOf("logoutRequest.then"),
+    "private local state must be cleared before the server responds");
+  assert.match(logout, /Signed out\. Your server session was revoked\./,
+    "successful logout must report confirmed server-side revocation");
+  assert.match(logout, /Server-side session revocation could not be confirmed/,
+    "failed logout must distinguish local sign-out from unconfirmed server revocation");
+})();
+
 console.log("Account isolation source regression checks passed.");
