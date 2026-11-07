@@ -16,7 +16,7 @@ async function expectPublicLanding(page: import('@playwright/test').Page) {
   const startupDiagnostic = page.getByRole('alert');
   const diagnosticCount = await startupDiagnostic.count();
   if (diagnosticCount > 0) {
-    throw new Error(`Unexpected startup diagnostic overlay: ${(await startupDiagnostic.first().innerText()).replace(/\\s+/g, ' ').trim()}`);
+    throw new Error(`Unexpected startup diagnostic overlay: ${(await startupDiagnostic.first().innerText()).replaceAll('\n', ' ').trim()}`);
   }
 }
 
