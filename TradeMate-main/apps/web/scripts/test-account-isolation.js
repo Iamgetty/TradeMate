@@ -141,7 +141,7 @@ function loadStoreFunctions(connected, state, items, ads, storage) {
   let resolveFetch;
   const fakeFetch = () => new Promise(resolve => { resolveFetch = resolve; });
   const apiFactory = new Function(
-    "CONNECTED", "TMCFG", "st", "captureAccountRequest", "isCurrentAccountRequest", "fetch",
+    "CONNECTED", "TMCFG", "st", "captureAccountRequest", "isCurrentAccountRequest", "fetch", "accountRequestControllers",
     apiBlock + "; return api;"
   );
   const api = apiFactory(
