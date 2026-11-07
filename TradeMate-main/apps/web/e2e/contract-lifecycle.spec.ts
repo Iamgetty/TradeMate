@@ -312,10 +312,9 @@ test('organization documents and own-offer screens recover after transient API f
 
     await page.locator('#app .top button[data-pg="profile"]').click();
     await page.locator('[data-act="mode"]').click();
-    await page.locator('#sbar [data-f="More"]').click();
     organizationFailureArmed = true;
     documentFailureArmed = true;
-    await page.locator('#app [data-f="Organization"]').click({ force: true });
+    await page.locator('#sbar [data-f="Organization"]').click();
     await expect(page.getByText('Could not load organization', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Retry Test Services' })).toBeVisible();
@@ -343,8 +342,10 @@ test('contracts and enquiries lists recover after transient API failures', async
   let authenticated = false;
   let contractRequests = 0;
   let enquiryRequests = 0;
-  let contractFailureArmed = false;
-  let enquiryFailureArmed = false;
+  // These endpoints are fetched during authenticated bootstrap. Arm failures
+  // before login so the first real request exercises the error/retry UI.
+  let contractFailureArmed = true;
+  let enquiryFailureArmed = true;
   const context = await browser.newContext();
   const page = await context.newPage();
 
@@ -393,14 +394,12 @@ test('contracts and enquiries lists recover after transient API failures', async
     await expect.poll(() => contractRequests, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
     await expect.poll(() => enquiryRequests, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
 
-    contractFailureArmed = true;
     await page.locator('#sbar [data-f="Contracts"]').click();
     await expect(page.getByText('Could not load contracts', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await expect(page.getByText('No contracts yet', { exact: true })).toBeVisible();
     expect(contractRequests).toBeGreaterThanOrEqual(2);
 
-    enquiryFailureArmed = true;
     await page.locator('#sbar [data-f="More"]').click();
     await page.locator('#app [data-f="Conversations"]').click({ force: true });
     await expect(page.getByText('Could not load conversations', { exact: true })).toBeVisible();
