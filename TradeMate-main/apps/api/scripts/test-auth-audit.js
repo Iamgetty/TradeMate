@@ -214,6 +214,7 @@ async function main() {
     while (Math.floor(Date.now() / 30000) < loginCounter) {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
+    const lastCounterBeforeDisable = Number(security.rows[0].last_totp_counter);
     const disableCounter = Math.floor(Date.now() / 30000) + 1;
     const disableCode = totp(secret, disableCounter * 30000);
     await installReject('auth.totp_disabled');
@@ -221,7 +222,7 @@ async function main() {
     assert.equal(disableFailed.status, 500, 'audit failure must fail TOTP disable');
     security = await pool.query('SELECT totp_enabled, totp_secret_encrypted, last_totp_counter FROM user_auth_security WHERE user_id = $1', [userId]);
     assert.equal(security.rows[0].totp_enabled, true, 'TOTP disable must roll back when audit insert fails');
-    assert.equal(Number(security.rows[0].last_totp_counter), disableCounter - 1, 'failed TOTP disable must not consume its authenticator counter');
+    assert.equal(Number(security.rows[0].last_totp_counter), lastCounterBeforeDisable, 'failed TOTP disable must not consume its authenticator counter');
     assert.ok(security.rows[0].totp_secret_encrypted, 'encrypted TOTP secret must remain after failed disable');
     await removeReject();
     const disableOk = await call('POST', '/api/auth/2fa/disable', { code: disableCode });
