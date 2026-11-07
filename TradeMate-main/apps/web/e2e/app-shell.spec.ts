@@ -16,7 +16,15 @@ async function expectPublicLanding(page: import('@playwright/test').Page) {
   const startupDiagnostic = page.getByRole('alert');
   const diagnosticCount = await startupDiagnostic.count();
   if (diagnosticCount > 0) {
-    throw new Error(`Unexpected startup diagnostic overlay: ${(await startupDiagnostic.first().innerText()).replaceAll('\n', ' ').trim()}`);
+    const details = await startupDiagnostic.evaluateAll(elements => elements.map(element => ({
+      tag: element.tagName,
+      id: element.id,
+      className: typeof element.className === 'string' ? element.className : '',
+      text: (element.textContent || '').trim(),
+      html: element.outerHTML.slice(0, 1600),
+      visible: !!(element as HTMLElement).offsetWidth || !!(element as HTMLElement).offsetHeight,
+    })));
+    throw new Error(`Unexpected alert element(s): ${JSON.stringify(details)}`);
   }
 }
 
