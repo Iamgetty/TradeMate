@@ -71,20 +71,22 @@ const base32Decode = (input: string) => {
   }
   return Buffer.from(output);
 };
-const verifyTotp = (secret: string, code: string) => {
-  if (!/^\d{6}$/.test(code)) return false;
+const verifyTotp = (secret: string, code: string): number | null => {
+  if (!/^\d{6}$/.test(code)) return null;
   const key = base32Decode(secret);
   const counter = Math.floor(Date.now() / 30000);
   for (let offset = -1; offset <= 1; offset++) {
+    const matchedCounter = counter + offset;
+    if (matchedCounter < 0) continue;
     const buffer = Buffer.alloc(8);
-    buffer.writeBigUInt64BE(BigInt(counter + offset));
+    buffer.writeBigUInt64BE(BigInt(matchedCounter));
     const digest = createHmac('sha1', key).update(buffer).digest();
     const position = digest[digest.length - 1] & 15;
     const binary = ((digest[position] & 127) << 24) | ((digest[position + 1] & 255) << 16) | ((digest[position + 2] & 255) << 8) | (digest[position + 3] & 255);
     const expected = String(binary % 1000000).padStart(6, '0');
-    if (timingSafeEqual(Buffer.from(expected), Buffer.from(code))) return true;
+    if (timingSafeEqual(Buffer.from(expected), Buffer.from(code))) return matchedCounter;
   }
-  return false;
+  return null;
 };
 
 const tokenDigest = (token: string) => createHash('sha256').update(token).digest('hex');
@@ -375,7 +377,7 @@ class AuthController {
     if (existing.rows[0]?.totp_enabled) throw new ConflictException('Two-factor authentication is already enabled.');
     const secret = base32Encode(randomBytes(20));
     await databasePool.query(
-      'INSERT INTO user_auth_security (user_id, totp_secret_encrypted, totp_enabled, setup_expires_at) VALUES ($1,$2,false,now()+interval \'15 minutes\') ON CONFLICT (user_id) DO UPDATE SET totp_secret_encrypted=EXCLUDED.totp_secret_encrypted, totp_enabled=false, setup_expires_at=EXCLUDED.setup_expires_at, updated_at=now()',
+      'INSERT INTO user_auth_security (user_id, totp_secret_encrypted, totp_enabled, setup_expires_at) VALUES ($1,$2,false,now()+interval \'15 minutes\') ON CONFLICT (user_id) DO UPDATE SET totp_secret_encrypted=EXCLUDED.totp_secret_encrypted, totp_enabled=false, last_totp_counter=NULL, setup_expires_at=EXCLUDED.setup_expires_at, updated_at=now()',
       [session.rows[0].id, encryptTotpSecret(secret)],
     );
     const label = encodeURIComponent('TradeMate:' + session.rows[0].email);
@@ -390,22 +392,31 @@ class AuthController {
     if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
     const session = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired.');
-    const rateKey = await enforceTotpRateLimit(request, session.rows[0].id);
-    const result = await databasePool.query('SELECT totp_secret_encrypted, setup_expires_at FROM user_auth_security WHERE user_id=$1 AND totp_enabled=false', [session.rows[0].id]);
-    if (!result.rowCount || !result.rows[0].setup_expires_at || new Date(result.rows[0].setup_expires_at).getTime() < Date.now()) throw new ConflictException('Start authenticator setup again; the setup has expired.');
-    let valid = false;
-    try { valid = verifyTotp(decryptTotpSecret(result.rows[0].totp_secret_encrypted), String(body?.code || '')); } catch { valid = false; }
-    if (!valid) throw new UnauthorizedException('That authenticator code is invalid. Check the code and try again.');
+    const userId = session.rows[0].id;
+    const rateKey = await enforceTotpRateLimit(request, userId);
     const client = await databasePool.connect();
     try {
       await client.query('BEGIN');
-      await client.query('DELETE FROM auth_rate_limits WHERE key_hash=$1', [rateKey]);
-      const updated = await client.query(
-        'UPDATE user_auth_security SET totp_enabled=true, totp_confirmed_at=now(), setup_expires_at=NULL, updated_at=now() WHERE user_id=$1 AND totp_enabled=false RETURNING user_id',
-        [session.rows[0].id],
+      const result = await client.query(
+        'SELECT totp_secret_encrypted, setup_expires_at, last_totp_counter FROM user_auth_security WHERE user_id=$1 AND totp_enabled=false FOR UPDATE',
+        [userId],
       );
-      if (!updated.rowCount) throw new ConflictException('Authenticator setup has changed. Start setup again.');
-      await client.query("INSERT INTO audit_events (actor_user_id,event_type,entity_type,entity_id,metadata) VALUES ($1,'auth.totp_enabled','user',$1,'{}'::jsonb)", [session.rows[0].id]);
+      if (!result.rowCount || !result.rows[0].setup_expires_at || new Date(result.rows[0].setup_expires_at).getTime() < Date.now()) {
+        throw new ConflictException('Start authenticator setup again; the setup has expired.');
+      }
+      let matchedCounter: number | null = null;
+      try { matchedCounter = verifyTotp(decryptTotpSecret(result.rows[0].totp_secret_encrypted), String(body?.code || '')); } catch { matchedCounter = null; }
+      const lastCounter = result.rows[0].last_totp_counter == null ? null : BigInt(result.rows[0].last_totp_counter);
+      if (matchedCounter === null || (lastCounter !== null && BigInt(matchedCounter) <= lastCounter)) {
+        throw new UnauthorizedException('That authenticator code is invalid or has already been used.');
+      }
+      const updated = await client.query(
+        'UPDATE user_auth_security SET totp_enabled=true, last_totp_counter=$2, totp_confirmed_at=now(), setup_expires_at=NULL, updated_at=now() WHERE user_id=$1 AND totp_enabled=false AND (last_totp_counter IS NULL OR last_totp_counter < $2) RETURNING user_id',
+        [userId, matchedCounter],
+      );
+      if (!updated.rowCount) throw new UnauthorizedException('That authenticator code has already been used. Generate a new code and try again.');
+      await client.query('DELETE FROM auth_rate_limits WHERE key_hash=$1', [rateKey]);
+      await client.query("INSERT INTO audit_events (actor_user_id,event_type,entity_type,entity_id,metadata) VALUES ($1,'auth.totp_enabled','user',$1,'{}'::jsonb)", [userId]);
       await client.query('COMMIT');
       return { success: true, enabled: true };
     } catch (error) {
@@ -423,22 +434,29 @@ class AuthController {
     if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
     const session = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired.');
-    const rateKey = await enforceTotpRateLimit(request, session.rows[0].id);
-    const result = await databasePool.query('SELECT totp_secret_encrypted FROM user_auth_security WHERE user_id=$1 AND totp_enabled=true', [session.rows[0].id]);
-    if (!result.rowCount) throw new ConflictException('Two-factor authentication is not enabled.');
-    let valid = false;
-    try { valid = verifyTotp(decryptTotpSecret(result.rows[0].totp_secret_encrypted), String(body?.code || '')); } catch { valid = false; }
-    if (!valid) throw new UnauthorizedException('That authenticator code is invalid.');
+    const userId = session.rows[0].id;
+    const rateKey = await enforceTotpRateLimit(request, userId);
     const client = await databasePool.connect();
     try {
       await client.query('BEGIN');
-      await client.query('DELETE FROM auth_rate_limits WHERE key_hash=$1', [rateKey]);
-      const updated = await client.query(
-        'UPDATE user_auth_security SET totp_enabled=false, totp_secret_encrypted=NULL, totp_confirmed_at=NULL, setup_expires_at=NULL, updated_at=now() WHERE user_id=$1 AND totp_enabled=true RETURNING user_id',
-        [session.rows[0].id],
+      const result = await client.query(
+        'SELECT totp_secret_encrypted, last_totp_counter FROM user_auth_security WHERE user_id=$1 AND totp_enabled=true FOR UPDATE',
+        [userId],
       );
-      if (!updated.rowCount) throw new ConflictException('Two-factor authentication state has changed. Refresh and try again.');
-      await client.query("INSERT INTO audit_events (actor_user_id,event_type,entity_type,entity_id,metadata) VALUES ($1,'auth.totp_disabled','user',$1,'{}'::jsonb)", [session.rows[0].id]);
+      if (!result.rowCount) throw new ConflictException('Two-factor authentication is not enabled.');
+      let matchedCounter: number | null = null;
+      try { matchedCounter = verifyTotp(decryptTotpSecret(result.rows[0].totp_secret_encrypted), String(body?.code || '')); } catch { matchedCounter = null; }
+      const lastCounter = result.rows[0].last_totp_counter == null ? null : BigInt(result.rows[0].last_totp_counter);
+      if (matchedCounter === null || (lastCounter !== null && BigInt(matchedCounter) <= lastCounter)) {
+        throw new UnauthorizedException('That authenticator code is invalid or has already been used.');
+      }
+      const updated = await client.query(
+        'UPDATE user_auth_security SET totp_enabled=false, last_totp_counter=$2, totp_secret_encrypted=NULL, totp_confirmed_at=NULL, setup_expires_at=NULL, updated_at=now() WHERE user_id=$1 AND totp_enabled=true AND (last_totp_counter IS NULL OR last_totp_counter < $2) RETURNING user_id',
+        [userId, matchedCounter],
+      );
+      if (!updated.rowCount) throw new UnauthorizedException('That authenticator code has already been used. Generate a new code and try again.');
+      await client.query('DELETE FROM auth_rate_limits WHERE key_hash=$1', [rateKey]);
+      await client.query("INSERT INTO audit_events (actor_user_id,event_type,entity_type,entity_id,metadata) VALUES ($1,'auth.totp_disabled','user',$1,'{}'::jsonb)", [userId]);
       await client.query('COMMIT');
       return { success: true, enabled: false };
     } catch (error) {
@@ -474,13 +492,25 @@ class AuthController {
         await client.query('COMMIT');
         throw new HttpException('Too many authenticator attempts. Please wait 15 minutes before trying again.', HttpStatus.TOO_MANY_REQUESTS);
       }
-      const secretResult = await client.query('SELECT totp_secret_encrypted,totp_enabled FROM user_auth_security WHERE user_id=$1', [challenge.rows[0].user_id]);
-      let valid = false;
-      try { valid = Boolean(secretResult.rows[0]?.totp_enabled && verifyTotp(decryptTotpSecret(secretResult.rows[0].totp_secret_encrypted), code)); } catch { valid = false; }
-      if (!valid) {
+      const secretResult = await client.query('SELECT totp_secret_encrypted,totp_enabled,last_totp_counter FROM user_auth_security WHERE user_id=$1 FOR UPDATE', [challenge.rows[0].user_id]);
+      let matchedCounter: number | null = null;
+      try {
+        if (secretResult.rows[0]?.totp_enabled) matchedCounter = verifyTotp(decryptTotpSecret(secretResult.rows[0].totp_secret_encrypted), code);
+      } catch { matchedCounter = null; }
+      const lastCounter = secretResult.rows[0]?.last_totp_counter == null ? null : BigInt(secretResult.rows[0].last_totp_counter);
+      if (matchedCounter === null || (lastCounter !== null && BigInt(matchedCounter) <= lastCounter)) {
         await client.query('UPDATE auth_login_challenges SET attempts=attempts+1 WHERE id=$1', [challenge.rows[0].id]);
         await client.query('COMMIT');
-        throw new UnauthorizedException('The authenticator code is incorrect.');
+        throw new UnauthorizedException('The authenticator code is incorrect or has already been used.');
+      }
+      const consumedCounter = await client.query(
+        'UPDATE user_auth_security SET last_totp_counter=$2, updated_at=now() WHERE user_id=$1 AND totp_enabled=true AND (last_totp_counter IS NULL OR last_totp_counter < $2) RETURNING user_id',
+        [challenge.rows[0].user_id, matchedCounter],
+      );
+      if (!consumedCounter.rowCount) {
+        await client.query('UPDATE auth_login_challenges SET attempts=attempts+1 WHERE id=$1', [challenge.rows[0].id]);
+        await client.query('COMMIT');
+        throw new UnauthorizedException('The authenticator code has already been used.');
       }
       await client.query('UPDATE auth_login_challenges SET consumed_at=now() WHERE id=$1', [challenge.rows[0].id]);
       await client.query('DELETE FROM auth_rate_limits WHERE key_hash IN ($1, $2)', [totpRateKey, tokenDigest((request.ip || 'unknown') + '|' + String(challenge.rows[0].email).trim().toLowerCase())]);
