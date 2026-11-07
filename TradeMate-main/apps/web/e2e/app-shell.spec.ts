@@ -22,7 +22,7 @@ test('root route redirects to the public TradeMate landing without API access', 
   page.on('pageerror', error => pageErrors.push(error.message));
 
   await page.goto('/');
-  await expect(page).toHaveURL(/\\/app\\/?$/);
+  await expect(page).toHaveURL(url => url.pathname === '/app' || url.pathname === '/app/');
   await expectPublicLanding(page);
   expect(pageErrors, 'the app should not emit uncaught browser exceptions').toEqual([]);
 });
