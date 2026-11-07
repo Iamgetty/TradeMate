@@ -290,7 +290,7 @@ test('organization documents and own-offer screens recover after transient API f
     }
     if (path === '/market/listings/mine' && method === 'GET') {
       ownOfferRequests += 1;
-      if (ownOfferRequests === 2) {
+      if (ownOfferRequests === 4) {
         await route.fulfill({ status: 503, json: { message: 'Your offers are temporarily unavailable' } });
       } else {
         await route.fulfill({ status: 200, json: { data: [] } });
@@ -321,7 +321,7 @@ test('organization documents and own-offer screens recover after transient API f
     await expect(page.getByText('Could not load your offers', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await expect(page.getByText('No contracts awaiting approval', { exact: true })).toBeVisible();
-    expect(ownOfferRequests).toBe(3);
+    expect(ownOfferRequests).toBe(5);
   } finally {
     await context.close();
   }
