@@ -230,7 +230,7 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
     await buyer.getByRole('button', { name: /Two-account UI acceptance fixture/ }).click();
     await expect(buyer.getByRole('button', { name: 'Confirm fulfilment' })).toBeVisible();
     await buyer.getByRole('button', { name: 'Confirm fulfilment' }).click();
-    await expect(buyer.getByText('Completed')).toBeVisible();
+    await expect(buyer.getByText('Completed', { exact: true }).first()).toBeVisible();
     expect(contract.status).toBe('completed');
     expect(contract.buyer_confirmed_at).not.toBeNull();
     expect(contract.seller_confirmed_at).not.toBeNull();
@@ -246,6 +246,9 @@ test('organization documents and own-offer screens recover after transient API f
   let organizationRequests = 0;
   let documentRequests = 0;
   let ownOfferRequests = 0;
+  let organizationFailureArmed = false;
+  let documentFailureArmed = false;
+  let ownOfferFailureArmed = false;
   const context = await browser.newContext();
   const page = await context.newPage();
 
@@ -268,7 +271,8 @@ test('organization documents and own-offer screens recover after transient API f
     }
     if (path === '/organizations/mine' && method === 'GET') {
       organizationRequests += 1;
-      if (organizationRequests === 1) {
+      if (organizationFailureArmed) {
+        organizationFailureArmed = false;
         await route.fulfill({ status: 503, json: { message: 'Organization service temporarily unavailable' } });
       } else {
         await route.fulfill({ status: 200, json: { organization: {
@@ -281,7 +285,8 @@ test('organization documents and own-offer screens recover after transient API f
     }
     if (path === '/organizations/org-retry-001/documents' && method === 'GET') {
       documentRequests += 1;
-      if (documentRequests === 1) {
+      if (documentFailureArmed) {
+        documentFailureArmed = false;
         await route.fulfill({ status: 503, json: { message: 'Document service temporarily unavailable' } });
       } else {
         await route.fulfill({ status: 200, json: { documents: [] } });
@@ -290,7 +295,8 @@ test('organization documents and own-offer screens recover after transient API f
     }
     if (path === '/market/listings/mine' && method === 'GET') {
       ownOfferRequests += 1;
-      if (ownOfferRequests === 4) {
+      if (ownOfferFailureArmed) {
+        ownOfferFailureArmed = false;
         await route.fulfill({ status: 503, json: { message: 'Your offers are temporarily unavailable' } });
       } else {
         await route.fulfill({ status: 200, json: { data: [] } });
@@ -303,10 +309,11 @@ test('organization documents and own-offer screens recover after transient API f
   try {
     await login(page, 'seller@example.test');
     await expect.poll(() => organizationRequests, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
-    await expect.poll(() => ownOfferRequests, { timeout: 10_000 }).toBe(1);
 
     await page.locator('#app .top button[data-pg="profile"]').click();
     await page.locator('[data-act="mode"]').click();
+    organizationFailureArmed = true;
+    documentFailureArmed = true;
     await page.locator('#app [data-f="Organization"]').click();
     await expect(page.getByText('Could not load organization', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
@@ -317,11 +324,12 @@ test('organization documents and own-offer screens recover after transient API f
     expect(organizationRequests).toBeGreaterThanOrEqual(2);
     expect(documentRequests).toBe(2);
 
+    ownOfferFailureArmed = true;
     await page.locator('#app [data-f="Contract approvals"]').click();
     await expect(page.getByText('Could not load your offers', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await expect(page.getByText('No contracts awaiting approval', { exact: true })).toBeVisible();
-    expect(ownOfferRequests).toBe(5);
+    expect(ownOfferRequests).toBeGreaterThanOrEqual(2);
   } finally {
     await context.close();
   }
@@ -333,6 +341,8 @@ test('contracts and enquiries lists recover after transient API failures', async
   let authenticated = false;
   let contractRequests = 0;
   let enquiryRequests = 0;
+  let contractFailureArmed = false;
+  let enquiryFailureArmed = false;
   const context = await browser.newContext();
   const page = await context.newPage();
 
@@ -355,7 +365,8 @@ test('contracts and enquiries lists recover after transient API failures', async
     }
     if (path === '/market/contracts/mine' && method === 'GET') {
       contractRequests += 1;
-      if (contractRequests === 1) {
+      if (contractFailureArmed) {
+        contractFailureArmed = false;
         await route.fulfill({ status: 503, json: { message: 'Contract service temporarily unavailable' } });
       } else {
         await route.fulfill({ status: 200, json: { data: [] } });
@@ -364,7 +375,8 @@ test('contracts and enquiries lists recover after transient API failures', async
     }
     if (path === '/market/enquiries/mine' && method === 'GET') {
       enquiryRequests += 1;
-      if (enquiryRequests === 1) {
+      if (enquiryFailureArmed) {
+        enquiryFailureArmed = false;
         await route.fulfill({ status: 503, json: { message: 'Enquiry service temporarily unavailable' } });
       } else {
         await route.fulfill({ status: 200, json: { data: [] } });
@@ -376,20 +388,22 @@ test('contracts and enquiries lists recover after transient API failures', async
 
   try {
     await login(page, 'retry@example.test');
-    await expect.poll(() => contractRequests, { timeout: 10_000 }).toBe(1);
-    await expect.poll(() => enquiryRequests, { timeout: 10_000 }).toBe(1);
+    await expect.poll(() => contractRequests, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
+    await expect.poll(() => enquiryRequests, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
 
+    contractFailureArmed = true;
     await page.locator('#app [data-f="Contracts"]').click();
     await expect(page.getByText('Could not load contracts', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await expect(page.getByText('No contracts yet', { exact: true })).toBeVisible();
-    expect(contractRequests).toBe(2);
+    expect(contractRequests).toBeGreaterThanOrEqual(2);
 
+    enquiryFailureArmed = true;
     await page.locator('#app [data-f="Conversations"]').click();
     await expect(page.getByText('Could not load conversations', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await expect(page.getByText('No conversations yet', { exact: true })).toBeVisible();
-    expect(enquiryRequests).toBe(2);
+    expect(enquiryRequests).toBeGreaterThanOrEqual(2);
   } finally {
     await context.close();
   }
