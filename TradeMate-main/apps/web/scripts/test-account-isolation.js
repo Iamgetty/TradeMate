@@ -133,7 +133,7 @@ function loadStoreFunctions(connected, state, items, ads, storage) {
 
 (async function staleAuthenticatedResponsesAreDiscarded() {
   const apiStart = source.indexOf("function api(");
-  const apiEnd = source.indexOf("\\nfunction fail", apiStart);
+  const apiEnd = source.indexOf("\nfunction fail", apiStart);
   assert.notEqual(apiStart, -1, "API helper must exist");
   assert.notEqual(apiEnd, -1, "API helper boundary must exist");
   const apiBlock = source.slice(apiStart, apiEnd);
@@ -165,9 +165,9 @@ function loadStoreFunctions(connected, state, items, ads, storage) {
     error => error && error.staleAccountRequest === true,
     "a response from the previous account must never reach mutation callbacks"
   );
-  assert.match(source, /function fail\\(e\\)\\{if\\(e&&e\\.staleAccountRequest\\)return;/,
+  assert.ok(source.includes("function fail(e){if(e&&e.staleAccountRequest)return;"),
     "stale request errors must not be surfaced as errors for the new account");
-  assert.match(source, /st\\.subs=\\[\\];st\\.links=\\{\\};st\\.joinedAff=false;st\\.fv=\\{\\};st\\.feedPosts=\\[\\]/,
+  assert.ok(source.includes("st.subs=[];st.links={};st.joinedAff=false;st.fv={};st.feedPosts=[]"),
     "account switches must clear remaining account-scoped state and feed cache");
   console.log("Account isolation regression tests passed.");
 })().catch(error => {
