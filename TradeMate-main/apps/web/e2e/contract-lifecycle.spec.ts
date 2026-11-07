@@ -198,6 +198,8 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
     console.log('[contract-e2e] buyer login starting');
     await login(buyer, 'buyer@example.test');
     await expect.poll(() => buyerListingRequests, { timeout: 10_000 }).toBe(1);
+    await buyer.locator('#app [data-tab="Markets"]').click();
+    await expect(buyer.locator('#app [data-mm="Services"]')).toBeVisible();
     await buyer.locator('#app [data-mm="Services"]').first().click();
     await expect(buyer.getByText('Could not load marketplace listings')).toBeVisible();
     await buyer.getByRole('button', { name: 'Retry', exact: true }).click();
