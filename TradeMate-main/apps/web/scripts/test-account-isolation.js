@@ -53,6 +53,10 @@ function section(startText, endText) {
     "failed verification must return the user to sign-in");
   assert.doesNotMatch(failure, /window\.draw\(\)/,
     "failed verification must not render the authenticated shell");
+  assert.doesNotMatch(failure, /releaseAuthGate\(\)/,
+    "failed verification must keep the app shell hidden until login succeeds");
+  assert.match(source, /host\.style\.display="none";releaseAuthGate\(\)/,
+    "a successful login must release the authenticated shell gate");
 })();
 
 (function authenticatedRequestsAreGenerationBound() {
