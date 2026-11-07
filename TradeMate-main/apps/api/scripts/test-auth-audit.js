@@ -177,8 +177,9 @@ async function main() {
     await installReject('auth.totp_enabled');
     const confirmFailed = await call('POST', '/api/auth/2fa/confirm', { code: totp(secret) });
     assert.equal(confirmFailed.status, 500, 'audit failure must fail TOTP enable');
-    let security = await pool.query('SELECT totp_enabled, totp_secret_encrypted FROM user_auth_security WHERE user_id = $1', [userId]);
+    let security = await pool.query('SELECT totp_enabled, totp_secret_encrypted, last_totp_counter FROM user_auth_security WHERE user_id = $1', [userId]);
     assert.equal(security.rows[0].totp_enabled, false, 'TOTP enable must roll back when audit insert fails');
+    assert.equal(security.rows[0].last_totp_counter, null, 'failed TOTP enable must not consume the authenticator counter');
     assert.ok(security.rows[0].totp_secret_encrypted, 'pending encrypted setup secret must remain available after rollback');
     await removeReject();
     const confirmationCode = totp(secret);
@@ -187,16 +188,40 @@ async function main() {
     security = await pool.query('SELECT totp_enabled, last_totp_counter FROM user_auth_security WHERE user_id = $1', [userId]);
     assert.equal(security.rows[0].totp_enabled, true);
     assert.ok(security.rows[0].last_totp_counter !== null, 'successful setup must consume its TOTP counter');
-    const replayedOnDisable = await call('POST', '/api/auth/2fa/disable', { code: confirmationCode });
-    assert.equal(replayedOnDisable.status, 401, 'a TOTP code used for setup must not be reusable to disable 2FA');
 
+    const loginCounter = Math.floor(Date.now() / 30000) + 1;
+    const loginCode = totp(secret, loginCounter * 30000);
+    const challengeTokenA = 'totp-replay-a-' + suffix;
+    const challengeTokenB = 'totp-replay-b-' + suffix;
+    await pool.query(
+      'INSERT INTO auth_login_challenges (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval \'5 minutes\'), ($1, $3, now() + interval \'5 minutes\')',
+      [userId, digest(challengeTokenA), digest(challengeTokenB)],
+    );
+    const [loginAttemptA, loginAttemptB] = await Promise.all([
+      call('POST', '/api/auth/2fa/verify', { challengeToken: challengeTokenA, code: loginCode }),
+      call('POST', '/api/auth/2fa/verify', { challengeToken: challengeTokenB, code: loginCode }),
+    ]);
+    assert.deepEqual(
+      [loginAttemptA.status, loginAttemptB.status].sort((a, b) => a - b),
+      [200, 401],
+      'only one of two concurrent login challenges may consume the same TOTP time-step',
+    );
+    security = await pool.query('SELECT last_totp_counter FROM user_auth_security WHERE user_id = $1', [userId]);
+    assert.equal(Number(security.rows[0].last_totp_counter), loginCounter, 'the successful login must persist the exact matched TOTP counter');
+    const replayedOnDisable = await call('POST', '/api/auth/2fa/disable', { code: loginCode });
+    assert.equal(replayedOnDisable.status, 401, 'a TOTP code used for login must not be reusable to disable 2FA');
+
+    while (Math.floor(Date.now() / 30000) < loginCounter) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
     const disableCounter = Math.floor(Date.now() / 30000) + 1;
     const disableCode = totp(secret, disableCounter * 30000);
     await installReject('auth.totp_disabled');
     const disableFailed = await call('POST', '/api/auth/2fa/disable', { code: disableCode });
     assert.equal(disableFailed.status, 500, 'audit failure must fail TOTP disable');
-    security = await pool.query('SELECT totp_enabled, totp_secret_encrypted FROM user_auth_security WHERE user_id = $1', [userId]);
+    security = await pool.query('SELECT totp_enabled, totp_secret_encrypted, last_totp_counter FROM user_auth_security WHERE user_id = $1', [userId]);
     assert.equal(security.rows[0].totp_enabled, true, 'TOTP disable must roll back when audit insert fails');
+    assert.equal(Number(security.rows[0].last_totp_counter), disableCounter - 1, 'failed TOTP disable must not consume its authenticator counter');
     assert.ok(security.rows[0].totp_secret_encrypted, 'encrypted TOTP secret must remain after failed disable');
     await removeReject();
     const disableOk = await call('POST', '/api/auth/2fa/disable', { code: disableCode });
