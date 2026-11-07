@@ -312,6 +312,7 @@ test('organization documents and own-offer screens recover after transient API f
 
     await page.locator('#app .top button[data-pg="profile"]').click();
     await page.locator('[data-act="mode"]').click();
+    await page.locator('#app [data-f="More"]').click();
     organizationFailureArmed = true;
     documentFailureArmed = true;
     await page.locator('#app [data-f="Organization"]').click();
@@ -325,6 +326,7 @@ test('organization documents and own-offer screens recover after transient API f
     expect(documentRequests).toBe(2);
 
     ownOfferFailureArmed = true;
+    await page.locator('#sbar [data-f="More"]').click();
     await page.locator('#app [data-f="Contract approvals"]').click();
     await expect(page.getByText('Could not load your offers', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
@@ -399,10 +401,11 @@ test('contracts and enquiries lists recover after transient API failures', async
     expect(contractRequests).toBeGreaterThanOrEqual(2);
 
     enquiryFailureArmed = true;
+    await page.locator('#sbar [data-f="More"]').click();
     await page.locator('#app [data-f="Conversations"]').click();
     await expect(page.getByText('Could not load conversations', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
-    await expect(page.getByText('No conversations yet', { exact: true })).toBeVisible();
+    await expect(page.getByText('No conversations yet.', { exact: true })).toBeVisible();
     expect(enquiryRequests).toBeGreaterThanOrEqual(2);
   } finally {
     await context.close();
