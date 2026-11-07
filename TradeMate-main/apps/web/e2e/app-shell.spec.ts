@@ -13,7 +13,11 @@ async function expectPublicLanding(page: import('@playwright/test').Page) {
   await expect(page.locator('#land')).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('#land nav button[data-login="in"]')).toBeVisible();
   await expect(page.locator('#land nav button[data-login="up"]')).toBeVisible();
-  await expect(page.getByRole('alert')).toHaveCount(0);
+  const startupDiagnostic = page.getByRole('alert');
+  const diagnosticCount = await startupDiagnostic.count();
+  if (diagnosticCount > 0) {
+    throw new Error(`Unexpected startup diagnostic overlay: ${(await startupDiagnostic.first().innerText()).replace(/\\s+/g, ' ').trim()}`);
+  }
 }
 
 test('root route redirects to the public TradeMate landing without API access', async ({ page }) => {
