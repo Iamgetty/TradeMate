@@ -9,6 +9,7 @@ type ContractFixture = {
 };
 
 async function solveLoginPuzzle(page: Page) {
+  await expect(page.locator('#tk')).toBeVisible({ timeout: 5_000 });
   const puzzle = await page.evaluate(() => {
     const track = document.querySelector('#tk');
     const handle = document.querySelector('#hd');
@@ -40,6 +41,7 @@ async function login(page: Page, email: string) {
   await page.locator('#land nav button[data-login="in"]').click();
   await page.locator('#id').fill(email);
   await page.locator('#login button[data-k="next"]').click();
+  await expect(page.locator('#pw')).toBeVisible();
   await page.locator('#pw').fill('TradeMate-test-password-2026');
   await page.locator('#login button[data-k="next"]').click();
   await solveLoginPuzzle(page);
