@@ -1,8 +1,10 @@
-# TradeMate
+# TradeMate by Metadusk
 
 **Trade Smart. Trade Direct.**
 
-TradeMate connects people and organizations to explore opportunities, negotiate terms and enter into contracts across supported markets. It is designed for international use from day one—not as a single-country marketplace that expands later.
+TradeMate is a global, contract-first business platform in the Metadusk technology ecosystem. It connects individuals and organizations to discover opportunities, communicate, negotiate terms, establish business agreements and manage contract fulfilment across supported markets.
+
+TradeMate retains its independent product identity. **Metadusk Inc.** is the intended parent-company identity and ecosystem; the public product endorsement is **TradeMate by Metadusk**. This is an intended brand/corporate structure, not a claim that Metadusk has been incorporated or that ventures are legal subsidiaries. See [docs/company-ecosystem.md](docs/company-ecosystem.md).
 
 ## Product direction
 
