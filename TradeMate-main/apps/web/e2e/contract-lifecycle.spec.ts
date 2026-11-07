@@ -238,3 +238,91 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
     await Promise.allSettled([buyerContext.close(), sellerContext.close()]);
   }
 });
+
+
+test('organization documents and own-offer screens recover after transient API failures', async ({ browser }) => {
+  test.setTimeout(75_000);
+  let authenticated = false;
+  let organizationRequests = 0;
+  let documentRequests = 0;
+  let ownOfferRequests = 0;
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  await page.route('**/api/**', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname.replace(/^\\/api/, '');
+    const method = request.method();
+
+    if (path === '/auth/me' && method === 'GET') {
+      await route.fulfill(authenticated
+        ? { status: 200, json: { user: { id: 'seller-retry-001', email: 'seller@example.test', display_name: 'Seller Test', country_code: 'NG' } } }
+        : { status: 401, json: { message: 'No active session' } });
+      return;
+    }
+    if (path === '/auth/login' && method === 'POST') {
+      authenticated = true;
+      await route.fulfill({ status: 200, json: { user: { id: 'seller-retry-001', email: 'seller@example.test', display_name: 'Seller Test', country_code: 'NG' } } });
+      return;
+    }
+    if (path === '/organizations/mine' && method === 'GET') {
+      organizationRequests += 1;
+      if (organizationRequests === 1) {
+        await route.fulfill({ status: 503, json: { message: 'Organization service temporarily unavailable' } });
+      } else {
+        await route.fulfill({ status: 200, json: { organization: {
+          id: 'org-retry-001', name: 'Retry Test Services', organization_type: 'service_provider',
+          country_code: 'NG', default_currency: 'NGN', status: 'pending', member_role: 'owner',
+          created_at: '2026-11-07T10:00:00.000Z',
+        } } });
+      }
+      return;
+    }
+    if (path === '/organizations/org-retry-001/documents' && method === 'GET') {
+      documentRequests += 1;
+      if (documentRequests === 1) {
+        await route.fulfill({ status: 503, json: { message: 'Document service temporarily unavailable' } });
+      } else {
+        await route.fulfill({ status: 200, json: { documents: [] } });
+      }
+      return;
+    }
+    if (path === '/market/listings/mine' && method === 'GET') {
+      ownOfferRequests += 1;
+      if (ownOfferRequests === 2) {
+        await route.fulfill({ status: 503, json: { message: 'Your offers are temporarily unavailable' } });
+      } else {
+        await route.fulfill({ status: 200, json: { data: [] } });
+      }
+      return;
+    }
+    await route.fulfill({ status: 200, json: {} });
+  });
+
+  try {
+    await login(page, 'seller@example.test');
+    await expect.poll(() => organizationRequests, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
+    await expect.poll(() => ownOfferRequests, { timeout: 10_000 }).toBe(1);
+
+    await page.locator('#app .top button[data-pg="profile"]').click();
+    await page.locator('[data-act="mode"]').click();
+    await page.locator('#app [data-f="Organization"]').click();
+    await expect(page.getByText('Could not load organization', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Retry', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Retry Test Services' })).toBeVisible();
+    await expect(page.getByText(/Could not load verification documents:/)).toBeVisible();
+    await page.getByRole('button', { name: 'Retry document loading' }).click();
+    await expect(page.getByText('No documents yet')).toBeVisible();
+    expect(organizationRequests).toBeGreaterThanOrEqual(2);
+    expect(documentRequests).toBe(2);
+
+    await page.locator('#app [data-f="Contract approvals"]').click();
+    await expect(page.getByText('Could not load your offers', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Retry', exact: true }).click();
+    await expect(page.getByText('No contracts awaiting approval', { exact: true })).toBeVisible();
+    expect(ownOfferRequests).toBe(3);
+  } finally {
+    await context.close();
+  }
+});
