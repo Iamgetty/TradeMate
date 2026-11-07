@@ -9,29 +9,29 @@ async function isolateApi(page: import('@playwright/test').Page) {
   }));
 }
 
-async function expectAppShell(page: import('@playwright/test').Page) {
-  await expect(page.locator('#app .view').first()).toBeVisible({ timeout: 20_000 });
-  await expect(page.locator('#nav')).toBeAttached();
-  await expect.poll(() => page.locator('#nav').evaluate(node => node.children.length)).toBeGreaterThan(0);
+async function expectPublicLanding(page: import('@playwright/test').Page) {
+  await expect(page.locator('#land')).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('#land button[data-login="in"]')).toBeVisible();
+  await expect(page.locator('#land button[data-login="up"]')).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
 }
 
-test('root route redirects to a rendered TradeMate app shell without API access', async ({ page }) => {
+test('root route redirects to the public TradeMate landing without API access', async ({ page }) => {
   await isolateApi(page);
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
 
   await page.goto('/');
-  await expect(page).toHaveURL(/\/app\/?$/);
-  await expectAppShell(page);
+  await expect(page).toHaveURL(/\\/app\\/?$/);
+  await expectPublicLanding(page);
   expect(pageErrors, 'the app should not emit uncaught browser exceptions').toEqual([]);
 });
 
-test('direct app route renders the shell on a narrow mobile viewport', async ({ page }) => {
+test('direct app route renders the public landing on a narrow mobile viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await isolateApi(page);
   await page.goto('/app');
-  await expectAppShell(page);
+  await expectPublicLanding(page);
 
   const dimensions = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
