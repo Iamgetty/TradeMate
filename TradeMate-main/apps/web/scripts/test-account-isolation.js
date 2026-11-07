@@ -78,6 +78,8 @@ function section(startText, endText) {
     "account changes must discard pending authenticator setup secrets");
   assert.match(source, /tlClose\("tlView"\)/,
     "account changes must close the previous account's timeline overlay");
+  assert.ok(source.includes("keepTp(function(){for(var i=items.length-1;i>=0;i--)if(items[i].own)items.splice(i,1)});ads=ads.filter(function(a){return !a.own})"),
+    "account switches must remove prior account-owned listings and ads");
   assert.match(source, /accountSessionGeneration\+\+;abortAccountRequests\(\)/,
     "logout must invalidate the old session generation and abort its requests");
 })();
