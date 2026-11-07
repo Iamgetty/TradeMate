@@ -9,14 +9,22 @@ type ContractFixture = {
 };
 
 async function solveLoginPuzzle(page: Page) {
-  await expect(page.locator('#tk')).toBeVisible({ timeout: 5_000 });
-  const puzzle = await page.evaluate(() => {
-    const track = document.querySelector('#tk');
-    const handle = document.querySelector('#hd');
-    const hole = document.querySelector('#ho');
-    const board = document.querySelector('#pz');
+  const captcha = page.locator('#cap');
+  await expect(captcha).not.toHaveClass(/hide/, { timeout: 5_000 });
+  await expect(captcha.locator('#tk')).toBeVisible({ timeout: 5_000 });
+  const puzzle = await captcha.evaluate(root => {
+    const track = root.querySelector('#tk');
+    const handle = root.querySelector('#hd');
+    const hole = root.querySelector('#ho');
+    const board = root.querySelector('#pz');
     if (!(track instanceof HTMLElement) || !(handle instanceof HTMLElement) ||
-        !(hole instanceof HTMLElement) || !(board instanceof HTMLElement)) return null;
+        !(hole instanceof HTMLElement) || !(board instanceof HTMLElement)) {
+      return {
+        diagnostic: [track, handle, hole, board].map(el =>
+          el ? { tag: el.tagName, className: el.className, rect: el.getBoundingClientRect().toJSON() } : null
+        ),
+      };
+    }
     const h = handle.getBoundingClientRect();
     const b = board.getBoundingClientRect();
     const holeLeft = hole.getBoundingClientRect().left;
@@ -27,12 +35,13 @@ async function solveLoginPuzzle(page: Page) {
       delta: holeLeft - b.left - startInset,
     };
   });
-  expect(puzzle, 'login puzzle should render').not.toBeNull();
-  await page.mouse.move(puzzle!.x, puzzle!.y);
+  expect(puzzle, 'captcha elements should be present').toHaveProperty('x');
+  if (!('x' in puzzle)) throw new Error('Captcha elements missing: ' + JSON.stringify(puzzle));
+  await page.mouse.move(puzzle.x, puzzle.y);
   await page.mouse.down();
-  await page.mouse.move(puzzle!.x + puzzle!.delta, puzzle!.y, { steps: 16 });
+  await page.mouse.move(puzzle.x + puzzle.delta, puzzle.y, { steps: 16 });
   await page.mouse.up();
-  await expect(page.locator('#cap')).toHaveClass(/hide/, { timeout: 5_000 });
+  await expect(captcha).toHaveClass(/hide/, { timeout: 5_000 });
 }
 
 async function login(page: Page, email: string) {
