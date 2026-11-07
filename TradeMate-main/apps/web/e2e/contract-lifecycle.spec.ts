@@ -251,6 +251,8 @@ test('organization documents and own-offer screens recover after transient API f
   let ownOfferFailureArmed = false;
   const context = await browser.newContext();
   const page = await context.newPage();
+  page.on('pageerror', error => console.log('[contract-e2e] organization pageerror:', error.stack || error.message));
+  page.on('console', message => { if (message.type() === 'error') console.log('[contract-e2e] organization console error:', message.text()); });
 
   await page.route('**/api/**', async route => {
     const request = route.request();
@@ -344,10 +346,14 @@ test('contracts and enquiries lists recover after transient API failures', async
   let enquiryRequests = 0;
   // These endpoints are fetched during authenticated bootstrap. Arm failures
   // before login so the first real request exercises the error/retry UI.
-  let contractFailureArmed = true;
-  let enquiryFailureArmed = true;
+  // Fail the initial bootstrap attempts even if the app issues overlapping requests;
+  // the explicit Retry action must be the first successful response.
+  let contractFailuresRemaining = 2;
+  let enquiryFailuresRemaining = 2;
   const context = await browser.newContext();
   const page = await context.newPage();
+  page.on('pageerror', error => console.log('[contract-e2e] list recovery pageerror:', error.stack || error.message));
+  page.on('console', message => { if (message.type() === 'error') console.log('[contract-e2e] list recovery console error:', message.text()); });
 
   await page.route('**/api/**', async route => {
     const request = route.request();
@@ -368,8 +374,8 @@ test('contracts and enquiries lists recover after transient API failures', async
     }
     if (path === '/market/contracts/mine' && method === 'GET') {
       contractRequests += 1;
-      if (contractFailureArmed) {
-        contractFailureArmed = false;
+      if (contractFailuresRemaining > 0) {
+        contractFailuresRemaining -= 1;
         await route.fulfill({ status: 503, json: { message: 'Contract service temporarily unavailable' } });
       } else {
         await route.fulfill({ status: 200, json: { data: [] } });
@@ -378,8 +384,8 @@ test('contracts and enquiries lists recover after transient API failures', async
     }
     if (path === '/market/enquiries/mine' && method === 'GET') {
       enquiryRequests += 1;
-      if (enquiryFailureArmed) {
-        enquiryFailureArmed = false;
+      if (enquiryFailuresRemaining > 0) {
+        enquiryFailuresRemaining -= 1;
         await route.fulfill({ status: 503, json: { message: 'Enquiry service temporarily unavailable' } });
       } else {
         await route.fulfill({ status: 200, json: { data: [] } });
