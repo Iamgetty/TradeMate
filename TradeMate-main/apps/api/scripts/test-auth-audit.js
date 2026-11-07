@@ -240,7 +240,22 @@ async function main() {
     assert.equal(sessionCheck.rowCount, 1, 'current session deletion must roll back when audit insert fails');
     await removeReject();
 
-    console.log('Audit atomicity passed: account, profile, feedback, follow and feed changes roll back when audit writes fail.');
+    await installReject('auth.logout');
+    const logoutFailed = await call('POST', '/api/auth/logout');
+    assert.equal(logoutFailed.status, 500, 'logout must report an audit failure');
+    assert.match(logoutFailed.headers.get('set-cookie') || '', /trademate_session=;/,
+      'logout must clear the browser cookie even when server-side revocation fails');
+    sessionCheck = await pool.query('SELECT id FROM user_sessions WHERE id = $1', [currentSession.rows[0].id]);
+    assert.equal(sessionCheck.rowCount, 1, 'logout session deletion must roll back when audit insert fails');
+    await removeReject();
+    const logoutOk = await call('POST', '/api/auth/logout');
+    assert.equal(logoutOk.status, 200, 'logout must succeed when its audit insert succeeds');
+    assert.match(logoutOk.headers.get('set-cookie') || '', /trademate_session=;/,
+      'successful logout must clear the browser cookie');
+    sessionCheck = await pool.query('SELECT id FROM user_sessions WHERE id = $1', [currentSession.rows[0].id]);
+    assert.equal(sessionCheck.rowCount, 0, 'successful logout must revoke the server-side session');
+
+    console.log('Auth audit atomicity and logout recovery checks passed.');
   } finally {
     if (triggerInstalled) {
       await pool.query('DROP TRIGGER IF EXISTS test_reject_auth_audit_trigger ON audit_events').catch(() => undefined);
