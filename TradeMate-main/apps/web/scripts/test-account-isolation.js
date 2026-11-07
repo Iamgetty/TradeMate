@@ -59,6 +59,12 @@ function section(startText, endText) {
     "session verification must fail closed without a valid account identity");
   assert.match(source, /host\.style\.display="none";releaseAuthGate\(\)/,
     "a successful login must release the authenticated shell gate");
+  assert.match(source, /r&&r\.requiresTwoFactor&&typeof r\.challengeToken==="string"/,
+    "password login must preserve the API's two-factor challenge response");
+  assert.match(source, /api\("POST","\/auth\/2fa\/verify"/,
+    "the authenticator code must be verified by the server before login");
+  assert.match(source, /S\.challengeToken=r\.challengeToken;S\.step="totp";rd\(\)/,
+    "the challenge token must be held only in the active login flow");
 })();
 
 (function authenticatedRequestsAreGenerationBound() {
