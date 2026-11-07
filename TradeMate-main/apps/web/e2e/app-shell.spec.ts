@@ -11,8 +11,8 @@ async function isolateApi(page: import('@playwright/test').Page) {
 
 async function expectPublicLanding(page: import('@playwright/test').Page) {
   await expect(page.locator('#land')).toBeVisible({ timeout: 20_000 });
-  await expect(page.locator('#land button[data-login="in"]')).toBeVisible();
-  await expect(page.locator('#land button[data-login="up"]')).toBeVisible();
+  await expect(page.locator('#land nav button[data-login="in"]')).toBeVisible();
+  await expect(page.locator('#land nav button[data-login="up"]')).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
 }
 
