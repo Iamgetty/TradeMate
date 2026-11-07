@@ -2506,6 +2506,7 @@ function api(m,p,b,options){if(!CONNECTED)return Promise.reject(new Error("The T
  .then(function(r){return r.text().then(function(t){var d=null;try{d=t?JSON.parse(t):null}catch(e){}
   if(accountToken&&!isCurrentAccountRequest(accountToken)){var stale=new Error("Request discarded because the signed-in account changed.");stale.staleAccountRequest=true;throw stale}
   if(!r.ok){var g=d&&d.message;if(Array.isArray(g))g=g.join(" ");var e=new Error(g||"Request failed ("+r.status+").");e.status=r.status;throw e}return d})})
+ .catch(function(error){if(error&&error.staleAccountRequest)throw error;if(accountToken&&!isCurrentAccountRequest(accountToken)){var stale=new Error("Request discarded because the signed-in account changed.");stale.staleAccountRequest=true;throw stale}throw error})
  .finally(function(){if(accountController){var i=accountRequestControllers.indexOf(accountController);if(i>=0)accountRequestControllers.splice(i,1)}})}
 function fail(e){if(e&&e.staleAccountRequest)return;toast(e&&e.message?e.message:"Something went wrong")}
 function fmtT(s){try{return new Date(s).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}catch(e){return ""}}
