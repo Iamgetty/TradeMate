@@ -131,4 +131,46 @@ function loadStoreFunctions(connected, state, items, ads, storage) {
   assert.doesNotMatch(failure, /window\.draw\(\)/, "failed verification must not render the authenticated shell");
 })();
 
-console.log("Account isolation regression tests passed.");
+(async function staleAuthenticatedResponsesAreDiscarded() {
+  const apiStart = source.indexOf("function api(");
+  const apiEnd = source.indexOf("\\nfunction fail", apiStart);
+  assert.notEqual(apiStart, -1, "API helper must exist");
+  assert.notEqual(apiEnd, -1, "API helper boundary must exist");
+  const apiBlock = source.slice(apiStart, apiEnd);
+  let current = true;
+  let resolveFetch;
+  const fakeFetch = () => new Promise(resolve => { resolveFetch = resolve; });
+  const apiFactory = new Function(
+    "CONNECTED", "TMCFG", "st", "captureAccountRequest", "isCurrentAccountRequest", "fetch",
+    apiBlock + "; return api;"
+  );
+  const api = apiFactory(
+    true,
+    { api: "https://api.example.test" },
+    { me: { id: "account-A" } },
+    () => ({ generation: 4, userId: "account-A" }),
+    token => current && token.generation === 4 && token.userId === "account-A",
+    fakeFetch
+  );
+
+  const pending = api("POST", "/private/action", { value: true });
+  current = false;
+  resolveFetch({
+    ok: true,
+    status: 200,
+    text: () => Promise.resolve(JSON.stringify({ secret: "account-A response" }))
+  });
+  await assert.rejects(
+    pending,
+    error => error && error.staleAccountRequest === true,
+    "a response from the previous account must never reach mutation callbacks"
+  );
+  assert.match(source, /function fail\\(e\\)\\{if\\(e&&e\\.staleAccountRequest\\)return;/,
+    "stale request errors must not be surfaced as errors for the new account");
+  assert.match(source, /st\\.subs=\\[\\];st\\.links=\\{\\};st\\.joinedAff=false;st\\.fv=\\{\\};st\\.feedPosts=\\[\\]/,
+    "account switches must clear remaining account-scoped state and feed cache");
+  console.log("Account isolation regression tests passed.");
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
