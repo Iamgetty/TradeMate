@@ -4,50 +4,40 @@
 
 TradeMate is a global, contract-first business platform in the Metadusk technology ecosystem. It connects individuals and organizations to discover opportunities, communicate, negotiate terms, establish business agreements and manage contract fulfilment across supported markets.
 
-TradeMate retains its independent product identity. **Metadusk Inc.** is the intended parent-company identity and ecosystem; the public product endorsement is **TradeMate by Metadusk**. This is an intended brand/corporate structure, not a claim that Metadusk has been incorporated or that ventures are legal subsidiaries. See [docs/company-ecosystem.md](docs/company-ecosystem.md).
+TradeMate retains its independent product identity. **Metadusk Inc.** is the intended parent-company identity and ecosystem; the public product endorsement is **TradeMate by Metadusk**.
 
 ## Product direction
 
-- Services, B2B opportunities, real estate, software, NFTs, Forex and crypto market information.
-- TradeMate is not a conventional product checkout or buy/sell exchange. The core marketplace is about connecting counterparties and agreeing the terms of a business contract.
-- Product listings and product-cart commerce are not part of the current product scope. A product marketplace may be reconsidered as a future roadmap option.
-- Multi-currency and country-aware discovery, with availability determined by supported providers and applicable requirements.
-- P2P cryptocurrency offers and related capabilities are a later-stage workstream, not a reason to change the current contract-first marketplace model.
+- Services and B2B opportunities, alongside real estate, software, NFTs and market-information sections.
+- A contract-centred workflow: counterparties discover one another, discuss an opportunity, negotiate scope and conditions, submit and review proposals, accept or decline terms, and confirm fulfilment.
+- TradeMate is not a conventional product checkout or buy/sell exchange.
+- TradeMate is not a cryptocurrency exchange or a spot/futures crypto trading platform. Crypto and Forex market information is distinct from the core contract workflow.
+- Product listings and product-cart commerce are not part of the current product scope.
+- P2P cryptocurrency offers and wallet-related capabilities are a separate later-stage workstream, not the definition of TradeMate.
+- International use from day one, with country, currency, language and provider availability handled explicitly.
 
-## Implemented foundation
+## Metadusk ecosystem
+
+TradeMate is one distinct product in the wider Metadusk ecosystem, alongside Deukleinz Technologies and PharmaCore. The founder's current intended structure and brand rules are documented in [docs/company-ecosystem.md](docs/company-ecosystem.md).
+
+The ecosystem document records intended brand architecture and founder-reported information. It does not claim that Metadusk or every venture has been legally incorporated or that trademark registrations have been completed.
+
+## Current product foundation
 
 - Responsive Next.js web application and NestJS API.
-- PostgreSQL-backed marketplace offer discovery, search, filters and seller/business spaces.
-- Database migrations for marketplace data, accounts, authentication rate limits and community Feed attachments.
-- Account registration and sign-in using scrypt password hashes, HTTP-only session cookies, revocable sessions and sign-in rate limiting.
-- Account session lookup and sign-out.
-- Business-space onboarding with country and default currency.
-- Seller offer-draft creation, viewing, editing and moderation submission.
-- Public market data endpoint for supported stock indices, commodities, equities and bonds/treasuries.
-- Feed posts with titles, file/audio attachments and comments.
-- Initial durable contract proposals for published Services/B2B offers, seller acceptance/decline, buyer cancellation and mutual fulfilment confirmation. This is not payment processing, escrow or e-signature.
-- Health and database-health endpoints.
+- PostgreSQL-backed marketplace offer discovery, search, filters and business spaces.
+- Authentication, secure sessions and account-security foundations.
+- Services/B2B contract proposal and acceptance foundations.
+- Enquiries, messaging, Feed posts, attachments and community features.
+- Public market-information endpoints and related data integrations.
 
-Offer drafts are private and are not public marketplace offers. A business space may remain pending. Do not treat these foundations as evidence that production readiness, all security testing, or end-to-end deployment verification is complete.
+See [docs/architecture.md](docs/architecture.md) for architecture boundaries and [docs/roadmap.md](docs/roadmap.md) for implementation status, outstanding QA and later-stage work. Documentation distinguishes implemented foundations from planned work and production verification.
 
-## Development sequence
+## Development and security
 
-1. **Pre-P2P marketplace completion:** finish the contract-first marketplace model, B2B publishing, Services, Feed, Clients/Alpha modes, Forex coverage, full-tab consistency and performance.
-2. **Contract lifecycle:** complete QA of proposal, counterparty review, acceptance/rejection, cancellation, contract messages and mutual fulfilment confirmation. Payment processing is separate and must not be implied as available.
-3. **Buyer–seller connection:** complete enquiries and messaging with access controls, abuse reporting and audit trails.
-4. **Trust and operations:** counterparty reputation, disputes/support workflows, monitoring, automated tests, backups and recovery procedures.
-5. **P2P:** begin only after the pre-P2P requirements and additional product instructions are complete; require jurisdiction-specific legal/compliance review, provider approval, threat modelling and independent security testing before any live trading, escrow, custody or crypto-payment launch.
-
-The current technical roadmap is in [docs/roadmap.md](docs/roadmap.md).
-
-## Security and global-product rules
-
-- Never commit `.env` files, API keys, credentials or secrets.
+- Never commit environment files, credentials, API keys or secrets.
 - Never collect wallet seed phrases or private keys.
-- Enforce authorization and organization boundaries on the server for every private operation.
-- Store monetary amounts as integer minor units with an explicit ISO currency code; never assume every user uses NGN.
-- Store timestamps in UTC and format them for the user's locale and time zone.
-- Keep country, language, currency, tax, shipping and payment availability as separate configurable concepts.
-- Do not imply that every payment method, service or crypto feature is available in every jurisdiction.
+- Enforce authorization and organization boundaries server-side.
+- Keep payments, escrow, custody and P2P crypto features gated behind legal/compliance review, provider approval, threat modelling and security testing.
+- Do not imply that any feature is available in every country or jurisdiction.
 
-See [docs/architecture.md](docs/architecture.md) for architecture and security boundaries.
