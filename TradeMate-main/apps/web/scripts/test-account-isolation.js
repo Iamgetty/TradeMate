@@ -168,7 +168,7 @@ function loadStoreFunctions(connected, state, items, ads, storage) {
   );
   assert.ok(source.includes("function fail(e){if(e&&e.staleAccountRequest)return;"),
     "stale request errors must not be surfaced as errors for the new account");
-  assert.ok(source.includes("st.subs=[];st.links={};st.joinedAff=false;st.fv={};st.feedPosts=[]"),
+  assert.ok(source.includes("st.subs=[];st.links={};st.joinedAff=false;st.pins=[];st.fv={};st.feedPosts=[]"),
     "account switches must clear remaining account-scoped state and feed cache");
   console.log("Account isolation regression tests passed.");
 })().catch(error => {
