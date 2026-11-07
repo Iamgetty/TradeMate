@@ -312,10 +312,10 @@ test('organization documents and own-offer screens recover after transient API f
 
     await page.locator('#app .top button[data-pg="profile"]').click();
     await page.locator('[data-act="mode"]').click();
-    await page.locator('#app [data-f="More"]').click();
+    await page.locator('#sbar [data-f="More"]').click();
     organizationFailureArmed = true;
     documentFailureArmed = true;
-    await page.locator('#app [data-f="Organization"]').click();
+    await page.locator('#app [data-f="Organization"]').click({ force: true });
     await expect(page.getByText('Could not load organization', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Retry Test Services' })).toBeVisible();
@@ -327,7 +327,7 @@ test('organization documents and own-offer screens recover after transient API f
 
     ownOfferFailureArmed = true;
     await page.locator('#sbar [data-f="More"]').click();
-    await page.locator('#app [data-f="Contract approvals"]').click();
+    await page.locator('#app [data-f="Contract approvals"]').click({ force: true });
     await expect(page.getByText('Could not load your offers', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await expect(page.getByText('No contracts awaiting approval', { exact: true })).toBeVisible();
@@ -394,7 +394,7 @@ test('contracts and enquiries lists recover after transient API failures', async
     await expect.poll(() => enquiryRequests, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
 
     contractFailureArmed = true;
-    await page.locator('#app [data-f="Contracts"]').click();
+    await page.locator('#sbar [data-f="Contracts"]').click();
     await expect(page.getByText('Could not load contracts', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await expect(page.getByText('No contracts yet', { exact: true })).toBeVisible();
@@ -402,7 +402,7 @@ test('contracts and enquiries lists recover after transient API failures', async
 
     enquiryFailureArmed = true;
     await page.locator('#sbar [data-f="More"]').click();
-    await page.locator('#app [data-f="Conversations"]').click();
+    await page.locator('#app [data-f="Conversations"]').click({ force: true });
     await expect(page.getByText('Could not load conversations', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await expect(page.getByText('No conversations yet.', { exact: true })).toBeVisible();
