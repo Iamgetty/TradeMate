@@ -68,6 +68,7 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
   test.setTimeout(90_000);
 
   const authenticated: Record<'buyer' | 'seller', boolean> = { buyer: false, seller: false };
+  let buyerListingRequests = 0;
   const contract: ContractFixture = {
     id: 'contract-e2e-001',
     title: 'Two-account UI acceptance fixture',
@@ -97,6 +98,27 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
         } } });
       } else {
         await route.fulfill({ status: 401, json: { message: 'No active session' } });
+      }
+      return;
+    }
+    if (path === '/market/listings' && method === 'GET' && account === 'buyer') {
+      buyerListingRequests += 1;
+      if (buyerListingRequests === 1) {
+        await route.fulfill({ status: 503, json: { message: 'Marketplace listings temporarily unavailable' } });
+      } else {
+        await route.fulfill({
+          status: 200,
+          json: { data: [{
+            id: 'listing-e2e-retry-001',
+            listing_type: 'service',
+            title: 'Retry recovered service',
+            currency_code: 'NGN',
+            price_minor_units: 450000,
+            country_code: 'NG',
+            seller_name: 'Seller Test',
+            description: 'A listing returned after retry.',
+          }] },
+        });
       }
       return;
     }
@@ -175,7 +197,13 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
   try {
     console.log('[contract-e2e] buyer login starting');
     await login(buyer, 'buyer@example.test');
-    console.log('[contract-e2e] buyer login complete; opening contract');
+    await expect.poll(() => buyerListingRequests, { timeout: 10_000 }).toBe(1);
+    await buyer.locator('#app [data-mm="Services"]').first().click();
+    await expect(buyer.getByText('Could not load marketplace listings')).toBeVisible();
+    await buyer.getByRole('button', { name: 'Retry', exact: true }).click();
+    await expect(buyer.getByText('Retry recovered service')).toBeVisible();
+    expect(buyerListingRequests).toBe(2);
+    console.log('[contract-e2e] marketplace listing failure recovered after retry; opening contract');
     await buyer.locator('#sbar [data-f="Contracts"]').click();
     await buyer.getByRole('button', { name: /Two-account UI acceptance fixture/ }).click();
     await expect(buyer.getByText('Awaiting response')).toBeVisible();
