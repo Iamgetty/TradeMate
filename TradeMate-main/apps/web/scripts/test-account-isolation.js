@@ -73,7 +73,7 @@ function section(startText, endText) {
 
 (function authenticatedRequestsAreGenerationBound() {
   const apiBlock = section("function api(", "\nfunction fail");
-  assert.match(apiBlock, /var accountToken=st\.me&&st\.me\.id\?captureAccountRequest\(\):null/,
+  assert.match(apiBlock, /var accountToken=!\(options&&options\.detached\)&&st\.me&&st\.me\.id\?captureAccountRequest\(\):null/,
     "authenticated requests must capture their account identity and generation");
   assert.match(apiBlock, /accountRequestControllers\.push\(accountController\)/,
     "authenticated requests must be cancellable on account changes");
