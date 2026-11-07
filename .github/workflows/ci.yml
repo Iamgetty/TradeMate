@@ -107,6 +107,8 @@ jobs:
           node-version: 20
       - name: Validate TradeMate runtime JavaScript
         run: node --check TradeMate-main/apps/web/public/tm/app.js
+      - name: Verify connected account cache isolation
+        run: node TradeMate-main/apps/web/scripts/test-account-isolation.js
       - name: Install web dependencies
         working-directory: TradeMate-main/apps/web
         run: npm install --no-audit --no-fund
