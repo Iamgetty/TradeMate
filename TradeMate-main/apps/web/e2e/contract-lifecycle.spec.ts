@@ -183,7 +183,7 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
     console.log('[contract-e2e] seller login starting');
     await login(seller, 'seller@example.test');
     console.log('[contract-e2e] seller login complete; switching to Alpha');
-    await seller.locator('#sbar [data-pg="profile"]').click();
+    await seller.locator('#app .top button[data-pg="profile"]').click();
     await seller.locator('[data-act="mode"]').click();
     await seller.locator('#sbar [data-f="Contracts"]').click();
     await seller.getByRole('button', { name: /Two-account UI acceptance fixture/ }).click();
