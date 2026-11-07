@@ -49,6 +49,7 @@ async function login(page: Page, email: string) {
 test('two separate accounts complete a contract through the Clients and Alpha UI', async ({ browser }) => {
   test.setTimeout(90_000);
 
+  const authenticated: Record<'buyer' | 'seller', boolean> = { buyer: false, seller: false };
   const contract: ContractFixture = {
     id: 'contract-e2e-001',
     title: 'Two-account UI acceptance fixture',
@@ -69,10 +70,20 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
     const method = request.method();
 
     if (path === '/auth/me' && method === 'GET') {
-      await route.fulfill({ status: 401, json: { message: 'No active session' } });
+      if (authenticated[account]) {
+        await route.fulfill({ status: 200, json: { user: {
+          id: account === 'buyer' ? 'buyer-user-001' : 'seller-user-001',
+          email: account === 'buyer' ? 'buyer@example.test' : 'seller@example.test',
+          display_name: account === 'buyer' ? 'Buyer Test' : 'Seller Test',
+          country_code: 'NG',
+        } } });
+      } else {
+        await route.fulfill({ status: 401, json: { message: 'No active session' } });
+      }
       return;
     }
     if (path === '/auth/login' && method === 'POST') {
+      authenticated[account] = true;
       await route.fulfill({
         status: 200,
         json: {
@@ -159,6 +170,8 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
     await seller.getByRole('button', { name: 'Confirm fulfilment' }).click();
     await expect(seller.getByText('Waiting for the other party')).toBeVisible();
 
+    await buyer.reload();
+    await expect(buyer.locator('#app .view')).toBeVisible();
     await buyer.locator('#sbar [data-f="Contracts"]').click();
     await buyer.getByRole('button', { name: /Two-account UI acceptance fixture/ }).click();
     await expect(buyer.getByRole('button', { name: 'Confirm fulfilment' })).toBeVisible();
