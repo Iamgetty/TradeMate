@@ -326,3 +326,71 @@ test('organization documents and own-offer screens recover after transient API f
     await context.close();
   }
 });
+
+
+test('contracts and enquiries lists recover after transient API failures', async ({ browser }) => {
+  test.setTimeout(75_000);
+  let authenticated = false;
+  let contractRequests = 0;
+  let enquiryRequests = 0;
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  await page.route('**/api/**', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname.replace(/^\\/api/, '');
+    const method = request.method();
+
+    if (path === '/auth/me' && method === 'GET') {
+      await route.fulfill(authenticated
+        ? { status: 200, json: { user: { id: 'retry-user-001', email: 'retry@example.test', display_name: 'Retry User', country_code: 'NG' } } }
+        : { status: 401, json: { message: 'No active session' } });
+      return;
+    }
+    if (path === '/auth/login' && method === 'POST') {
+      authenticated = true;
+      await route.fulfill({ status: 200, json: { user: { id: 'retry-user-001', email: 'retry@example.test', display_name: 'Retry User', country_code: 'NG' } } });
+      return;
+    }
+    if (path === '/market/contracts/mine' && method === 'GET') {
+      contractRequests += 1;
+      if (contractRequests === 1) {
+        await route.fulfill({ status: 503, json: { message: 'Contract service temporarily unavailable' } });
+      } else {
+        await route.fulfill({ status: 200, json: { data: [] } });
+      }
+      return;
+    }
+    if (path === '/market/enquiries/mine' && method === 'GET') {
+      enquiryRequests += 1;
+      if (enquiryRequests === 1) {
+        await route.fulfill({ status: 503, json: { message: 'Enquiry service temporarily unavailable' } });
+      } else {
+        await route.fulfill({ status: 200, json: { data: [] } });
+      }
+      return;
+    }
+    await route.fulfill({ status: 200, json: {} });
+  });
+
+  try {
+    await login(page, 'retry@example.test');
+    await expect.poll(() => contractRequests, { timeout: 10_000 }).toBe(1);
+    await expect.poll(() => enquiryRequests, { timeout: 10_000 }).toBe(1);
+
+    await page.locator('#app [data-f="Contracts"]').click();
+    await expect(page.getByText('Could not load contracts', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Retry', exact: true }).click();
+    await expect(page.getByText('No contracts yet', { exact: true })).toBeVisible();
+    expect(contractRequests).toBe(2);
+
+    await page.locator('#app [data-f="Conversations"]').click();
+    await expect(page.getByText('Could not load conversations', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Retry', exact: true }).click();
+    await expect(page.getByText('No conversations yet', { exact: true })).toBeVisible();
+    expect(enquiryRequests).toBe(2);
+  } finally {
+    await context.close();
+  }
+});
