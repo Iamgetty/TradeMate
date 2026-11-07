@@ -65,6 +65,10 @@ function section(startText, endText) {
     "the authenticator code must be verified by the server before login");
   assert.match(source, /S\.challengeToken=r\.challengeToken;S\.step="totp";rd\(\)/,
     "the challenge token must be held only in the active login flow");
+  assert.match(source, /function invalidateAuthFlow\(\)\{authFlowGeneration\+\+;S\.challengeToken="";if\(authFlowController\)\{authFlowController\.abort\(\)/,
+    "leaving or restarting authentication must abort its outstanding request");
+  assert.match(source, /api\("POST","\/auth\/2fa\/verify".*authFlowController\?\{signal:authFlowController\.signal\}/,
+    "authenticator verification must be cancellable if the user backs out");
 })();
 
 (function authenticatedRequestsAreGenerationBound() {
