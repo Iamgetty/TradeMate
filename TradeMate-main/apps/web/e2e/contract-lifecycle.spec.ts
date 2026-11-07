@@ -47,16 +47,21 @@ async function solveLoginPuzzle(page: Page) {
 }
 
 async function login(page: Page, email: string) {
+  console.log(`[contract-e2e] ${email}: opening app`);
   await page.goto('/app');
   await expect(page.locator('#land')).toBeVisible({ timeout: 20_000 });
+  console.log(`[contract-e2e] ${email}: landing ready; opening login`);
   await page.locator('#land nav button[data-login="in"]').click();
   await page.locator('#id').fill(email);
   await page.locator('#login button[data-k="next"]').click();
   await expect(page.locator('#pw')).toBeVisible();
   await page.locator('#pw').fill('TradeMate-test-password-2026');
   await page.locator('#login button[data-k="next"]').click();
+  console.log(`[contract-e2e] ${email}: password submitted; solving visible login puzzle`);
   await solveLoginPuzzle(page);
-  await expect(page.locator('#app .view')).toBeVisible();
+  console.log(`[contract-e2e] ${email}: puzzle accepted; waiting for authenticated app`);
+  await expect(page.locator('#app .view')).toBeVisible({ timeout: 15_000 });
+  console.log(`[contract-e2e] ${email}: authenticated app visible`);
 }
 
 test('two separate accounts complete a contract through the Clients and Alpha UI', async ({ browser }) => {
@@ -168,12 +173,16 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
   await seller.route('**/api/**', route => mockApi(route, 'seller'));
 
   try {
+    console.log('[contract-e2e] buyer login starting');
     await login(buyer, 'buyer@example.test');
+    console.log('[contract-e2e] buyer login complete; opening contract');
     await buyer.locator('#sbar [data-f="Contracts"]').click();
     await buyer.getByRole('button', { name: /Two-account UI acceptance fixture/ }).click();
     await expect(buyer.getByText('Awaiting response')).toBeVisible();
 
+    console.log('[contract-e2e] seller login starting');
     await login(seller, 'seller@example.test');
+    console.log('[contract-e2e] seller login complete; switching to Alpha');
     await seller.locator('#sbar [data-pg="profile"]').click();
     await seller.locator('[data-act="mode"]').click();
     await seller.locator('#sbar [data-f="Contracts"]').click();
@@ -183,6 +192,7 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
     await seller.getByRole('button', { name: 'Confirm fulfilment' }).click();
     await expect(seller.getByText('Waiting for the other party')).toBeVisible();
 
+    console.log('[contract-e2e] seller accepted and confirmed; reloading buyer');
     await buyer.reload();
     await expect(buyer.locator('#app .view')).toBeVisible();
     await buyer.locator('#sbar [data-f="Contracts"]').click();
@@ -194,7 +204,6 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
     expect(contract.buyer_confirmed_at).not.toBeNull();
     expect(contract.seller_confirmed_at).not.toBeNull();
   } finally {
-    await buyerContext.close();
-    await sellerContext.close();
+    await Promise.allSettled([buyerContext.close(), sellerContext.close()]);
   }
 });
