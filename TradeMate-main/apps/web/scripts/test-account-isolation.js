@@ -150,7 +150,8 @@ function loadStoreFunctions(connected, state, items, ads, storage) {
     { me: { id: "account-A" } },
     () => ({ generation: 4, userId: "account-A" }),
     token => current && token.generation === 4 && token.userId === "account-A",
-    fakeFetch
+    fakeFetch,
+    []
   );
 
   const pending = api("POST", "/private/action", { value: true });
