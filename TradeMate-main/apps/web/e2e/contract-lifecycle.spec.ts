@@ -35,8 +35,10 @@ async function solveLoginPuzzle(page: Page) {
       delta: holeLeft - b.left - startInset,
     };
   });
-  expect(puzzle, 'captcha elements should be present').toHaveProperty('x');
-  if (!('x' in puzzle)) throw new Error('Captcha elements missing: ' + JSON.stringify(puzzle));
+  if (!('x' in puzzle) || typeof puzzle.x !== 'number' ||
+      typeof puzzle.y !== 'number' || typeof puzzle.delta !== 'number') {
+    throw new Error('Captcha elements missing: ' + JSON.stringify(puzzle));
+  }
   await page.mouse.move(puzzle.x, puzzle.y);
   await page.mouse.down();
   await page.mouse.move(puzzle.x + puzzle.delta, puzzle.y, { steps: 16 });
