@@ -1069,7 +1069,7 @@ function lg(i){var a=i.n.split("/"),y=a[0].toLowerCase();
  return '<span class="lgb">'+ic(MI[i.m],"width:58%;height:58%")+'</span>'+(i.image?chainImg("lgi",[esc(i.image)],esc(i.n)):"")}
 
 function money(n){return n>=1e12?"$"+(n/1e12).toFixed(2)+"T":n>=1e9?"$"+(n/1e9).toFixed(2)+"B":n>=1e6?"$"+(n/1e6).toFixed(2)+"M":"$"+fx2(n,n<100?2:0)}
-function val(i){if(i.m==="Crypto")return i.cap?"MCap "+money(i.cap):"";if(i.m==="Forex"||typeof i.p==="number")return "";
+function val(i){if(i.srv||i.m==="Crypto")return i.cap?"MCap "+money(i.cap):"";if(i.m==="Forex"||typeof i.p==="number")return "";
  var n=pnum(i.p),s=psym(i.p),u=s==="$"?null:s==="Ξ"?n*byName("ETH/USDT").p:s==="₦"?n/byName("USD/NGN").p:null;return u==null?"":"≈ "+money(u)}
 var TM_FX_SNAPSHOT_KEY="tm.fx.reference.snapshot.v1",TM_FX_SNAPSHOT_MAX_AGE=14*24*60*60*1000;
 function tmApplyFxRates(rates,status,rateTimestamp,savedAt){
