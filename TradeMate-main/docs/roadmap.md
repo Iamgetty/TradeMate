@@ -241,6 +241,46 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 
 **Migration acceptance gates:** no secrets in source control or build logs; private database/cache/queue access; TLS verification; least-privilege identities; tenant/RLS and audit-integrity tests; successful restore and rollback rehearsal; WebSocket load/reconnect tests; queue idempotency/dead-letter tests; CDN cache privacy tests; security scans; operational dashboards/alerts; cost budgets; and documented owner sign-off. Record actual provider, regions, service names, deployment IDs and verification evidence only after implementation.
 
+### Independent audit, certification and regulatory assurance programme — planned
+
+This programme is a procurement and readiness roadmap, not evidence that any auditor, certification body, legal adviser or monitoring provider has been engaged. Select firms through a documented RFP, scope, independence/conflict checks, references, jurisdiction coverage, deliverables, timeline and budget. Do not imply endorsement by any named provider.
+
+#### 1. Independent technical security audit and penetration test
+
+- Commission an independent application and infrastructure security assessment before enabling high-risk financial, escrow, custody, P2P or crypto-transfer capabilities. Potential firms to evaluate include **NCC Group**, **Trail of Bits**, **Halborn** and **Stingrai**; compare relevant fintech, Web/API and blockchain experience rather than selecting by name alone.
+- Scope the assessment across the web/mobile application, public and authenticated APIs, authentication/session lifecycle, MFA/TOTP, account recovery, authorization and tenant isolation, organization/document access, contract lifecycle, proposed escrow/payment state machines, wallet/key management, crypto integrations, infrastructure, CI/CD and secrets handling.
+- Require threat modelling, manual penetration testing, abuse-case testing, business-logic review, severity-rated findings, reproducible evidence, remediation guidance and an independent retest of critical/high findings. Include source-code review where appropriate.
+- Keep escrow, custody and crypto-transfer components explicitly marked **not in scope / not implemented** until they actually exist; when introduced, commission a dedicated assessment of their state machines, key custody/signing boundaries, replay/idempotency, settlement, refund/dispute and recovery paths.
+- If TradeMate later deploys smart contracts, tokenization or on-chain settlement, commission a specialist smart-contract/protocol audit before mainnet deployment. Evaluate firms with demonstrable expertise in the target chain, language, protocol design, economic attack analysis and formal verification where warranted. Require remediation and retest; a general web-app penetration test is not a substitute.
+
+#### 2. SOC 2 Type II and ISO/IEC 27001 readiness
+
+- Run a readiness/gap assessment against **SOC 2 Trust Services Criteria** and **ISO/IEC 27001** before seeking formal examination/certification. Potential SOC 2 audit firms to evaluate include **A-LIGN**, **Schellman** and qualified Big Four practices; independently verify accreditation, auditor eligibility, scope and relevant experience.
+- Establish the control environment first: security governance, risk register, asset/data inventory, access reviews, joiner-mover-leaver controls, vendor management, secure SDLC, change/release approvals, incident response, business continuity, backup/restore tests, vulnerability management, logging/monitoring, privacy/data retention and evidence ownership.
+- Define the audit boundary and system description accurately, including production/staging environments, cloud/service providers, subprocessors, data flows and exclusions. Close readiness gaps and collect operating evidence over the required observation period before a SOC 2 Type II examination; do not describe a readiness review as a Type II report.
+- Build and operate an ISO/IEC 27001-aligned Information Security Management System (ISMS), including risk assessment, risk treatment plan, Statement of Applicability, internal audit, management review and corrective actions. Select an appropriately accredited certification body for the formal certification audit.
+- Treat SOC 2 Type II as an independent attestation report and ISO/IEC 27001 as a certifiable management-system standard; they are complementary, not interchangeable. Confirm exact scope, period, exceptions and report-sharing terms before making claims to customers or investors.
+
+#### 3. Regulatory and specialist legal review
+
+- Retain qualified fintech/crypto counsel, and where useful a Big Four regulatory practice, to map TradeMate's actual operating model and user/customer jurisdictions before launching regulated features. Evaluate the laws and licensing/registration obligations relevant to identity/KYC/KYB, AML/sanctions, payments, money transmission, custody, crypto-assets, securities/derivatives, consumer protection, privacy/data protection, real-estate brokerage and tokenization, advertising and cross-border transfers.
+- Produce a written jurisdiction-by-jurisdiction legal perimeter memo covering entity structure, products, counterparties, funds/assets flow, custody/control, third-party providers, marketing, licensing triggers, reporting duties and prohibited activities. Include Nigeria and any other markets only where TradeMate actually operates or targets users; do not assume a single global answer.
+- Obtain separate specialist advice before offering escrow, payment handling, wallet custody, crypto transfers, tokenized real estate, investment products or derivatives. Product design and engineering must follow the resulting written legal advice; no feature is authorized merely by inclusion in this roadmap.
+- Reassess the legal perimeter whenever a new country, asset, payment rail, custody model, marketplace category or material business flow is introduced.
+
+#### 4. Ongoing monitoring and continuous security testing
+
+- Before any crypto transfer or wallet-related regulated flow, evaluate **Chainalysis**, **TRM Labs** and **Elliptic** for wallet/address screening, sanctions exposure, transaction monitoring, risk scoring, case management, data coverage, false-positive handling, API reliability, privacy, retention, cost and jurisdictional suitability. Integrate only after legal/compliance approval, documented risk policy, human escalation and auditable decisions.
+- Maintain continuous dependency/SCA, secret scanning, SAST, infrastructure-as-code scanning and authenticated DAST in safe environments; add external attack-surface monitoring and recurring independent penetration tests based on risk and material changes.
+- Establish vulnerability SLAs, security alert triage, incident escalation, evidence retention, provider outage procedures, false-positive review and periodic tuning. Monitor wallets/transactions only where the product actually handles or facilitates them and the legal basis is established.
+- Repeat independent technical reviews after material changes to identity, authorization, contracts, escrow/payment, wallet/key management, smart contracts, cloud architecture or threat exposure; track findings through verified remediation and retest.
+
+#### 5. Procurement, investor and partner evidence
+
+- Compare Big Four providers and specialist firms on independence, scope depth, relevant technical/regulatory expertise, report quality, ability to retest, timelines and total cost. Big Four firms may carry broader institutional recognition; specialist firms may offer deeper focused technical work or better early-stage value. Validate both claims through references and the proposed team rather than assuming either category is automatically superior.
+- Many institutional customers, banking partners and investors may request a recent independent penetration test and SOC 2 evidence; expectations vary by counterparty, geography, product risk and maturity. Treat these as common diligence considerations, not universal legal requirements or a guarantee of funding/partnership.
+- Maintain a controlled assurance pack: current architecture and data-flow diagrams, policies, risk register, penetration-test executive summary, remediation/retest status, SOC 2 report when issued, ISO certificate and scope when achieved, legal perimeter memo, vendor/subprocessor register, incident/BCP evidence and dated control attestations. Share confidential reports only under appropriate NDA and access controls.
+
 ### Phase S5 — Continuous assurance
 
 1. Maintain threat models for identity, contracts, high-value property/business deals, P2P and any future crypto withdrawal or payment capability.
