@@ -339,7 +339,7 @@ test('contracts and enquiries lists recover after transient API failures', async
   await page.route('**/api/**', async route => {
     const request = route.request();
     const url = new URL(request.url());
-    const path = url.pathname.replace(/^\\/api/, '');
+    const path = url.pathname.replace(/^\/api/, '');
     const method = request.method();
 
     if (path === '/auth/me' && method === 'GET') {
