@@ -658,6 +658,7 @@ class AuthController {
   @HttpCode(200)
   async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
     const token = sessionTokenFrom(request);
+    response.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' });
     if (databasePool && token) {
       const client = await databasePool.connect();
       try {
@@ -680,7 +681,6 @@ class AuthController {
         client.release();
       }
     }
-    response.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' });
     return { success: true };
   }
 }
