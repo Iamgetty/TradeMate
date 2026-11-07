@@ -2746,7 +2746,7 @@ function er(t){var e=$("#er");if(e)e.textContent=t}
 /* LIVE: sign in / sign up against the TradeMate API (email + password, cookie session) */
 function startCode(next){if(!CONNECTED){next();return}
  var em=S.id.trim().toLowerCase(),up=S.flow==="up";
- api("POST","/auth/"+(up?"register":"login"),up?{email:em,password:S.pw,displayName:(S.name||"").trim()}:{email:em,password:S.pw}).then(function(r){window.applyUser(r.user);enter()}).catch(function(e){er(e.message)})}
+ api("POST","/auth/"+(up?"register":"login"),up?{email:em,password:S.pw,displayName:(S.name||"").trim()}:{email:em,password:S.pw}).then(function(r){if(CONNECTED&&(!r||!r.user||!r.user.id))throw new Error("Sign-in did not return an account.");window.applyUser(r.user);enter()}).catch(function(e){er(e.message)})}
 function verify(code){if(!CONNECTED){window.toast("Local mode: no server configured, this device only");enter()}}
 function kindOk(){return !CONNECTED||S.kind==="email"}
 var MOBILE_MSG="Mobile number sign-in is not available yet. Use your email address.";
@@ -2785,7 +2785,7 @@ R.addEventListener("keydown",function(e){var t=e.target;if(t.classList&&t.classL
 $("#bk2").onclick=function(){show("land")};
 $("#ab5").innerHTML=Object.keys(DS).map(function(k){return '<div class="wc" style="--c:'+COL[k]+'"><span class="ic">'+IC[k]+'</span><div><h3>'+k+'</h3><p>'+DS[k]+'</p></div></div>'}).join("");
 R.addEventListener("click",function(e){if(e.target.closest("[data-about]")){show("about");return}var kk=e.target.closest("[data-k]");if(kk){kact(kk);return}var l=e.target.closest("[data-login]");if(l){startFlow(l.dataset.login);return}var g=e.target.closest("[data-go]");if(g){var t=g.dataset.go==="top"?sc:R.getElementById(g.dataset.go);if(g.dataset.go==="top")sc.scrollTo({top:0,behavior:"smooth"});else if(t)sc.scrollTo({top:t.offsetTop-70,behavior:"smooth"})}});
-if(CONNECTED){host.style.visibility="hidden";api("GET","/auth/me").then(function(r){window.applyUser(r.user);host.style.display="none";try{window.draw();navH()}catch(e){}releaseAuthGate()}).catch(function(error){/* Keep the app shell gated until a fresh login succeeds. */resetSession();st.stack=[];st.tab="Home";try{window.openLanding()}catch(e){host.style.display="block";show("land")}if(!(error&&error.status===401))setTimeout(function(){toast("Could not verify your session. Check your connection and sign in again.")},0)}).then(function(){host.style.visibility="";if(window.tmReveal)window.tmReveal()})}else if(window.tmReveal)window.tmReveal();
+if(CONNECTED){host.style.visibility="hidden";api("GET","/auth/me").then(function(r){if(!r||!r.user||!r.user.id)throw new Error("Session verification returned no account.");window.applyUser(r.user);host.style.display="none";try{window.draw();navH()}catch(e){}releaseAuthGate()}).catch(function(error){/* Keep the app shell gated until a fresh login succeeds. */resetSession();st.stack=[];st.tab="Home";try{window.openLanding()}catch(e){host.style.display="block";show("land")}if(!(error&&error.status===401))setTimeout(function(){toast("Could not verify your session. Check your connection and sign in again.")},0)}).then(function(){host.style.visibility="";if(window.tmReveal)window.tmReveal()})}else if(window.tmReveal)window.tmReveal();
 })();
 
 /* ---- TradeMate polish layer v83: small, additive, theme-aware (existing --vars; no colour or layout changes elsewhere) ---- */
