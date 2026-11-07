@@ -55,6 +55,8 @@ function section(startText, endText) {
     "failed verification must not render the authenticated shell");
   assert.doesNotMatch(failure, /releaseAuthGate\(\)/,
     "failed verification must keep the app shell hidden until login succeeds");
+  assert.match(startup, /if\(!r\|\|!r\.user\|\|!r\.user\.id\)throw new Error/,
+    "session verification must fail closed without a valid account identity");
   assert.match(source, /host\.style\.display="none";releaseAuthGate\(\)/,
     "a successful login must release the authenticated shell gate");
 })();
