@@ -1309,7 +1309,7 @@ function markets(categoryPage){
  if(st.mm==="Forex"||st.mm==="Crypto")ensureFXFeed();
  var rawList=st.mm==="NFTs"?NFTLIVE:items.filter(function(i){return i.m===st.mm&&(st.mm!=="Forex"||((i.assetClass||"Currency Pairs")===fxGroup))&&(st.mm!=="Crypto"||!i.assetClass)&&(!st.q||i.n.toLowerCase().indexOf(st.q.toLowerCase())>=0)});
  if(st.mm==="Forex"&&fxGroup!=="Currency Pairs")loadMarketQuotes(fxGroup,rawList);
- var list=st.mm==="NFTs"?rawList:rawList.filter(hasCurrentMarketFeed);
+ var list=st.mm==="NFTs"?rawList:rawList.filter(function(i){return i.srv||hasCurrentMarketFeed(i)});
  if(st.mm==="NFTs"){
   var chains=[["ethereum","Ethereum"],["polygon","Polygon"],["arbitrum","Arbitrum"],["base","Base"],["avalanche","Avalanche"]];
    return nftHub(list,chains);
