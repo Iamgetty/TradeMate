@@ -170,6 +170,12 @@ function loadStoreFunctions(connected, state, items, ads, storage) {
     "stale request errors must not be surfaced as errors for the new account");
   assert.ok(source.includes("st.subs=[];st.links={};st.joinedAff=false;st.pins=[];st.fv={};st.feedPosts=[]"),
     "account switches must clear remaining account-scoped state and feed cache");
+  assert.ok(source.includes("st.twofaStatus=null;st.twofaSetup=null"),
+    "account switches must discard any pending authenticator setup secret");
+  assert.ok(source.includes('tlClose("tlView")'),
+    "account switches must close the previous account's timeline overlay");
+  assert.ok(source.includes("function abortAccountRequests()"),
+    "account changes must abort outstanding authenticated requests");
   console.log("Account isolation regression tests passed.");
 })().catch(error => {
   console.error(error);
