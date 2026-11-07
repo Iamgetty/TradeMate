@@ -72,3 +72,31 @@ test('support and notification controllers are registered and enforce authentica
   });
   assert.equal(supportResponse.status, 401);
 });
+
+test('organization verification document endpoints require an authenticated session', async () => {
+  const organizationId = '123e4567-e89b-42d3-a456-426614174000';
+  const listResponse = await fetch(baseUrl + '/api/organizations/' + organizationId + '/documents');
+  assert.equal(listResponse.status, 401);
+
+  const uploadResponse = await fetch(baseUrl + '/api/organizations/' + organizationId + '/documents', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ files: [{ fileName: 'certificate.pdf', mimeType: 'application/pdf', dataBase64: 'YQ==' }] }),
+  });
+  assert.equal(uploadResponse.status, 401);
+});
+
+test('contract proposal response and cancellation endpoints require an authenticated session', async () => {
+  const contractId = '123e4567-e89b-42d3-a456-426614174000';
+  const respondResponse = await fetch(baseUrl + '/api/market/contracts/' + contractId + '/respond', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ decision: 'accept' }),
+  });
+  assert.equal(respondResponse.status, 401);
+
+  const cancelResponse = await fetch(baseUrl + '/api/market/contracts/' + contractId + '/cancel', {
+    method: 'PATCH',
+  });
+  assert.equal(cancelResponse.status, 401);
+});

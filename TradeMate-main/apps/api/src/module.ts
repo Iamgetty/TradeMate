@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { Pool } from 'pg';
 import { createRlsAwarePool } from './database-context';
-import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
+import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -71,20 +71,22 @@ const base32Decode = (input: string) => {
   }
   return Buffer.from(output);
 };
-const verifyTotp = (secret: string, code: string) => {
-  if (!/^\d{6}$/.test(code)) return false;
+const verifyTotp = (secret: string, code: string): number | null => {
+  if (!/^\d{6}$/.test(code)) return null;
   const key = base32Decode(secret);
   const counter = Math.floor(Date.now() / 30000);
   for (let offset = -1; offset <= 1; offset++) {
+    const matchedCounter = counter + offset;
+    if (matchedCounter < 0) continue;
     const buffer = Buffer.alloc(8);
-    buffer.writeBigUInt64BE(BigInt(counter + offset));
+    buffer.writeBigUInt64BE(BigInt(matchedCounter));
     const digest = createHmac('sha1', key).update(buffer).digest();
     const position = digest[digest.length - 1] & 15;
     const binary = ((digest[position] & 127) << 24) | ((digest[position + 1] & 255) << 16) | ((digest[position + 2] & 255) << 8) | (digest[position + 3] & 255);
     const expected = String(binary % 1000000).padStart(6, '0');
-    if (timingSafeEqual(Buffer.from(expected), Buffer.from(code))) return true;
+    if (timingSafeEqual(Buffer.from(expected), Buffer.from(code))) return matchedCounter;
   }
-  return false;
+  return null;
 };
 
 const tokenDigest = (token: string) => createHash('sha256').update(token).digest('hex');
@@ -283,15 +285,26 @@ class AuthController {
     const displayName = typeof body?.displayName === 'string' ? body.displayName.trim() : '';
     if (displayName.length < 2 || displayName.length > 24) throw new BadRequestException('Your nickname must be between 2 and 24 characters.');
     const userId = session.rows[0].id as string;
-    const updated = await databasePool.query(
-      'UPDATE users SET display_name = $1, updated_at = now() WHERE id = $2 RETURNING id, email, display_name, country_code',
-      [displayName, userId],
-    );
-    await databasePool.query(
-      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.display_name_updated', 'user', $1, '{}'::jsonb)",
-      [userId],
-    );
-    return { user: updated.rows[0] };
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const updated = await client.query(
+        'UPDATE users SET display_name = $1, updated_at = now() WHERE id = $2 RETURNING id, email, display_name, country_code',
+        [displayName, userId],
+      );
+      if (!updated.rowCount) throw new NotFoundException('User profile not found.');
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.display_name_updated', 'user', $1, '{}'::jsonb)",
+        [userId],
+      );
+      await client.query('COMMIT');
+      return { user: updated.rows[0] };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Post('change-password')
@@ -364,7 +377,7 @@ class AuthController {
     if (existing.rows[0]?.totp_enabled) throw new ConflictException('Two-factor authentication is already enabled.');
     const secret = base32Encode(randomBytes(20));
     await databasePool.query(
-      'INSERT INTO user_auth_security (user_id, totp_secret_encrypted, totp_enabled, setup_expires_at) VALUES ($1,$2,false,now()+interval \'15 minutes\') ON CONFLICT (user_id) DO UPDATE SET totp_secret_encrypted=EXCLUDED.totp_secret_encrypted, totp_enabled=false, setup_expires_at=EXCLUDED.setup_expires_at, updated_at=now()',
+      'INSERT INTO user_auth_security (user_id, totp_secret_encrypted, totp_enabled, setup_expires_at) VALUES ($1,$2,false,now()+interval \'15 minutes\') ON CONFLICT (user_id) DO UPDATE SET totp_secret_encrypted=EXCLUDED.totp_secret_encrypted, totp_enabled=false, last_totp_counter=NULL, setup_expires_at=EXCLUDED.setup_expires_at, updated_at=now()',
       [session.rows[0].id, encryptTotpSecret(secret)],
     );
     const label = encodeURIComponent('TradeMate:' + session.rows[0].email);
@@ -379,16 +392,39 @@ class AuthController {
     if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
     const session = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired.');
-    const rateKey = await enforceTotpRateLimit(request, session.rows[0].id);
-    const result = await databasePool.query('SELECT totp_secret_encrypted, setup_expires_at FROM user_auth_security WHERE user_id=$1 AND totp_enabled=false', [session.rows[0].id]);
-    if (!result.rowCount || !result.rows[0].setup_expires_at || new Date(result.rows[0].setup_expires_at).getTime() < Date.now()) throw new ConflictException('Start authenticator setup again; the setup has expired.');
-    let valid = false;
-    try { valid = verifyTotp(decryptTotpSecret(result.rows[0].totp_secret_encrypted), String(body?.code || '')); } catch { valid = false; }
-    if (!valid) throw new UnauthorizedException('That authenticator code is invalid. Check the code and try again.');
-    await databasePool.query('DELETE FROM auth_rate_limits WHERE key_hash=$1', [rateKey]);
-    await databasePool.query('UPDATE user_auth_security SET totp_enabled=true, totp_confirmed_at=now(), setup_expires_at=NULL, updated_at=now() WHERE user_id=$1', [session.rows[0].id]);
-    await databasePool.query("INSERT INTO audit_events (actor_user_id,event_type,entity_type,entity_id,metadata) VALUES ($1,'auth.totp_enabled','user',$1,'{}'::jsonb)", [session.rows[0].id]);
-    return { success: true, enabled: true };
+    const userId = session.rows[0].id;
+    const rateKey = await enforceTotpRateLimit(request, userId);
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        'SELECT totp_secret_encrypted, setup_expires_at, last_totp_counter FROM user_auth_security WHERE user_id=$1 AND totp_enabled=false FOR UPDATE',
+        [userId],
+      );
+      if (!result.rowCount || !result.rows[0].setup_expires_at || new Date(result.rows[0].setup_expires_at).getTime() < Date.now()) {
+        throw new ConflictException('Start authenticator setup again; the setup has expired.');
+      }
+      let matchedCounter: number | null = null;
+      try { matchedCounter = verifyTotp(decryptTotpSecret(result.rows[0].totp_secret_encrypted), String(body?.code || '')); } catch { matchedCounter = null; }
+      const lastCounter = result.rows[0].last_totp_counter == null ? null : BigInt(result.rows[0].last_totp_counter);
+      if (matchedCounter === null || (lastCounter !== null && BigInt(matchedCounter) <= lastCounter)) {
+        throw new UnauthorizedException('That authenticator code is invalid or has already been used.');
+      }
+      const updated = await client.query(
+        'UPDATE user_auth_security SET totp_enabled=true, last_totp_counter=$2, totp_confirmed_at=now(), setup_expires_at=NULL, updated_at=now() WHERE user_id=$1 AND totp_enabled=false AND (last_totp_counter IS NULL OR last_totp_counter < $2) RETURNING user_id',
+        [userId, matchedCounter],
+      );
+      if (!updated.rowCount) throw new UnauthorizedException('That authenticator code has already been used. Generate a new code and try again.');
+      await client.query('DELETE FROM auth_rate_limits WHERE key_hash=$1', [rateKey]);
+      await client.query("INSERT INTO audit_events (actor_user_id,event_type,entity_type,entity_id,metadata) VALUES ($1,'auth.totp_enabled','user',$1,'{}'::jsonb)", [userId]);
+      await client.query('COMMIT');
+      return { success: true, enabled: true };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Post('2fa/disable')
@@ -398,16 +434,37 @@ class AuthController {
     if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
     const session = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired.');
-    const rateKey = await enforceTotpRateLimit(request, session.rows[0].id);
-    const result = await databasePool.query('SELECT totp_secret_encrypted FROM user_auth_security WHERE user_id=$1 AND totp_enabled=true', [session.rows[0].id]);
-    if (!result.rowCount) throw new ConflictException('Two-factor authentication is not enabled.');
-    let valid = false;
-    try { valid = verifyTotp(decryptTotpSecret(result.rows[0].totp_secret_encrypted), String(body?.code || '')); } catch { valid = false; }
-    if (!valid) throw new UnauthorizedException('That authenticator code is invalid.');
-    await databasePool.query('DELETE FROM auth_rate_limits WHERE key_hash=$1', [rateKey]);
-    await databasePool.query('UPDATE user_auth_security SET totp_enabled=false, totp_secret_encrypted=NULL, totp_confirmed_at=NULL, setup_expires_at=NULL, updated_at=now() WHERE user_id=$1', [session.rows[0].id]);
-    await databasePool.query("INSERT INTO audit_events (actor_user_id,event_type,entity_type,entity_id,metadata) VALUES ($1,'auth.totp_disabled','user',$1,'{}'::jsonb)", [session.rows[0].id]);
-    return { success: true, enabled: false };
+    const userId = session.rows[0].id;
+    const rateKey = await enforceTotpRateLimit(request, userId);
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        'SELECT totp_secret_encrypted, last_totp_counter FROM user_auth_security WHERE user_id=$1 AND totp_enabled=true FOR UPDATE',
+        [userId],
+      );
+      if (!result.rowCount) throw new ConflictException('Two-factor authentication is not enabled.');
+      let matchedCounter: number | null = null;
+      try { matchedCounter = verifyTotp(decryptTotpSecret(result.rows[0].totp_secret_encrypted), String(body?.code || '')); } catch { matchedCounter = null; }
+      const lastCounter = result.rows[0].last_totp_counter == null ? null : BigInt(result.rows[0].last_totp_counter);
+      if (matchedCounter === null || (lastCounter !== null && BigInt(matchedCounter) <= lastCounter)) {
+        throw new UnauthorizedException('That authenticator code is invalid or has already been used.');
+      }
+      const updated = await client.query(
+        'UPDATE user_auth_security SET totp_enabled=false, last_totp_counter=$2, totp_secret_encrypted=NULL, totp_confirmed_at=NULL, setup_expires_at=NULL, updated_at=now() WHERE user_id=$1 AND totp_enabled=true AND (last_totp_counter IS NULL OR last_totp_counter < $2) RETURNING user_id',
+        [userId, matchedCounter],
+      );
+      if (!updated.rowCount) throw new UnauthorizedException('That authenticator code has already been used. Generate a new code and try again.');
+      await client.query('DELETE FROM auth_rate_limits WHERE key_hash=$1', [rateKey]);
+      await client.query("INSERT INTO audit_events (actor_user_id,event_type,entity_type,entity_id,metadata) VALUES ($1,'auth.totp_disabled','user',$1,'{}'::jsonb)", [userId]);
+      await client.query('COMMIT');
+      return { success: true, enabled: false };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Post('2fa/verify')
@@ -435,13 +492,25 @@ class AuthController {
         await client.query('COMMIT');
         throw new HttpException('Too many authenticator attempts. Please wait 15 minutes before trying again.', HttpStatus.TOO_MANY_REQUESTS);
       }
-      const secretResult = await client.query('SELECT totp_secret_encrypted,totp_enabled FROM user_auth_security WHERE user_id=$1', [challenge.rows[0].user_id]);
-      let valid = false;
-      try { valid = Boolean(secretResult.rows[0]?.totp_enabled && verifyTotp(decryptTotpSecret(secretResult.rows[0].totp_secret_encrypted), code)); } catch { valid = false; }
-      if (!valid) {
+      const secretResult = await client.query('SELECT totp_secret_encrypted,totp_enabled,last_totp_counter FROM user_auth_security WHERE user_id=$1 FOR UPDATE', [challenge.rows[0].user_id]);
+      let matchedCounter: number | null = null;
+      try {
+        if (secretResult.rows[0]?.totp_enabled) matchedCounter = verifyTotp(decryptTotpSecret(secretResult.rows[0].totp_secret_encrypted), code);
+      } catch { matchedCounter = null; }
+      const lastCounter = secretResult.rows[0]?.last_totp_counter == null ? null : BigInt(secretResult.rows[0].last_totp_counter);
+      if (matchedCounter === null || (lastCounter !== null && BigInt(matchedCounter) <= lastCounter)) {
         await client.query('UPDATE auth_login_challenges SET attempts=attempts+1 WHERE id=$1', [challenge.rows[0].id]);
         await client.query('COMMIT');
-        throw new UnauthorizedException('The authenticator code is incorrect.');
+        throw new UnauthorizedException('The authenticator code is incorrect or has already been used.');
+      }
+      const consumedCounter = await client.query(
+        'UPDATE user_auth_security SET last_totp_counter=$2, updated_at=now() WHERE user_id=$1 AND totp_enabled=true AND (last_totp_counter IS NULL OR last_totp_counter < $2) RETURNING user_id',
+        [challenge.rows[0].user_id, matchedCounter],
+      );
+      if (!consumedCounter.rowCount) {
+        await client.query('UPDATE auth_login_challenges SET attempts=attempts+1 WHERE id=$1', [challenge.rows[0].id]);
+        await client.query('COMMIT');
+        throw new UnauthorizedException('The authenticator code has already been used.');
       }
       await client.query('UPDATE auth_login_challenges SET consumed_at=now() WHERE id=$1', [challenge.rows[0].id]);
       await client.query('DELETE FROM auth_rate_limits WHERE key_hash IN ($1, $2)', [totpRateKey, tokenDigest((request.ip || 'unknown') + '|' + String(challenge.rows[0].email).trim().toLowerCase())]);
@@ -492,22 +561,33 @@ class AuthController {
     if (!token) throw new UnauthorizedException('Please sign in to manage sessions.');
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid session identifier.');
     const digest = tokenDigest(token);
-    const current = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [digest],
-    );
-    if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
-    const result = await databasePool.query(
-      'DELETE FROM user_sessions WHERE id = $1 AND user_id = $2 RETURNING (token_hash = $3) AS is_current',
-      [id, current.rows[0].id, digest],
-    );
-    if (!result.rowCount) throw new NotFoundException('Session not found.');
-    const isCurrent = Boolean(result.rows[0].is_current);
+    const client = await databasePool.connect();
+    let isCurrent = false;
+    try {
+      await client.query('BEGIN');
+      const current = await client.query(
+        "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1 FOR UPDATE OF s",
+        [digest],
+      );
+      if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+      const result = await client.query(
+        'DELETE FROM user_sessions WHERE id = $1 AND user_id = $2 RETURNING (token_hash = $3) AS is_current',
+        [id, current.rows[0].id, digest],
+      );
+      if (!result.rowCount) throw new NotFoundException('Session not found.');
+      isCurrent = Boolean(result.rows[0].is_current);
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.session_revoked', 'user_session', $2, $3::jsonb)",
+        [current.rows[0].id, id, JSON.stringify({ current: isCurrent })],
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
     if (isCurrent) response.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' });
-    await databasePool.query(
-      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.session_revoked', 'user_session', $2, $3::jsonb)",
-      [current.rows[0].id, id, JSON.stringify({ current: isCurrent })],
-    );
     return { success: true, current: isCurrent };
   }
 
@@ -656,15 +736,25 @@ class PreferencesController {
       }
     }
     if (!Object.keys(update).length) throw new BadRequestException('No supported preferences were supplied.');
-    const result = await databasePool!.query(
-      'INSERT INTO user_preferences (user_id, preferences, updated_at) VALUES ($1, $2::jsonb, now()) ON CONFLICT (user_id) DO UPDATE SET preferences = user_preferences.preferences || EXCLUDED.preferences, updated_at = now() RETURNING preferences',
-      [userId, JSON.stringify(update)],
-    );
-    await databasePool!.query(
-      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'account.preferences_updated', 'user', $1, $2::jsonb)",
-      [userId, JSON.stringify({ keys: Object.keys(update) })],
-    );
-    return { preferences: { ...this.defaults(), ...result.rows[0].preferences } };
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        'INSERT INTO user_preferences (user_id, preferences, updated_at) VALUES ($1, $2::jsonb, now()) ON CONFLICT (user_id) DO UPDATE SET preferences = user_preferences.preferences || EXCLUDED.preferences, updated_at = now() RETURNING preferences',
+        [userId, JSON.stringify(update)],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'account.preferences_updated', 'user', $1, $2::jsonb)",
+        [userId, JSON.stringify({ keys: Object.keys(update) })],
+      );
+      await client.query('COMMIT');
+      return { preferences: { ...this.defaults(), ...result.rows[0].preferences } };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
 
@@ -859,15 +949,25 @@ class SupportController {
     const message = typeof body?.message === 'string' ? body.message.trim() : '';
     if (!['Idea', 'Bug', 'Complaint', 'Praise'].includes(type)) throw new BadRequestException('Choose a valid feedback type.');
     if (message.length < 3 || message.length > 10000) throw new BadRequestException('Feedback must be between 3 and 10,000 characters.');
-    const result = await databasePool!.query(
-      'INSERT INTO user_feedback (user_id, feedback_type, message) VALUES ($1,$2,$3) RETURNING id, feedback_type, message, status, created_at',
-      [userId, type, message],
-    );
-    await databasePool!.query(
-      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1,'feedback.submitted','user_feedback',$2,$3::jsonb)",
-      [userId, result.rows[0].id, JSON.stringify({ type })],
-    );
-    return { feedback: result.rows[0], message: 'Thank you. Your feedback has been submitted.' };
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        'INSERT INTO user_feedback (user_id, feedback_type, message) VALUES ($1,$2,$3) RETURNING id, feedback_type, message, status, created_at',
+        [userId, type, message],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1,'feedback.submitted','user_feedback',$2,$3::jsonb)",
+        [userId, result.rows[0].id, JSON.stringify({ type })],
+      );
+      await client.query('COMMIT');
+      return { feedback: result.rows[0], message: 'Thank you. Your feedback has been submitted.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
 
@@ -957,23 +1057,33 @@ class OrganizationsController {
     if (name.length < 2 || name.length > 120) {
       throw new BadRequestException('Business name must be between 2 and 120 characters.');
     }
-    const updated = await databasePool!.query(
-      `UPDATE organizations o
-       SET name = $1, updated_at = now()
-       WHERE o.id = $2
-         AND EXISTS (
-           SELECT 1 FROM organization_members om
-           WHERE om.organization_id = o.id AND om.user_id = $3 AND om.member_role = 'owner'
-         )
-       RETURNING o.id, o.name, o.organization_type, o.country_code, o.default_currency, o.status, o.updated_at`,
-      [name, id, userId],
-    );
-    if (!updated.rowCount) throw new NotFoundException('Business space not found or you are not its owner.');
-    await databasePool!.query(
-      "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, $2, 'organization.updated', 'organization', $2, $3::jsonb)",
-      [userId, id, JSON.stringify({ changed_fields: ['name'] })],
-    );
-    return { organization: updated.rows[0], message: 'Business profile updated.' };
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const updated = await client.query(
+        `UPDATE organizations o
+         SET name = $1, updated_at = now()
+         WHERE o.id = $2
+           AND EXISTS (
+             SELECT 1 FROM organization_members om
+             WHERE om.organization_id = o.id AND om.user_id = $3 AND om.member_role = 'owner'
+           )
+         RETURNING o.id, o.name, o.organization_type, o.country_code, o.default_currency, o.status, o.updated_at`,
+        [name, id, userId],
+      );
+      if (!updated.rowCount) throw new NotFoundException('Business space not found or you are not its owner.');
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, $2, 'organization.updated', 'organization', $2, $3::jsonb)",
+        [userId, id, JSON.stringify({ changed_fields: ['name'] })],
+      );
+      await client.query('COMMIT');
+      return { organization: updated.rows[0], message: 'Business profile updated.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Post(':id/documents')
@@ -990,8 +1100,10 @@ class OrganizationsController {
     if (!files.length || files.length > 4) throw new BadRequestException('Select between 1 and 4 documents.');
     const client = await databasePool!.connect();
     try {
-      const member = await client.query('SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
+      await client.query('BEGIN');
+      const member = await client.query('SELECT member_role FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
       if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
+      if (!organizationDocumentManagerRoleSchema.safeParse(member.rows[0].member_role).success) throw new ForbiddenException('Only organization owners and admins can upload verification documents.');
       const saved: Array<Record<string, unknown>> = [];
       for (const file of files) {
         const fileName = typeof file.fileName === 'string' ? file.fileName.trim().slice(0, 180) : '';
@@ -1012,7 +1124,11 @@ class OrganizationsController {
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'organization.documents_uploaded','organization',$2,$3::jsonb)",
         [userId, id, JSON.stringify({ count: saved.length })],
       );
+      await client.query('COMMIT');
       return { documents: saved };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
     } finally {
       client.release();
     }
@@ -1022,8 +1138,9 @@ class OrganizationsController {
   async organizationDocuments(@Req() request: Request, @Param('id') id: string) {
     parseUuidParam(id);
     const userId = await this.currentUser(request);
-    const member = await databasePool!.query('SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
+    const member = await databasePool!.query('SELECT member_role FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
     if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
+    if (!organizationDocumentManagerRoleSchema.safeParse(member.rows[0].member_role).success) throw new ForbiddenException('Only organization owners and admins can view verification documents.');
     const result = await databasePool!.query(
       'SELECT id, file_name, mime_type, file_size, review_status, created_at FROM organization_documents WHERE organization_id = $1 ORDER BY created_at DESC',
       [id],
@@ -1063,6 +1180,7 @@ class PublicListingsController {
     if (!Number.isSafeInteger(priceMinorUnits) || priceMinorUnits < 0) throw new BadRequestException('Enter a valid non-negative price.');
     let quantity: number | null = null;
     if (quantityText !== null) {
+      if (listingType === 'service') throw new BadRequestException('Service offers cannot have a quantity.');
       if (!/^\d{1,12}$/.test(quantityText) || !Number.isSafeInteger(Number(quantityText))) throw new BadRequestException('Quantity must be a whole number, or leave it blank.');
       quantity = Number(quantityText);
     }
@@ -1072,15 +1190,25 @@ class PublicListingsController {
     );
     if (!membership.rowCount) throw new BadRequestException('Create your business space before adding an offer.');
     const organization = membership.rows[0];
-    const created = await databasePool.query(
-      "INSERT INTO listings (seller_organization_id, title, description, listing_type, price_minor_units, currency_code, country_code, quantity_available, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'draft') RETURNING id, title, description, listing_type, price_minor_units::text AS price_minor_units, currency_code, country_code, quantity_available, status, created_at",
-      [organization.id, title, description, listingType, priceMinorUnits, organization.default_currency, organization.country_code, quantity],
-    );
-    await databasePool.query(
-      "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'listing.draft_created','listing',$3,$4::jsonb)",
-      [userId, organization.id, created.rows[0].id, JSON.stringify({ listing_type: listingType, business_status: organization.status })],
-    );
-    return { listing: created.rows[0], message: 'Offer saved as a draft. It is not publicly visible yet.' };
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const created = await client.query(
+        "INSERT INTO listings (seller_organization_id, title, description, listing_type, price_minor_units, currency_code, country_code, quantity_available, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'draft') RETURNING id, title, description, listing_type, price_minor_units::text AS price_minor_units, currency_code, country_code, quantity_available, status, created_at",
+        [organization.id, title, description, listingType, priceMinorUnits, organization.default_currency, organization.country_code, quantity],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'listing.draft_created','listing',$3,$4::jsonb)",
+        [userId, organization.id, created.rows[0].id, JSON.stringify({ listing_type: listingType, business_status: organization.status })],
+      );
+      await client.query('COMMIT');
+      return { listing: created.rows[0], message: 'Offer saved as a draft. It is not publicly visible yet.' };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Get('mine')
@@ -1196,29 +1324,39 @@ class PublicListingsController {
       if (!/^\d{1,12}$/.test(quantityText) || !Number.isSafeInteger(Number(quantityText))) throw new BadRequestException('Quantity must be a whole number, or leave it blank.');
       quantity = Number(quantityText);
     }
-    const updated = await databasePool.query(
-      `UPDATE listings l
-       SET title = $1, description = $2, listing_type = $3, price_minor_units = $4, quantity_available = $5, updated_at = now()
-       WHERE l.id = $6 AND l.status = 'draft'
-         AND EXISTS (
-           SELECT 1 FROM organization_members om
-           WHERE om.organization_id = l.seller_organization_id AND om.user_id = $7
-         )
-       RETURNING l.id, l.title, l.description, l.listing_type, l.price_minor_units::text AS price_minor_units,
-                 l.currency_code, l.country_code, l.quantity_available, l.status, l.created_at, l.updated_at`,
-      [title, description, listingType, priceMinorUnits, quantity, id, userId],
-    );
-    if (!updated.rowCount) {
-      const exists = await databasePool.query('SELECT status FROM listings WHERE id = $1', [id]);
-      if (!exists.rowCount) throw new NotFoundException('Offer not found.');
-      if (exists.rows[0].status !== 'draft') throw new ConflictException('Only draft offers can be edited.');
-      throw new NotFoundException('Offer not found in your business space.');
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const updated = await client.query(
+        `UPDATE listings l
+         SET title = $1, description = $2, listing_type = $3, price_minor_units = $4, quantity_available = $5, updated_at = now()
+         WHERE l.id = $6 AND l.status = 'draft'
+           AND EXISTS (
+             SELECT 1 FROM organization_members om
+             WHERE om.organization_id = l.seller_organization_id AND om.user_id = $7
+           )
+         RETURNING l.id, l.title, l.description, l.listing_type, l.price_minor_units::text AS price_minor_units,
+                   l.currency_code, l.country_code, l.quantity_available, l.status, l.created_at, l.updated_at`,
+        [title, description, listingType, priceMinorUnits, quantity, id, userId],
+      );
+      if (!updated.rowCount) {
+        const exists = await client.query('SELECT status FROM listings WHERE id = $1', [id]);
+        if (!exists.rowCount) throw new NotFoundException('Offer not found.');
+        if (exists.rows[0].status !== 'draft') throw new ConflictException('Only draft offers can be edited.');
+        throw new NotFoundException('Offer not found in your business space.');
+      }
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, (SELECT seller_organization_id FROM listings WHERE id = $3), 'listing.draft_updated', 'listing', $3, $2::jsonb)",
+        [userId, JSON.stringify({ listing_type: listingType }), id],
+      );
+      await client.query('COMMIT');
+      return { listing: updated.rows[0], message: 'Draft offer updated.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
     }
-    await databasePool.query(
-      "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) SELECT $1, l.seller_organization_id, 'listing.draft_updated', 'listing', l.id, $2::jsonb FROM listings l WHERE l.id = $3",
-      [userId, JSON.stringify({ listing_type: listingType }), id],
-    );
-    return { listing: updated.rows[0], message: 'Draft offer updated.' };
   }
 
   @Delete(':id')
@@ -1236,27 +1374,37 @@ class PublicListingsController {
     );
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const userId = session.rows[0].id as string;
-    const deleted = await databasePool.query(
-      `DELETE FROM listings l
-       WHERE l.id = $1 AND l.status = 'draft'
-         AND EXISTS (
-           SELECT 1 FROM organization_members om
-           WHERE om.organization_id = l.seller_organization_id AND om.user_id = $2
-         )
-       RETURNING l.id, l.seller_organization_id`,
-      [id, userId],
-    );
-    if (!deleted.rowCount) {
-      const exists = await databasePool.query('SELECT status FROM listings WHERE id = $1', [id]);
-      if (!exists.rowCount) throw new NotFoundException('Offer not found.');
-      if (exists.rows[0].status !== 'draft') throw new ConflictException('Only draft offers can be deleted.');
-      throw new NotFoundException('Offer not found in your business space.');
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const deleted = await client.query(
+        `DELETE FROM listings l
+         WHERE l.id = $1 AND l.status = 'draft'
+           AND EXISTS (
+             SELECT 1 FROM organization_members om
+             WHERE om.organization_id = l.seller_organization_id AND om.user_id = $2
+           )
+         RETURNING l.id, l.seller_organization_id`,
+        [id, userId],
+      );
+      if (!deleted.rowCount) {
+        const exists = await client.query('SELECT status FROM listings WHERE id = $1', [id]);
+        if (!exists.rowCount) throw new NotFoundException('Offer not found.');
+        if (exists.rows[0].status !== 'draft') throw new ConflictException('Only draft offers can be deleted.');
+        throw new NotFoundException('Offer not found in your business space.');
+      }
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, $2, 'listing.draft_deleted', 'listing', $3, '{}'::jsonb)",
+        [userId, deleted.rows[0].seller_organization_id, deleted.rows[0].id],
+      );
+      await client.query('COMMIT');
+      return { success: true, id: deleted.rows[0].id, message: 'Draft offer deleted.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
     }
-    await databasePool.query(
-      "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, $2, 'listing.draft_deleted', 'listing', $3, '{}'::jsonb)",
-      [userId, deleted.rows[0].seller_organization_id, deleted.rows[0].id],
-    );
-    return { success: true, id: deleted.rows[0].id, message: 'Draft offer deleted.' };
   }
 
   @Get(':id')
@@ -1389,31 +1537,42 @@ class EnquiriesController {
       throw new BadRequestException('Your enquiry must be between 5 and 2,000 characters.');
     }
 
-    const listing = await databasePool!.query(
-      `SELECT l.id, l.seller_organization_id, o.name AS seller_name
-       FROM listings l
-       JOIN organizations o ON o.id = l.seller_organization_id
-       WHERE l.id = $1 AND l.status = 'published' AND o.status = 'active'
-       LIMIT 1`,
-      [listingId],
-    );
-    if (!listing.rowCount) throw new NotFoundException('This listing is not available for enquiries.');
-    const target = listing.rows[0];
-    const sellerMembership = await databasePool!.query(
-      'SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1',
-      [target.seller_organization_id, userId],
-    );
-    if (sellerMembership.rowCount) throw new BadRequestException('You cannot send an enquiry about your own listing.');
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const listing = await client.query(
+        `SELECT l.id, l.seller_organization_id, o.name AS seller_name
+         FROM listings l
+         JOIN organizations o ON o.id = l.seller_organization_id
+         WHERE l.id = $1 AND l.status = 'published' AND o.status = 'active'
+         LIMIT 1
+         FOR SHARE OF l, o`,
+        [listingId],
+      );
+      if (!listing.rowCount) throw new NotFoundException('This listing is not available for enquiries.');
+      const target = listing.rows[0];
+      const sellerMembership = await client.query(
+        'SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1',
+        [target.seller_organization_id, userId],
+      );
+      if (sellerMembership.rowCount) throw new BadRequestException('You cannot send an enquiry about your own listing.');
 
-    const created = await databasePool!.query(
-      "INSERT INTO marketplace_enquiries (listing_id, buyer_user_id, message, status) VALUES ($1, $2, $3, 'open') RETURNING id, listing_id, buyer_user_id, message, status, created_at",
-      [listingId, userId, message],
-    );
-    await databasePool!.query(
-      "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, $2, 'marketplace.enquiry_created', 'enquiry', $3, $4::jsonb)",
-      [userId, target.seller_organization_id, created.rows[0].id, JSON.stringify({ listing_id: listingId })],
-    );
-    return { data: { ...created.rows[0], seller_name: target.seller_name }, message: 'Enquiry sent to the seller.' };
+      const created = await client.query(
+        "INSERT INTO marketplace_enquiries (listing_id, buyer_user_id, message, status) VALUES ($1, $2, $3, 'open') RETURNING id, listing_id, buyer_user_id, message, status, created_at",
+        [listingId, userId, message],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, $2, 'marketplace.enquiry_created', 'enquiry', $3, $4::jsonb)",
+        [userId, target.seller_organization_id, created.rows[0].id, JSON.stringify({ listing_id: listingId })],
+      );
+      await client.query('COMMIT');
+      return { data: { ...created.rows[0], seller_name: target.seller_name }, message: 'Enquiry sent to the seller.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   private async authorizedEnquiry(enquiryId: string, userId: string) {
@@ -1648,44 +1807,55 @@ class MarketplaceContractsController {
     const amountParts = amountText.split(".");
     const amountMinorUnits = (BigInt(amountParts[0]) * 100n + BigInt(((amountParts[1] || "") + "00").slice(0, 2))).toString();
 
-    const listing = await databasePool!.query(
-      `SELECT l.id, l.title, l.listing_type, l.seller_organization_id, l.currency_code,
-              l.status, o.status AS organization_status
-       FROM listings l
-       JOIN organizations o ON o.id = l.seller_organization_id
-       WHERE l.id = $1 AND l.status = 'published' AND o.status = 'active'
-         AND l.listing_type IN ('service', 'b2b')
-       LIMIT 1`,
-      [listingId],
-    );
-    if (!listing.rowCount) throw new NotFoundException('This published Services or B2B offer is not available for a contract.');
-    const offer = listing.rows[0];
-    const sellerMembership = await databasePool!.query(
-      'SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1',
-      [offer.seller_organization_id, buyerId],
-    );
-    if (sellerMembership.rowCount) throw new BadRequestException('You cannot propose a contract to your own business space.');
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const listing = await client.query(
+        `SELECT l.id, l.title, l.listing_type, l.seller_organization_id, l.currency_code,
+                l.status, o.status AS organization_status
+         FROM listings l
+         JOIN organizations o ON o.id = l.seller_organization_id
+         WHERE l.id = $1 AND l.status = 'published' AND o.status = 'active'
+           AND l.listing_type IN ('service', 'b2b')
+         LIMIT 1
+         FOR SHARE OF l, o`,
+        [listingId],
+      );
+      if (!listing.rowCount) throw new NotFoundException('This published Services or B2B offer is not available for a contract.');
+      const offer = listing.rows[0];
+      const sellerMembership = await client.query(
+        'SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1',
+        [offer.seller_organization_id, buyerId],
+      );
+      if (sellerMembership.rowCount) throw new BadRequestException('You cannot propose a contract to your own business space.');
 
-    const created = await databasePool!.query(
-      `INSERT INTO marketplace_contracts
-       (listing_id, buyer_user_id, seller_organization_id, title, scope, terms,
-        amount_minor_units, currency_code, requested_start_date, requested_completion_date, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'proposed')
-       RETURNING id, listing_id, buyer_user_id, seller_organization_id, title, scope, terms,
-                 amount_minor_units::text AS amount_minor_units, currency_code,
-                 requested_start_date, requested_completion_date, status, created_at`,
-      [listingId, buyerId, offer.seller_organization_id, offer.title, scope, terms,
-       String(amountMinorUnits), offer.currency_code, startDate, completionDate],
-    );
-    await databasePool!.query(
-      "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_proposed','contract',$3,$4::jsonb)",
-      [buyerId, offer.seller_organization_id, created.rows[0].id, JSON.stringify({ listing_id: listingId, listing_type: offer.listing_type })],
-    );
-    await databasePool!.query(
-      "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', 'New contract proposal', $1, 'doc' FROM organization_members om WHERE om.organization_id = $2 AND om.user_id <> $3 AND om.member_role IN ('owner','admin')",
-      ['A buyer sent a proposal for ' + offer.title + '.', offer.seller_organization_id, buyerId],
-    );
-    return { data: created.rows[0], message: 'Contract proposal sent to the business for review.' };
+      const created = await client.query(
+        `INSERT INTO marketplace_contracts
+         (listing_id, buyer_user_id, seller_organization_id, title, scope, terms,
+          amount_minor_units, currency_code, requested_start_date, requested_completion_date, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'proposed')
+         RETURNING id, listing_id, buyer_user_id, seller_organization_id, title, scope, terms,
+                   amount_minor_units::text AS amount_minor_units, currency_code,
+                   requested_start_date, requested_completion_date, status, created_at`,
+        [listingId, buyerId, offer.seller_organization_id, offer.title, scope, terms,
+         String(amountMinorUnits), offer.currency_code, startDate, completionDate],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_proposed','contract',$3,$4::jsonb)",
+        [buyerId, offer.seller_organization_id, created.rows[0].id, JSON.stringify({ listing_id: listingId, listing_type: offer.listing_type })],
+      );
+      await client.query(
+        "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', 'New contract proposal', $1, 'doc' FROM organization_members om WHERE om.organization_id = $2 AND om.user_id <> $3 AND om.member_role IN ('owner','admin')",
+        ['A buyer sent a proposal for ' + offer.title + '.', offer.seller_organization_id, buyerId],
+      );
+      await client.query('COMMIT');
+      return { data: created.rows[0], message: 'Contract proposal sent to the business for review.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Get('mine')
@@ -1752,7 +1922,7 @@ class MarketplaceContractsController {
       const status = body.decision === 'accept' ? 'accepted' : 'rejected';
       const updated = await client.query(
         `UPDATE marketplace_contracts
-         SET status = $2, accepted_by_user_id = CASE WHEN $2 = 'accepted' THEN $3 ELSE NULL END,
+         SET status = $2, accepted_by_user_id = CASE WHEN $2 = 'accepted' THEN $3::uuid ELSE NULL::uuid END,
              accepted_at = CASE WHEN $2 = 'accepted' THEN now() ELSE NULL END, updated_at = now()
          WHERE id = $1
          RETURNING id, status, accepted_by_user_id, accepted_at, updated_at`,
@@ -2260,20 +2430,30 @@ class PublicProfilesController {
     if (highlights.length > 12 || JSON.stringify(highlights).length > 200000 || highlights.some((h) => !h || typeof h !== 'object' || typeof (h as any).id !== 'string' || typeof (h as any).title !== 'string' || (h as any).title.length > 20 || typeof (h as any).img !== 'string' || (h as any).img.length > 700000)) {
       throw new BadRequestException('Highlights are invalid or exceed the profile limits.');
     }
-    const result = await databasePool!.query(
-      `INSERT INTO user_profiles (user_id, bio, instagram_username, x_username, website_url, profile_photo_data, cover_photo_data, highlights)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)
-       ON CONFLICT (user_id) DO UPDATE SET bio=EXCLUDED.bio, instagram_username=EXCLUDED.instagram_username,
-         x_username=EXCLUDED.x_username, website_url=EXCLUDED.website_url, profile_photo_data=EXCLUDED.profile_photo_data,
-         cover_photo_data=EXCLUDED.cover_photo_data, highlights=EXCLUDED.highlights, updated_at=now()
-       RETURNING bio, instagram_username, x_username, website_url, profile_photo_data, cover_photo_data, highlights`,
-      [userId, bio, instagram, x, website, photo, cover, JSON.stringify(highlights)],
-    );
-    await databasePool!.query(
-      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.public_details_updated', 'user', $1, '{}'::jsonb)",
-      [userId],
-    );
-    return { profile: result.rows[0] };
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        `INSERT INTO user_profiles (user_id, bio, instagram_username, x_username, website_url, profile_photo_data, cover_photo_data, highlights)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)
+         ON CONFLICT (user_id) DO UPDATE SET bio=EXCLUDED.bio, instagram_username=EXCLUDED.instagram_username,
+           x_username=EXCLUDED.x_username, website_url=EXCLUDED.website_url, profile_photo_data=EXCLUDED.profile_photo_data,
+           cover_photo_data=EXCLUDED.cover_photo_data, highlights=EXCLUDED.highlights, updated_at=now()
+         RETURNING bio, instagram_username, x_username, website_url, profile_photo_data, cover_photo_data, highlights`,
+        [userId, bio, instagram, x, website, photo, cover, JSON.stringify(highlights)],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.public_details_updated', 'user', $1, '{}'::jsonb)",
+        [userId],
+      );
+      await client.query('COMMIT');
+      return { profile: result.rows[0] };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Post(':id/follow')
@@ -2282,17 +2462,27 @@ class PublicProfilesController {
     const userId = await this.currentUser(request);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid profile id.');
     if (id === userId) throw new BadRequestException('You cannot follow your own profile.');
-    const result = await databasePool!.query(
-      "INSERT INTO user_follows (follower_user_id, followed_user_id) SELECT $1, u.id FROM users u WHERE u.id=$2 AND u.status='active' ON CONFLICT DO NOTHING RETURNING followed_user_id",
-      [userId, id],
-    );
-    const exists = await databasePool!.query("SELECT 1 FROM users WHERE id=$1 AND status='active'", [id]);
-    if (!exists.rowCount) throw new NotFoundException('Profile not found.');
-    if (result.rowCount) await databasePool!.query(
-      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.followed', 'user', $2, '{}'::jsonb)",
-      [userId, id],
-    );
-    return { following: true };
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const exists = await client.query("SELECT 1 FROM users WHERE id=$1 AND status='active' FOR SHARE", [id]);
+      if (!exists.rowCount) throw new NotFoundException('Profile not found.');
+      const result = await client.query(
+        'INSERT INTO user_follows (follower_user_id, followed_user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING followed_user_id',
+        [userId, id],
+      );
+      if (result.rowCount) await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.followed', 'user', $2, '{}'::jsonb)",
+        [userId, id],
+      );
+      await client.query('COMMIT');
+      return { following: true };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Delete(':id/follow')
@@ -2300,15 +2490,25 @@ class PublicProfilesController {
     parseUuidParam(id);
     const userId = await this.currentUser(request);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid profile id.');
-    const removed = await databasePool!.query(
-      'DELETE FROM user_follows WHERE follower_user_id=$1 AND followed_user_id=$2 RETURNING followed_user_id',
-      [userId, id],
-    );
-    if (removed.rowCount) await databasePool!.query(
-      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.unfollowed', 'user', $2, '{}'::jsonb)",
-      [userId, id],
-    );
-    return { following: false };
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const removed = await client.query(
+        'DELETE FROM user_follows WHERE follower_user_id=$1 AND followed_user_id=$2 RETURNING followed_user_id',
+        [userId, id],
+      );
+      if (removed.rowCount) await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.unfollowed', 'user', $2, '{}'::jsonb)",
+        [userId, id],
+      );
+      await client.query('COMMIT');
+      return { following: false };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
 
@@ -2368,7 +2568,7 @@ class CommunityFeedController {
     const userId = await this.currentUser(request);
     const title = typeof body?.title === 'string' ? body.title.trim() : '';
     const content = typeof body?.body === 'string' ? body.body.trim() : '';
-    if (title.length < 1 || title.length > 140) throw new BadRequestException('Post titles must be between 1 and 140 characters.');
+    if (title.length > 140) throw new BadRequestException('Post titles must be 140 characters or fewer.');
     if (content.length < 1 || content.length > 5000) throw new BadRequestException('Posts must be between 1 and 5,000 characters.');
     const type = body?.type === 'feedback' ? 'feedback' : body?.type === 'post' ? 'post' : null;
     if (!type) throw new BadRequestException('Choose post or feedback. Announcements are published by moderators.');
@@ -2496,16 +2696,26 @@ class CommunityFeedController {
   async pinPost(@Param('id') id: string, @Req() request: Request, @Body() body: { pinned?: boolean }) {
     parseUuidParam(id); parseBody(feedPinBodySchema, body);
     const userId = await this.currentUser(request);
-    const result = await databasePool!.query(
-      "UPDATE feed_posts SET pinned = $3, updated_at = now() WHERE id = $1 AND author_user_id = $2 AND status = 'published' RETURNING id, pinned",
-      [id, userId, body.pinned],
-    );
-    if (!result.rowCount) throw new NotFoundException('Post not found or you are not its owner.');
-    await databasePool!.query(
-      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'feed.post.pin_changed', 'feed_post', $2, $3::jsonb)",
-      [userId, id, JSON.stringify({ pinned: body.pinned })],
-    );
-    return { post: result.rows[0] };
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        "UPDATE feed_posts SET pinned = $3, updated_at = now() WHERE id = $1 AND author_user_id = $2 AND status = 'published' RETURNING id, pinned",
+        [id, userId, body.pinned],
+      );
+      if (!result.rowCount) throw new NotFoundException('Post not found or you are not its owner.');
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'feed.post.pin_changed', 'feed_post', $2, $3::jsonb)",
+        [userId, id, JSON.stringify({ pinned: body.pinned })],
+      );
+      await client.query('COMMIT');
+      return { post: result.rows[0] };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Post('posts/:id/reshare')
@@ -2602,18 +2812,27 @@ class CommunityFeedController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const content = typeof body?.body === 'string' ? body.body.trim() : '';
     if (content.length < 1 || content.length > 5000) throw new BadRequestException('Announcements must be between 1 and 5,000 characters.');
-    const result = await databasePool.query(
-      `INSERT INTO feed_posts (author_user_id, post_type, body, pinned)
-       VALUES (NULL, 'announcement', $1, true)
-       RETURNING id, post_type, body, pinned, created_at`,
-      [content],
-    );
-    
-    await databasePool.query(
-      "INSERT INTO audit_events (event_type, entity_type, entity_id, metadata) VALUES ('feed.announcement.created', 'feed_post', $1, $2::jsonb)",
-      [result.rows[0].id, JSON.stringify({ reviewer_key_id: keyId })],
-    );
-    return { announcement: result.rows[0] };
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        `INSERT INTO feed_posts (author_user_id, post_type, body, pinned)
+         VALUES (NULL, 'announcement', $1, true)
+         RETURNING id, post_type, body, pinned, created_at`,
+        [content],
+      );
+      await client.query(
+        "INSERT INTO audit_events (event_type, entity_type, entity_id, metadata) VALUES ('feed.announcement.created', 'feed_post', $1, $2::jsonb)",
+        [result.rows[0].id, JSON.stringify({ reviewer_key_id: keyId })],
+      );
+      await client.query('COMMIT');
+      return { announcement: result.rows[0] };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
 
