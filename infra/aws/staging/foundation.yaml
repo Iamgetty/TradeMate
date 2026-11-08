@@ -247,20 +247,25 @@ Resources:
   AlbSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Public HTTPS/HTTP ingress for TradeMate staging ALB
+      GroupDescription: Private ALB ingress only from the Cloudflare Tunnel connector
       VpcId: !Ref Vpc
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
-          CidrIp: 0.0.0.0/0
+          SourceSecurityGroupId: !Ref CloudflareTunnelSecurityGroup
       Tags:
         - Key: Name
           Value: !Sub "${EnvironmentName}-alb-sg"
+
+  CloudflareTunnelSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Outbound-only Cloudflare Tunnel connector tasks
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-cloudflare-tunnel-sg"
 
   ApiSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -368,6 +373,12 @@ Resources:
       LogGroupName: !Sub "/trademate/${EnvironmentName}/exchange-feed"
       RetentionInDays: 30
 
+  CloudflareTunnelLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/trademate/${EnvironmentName}/cloudflare-tunnel"
+      RetentionInDays: 30
+
   S3GatewayEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -391,6 +402,8 @@ Outputs:
     Value: !Join [",", [!Ref PrivateDbSubnetA, !Ref PrivateDbSubnetB]]
   AlbSecurityGroupId:
     Value: !Ref AlbSecurityGroup
+  CloudflareTunnelSecurityGroupId:
+    Value: !Ref CloudflareTunnelSecurityGroup
   ApiSecurityGroupId:
     Value: !Ref ApiSecurityGroup
   ExchangeFeedSecurityGroupId:
