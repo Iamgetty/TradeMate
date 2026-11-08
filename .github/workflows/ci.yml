@@ -226,3 +226,87 @@ jobs:
         env:
           CI: true
         run: npm run test:e2e
+
+  cloudflare-workers:
+    name: Isolated Cloudflare Workers frontend build and runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - name: Create disposable frontend copy
+        run: |
+          mkdir -p "$RUNNER_TEMP/trademate-web"
+          cp -a TradeMate-main/apps/web/. "$RUNNER_TEMP/trademate-web/"
+      - name: Initialize Cloudflare Workers adapter in disposable copy
+        working-directory: ${{ runner.temp }}/trademate-web
+        run: |
+          npx --yes vinext@1.4.0 init --platform=cloudflare \
+            --cdn-cache=none \
+            --data-cache=none \
+            --image-optimization=none \
+            --no-prerender
+      # The source app's standalone output is for the Node.js deployment target.
+      # vinext/Workers writes its own .cloudflare output; leaving Next's standalone
+      # setting enabled makes vinext's finalizer incorrectly look for ./dist.
+      # Remove it only from the disposable CI copy, never from the tracked app.
+      - name: Disable Node standalone output in disposable adapter copy
+        working-directory: ${{ runner.temp }}/trademate-web
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("next.config.mjs")
+          source = path.read_text()
+          setting = "  output: 'standalone',\n"
+          if source.count(setting) != 1:
+              raise SystemExit("Expected exactly one standalone output setting in next.config.mjs")
+          path.write_text(source.replace(setting, ""))
+          PY
+      - name: Install isolated adapter dependencies
+        working-directory: ${{ runner.temp }}/trademate-web
+        run: npm install --no-audit --no-fund
+      - name: Build Cloudflare Workers output
+        working-directory: ${{ runner.temp }}/trademate-web
+        run: npm run build:vinext
+      - name: Smoke-test local Workers runtime and API proxy guard
+        working-directory: ${{ runner.temp }}/trademate-web
+        run: |
+          set -euo pipefail
+          # Exercise the built Worker preview, not Vite's development server.
+          npm run start:vinext -- --host 127.0.0.1 --port 4173 > "$RUNNER_TEMP/vinext-runtime.log" 2>&1 &
+          server_pid=$!
+          cleanup() {
+            kill "$server_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          ready=0
+          for attempt in $(seq 1 60); do
+            if curl --silent --show-error --location --max-redirs 5 --fail http://127.0.0.1:4173/ -o "$RUNNER_TEMP/vinext-home.html"; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat "$RUNNER_TEMP/vinext-runtime.log"
+            echo "Workers local runtime did not become ready" >&2
+            exit 1
+          fi
+          if ! grep -Eiq '<html([[:space:]>])' "$RUNNER_TEMP/vinext-home.html"; then
+            echo "Homepage response did not contain an HTML document marker." >&2
+            head -c 1000 "$RUNNER_TEMP/vinext-home.html" >&2 || true
+            cat "$RUNNER_TEMP/vinext-runtime.log" >&2
+            exit 1
+          fi
+          proxy_status=$(curl --silent --output "$RUNNER_TEMP/vinext-proxy.txt" --write-out '%{http_code}' http://127.0.0.1:4173/api/cloudflare-validation-probe)
+          if [ "$proxy_status" != "503" ]; then
+            echo "Expected API proxy HTTP 503 without TRADEMATE_API_ORIGIN; received HTTP $proxy_status." >&2
+            cat "$RUNNER_TEMP/vinext-proxy.txt" >&2 || true
+            cat "$RUNNER_TEMP/vinext-runtime.log" >&2
+            exit 1
+          fi
+          echo "Homepage rendered and unconfigured API proxy correctly returned HTTP 503."
