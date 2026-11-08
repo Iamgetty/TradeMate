@@ -27,6 +27,18 @@ Cloudflare's current guidance recommends vinext as the default path for Next.js 
 
 The first AWS staging region is proposed as **us-west-2 (Oregon)** because the current API and PostgreSQL production resources are co-located in Render Oregon. This is a migration starting point, not a final global-region decision; validate user geography, latency and data-residency requirements before production placement. The existing Frankfurt feed must be load-tested before deciding whether to keep it in a second region or consolidate it.
 
+## Frontend compatibility audit findings
+
+The existing frontend has several items that must be resolved or proven in an isolated Cloudflare staging build before the frontend can move:
+
+- The catch-all same-origin API proxy at `TradeMate-main/apps/web/app/api/[...path]/route.ts` currently reads `NEXT_PUBLIC_API_URL` and falls back to the Render API hostname. Do not carry that fallback into the Cloudflare deployment. Introduce a server-only, environment-specific API origin (for example `TRADEMATE_API_ORIGIN`) and bind it to the AWS staging API only in the staging Worker environment. Keep production and Render endpoints separate.
+- That proxy explicitly declares `runtime = 'nodejs'`. Validate the route under the chosen Workers adapter and its Node.js compatibility mode; do not assume the route can be moved unchanged.
+- The NFT route handlers (`app/api/nfts`, `app/api/nft-collection`, and `app/api/nft-collections`) read `OPENSEA_API_KEY` server-side. Preserve this as a server-only secret in the Cloudflare staging environment; never prefix it with `NEXT_PUBLIC_` or expose it to client bundles.
+- These handlers use Next.js fetch extensions such as `next: { revalidate: ... }`, dynamic route configuration, and `AbortSignal.timeout`. Verify their caching and timeout semantics on Workers, including that user-specific API proxy responses remain uncached.
+- A repository search did not find `next/headers` imports or `cookies()` calls in the frontend at the time of this audit. This is a scoped search result, not proof that all request-context or Node-specific dependencies are absent.
+
+No application source, environment variables, secrets, routes or deployment settings were changed as part of this audit. The compatibility workflow is diagnostic only and does not initialize vinext or deploy a Worker.
+
 ## AWS backend staging topology
 
 - Dedicated AWS account or isolated staging account under AWS Organizations; do not mix staging and production resources.
