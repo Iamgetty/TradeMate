@@ -15,7 +15,7 @@ This directory is the implementation entry point for the AWS backend staging env
 
 | Existing workload | Target platform |
 |---|---|
-| `trademate-web` (Next.js, Node.js) | Cloudflare Workers using the OpenNext adapter, subject to compatibility/build validation; Cloudflare serves the frontend and static assets |
+| `trademate-web` (Next.js 16, React 19) | Cloudflare Workers; evaluate vinext (Cloudflare's current recommended path for Next.js 16+) against the OpenNext adapter using compatibility and production-build tests before choosing; Cloudflare serves the frontend and static assets |
 | `trademate-api` (NestJS, Node.js) | AWS ECS Fargate behind an Application Load Balancer |
 | `exchange-feed` (Node.js WebSocket service) | AWS ECS Fargate behind WebSocket-capable ALB routing, subject to connection, idle-timeout and drain testing |
 | PostgreSQL 18 | Amazon RDS for PostgreSQL, private subnets, encrypted storage, automated backups and tested restore |
@@ -23,7 +23,7 @@ This directory is the implementation entry point for the AWS backend staging env
 | Backend deploy history/logs | GitHub Actions release pipeline and CloudWatch logs/metrics/alarms |
 | Frontend deployment and edge delivery | Cloudflare Workers deployment pipeline, with Cloudflare-managed routing, TLS and edge controls |
 
-The Next.js deployment must be validated against the application's actual use of SSR, route handlers, middleware, image optimization, runtime APIs and Node-specific packages. Do not assume a static export is sufficient. If the application uses features unsupported by the selected Workers runtime, resolve compatibility before switching frontend traffic. Cloudflare Pages is not the default target for this SSR application; use the supported Workers/OpenNext path unless validation demonstrates a better fit.
+Cloudflare's current guidance recommends vinext as the default path for Next.js 16+ on Workers, while documenting OpenNext as an alternative for applications that need it. vinext is in beta, so do not adopt it solely on the recommendation. Run its compatibility check and review the compatibility dashboard, then compare a staging build and runtime smoke tests against the OpenNext adapter. Preserve the existing Next.js build and Node.js deployment until one path passes. Validate the application's actual use of SSR, route handlers, middleware/proxy, image optimization, runtime APIs, server actions and Node-specific packages. Do not assume a static export is sufficient. Cloudflare Pages is not the default target for this SSR application; target Workers after the adapter decision is evidence-based.
 
 The first AWS staging region is proposed as **us-west-2 (Oregon)** because the current API and PostgreSQL production resources are co-located in Render Oregon. This is a migration starting point, not a final global-region decision; validate user geography, latency and data-residency requirements before production placement. The existing Frankfurt feed must be load-tested before deciding whether to keep it in a second region or consolidate it.
 
@@ -49,7 +49,7 @@ The first AWS staging region is proposed as **us-west-2 (Oregon)** because the c
 
 1. **Foundation (this change):** record platform responsibilities, workload mapping, region assumptions, security boundaries and operational gates.
 2. **Provision AWS backend staging:** after AWS account access and region approval, create the staging VPC, IAM roles, ECR, ECS cluster/services, ALB, RDS and observability using reviewed infrastructure-as-code.
-3. **Prepare Cloudflare frontend delivery:** validate Next.js/OpenNext compatibility, configure a separate staging Worker/environment, bind staging-only API origins and secrets, and add a reviewed frontend deployment workflow. Do not change production routes or DNS.
+3. **Prepare Cloudflare frontend delivery:** compare vinext and OpenNext compatibility for the existing Next.js 16 application; retain the current deployment until one passes staging build and runtime tests. Then configure a separate staging Worker/environment, bind staging-only API origins and secrets, and add a reviewed frontend deployment workflow. Do not change production routes or DNS.
 4. **Build and deploy:** containerize backend workloads, pin runtime versions, configure health checks and secret references, and grant staging-only GitHub OIDC deployment permissions.
 5. **Data rehearsal:** create an encrypted backup/export of staging data, restore to RDS, apply migrations, verify row counts and application invariants. Never use production data for staging without explicit data-handling approval and an approved sanitization process.
 6. **Acceptance:** test auth/session/TOTP, contracts, enquiries, feed/WebSockets, uploads, scheduled jobs, email/provider integrations, frontend rendering/routing, CORS/CSRF, database recovery, load, security and rollback.
