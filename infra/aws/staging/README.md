@@ -31,13 +31,13 @@ The first AWS staging region is proposed as **us-west-2 (Oregon)** because the c
 
 The existing frontend has several items that must be resolved or proven in an isolated Cloudflare staging build before the frontend can move:
 
-- The catch-all same-origin API proxy at `TradeMate-main/apps/web/app/api/[...path]/route.ts` currently reads `NEXT_PUBLIC_API_URL` and falls back to the Render API hostname. Do not carry that fallback into the Cloudflare deployment. Introduce a server-only, environment-specific API origin (for example `TRADEMATE_API_ORIGIN`) and bind it to the AWS staging API only in the staging Worker environment. Keep production and Render endpoints separate.
-- That proxy explicitly declares `runtime = 'nodejs'`. Validate the route under the chosen Workers adapter and its Node.js compatibility mode; do not assume the route can be moved unchanged.
+- The catch-all same-origin API proxy at `TradeMate-main/apps/web/app/api/[...path]/route.ts` now reads the server-only `TRADEMATE_API_ORIGIN`; it no longer falls back to `NEXT_PUBLIC_API_URL` or the Render API hostname. An absent or invalid origin returns HTTP 503. Bind the AWS staging API origin only in the staging Worker environment, and keep production and Render endpoints separate.
+- That proxy explicitly declares `runtime = 'nodejs'`. Validate the route under the chosen Workers adapter. It still explicitly declares `runtime = 'nodejs'`; do not remove that declaration or claim Workers compatibility until a real adapter build and runtime test proves it.
 - The NFT route handlers (`app/api/nfts`, `app/api/nft-collection`, and `app/api/nft-collections`) read `OPENSEA_API_KEY` server-side. Preserve this as a server-only secret in the Cloudflare staging environment; never prefix it with `NEXT_PUBLIC_` or expose it to client bundles.
 - These handlers use Next.js fetch extensions such as `next: { revalidate: ... }`, dynamic route configuration, and `AbortSignal.timeout`. Verify their caching and timeout semantics on Workers, including that user-specific API proxy responses remain uncached.
 - A repository search did not find `next/headers` imports or `cookies()` calls in the frontend at the time of this audit. This is a scoped search result, not proof that all request-context or Node-specific dependencies are absent.
 
-No application source, environment variables, secrets, routes or deployment settings were changed as part of this audit. The compatibility workflow is diagnostic only and does not initialize vinext or deploy a Worker.
+No cloud resources, environment secrets, routes or deployment settings were changed. The API proxy source was changed to remove the Render fallback; see the current route implementation for exact behaviour. The compatibility workflow is diagnostic only and does not initialize vinext or deploy a Worker.
 
 ## AWS backend staging topology
 
@@ -53,7 +53,7 @@ No application source, environment variables, secrets, routes or deployment sett
 - Use immutable container images in ECR, tagged with the Git commit SHA. GitHub Actions builds/tests/scans and deploys backend staging only after required checks pass.
 - Database migrations run as a one-off ECS task/release step, not automatically in every API replica's startup command.
 - Preserve WebSocket upgrade behaviour, idle timeouts, health checks and graceful connection draining for the exchange feed.
-- Configure the Cloudflare frontend's API origin, CORS allowlist, cookie domain/SameSite/Secure attributes, CSRF protections and authentication redirects deliberately. Do not expose private AWS service endpoints.
+- Before staging deployment, add focused proxy tests for GET/HEAD and write methods, query-string/path forwarding, cookies and multiple Set-Cookie headers, authorization-header requirements, missing/invalid origin (503), upstream failure (502), redirects and no-store caching. Review which request/response headers must be forwarded; current proxy forwards content-type and cookie only. Configure the Cloudflare frontend's API origin, CORS allowlist, cookie domain/SameSite/Secure attributes, CSRF protections and authentication redirects deliberately. Do not expose private AWS service endpoints.
 - Cloudflare-to-AWS origin traffic must use TLS and a restricted, authenticated origin path where feasible. Do not rely on an obscured hostname as origin protection.
 - Keep API caching disabled by default for authenticated or user-specific responses; add explicit cache rules only after response semantics are reviewed.
 
