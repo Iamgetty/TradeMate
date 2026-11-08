@@ -295,7 +295,17 @@ jobs:
             echo "Workers local runtime did not become ready" >&2
             exit 1
           fi
-          grep -q '<html' "$RUNNER_TEMP/vinext-home.html"
+          if ! grep -Eiq '<html([[:space:]>])' "$RUNNER_TEMP/vinext-home.html"; then
+            echo "Homepage response did not contain an HTML document marker." >&2
+            head -c 1000 "$RUNNER_TEMP/vinext-home.html" >&2 || true
+            cat "$RUNNER_TEMP/vinext-runtime.log" >&2
+            exit 1
+          fi
           proxy_status=$(curl --silent --output "$RUNNER_TEMP/vinext-proxy.txt" --write-out '%{http_code}' http://127.0.0.1:4173/api/cloudflare-validation-probe)
-          test "$proxy_status" = "503"
+          if [ "$proxy_status" != "503" ]; then
+            echo "Expected API proxy HTTP 503 without TRADEMATE_API_ORIGIN; received HTTP $proxy_status." >&2
+            cat "$RUNNER_TEMP/vinext-proxy.txt" >&2 || true
+            cat "$RUNNER_TEMP/vinext-runtime.log" >&2
+            exit 1
+          fi
           echo "Homepage rendered and unconfigured API proxy correctly returned HTTP 503."
