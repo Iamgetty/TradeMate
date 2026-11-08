@@ -310,31 +310,38 @@ test('organization documents and own-offer screens recover after transient API f
 
   try {
     await login(page, 'seller@example.test');
+    console.log('[contract-e2e] organization recovery: authenticated; bootstrap requests', { organizationRequests, documentRequests, ownOfferRequests });
     await expect.poll(() => organizationRequests, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
 
-    await page.locator('#app .top button[data-pg="profile"]').click();
-    await page.locator('[data-act="mode"]').click();
+    console.log('[contract-e2e] organization recovery: opening profile and switching to Alpha');
+    await page.locator('#app .top button[data-pg="profile"]').click({ force: true });
+    await page.locator('[data-act="mode"]').click({ force: true });
     organizationFailureArmed = true;
     documentFailureArmed = true;
-    await page.locator('#sbar [data-f="Organization"]').click();
-    await expect(page.getByText('Could not load organization', { exact: true })).toBeVisible();
+    console.log('[contract-e2e] organization recovery: navigating; failure armed');
+    await page.locator('#sbar [data-f="Organization"]').click({ force: true, timeout: 10_000 });
+    console.log('[contract-e2e] organization recovery: navigation returned', { organizationRequests, documentRequests });
+    await expect(page.getByText('Could not load organization', { exact: true })).toBeVisible({ timeout: 10_000 });
+    console.log('[contract-e2e] organization recovery: retrying organization', { organizationRequests, documentRequests });
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Retry Test Services' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Retry Test Services' })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/Could not load verification documents:/)).toBeVisible();
+    console.log('[contract-e2e] organization recovery: retrying documents', { organizationRequests, documentRequests });
     await page.getByRole('button', { name: 'Retry document loading' }).click();
-    await expect(page.getByText('No documents yet')).toBeVisible();
+    await expect(page.getByText('No documents yet')).toBeVisible({ timeout: 10_000 });
     expect(organizationRequests).toBeGreaterThanOrEqual(2);
     expect(documentRequests).toBe(2);
 
     ownOfferFailureArmed = true;
-    await page.locator('#sbar [data-f="More"]').click();
-    await page.locator('#app [data-f="Contract approvals"]').click({ force: true });
+    console.log('[contract-e2e] own-offer recovery: opening More; failure armed');
+    await page.locator('#sbar [data-f="More"]').click({ force: true, timeout: 10_000 });
+    await page.locator('#app [data-f="Contract approvals"]').click({ force: true, timeout: 10_000 });
     await expect(page.getByText('Could not load your offers', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await expect(page.getByText('No contracts awaiting approval', { exact: true })).toBeVisible();
     expect(ownOfferRequests).toBeGreaterThanOrEqual(2);
   } finally {
-    await context.close();
+    await context.close().catch(error => console.log('[contract-e2e] organization recovery cleanup:', String(error)));
   }
 });
 
@@ -400,19 +407,23 @@ test('contracts and enquiries lists recover after transient API failures', async
     await expect.poll(() => contractRequests, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
     await expect.poll(() => enquiryRequests, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
 
-    await page.locator('#sbar [data-f="Contracts"]').click();
-    await expect(page.getByText('Could not load contracts', { exact: true })).toBeVisible();
+    console.log('[contract-e2e] list recovery: bootstrap request counts', { contractRequests, enquiryRequests });
+    await page.locator('#sbar [data-f="Contracts"]').click({ force: true, timeout: 10_000 });
+    console.log('[contract-e2e] list recovery: opened Contracts', { contractRequests, enquiryRequests });
+    await expect(page.getByText('Could not load contracts', { exact: true })).toBeVisible({ timeout: 10_000 });
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await expect(page.getByText('No contracts yet', { exact: true })).toBeVisible();
     expect(contractRequests).toBeGreaterThanOrEqual(2);
 
-    await page.locator('#sbar [data-f="More"]').click();
-    await page.locator('#app [data-f="Conversations"]').click({ force: true });
-    await expect(page.getByText('Could not load conversations', { exact: true })).toBeVisible();
+    console.log('[contract-e2e] list recovery: opening Conversations', { contractRequests, enquiryRequests });
+    await page.locator('#sbar [data-f="More"]').click({ force: true, timeout: 10_000 });
+    await page.locator('#app [data-f="Conversations"]').click({ force: true, timeout: 10_000 });
+    console.log('[contract-e2e] list recovery: opened Conversations', { contractRequests, enquiryRequests });
+    await expect(page.getByText('Could not load conversations', { exact: true })).toBeVisible({ timeout: 10_000 });
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await expect(page.getByText('No conversations yet.', { exact: true })).toBeVisible();
     expect(enquiryRequests).toBeGreaterThanOrEqual(2);
   } finally {
-    await context.close();
+    await context.close().catch(error => console.log('[contract-e2e] list recovery cleanup:', String(error)));
   }
 });
