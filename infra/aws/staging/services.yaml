@@ -223,6 +223,19 @@ Resources:
                   - !Ref ApiDatabaseUrlSecretArn
                   - !Ref TotpEncryptionKeySecretArn
 
+  FeedEcsExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
   CloudflareTunnelExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -437,7 +450,7 @@ Resources:
       NetworkMode: awsvpc
       Cpu: "512"
       Memory: "1024"
-      ExecutionRoleArn: !GetAtt EcsExecutionRole.Arn
+      ExecutionRoleArn: !GetAtt FeedEcsExecutionRole.Arn
       TaskRoleArn: !GetAtt FeedTaskRole.Arn
       RuntimePlatform:
         CpuArchitecture: X86_64
