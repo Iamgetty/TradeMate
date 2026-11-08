@@ -44,8 +44,8 @@ No cloud resources, environment secrets, routes or deployment settings were chan
 
 - Dedicated AWS account or isolated staging account under AWS Organizations; do not mix staging and production resources.
 - VPC across at least two Availability Zones.
-- Public subnets contain only the internet-facing ALB and required egress components.
-- ECS tasks and RDS stay in private subnets; no public database endpoint.
+- Public subnets contain the internet gateway routing and NAT gateway egress components only.
+- The Application Load Balancer is internal and resides in the private application subnets; ECS tasks also stay private, and RDS remains in isolated database subnets with no public endpoint.
 - RDS PostgreSQL 18 compatibility must be verified against the exact extensions, collation, parameter settings and migration history used by TradeMate.
 - Security groups allow ALB-to-service traffic and API-to-database traffic only. No broad database CIDRs.
 - KMS encryption for RDS, logs and secrets; task roles use least-privilege IAM.
