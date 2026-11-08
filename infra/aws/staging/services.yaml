@@ -38,6 +38,9 @@ Parameters:
   TotpEncryptionKeySecretArn:
     Type: String
     Description: Secrets Manager ARN whose SecretString contains the 64-character hex TOTP_ENCRYPTION_KEY.
+  MigrationDatabaseUrlSecretArn:
+    Type: String
+    Description: Separate Secrets Manager ARN whose SecretString is the migrator-role PostgreSQL URL; never use the master or app-role credential.
   ApiWebOrigin:
     Type: String
     Description: Exact HTTPS origin of the isolated Cloudflare staging frontend.
@@ -208,6 +211,7 @@ Resources:
                 Resource:
                   - !Ref ApiDatabaseUrlSecretArn
                   - !Ref TotpEncryptionKeySecretArn
+                  - !Ref MigrationDatabaseUrlSecretArn
 
   ApiTaskRole:
     Type: AWS::IAM::Role
@@ -221,6 +225,17 @@ Resources:
             Action: sts:AssumeRole
 
   FeedTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+
+  MigrationTaskRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -279,6 +294,41 @@ Resources:
               awslogs-group: !Sub "/trademate/${EnvironmentName}/api"
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
+
+  MigrationTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${EnvironmentName}-database-migration"
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: "512"
+      Memory: "1024"
+      ExecutionRoleArn: !GetAtt EcsExecutionRole.Arn
+      TaskRoleArn: !GetAtt MigrationTaskRole.Arn
+      RuntimePlatform:
+        CpuArchitecture: X86_64
+        OperatingSystemFamily: LINUX
+      ContainerDefinitions:
+        - Name: database-migration
+          Image: !Ref ApiImageUri
+          Essential: true
+          Command:
+            - node
+            - scripts/migrate.js
+          Environment:
+            - Name: NODE_ENV
+              Value: production
+            - Name: PGSSLMODE
+              Value: require
+          Secrets:
+            - Name: MIGRATION_DATABASE_URL
+              ValueFrom: !Ref MigrationDatabaseUrlSecretArn
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "/trademate/${EnvironmentName}/api"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: migration
 
   FeedTaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -401,3 +451,5 @@ Outputs:
     Value: !Ref ApiTaskDefinition
   ExchangeFeedTaskDefinitionArn:
     Value: !Ref FeedTaskDefinition
+  MigrationTaskDefinitionArn:
+    Value: !Ref MigrationTaskDefinition
