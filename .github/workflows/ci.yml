@@ -250,6 +250,22 @@ jobs:
             --data-cache=none \
             --image-optimization=none \
             --no-prerender
+      # The source app's standalone output is for the Node.js deployment target.
+      # vinext/Workers writes its own .cloudflare output; leaving Next's standalone
+      # setting enabled makes vinext's finalizer incorrectly look for ./dist.
+      # Remove it only from the disposable CI copy, never from the tracked app.
+      - name: Disable Node standalone output in disposable adapter copy
+        working-directory: ${{ runner.temp }}/trademate-web
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("next.config.mjs")
+          source = path.read_text()
+          setting = "  output: 'standalone',\n"
+          if source.count(setting) != 1:
+              raise SystemExit("Expected exactly one standalone output setting in next.config.mjs")
+          path.write_text(source.replace(setting, ""))
+          PY
       - name: Install isolated adapter dependencies
         working-directory: ${{ runner.temp }}/trademate-web
         run: npm install --no-audit --no-fund
