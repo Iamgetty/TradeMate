@@ -46,10 +46,11 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       redirect: 'manual',
     });
     const responseHeaders = new Headers();
-    for (const name of ['content-type', 'location', 'cache-control', 'content-disposition']) {
+    for (const name of ['content-type', 'location', 'content-disposition']) {
       const value = upstream.headers.get(name);
       if (value) responseHeaders.set(name, value);
     }
+    responseHeaders.set('cache-control', 'no-store');
     const setCookies = upstream.headers.getSetCookie?.() ?? [];
     for (const setCookie of setCookies) responseHeaders.append('set-cookie', setCookie);
     return new NextResponse(upstream.body, { status: upstream.status, headers: responseHeaders });
