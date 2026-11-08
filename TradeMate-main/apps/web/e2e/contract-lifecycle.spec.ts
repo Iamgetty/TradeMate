@@ -246,7 +246,7 @@ test('organization documents and own-offer screens recover after transient API f
   let organizationRequests = 0;
   let documentRequests = 0;
   let ownOfferRequests = 0;
-  let organizationFailureArmed = false;
+  let organizationFailuresRemaining = 0;
   let documentFailureArmed = false;
   let ownOfferFailureArmed = false;
   const context = await browser.newContext();
@@ -273,8 +273,8 @@ test('organization documents and own-offer screens recover after transient API f
     }
     if (path === '/organizations/mine' && method === 'GET') {
       organizationRequests += 1;
-      if (organizationFailureArmed) {
-        organizationFailureArmed = false;
+      if (organizationFailuresRemaining > 0) {
+        organizationFailuresRemaining -= 1;
         await route.fulfill({ status: 503, json: { message: 'Organization service temporarily unavailable' } });
       } else {
         await route.fulfill({ status: 200, json: { organization: {
@@ -309,9 +309,10 @@ test('organization documents and own-offer screens recover after transient API f
   });
 
   try {
-    // Fail the first organization bootstrap request so this exercises the
-    // true empty-state recovery path, rather than a failed refresh over stale data.
-    organizationFailureArmed = true;
+    // Fail both authenticated bootstrap and the Organization-page refresh.
+    // The page wrapper performs a second loadOrg() when the page is opened;
+    // both failures are required to reach the empty-state error UI. Retry then succeeds.
+    organizationFailuresRemaining = 2;
     documentFailureArmed = true;
     await login(page, 'seller@example.test');
     console.log('[contract-e2e] organization recovery: authenticated; bootstrap requests', { organizationRequests, documentRequests, ownOfferRequests });
@@ -333,7 +334,7 @@ test('organization documents and own-offer screens recover after transient API f
     console.log('[contract-e2e] organization recovery: retrying documents', { organizationRequests, documentRequests });
     await page.getByRole('button', { name: 'Retry document loading' }).click();
     await expect(page.getByText('No documents yet')).toBeVisible({ timeout: 10_000 });
-    expect(organizationRequests).toBeGreaterThanOrEqual(2);
+    expect(organizationRequests).toBeGreaterThanOrEqual(3);
     expect(documentRequests).toBe(2);
 
     ownOfferFailureArmed = true;
