@@ -7,7 +7,7 @@ TradeMate uses a split-cloud architecture:
 - **AWS is the primary application and data platform** for production backend workloads.
 - **Cloudflare hosts and serves the frontend** and provides DNS, WAF, DDoS protection and edge traffic controls.
 - **Render is retained as a secondary environment for staging, testing, QA and pre-release validation**. It is not the production source of truth or the primary production rollback platform.
-- GCP is outside the initial migration scope.
+- **Google Cloud Platform (GCP)** is recognized in TradeMate's longer-term cloud strategy. AWS remains the primary backend/data platform for the initial migration; GCP is not a duplicate primary production stack in this phase. Any GCP workload requires a separately documented use case, security/data-flow review, operational owner and approved budget.
 
 This directory is the implementation entry point for the AWS backend staging environment. This is a design and repository change only; it does not provision or modify cloud resources.
 
@@ -21,7 +21,8 @@ This directory is the implementation entry point for the AWS backend staging env
 | PostgreSQL 18 | Amazon RDS for PostgreSQL, private subnets, encrypted storage, automated backups and tested restore |
 | Backend secrets and configuration | AWS Secrets Manager for secrets; task environment only for non-secret configuration |
 | Backend deploy history/logs | GitHub Actions release pipeline and CloudWatch logs/metrics/alarms |
-| Frontend deployment and edge delivery | Cloudflare Workers deployment pipeline, with Cloudflare-managed routing, TLS and edge controls |
+| Primary frontend deployment and edge delivery | Cloudflare Workers deployment pipeline, with Cloudflare-managed routing, TLS and edge controls |
+| Optional AWS asset delivery | Amazon CloudFront may serve selected public/static assets from AWS origins such as S3 where justified; it does not replace Cloudflare or sit in front of the Cloudflare-hosted frontend by default |
 
 Cloudflare's current guidance recommends vinext as the default path for Next.js 16+ on Workers, while documenting OpenNext as an alternative for applications that need it. vinext is in beta, so do not adopt it solely on the recommendation. Run its compatibility check and review the compatibility dashboard, then compare a staging build and runtime smoke tests against the OpenNext adapter. Preserve the existing Next.js build and Node.js deployment until one path passes. Validate the application's actual use of SSR, route handlers, middleware/proxy, image optimization, runtime APIs, server actions and Node-specific packages. Do not assume a static export is sufficient. Cloudflare Pages is not the default target for this SSR application; target Workers after the adapter decision is evidence-based.
 
