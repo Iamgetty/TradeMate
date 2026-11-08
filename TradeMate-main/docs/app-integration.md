@@ -62,5 +62,5 @@ The Forex market groups include ten stock indices, ten commodities, ten individu
 
 1. `docker compose -f infra/docker-compose.yml up -d`
 2. In `apps/api`: copy `.env.example` to `.env`, run `npm install`, `npm run db:migrate`, then `npm run start:dev`.
-3. In `apps/web`: run `NEXT_PUBLIC_API_URL=http://localhost:4000 npm run dev`.
+3. In `apps/web`: run `TRADEMATE_API_ORIGIN=http://localhost:4000 npm run dev` (the catch-all API proxy reads this server-side variable).
 4. Open `http://localhost:3000/app`.
