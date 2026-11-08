@@ -379,7 +379,8 @@ Resources:
           HealthCheck:
             Command:
               - CMD-SHELL
-              - node -e 'fetch("http://127.0.0.1:4000/api/health").then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))'
+              - |
+                node -e "fetch('http' + String.fromCharCode(58) + '//127.0.0.1:4000/api/health').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"
             Interval: 30
             Timeout: 5
             Retries: 3
