@@ -21,6 +21,15 @@ This first foundation does **not** create an ALB, listener, ECS task definitions
 The RDS security group and isolated database subnets are prepared, but no database is provisioned. API and feed images are built in CI only; this template does not push images or deploy containers.
 
 
+
+## PostgreSQL layer (database.yaml)
+
+The database template creates an encrypted, non-public RDS for PostgreSQL 18 instance in the two isolated database subnets, with a security group supplied by the foundation stack, automated backups, storage autoscaling, PostgreSQL/upgrade log exports and an AWS-managed master credential secret. The engine minor version is an explicit required parameter because supported versions vary by region. Verify the selected version and instance class with the AWS account/region before any deployment.
+
+Staging defaults are intentionally cost-conscious: 20 GiB gp3, 7-day backups, single-AZ and deletion protection off. These are parameters, not production recommendations. The DB resource has snapshot deletion/update-replacement policies; do not delete or replace a populated database without a separately reviewed restore/retention plan. Enable Multi-AZ and deletion protection for longer-lived or production environments after cost and recovery review.
+
+The RDS master secret is for controlled administration only. Do not inject it into the API task. The application requires separate `trademate_app`, `trademate_migrator` and `trademate_worker` credentials following the repository's database role bootstrap design. Create the roles and their credentials using a reviewed, one-off administrative procedure, then store the app role's full PostgreSQL connection URL in the Secrets Manager secret passed as `ApiDatabaseUrlSecretArn`. Keep migration and worker credentials separate; do not place them in the long-running API task. No database migration is run by this template.
+
 ## ECS service layer (services.yaml)
 
 The separate `services.yaml` template consumes outputs/IDs from the network foundation and defines:
