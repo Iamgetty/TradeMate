@@ -26,7 +26,7 @@ This directory is the implementation entry point for the AWS backend staging env
 
 Cloudflare's current guidance recommends vinext as the default path for Next.js 16+ on Workers, while documenting OpenNext as an alternative for applications that need it. vinext is in beta, so do not adopt it solely on the recommendation. Run its compatibility check and review the compatibility dashboard, then compare a staging build and runtime smoke tests against the OpenNext adapter. Preserve the existing Next.js build and Node.js deployment until one path passes. Validate the application's actual use of SSR, route handlers, middleware/proxy, image optimization, runtime APIs, server actions and Node-specific packages. Do not assume a static export is sufficient. Cloudflare Pages is not the default target for this SSR application; target Workers after the adapter decision is evidence-based.
 
-The first AWS staging region is proposed as **us-west-2 (Oregon)** because the current API and PostgreSQL production resources are co-located in Render Oregon. This is a migration starting point, not a final global-region decision; validate user geography, latency and data-residency requirements before production placement. The existing Frankfurt feed must be load-tested before deciding whether to keep it in a second region or consolidate it.
+The initial AWS staging target is **eu-north-1 (Europe/Stockholm)**, selected for the current deployment plan. This is a staging-region decision, not a final global production-region decision; validate latency, data-residency and operational requirements before production placement. The existing Frankfurt feed must be load-tested before deciding whether to keep it in a second region or consolidate it.
 
 ## Frontend compatibility audit findings
 
@@ -71,7 +71,7 @@ No cloud resources, environment secrets, routes or deployment settings were chan
 ## Blocking inputs for provisioning
 
 - AWS account ID and confirmation that the account is ready for TradeMate.
-- Approval to use `us-west-2` for the first AWS staging deployment.
+- `eu-north-1` is the selected AWS staging target region; actual provisioning still requires separate approval.
 - AWS access path: preferably GitHub Actions OIDC with a narrowly scoped staging deployment role; do not send access keys or secrets in chat.
 - Monthly AWS staging budget ceiling and desired RDS/ECS availability profile.
 - Cloudflare account access and an approved staging hostname/zone for the frontend deployment. Do not share API tokens in chat; use a secure secret-management flow.
@@ -147,7 +147,7 @@ The services template does not create RDS, ACM certificates, DNS records, Cloudf
 
 ## Network and cost choices
 
-- The template is region-agnostic. `us-west-2` remains a proposed staging region, not an approved deployment decision.
+- The template is region-agnostic. `eu-north-1` is the selected staging target; actual deployment remains subject to account access, cost review and separate provisioning approval.
 - The default single NAT gateway lowers fixed staging cost but means private application egress from the second AZ depends on the NAT gateway in the first AZ and can incur cross-AZ transfer charges. Choose two NAT gateways for AZ-independent egress after reviewing cost.
 - NAT gateways, Elastic IPs, VPC endpoints, ECS Container Insights and CloudWatch log ingestion can incur charges. Review the AWS pricing calculator and set a budget before deployment.
 - Database subnets have no default internet route. Do not add public database access.
