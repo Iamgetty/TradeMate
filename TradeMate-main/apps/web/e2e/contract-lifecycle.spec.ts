@@ -435,3 +435,95 @@ test('contracts and enquiries lists recover after transient API failures', async
     await context.close().catch(error => console.log('[contract-e2e] list recovery cleanup:', String(error)));
   }
 });
+
+test('individual contract and enquiry messages recover after transient API failures', async ({ browser }) => {
+  test.setTimeout(75_000);
+  let authenticated = false;
+  let contractMessageRequests = 0;
+  let enquiryMessageRequests = 0;
+  const contractId = 'message-retry-contract-001';
+  const enquiryId = 'message-retry-enquiry-001';
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  await page.route('**/api/**', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname.replace(/^\\/api/, '');
+    const method = request.method();
+
+    if (path === '/auth/me' && method === 'GET') {
+      await route.fulfill(authenticated
+        ? { status: 200, json: { user: { id: 'message-retry-user', email: 'messages@example.test', display_name: 'Message Retry User', country_code: 'NG' } } }
+        : { status: 401, json: { message: 'No active session' } });
+      return;
+    }
+    if (path === '/auth/login' && method === 'POST') {
+      authenticated = true;
+      await route.fulfill({ status: 200, json: { user: { id: 'message-retry-user', email: 'messages@example.test', display_name: 'Message Retry User', country_code: 'NG' } } });
+      return;
+    }
+    if (path === '/market/contracts/mine' && method === 'GET') {
+      await route.fulfill({ status: 200, json: { data: [{
+        id: contractId, direction: 'sent', title: 'Contract message retry fixture',
+        status: 'proposed', buyer_name: 'Message Retry User', seller_name: 'Seller Fixture',
+        buyer_member_role: 'owner', seller_member_role: 'owner', amount_minor_units: 9900,
+        currency_code: 'NGN', scope: 'Complete the agreed service.', terms: 'Both parties confirm completion.',
+        created_at: '2026-11-08T09:00:00.000Z', buyer_confirmed_at: null, seller_confirmed_at: null,
+      }] } });
+      return;
+    }
+    if (path === `/market/contracts/${contractId}/messages` && method === 'GET') {
+      contractMessageRequests += 1;
+      if (contractMessageRequests === 1) {
+        await route.fulfill({ status: 503, json: { message: 'Contract messages temporarily unavailable' } });
+      } else {
+        await route.fulfill({ status: 200, json: { data: { messages: [] } } });
+      }
+      return;
+    }
+    if (path === '/market/enquiries/mine' && method === 'GET') {
+      await route.fulfill({ status: 200, json: { data: [{
+        id: enquiryId, listing_id: 'message-retry-listing', listing_title: 'Enquiry message retry fixture',
+        seller_name: 'Seller Fixture', buyer_name: 'Message Retry User', direction: 'sent',
+        currency_code: 'NGN', price_minor_units: 9900, created_at: '2026-11-08T09:00:00.000Z', unread_count: 0,
+      }] } });
+      return;
+    }
+    if (path === `/market/enquiries/${enquiryId}/messages` && method === 'GET') {
+      enquiryMessageRequests += 1;
+      if (enquiryMessageRequests === 1) {
+        await route.fulfill({ status: 503, json: { message: 'Enquiry messages temporarily unavailable' } });
+      } else {
+        await route.fulfill({ status: 200, json: { data: { messages: [] } } });
+      }
+      return;
+    }
+    await route.fulfill({ status: 200, json: {} });
+  });
+
+  try {
+    await login(page, 'messages@example.test');
+
+    await page.locator('#sbar [data-f="Contracts"]').click({ force: true, timeout: 10_000 });
+    await page.getByRole('button', { name: /Contract message retry fixture/ }).click();
+    await expect(page.getByText('Could not load messages', { exact: true })).toBeVisible({ timeout: 10_000 });
+    expect(contractMessageRequests).toBe(1);
+    await page.getByRole('button', { name: 'Retry', exact: true }).click();
+    await expect(page.getByText('No contract messages yet.', { exact: true })).toBeVisible({ timeout: 10_000 });
+    expect(contractMessageRequests).toBe(2);
+
+    await page.locator('#sbar [data-f="More"]').click({ force: true, timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: 'All services' })).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: 'Conversations', exact: true }).click({ force: true, timeout: 10_000 });
+    await page.getByRole('button', { name: /Enquiry message retry fixture/ }).click();
+    await expect(page.getByText('Could not load messages', { exact: true })).toBeVisible({ timeout: 10_000 });
+    expect(enquiryMessageRequests).toBe(1);
+    await page.getByRole('button', { name: 'Retry', exact: true }).click();
+    await expect(page.getByText('Could not load messages', { exact: true })).toHaveCount(0, { timeout: 10_000 });
+    await expect(page.locator('#dm')).toBeVisible();
+    expect(enquiryMessageRequests).toBe(2);
+  } finally {
+    await context.close().catch(() => undefined);
+  }
+});
