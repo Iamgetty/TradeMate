@@ -30,7 +30,7 @@ Parameters:
   MaxAllocatedStorage:
     Type: Number
     Default: 100
-    MinValue: 20
+    MinValue: 100
     MaxValue: 1000
   BackupRetentionDays:
     Type: Number
