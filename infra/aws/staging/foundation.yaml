@@ -7,7 +7,7 @@ Parameters:
   EnvironmentName:
     Type: String
     Default: trademate-staging
-    AllowedPattern: "^[a-z][a-z0-9-]{2, twenty}$"
+    AllowedPattern: "^[a-z][a-z0-9-]{2,19}$"
     ConstraintDescription: Use a lowercase name beginning with a letter.
   VpcCidr:
     Type: String
@@ -328,7 +328,7 @@ Resources:
         EncryptionType: AES256
       LifecyclePolicy:
         LifecyclePolicyText: |
-          {"rules":[{"rulePriority":1,"description":"Keep the 30 most recent images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]
+          {"rules":[{"rulePriority":1,"description":"Keep the 30 most recent images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}
 
   ExchangeFeedRepository:
     Type: AWS::ECR::Repository
