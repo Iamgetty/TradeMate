@@ -46,7 +46,7 @@ Parameters:
     Type: String
     Description: Cloudflare cloudflared container image pinned to an immutable SHA-256 digest.
     AllowedPattern: '^.+@sha256:[a-f0-9]{64}$'
-    ConstraintDescription: Provide an image URI ending in @sha256: followed by 64 lowercase hexadecimal characters.
+    ConstraintDescription: "Provide an image URI ending in @sha256: followed by 64 lowercase hexadecimal characters."
   ApiWebOrigin:
     Type: String
     Description: Exact HTTPS origin of the isolated Cloudflare staging frontend.
