@@ -78,14 +78,6 @@ jobs:
           proxy_status=$(curl --silent --output "$RUNNER_TEMP/vinext-proxy.txt" --write-out '%{http_code}' http://127.0.0.1:4173/api/cloudflare-validation-probe)
           test "$proxy_status" = "503"
           echo "Homepage rendered and unconfigured API proxy correctly returned HTTP 503."
-      - name: Upload runtime log on failure
-        if: failure()
-        uses: actions/upload-artifact@ea8a3f9b5f5b3f5f1a0b7f1c8c2f7f1c3b9d2a1e # v4
-        with:
-          name: vinext-workers-runtime-log
-          path: ${{ runner.temp }}/vinext-runtime.log
-          if-no-files-found: ignore
-
 # This workflow copies the frontend into RUNNER_TEMP before vinext init.
 # It does not modify tracked Next.js configuration, authenticate to Cloudflare,
 # create Cloudflare resources, or deploy a Worker. Cache and image optimization
