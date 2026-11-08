@@ -1,0 +1,42 @@
+name: Cloudflare frontend compatibility
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "TradeMate-main/apps/web/**"
+      - "infra/aws/staging/**"
+      - ".github/workflows/cloudflare-compatibility.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-compatibility-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  vinext-compatibility:
+    name: Non-destructive vinext compatibility scan
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: TradeMate-main/apps/web
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - name: Install existing frontend dependencies
+        run: npm install --no-audit --no-fund
+      - name: Scan Next.js application for vinext compatibility
+        run: npx --yes vinext@1.4.0 check
+
+# This workflow only reports compatibility. It does not run vinext init,
+# change package.json/lockfiles/configuration, build a Worker, or deploy.
+# Keep the existing Next.js build and runtime as the source of truth until
+# a separate staging migration passes build, route, auth, and browser tests.
