@@ -309,16 +309,19 @@ test('organization documents and own-offer screens recover after transient API f
   });
 
   try {
+    // Fail the first organization bootstrap request so this exercises the
+    // true empty-state recovery path, rather than a failed refresh over stale data.
+    organizationFailureArmed = true;
+    documentFailureArmed = true;
     await login(page, 'seller@example.test');
     console.log('[contract-e2e] organization recovery: authenticated; bootstrap requests', { organizationRequests, documentRequests, ownOfferRequests });
     await expect.poll(() => organizationRequests, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
+    await expect(page.getByText('Could not load organization', { exact: true })).toBeVisible({ timeout: 10_000 });
 
     console.log('[contract-e2e] organization recovery: opening profile and switching to Alpha');
     await page.locator('#app .top button[data-pg="profile"]').click({ force: true });
     await page.locator('[data-act="mode"]').click({ force: true });
-    organizationFailureArmed = true;
-    documentFailureArmed = true;
-    console.log('[contract-e2e] organization recovery: navigating; failure armed');
+    console.log('[contract-e2e] organization recovery: navigating; failure already exercised');
     await page.locator('#sbar [data-f="More"]').click({ force: true, timeout: 10_000 });
     await expect(page.getByRole('heading', { name: 'All services' })).toBeVisible({ timeout: 10_000 });
     await page.locator('#pg').getByRole('button', { name: 'Organization', exact: true }).click({ force: true, timeout: 10_000 });
