@@ -449,7 +449,7 @@ test('individual contract and enquiry messages recover after transient API failu
   await page.route('**/api/**', async route => {
     const request = route.request();
     const url = new URL(request.url());
-    const path = url.pathname.replace(/^\\/api/, '');
+    const path = url.pathname.replace(/^\/api/, '');
     const method = request.method();
 
     if (path === '/auth/me' && method === 'GET') {
