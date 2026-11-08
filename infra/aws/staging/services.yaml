@@ -10,10 +10,6 @@ Parameters:
     AllowedPattern: "^[a-z][a-z0-9-]{2,19}$"
   VpcId:
     Type: AWS::EC2::VPC::Id
-  PublicSubnetA:
-    Type: AWS::EC2::Subnet::Id
-  PublicSubnetB:
-    Type: AWS::EC2::Subnet::Id
   PrivateAppSubnetA:
     Type: AWS::EC2::Subnet::Id
   PrivateAppSubnetB:
@@ -23,6 +19,8 @@ Parameters:
   ApiSecurityGroupId:
     Type: AWS::EC2::SecurityGroup::Id
   ExchangeFeedSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+  CloudflareTunnelSecurityGroupId:
     Type: AWS::EC2::SecurityGroup::Id
   EcsClusterName:
     Type: String
@@ -41,6 +39,12 @@ Parameters:
   MigrationDatabaseUrlSecretArn:
     Type: String
     Description: Separate Secrets Manager ARN whose SecretString is the migrator-role PostgreSQL URL; never use the master or app-role credential.
+  CloudflareTunnelTokenSecretArn:
+    Type: String
+    Description: Secrets Manager ARN containing the Cloudflare Tunnel token for this staging environment.
+  CloudflaredImageUri:
+    Type: String
+    Description: Cloudflare cloudflared container image pinned to an immutable digest.
   ApiWebOrigin:
     Type: String
     Description: Exact HTTPS origin of the isolated Cloudflare staging frontend.
@@ -64,6 +68,11 @@ Parameters:
     Default: 1
     MinValue: 1
     MaxValue: 4
+  TunnelDesiredCount:
+    Type: Number
+    Default: 2
+    MinValue: 2
+    MaxValue: 4
 
 Resources:
   Alb:
@@ -71,11 +80,11 @@ Resources:
     Properties:
       Name: !Sub "${EnvironmentName}-alb"
       Type: application
-      Scheme: internet-facing
+      Scheme: internal
       IpAddressType: ipv4
       Subnets:
-        - !Ref PublicSubnetA
-        - !Ref PublicSubnetB
+        - !Ref PrivateAppSubnetA
+        - !Ref PrivateAppSubnetB
       SecurityGroups:
         - !Ref AlbSecurityGroupId
       LoadBalancerAttributes:
@@ -212,6 +221,29 @@ Resources:
                   - !Ref ApiDatabaseUrlSecretArn
                   - !Ref TotpEncryptionKeySecretArn
 
+  CloudflareTunnelExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: ReadOnlyCloudflareTunnelToken
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref CloudflareTunnelTokenSecretArn
+
   ApiTaskRole:
     Type: AWS::IAM::Role
     Properties:
@@ -258,6 +290,48 @@ Resources:
                   - !Ref MigrationDatabaseUrlSecretArn
 
   MigrationTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+
+  CloudflareTunnelTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${EnvironmentName}-cloudflare-tunnel"
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: "256"
+      Memory: "512"
+      ExecutionRoleArn: !GetAtt CloudflareTunnelExecutionRole.Arn
+      TaskRoleArn: !GetAtt CloudflareTunnelTaskRole.Arn
+      RuntimePlatform:
+        CpuArchitecture: X86_64
+        OperatingSystemFamily: LINUX
+      ContainerDefinitions:
+        - Name: cloudflared
+          Image: !Ref CloudflaredImageUri
+          Essential: true
+          Command:
+            - tunnel
+            - --no-autoupdate
+            - run
+          Secrets:
+            - Name: TUNNEL_TOKEN
+              ValueFrom: !Ref CloudflareTunnelTokenSecretArn
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "/trademate/${EnvironmentName}/cloudflare-tunnel"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+
+  CloudflareTunnelTaskRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -396,6 +470,32 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
 
+  CloudflareTunnelService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${EnvironmentName}-cloudflare-tunnel"
+      Cluster: !Ref EcsClusterName
+      LaunchType: FARGATE
+      PlatformVersion: LATEST
+      DesiredCount: !Ref TunnelDesiredCount
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 50
+        MaximumPercent: 200
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      EnableECSManagedTags: true
+      PropagateTags: SERVICE
+      TaskDefinition: !Ref CloudflareTunnelTaskDefinition
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets:
+            - !Ref PrivateAppSubnetA
+            - !Ref PrivateAppSubnetB
+          SecurityGroups:
+            - !Ref CloudflareTunnelSecurityGroupId
+
   ApiService:
     Type: AWS::ECS::Service
     DependsOn:
@@ -475,3 +575,7 @@ Outputs:
     Value: !Ref FeedTaskDefinition
   MigrationTaskDefinitionArn:
     Value: !Ref MigrationTaskDefinition
+  CloudflareTunnelTaskDefinitionArn:
+    Value: !Ref CloudflareTunnelTaskDefinition
+  CloudflareTunnelServiceName:
+    Value: !GetAtt CloudflareTunnelService.Name
