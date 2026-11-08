@@ -17,7 +17,7 @@ Parameters:
   EngineVersion:
     Type: String
     Description: Explicit PostgreSQL 18 minor version verified in the selected AWS region.
-    AllowedPattern: "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$"
+    AllowedPattern: "^[0-9]+\.[0-9]+(\.[0-9]+)?$"
   DBInstanceClass:
     Type: String
     Default: db.t4g.small
@@ -49,8 +49,8 @@ Parameters:
     Description: Enable deletion protection for long-lived staging databases.
 
 Conditions:
-  EnableMultiAZ: !If [EnableMultiAZ, true, false]
-  EnableDeletionProtection: !If [EnableDeletionProtection, true, false]
+  EnableMultiAZ: !Equals [!Ref MultiAZ, "true"]
+  EnableDeletionProtection: !Equals [!Ref DeletionProtection, "true"]
 
 Resources:
   DatabaseSubnetGroup:
@@ -85,8 +85,8 @@ Resources:
       StorageEncrypted: true
       BackupRetentionPeriod: !Ref BackupRetentionDays
       CopyTagsToSnapshot: true
-      MultiAZ: !Equals [!Ref MultiAZ, "true"]
-      DeletionProtection: !Equals [!Ref DeletionProtection, "true"]
+      MultiAZ: !If [EnableMultiAZ, true, false]
+      DeletionProtection: !If [EnableDeletionProtection, true, false]
       PubliclyAccessible: false
       AutoMinorVersionUpgrade: true
       EnableCloudwatchLogsExports:
