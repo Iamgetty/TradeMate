@@ -69,11 +69,11 @@ test.describe('same-origin API proxy', () => {
     const handlers = { POST, PUT, PATCH, DELETE };
     for (const [method, handler] of Object.entries(handlers)) {
       let capturedMethod = '';
-      let capturedBody = '';
+      let capturedBody: BodyInit | null | undefined;
       let capturedHeaders: Headers | undefined;
       globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
         capturedMethod = init?.method ?? '';
-        capturedBody = String(init?.body ?? '');
+        capturedBody = init?.body;
         capturedHeaders = new Headers(init?.headers);
         return new Response(null, { status: 204 });
       }) as typeof fetch;
@@ -85,7 +85,10 @@ test.describe('same-origin API proxy', () => {
 
       expect(response.status).toBe(204);
       expect(capturedMethod).toBe(method);
-      expect(capturedBody).toBe('{"active":true}');
+      const bodyText = capturedBody instanceof ArrayBuffer
+        ? new TextDecoder().decode(capturedBody)
+        : String(capturedBody ?? '');
+      expect(bodyText).toBe('{"active":true}');
       expect(capturedHeaders?.get('content-type')).toBe('application/json');
       expect(capturedHeaders?.get('x-csrf-token')).toBe('csrf-value');
     }
