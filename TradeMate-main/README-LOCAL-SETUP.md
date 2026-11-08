@@ -21,7 +21,7 @@ This is an initial foundation, not a production-ready marketplace. The web app i
 From the repository root, run `docker compose -f infra/docker-compose.yml up -d`. The password in the compose file is for local development only; replace it for any shared environment.
 
 ## Render deployment
-The `render.yaml` file is a starter Blueprint, not proof of a successful deployment. Review the build/start commands and environment variables in Render before creating services. Configure `NEXT_PUBLIC_API_URL` to the deployed API base URL (without a trailing slash). Configure `WEB_ORIGIN` to the deployed website origin. Never paste credentials into source files or commit real `.env` files.
+The `render.yaml` file is a starter Blueprint, not proof of a successful deployment. Review the build/start commands and environment variables in Render before creating services. Configure `TRADEMATE_API_ORIGIN` as a server-side environment variable containing the API base URL (without a trailing slash); do not use a `NEXT_PUBLIC_` prefix. Configure `WEB_ORIGIN` to the deployed website origin. For local web development, set `TRADEMATE_API_ORIGIN=http://localhost:4000`. Never paste credentials into source files or commit real `.env` files.
 
 ## Before production
 Add and test authentication, authorization, persistent data models and migrations, input validation, rate limiting, security headers, logging, monitoring, backups, and rollback procedures. Do not launch payments, escrow, or crypto/P2P features until legal, compliance, provider, and security reviews are complete.
