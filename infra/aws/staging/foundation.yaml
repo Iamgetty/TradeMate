@@ -290,16 +290,29 @@ Resources:
         - Key: Name
           Value: !Sub "${EnvironmentName}-feed-sg"
 
+  MigrationSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: One-off authorized database migration tasks
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-migration-sg"
+
   DatabaseSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: PostgreSQL ingress only from the API task security group
+      GroupDescription: PostgreSQL ingress only from API and one-off migration task security groups
       VpcId: !Ref Vpc
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 5432
           ToPort: 5432
           SourceSecurityGroupId: !Ref ApiSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref MigrationSecurityGroup
       Tags:
         - Key: Name
           Value: !Sub "${EnvironmentName}-db-sg"
@@ -384,6 +397,8 @@ Outputs:
     Value: !Ref ExchangeFeedSecurityGroup
   DatabaseSecurityGroupId:
     Value: !Ref DatabaseSecurityGroup
+  MigrationSecurityGroupId:
+    Value: !Ref MigrationSecurityGroup
   EcsClusterName:
     Value: !Ref EcsCluster
   ApiEcrRepositoryUri:
