@@ -8,7 +8,7 @@ This is an **un-deployed infrastructure template** for the first AWS staging fou
 - Two public subnets, two private application subnets and two isolated database subnets across the first two Availability Zones in the selected region.
 - Internet gateway and public routing.
 - One NAT gateway by default for private application egress. Set `NatGatewayCount=2` to use one NAT gateway per AZ.
-- Separate ALB, API, exchange-feed, one-off migration and PostgreSQL security groups. The database accepts TCP/5432 only from the API and dedicated migration task security groups.
+- Separate internal ALB, Cloudflare Tunnel connector, API, exchange-feed, one-off migration and PostgreSQL security groups. The ALB accepts HTTPS only from the tunnel connector; the database accepts TCP/5432 only from API and dedicated migration task security groups.
 - ECS cluster with Container Insights.
 - Immutable ECR repositories with scan-on-push and 30-image lifecycle policies.
 - CloudWatch log groups with 30-day retention.
@@ -16,7 +16,7 @@ This is an **un-deployed infrastructure template** for the first AWS staging fou
 
 ## Deliberate exclusions
 
-This first foundation does **not** create an ALB, listener, ECS task definitions/services, RDS instance, database credentials, IAM task/execution roles, Secrets Manager secrets, CloudFront distribution, or Cloudflare configuration. Those require workload-specific configuration and a separate review. No production hostname, DNS, frontend origin or Render service is modified.
+This network foundation does **not** create RDS, database credentials, Secrets Manager secrets, CloudFront distribution, or Cloudflare dashboard configuration. The separate services template creates an internal ALB, listeners, API/feed ECS services and a Cloudflare Tunnel connector service; it references pre-created secrets and an immutable cloudflared image. Those require workload-specific configuration and a separate review. No production hostname, DNS, frontend origin or Render service is modified.
 
 The RDS security group and isolated database subnets are prepared, but no database is provisioned. API and feed images are built in CI only; this template does not push images or deploy containers.
 
@@ -32,14 +32,14 @@ The RDS master secret is for controlled administration only. Do not inject it in
 
 ## ECS service layer (services.yaml)
 
-**Deployment blocker:** the current ALB is internet-facing with public IPv4 ingress. It is not yet locked to Cloudflare and must not be deployed as the staging origin until the [origin security design](origin-security-design.md) is implemented and validated. The preferred target is an internal ALB behind a dedicated Cloudflare Tunnel connector; that connector and internal-ALB conversion are not yet included in these templates.
+**Origin protection is now represented in the templates:** the ALB is internal, lives in private application subnets, and its security group accepts HTTPS only from the dedicated Cloudflare Tunnel connector security group. The connector runs as a private Fargate service with no public IP and reads its tunnel token from a dedicated Secrets Manager secret. The connector needs outbound NAT access to Cloudflare. This is infrastructure-as-code preparation only; Cloudflare dashboard routes, secrets, image digest and ACM certificate still need to be configured and validated before deployment.
 
 The separate `services.yaml` template consumes outputs/IDs from the network foundation and defines:
 
-- An internet-facing ALB in the two public subnets, HTTP-to-HTTPS redirect, TLS listener and host-header routing for the API and exchange-feed hostnames.
+- An internal ALB in the two private application subnets, HTTPS listener and host-header routing for the API and exchange-feed hostnames. It is not directly reachable from the public internet.
 - Separate IP target groups with application-matched health checks: API `GET /api/health` on port 4000 and feed `GET /health` on port 3000.
 - Independent Fargate task definitions and services for the NestJS API and WebSocket exchange feed, with private-subnet tasks, no public IPs, deployment circuit breakers and CloudWatch logs.
-- A narrowly scoped ECS execution role for the API that can read only its database URL and TOTP secret; the one-off migration task has a separate execution role that can read only its migrator secret. Application and migration task roles receive no additional AWS permissions by default.
+- A private Cloudflare Tunnel connector ECS service (two tasks by default) with a dedicated security group and execution role that can read only its tunnel token secret. The API execution role can read only its database URL and TOTP secret; the one-off migration task has a separate execution role that can read only its migrator secret. Application, connector and migration task roles receive no additional AWS permissions by default.
 - A 3,600-second ALB idle timeout for long-lived WebSocket connections and a 60-second feed target deregistration delay. Validate real connection lifetimes and graceful shutdown before increasing traffic.
 - MT5 public broadcast remains explicitly disabled in the feed task until redistribution permission is confirmed.
 
@@ -48,12 +48,13 @@ The separate `services.yaml` template consumes outputs/IDs from the network foun
 - VPC, public/private subnet, security-group and ECS cluster identifiers from the foundation stack outputs.
 - Immutable API and feed image URIs tagged with a Git commit SHA.
 - A separate migrator-role database URL secret ARN for `MigrationDatabaseUrlSecretArn`; never reuse the master or application-role secret.
+- A Cloudflare Tunnel token secret ARN for `CloudflareTunnelTokenSecretArn`, plus a `CloudflaredImageUri` pinned to an immutable image digest. The connector runs in private subnets and requires outbound connectivity through NAT.
 - An ACM certificate in the same AWS region covering both staging hostnames, plus the exact API/feed hostnames and Cloudflare staging frontend origin.
 - A Secrets Manager secret whose SecretString is the complete API `DATABASE_URL`, a separate secret whose SecretString is the 64-character hex `TOTP_ENCRYPTION_KEY`, and a third, distinct secret whose SecretString is the migrator-role PostgreSQL URL (`MIGRATION_DATABASE_URL`). The first two are injected into the API task; the migrator secret is injected only into the one-off migration task. Do not put secret values in CloudFormation parameters, GitHub, or chat. For the first pass, use the AWS-managed Secrets Manager key unless a separately reviewed customer-managed KMS key policy is provided.
 
 The API's migration credential is intentionally **not** injected into the long-running API task, and the API execution role cannot read the migrator secret. The database URL secret must use the least-privileged application DB role, not the migration/master role. The service template defines a standalone `MigrationTaskDefinition` using the API image and `node scripts/migrate.js`; it creates no ECS service and never runs migrations on API startup. To execute it later, an explicitly authorized operator must use ECS `RunTask` in the private app subnets, attach the dedicated `MigrationSecurityGroupId` output (not the API/feed SG), inject only the migrator secret through the task definition, and inspect the task exit code and logs before allowing an API rollout. The task definition is preparatory only: this PR does not invoke `RunTask`, create database roles, populate secrets or execute SQL. Complete a staging backup/restore rehearsal and review the migration plan before first execution. The foundation exposes a dedicated migration security group; only tasks launched with that group can use its additional PostgreSQL ingress. Do not attach it to either long-running service.
 
-The services template does not create RDS, ACM certificates, DNS records, Cloudflare records, secret values, or images; it only references those prerequisites. Do not deploy until the exact staging hostnames, certificate, secrets, account permissions, region and cost are reviewed and separately approved.
+The services template does not create RDS, ACM certificates, DNS records, Cloudflare Tunnel/dashboard routes, secret values, or images; it only references those prerequisites. Configure two Cloudflare Tunnel public-hostname routes in the Cloudflare dashboard: API hostname to `https://` plus the internal ALB DNS name, and feed hostname to the same ALB. For each route set the origin Host header to its respective API/feed hostname and the TLS origin server name to that hostname so the ALB certificate validates. Confirm Cloudflare WebSocket proxying is enabled for the feed hostname. Do not disable TLS verification. Test API health, authentication, WebSocket upgrade/reconnect and long-lived connection behavior before accepting staging traffic. Do not deploy until the exact staging hostnames, certificate, secrets, account permissions, region and cost are reviewed and separately approved.
 
 ## Network and cost choices
 
@@ -62,7 +63,7 @@ The services template does not create RDS, ACM certificates, DNS records, Cloudf
 - NAT gateways, Elastic IPs, VPC endpoints, ECS Container Insights and CloudWatch log ingestion can incur charges. Review the AWS pricing calculator and set a budget before deployment.
 - Database subnets have no default internet route. Do not add public database access.
 - VPC Flow Logs are not configured yet; add them with an approved retention and cost policy before production.
-- The current public ALB is provisional and must not be deployed before implementing the private-origin design in `origin-security-design.md`.
+- The internal ALB and Tunnel connector are template-defined but not yet deployed or end-to-end verified. Do not deploy until the tunnel token, immutable cloudflared image digest, ACM certificate and Cloudflare hostname routes are ready and separately approved.
 - The migration security group is a network permission boundary, not an authorization workflow by itself. A future one-off migration task must be manually/CI-authorized, run in private app subnets with that security group, receive only the migration credential, and be removed from the release path after successful completion. No migration task is created by this change.
 
 ## Validate without deploying
