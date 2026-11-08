@@ -12,7 +12,7 @@ Do not describe the current template as Cloudflare-only ingress or deploy it wit
 
 A static Cloudflare edge-IP allowlist is appropriate when Cloudflare's reverse proxy is the network peer connecting to the origin. It is not a safe assumption for arbitrary Cloudflare Workers subrequests: Workers egress does not generally provide a dedicated, stable per-application source-IP range that can be used as an origin allowlist. Do not copy Cloudflare's published proxy IP ranges into the ALB security group and assume that this secures Worker-to-origin requests.
 
-## Preferred target: private ALB behind Cloudflare Tunnel
+## Implemented template target: private ALB behind Cloudflare Tunnel
 
 For staging, prefer a Cloudflare Tunnel connector running as a dedicated, independently deployed ECS Fargate service:
 
@@ -24,7 +24,7 @@ For staging, prefer a Cloudflare Tunnel connector running as a dedicated, indepe
 6. Keep the ALB TLS listener and ACM certificate if the tunnel-to-origin leg uses HTTPS; validate certificate hostname/SNI and trust behavior. Alternatively use an explicitly reviewed private-origin TLS arrangement. Do not silently downgrade the origin leg to plaintext.
 7. Add health checks, log retention, deployment rollback, connector capacity and tunnel-token rotation procedures.
 
-This pattern avoids treating Workers egress IPs as fixed and removes the ALB from direct public reachability. It also means the current service template must be revised to consume an internal ALB and connector security group; the current public-subnet ALB is not ready for this target.
+This pattern avoids treating Workers egress IPs as fixed and removes the ALB from direct public reachability. The current branch templates now include the internal ALB, connector security group, private Fargate connector service and dedicated token-read role. The Cloudflare dashboard routes and runtime validation remain manual prerequisites.
 
 ## Alternatives and constraints
 
@@ -35,4 +35,4 @@ This pattern avoids treating Workers egress IPs as fixed and removes the ALB fro
 
 ## Decision gate before staging deployment
 
-Do not deploy the current public ALB template. First approve and implement the private-ALB/Tunnel design (or a documented alternative with equivalent origin authentication), then run CloudFormation lint, security review and end-to-end API/WebSocket tests. This document makes no AWS changes, DNS changes, Cloudflare changes, or secret changes.
+Do not deploy until the Cloudflare Tunnel token secret, immutable cloudflared image digest, ACM certificate and two public-hostname routes are prepared, and the Cloudflare-to-ALB TLS/SNI/Host-header settings are verified. Then run CloudFormation lint, security review and end-to-end API/WebSocket tests. Keep DNS and production routing unchanged. This document makes no AWS changes, DNS changes, Cloudflare changes, or secret changes.
