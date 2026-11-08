@@ -70,7 +70,7 @@ The services template does not create RDS, ACM certificates, DNS records, Cloudf
 
 ```bash
 python -m pip install cfn-lint
-cfn-lint infra/aws/staging/foundation.yaml
+cfn-lint infra/aws/staging/*.yaml
 ```
 
 A deployment review must additionally check CIDR overlap with existing VPCs/VPNs, selected-region AZ availability, quotas, NAT cost, security-group egress, endpoint requirements, CloudFormation change set and IAM permissions.
