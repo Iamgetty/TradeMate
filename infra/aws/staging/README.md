@@ -32,6 +32,8 @@ The RDS master secret is for controlled administration only. Do not inject it in
 
 ## ECS service layer (services.yaml)
 
+**Deployment blocker:** the current ALB is internet-facing with public IPv4 ingress. It is not yet locked to Cloudflare and must not be deployed as the staging origin until the [origin security design](origin-security-design.md) is implemented and validated. The preferred target is an internal ALB behind a dedicated Cloudflare Tunnel connector; that connector and internal-ALB conversion are not yet included in these templates.
+
 The separate `services.yaml` template consumes outputs/IDs from the network foundation and defines:
 
 - An internet-facing ALB in the two public subnets, HTTP-to-HTTPS redirect, TLS listener and host-header routing for the API and exchange-feed hostnames.
@@ -60,6 +62,7 @@ The services template does not create RDS, ACM certificates, DNS records, Cloudf
 - NAT gateways, Elastic IPs, VPC endpoints, ECS Container Insights and CloudWatch log ingestion can incur charges. Review the AWS pricing calculator and set a budget before deployment.
 - Database subnets have no default internet route. Do not add public database access.
 - VPC Flow Logs are not configured yet; add them with an approved retention and cost policy before production.
+- The current public ALB is provisional and must not be deployed before implementing the private-origin design in `origin-security-design.md`.
 - The migration security group is a network permission boundary, not an authorization workflow by itself. A future one-off migration task must be manually/CI-authorized, run in private app subnets with that security group, receive only the migration credential, and be removed from the release path after successful completion. No migration task is created by this change.
 
 ## Validate without deploying
