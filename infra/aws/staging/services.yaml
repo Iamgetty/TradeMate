@@ -61,20 +61,6 @@ Parameters:
     Default: 1
     MinValue: 1
     MaxValue: 4
-  ApiCpu:
-    Type: String
-    Default: "512"
-    AllowedValues: ["256", "512", "1024", "2048", "4096"]
-  ApiMemory:
-    Type: String
-    Default: "1024"
-  FeedCpu:
-    Type: String
-    Default: "512"
-    AllowedValues: ["256", "512", "1024", "2048", "4096"]
-  FeedMemory:
-    Type: String
-    Default: "1024"
 
 Resources:
   Alb:
@@ -251,8 +237,8 @@ Resources:
       Family: !Sub "${EnvironmentName}-api"
       RequiresCompatibilities: [FARGATE]
       NetworkMode: awsvpc
-      Cpu: !Ref ApiCpu
-      Memory: !Ref ApiMemory
+      Cpu: "512"
+      Memory: "1024"
       ExecutionRoleArn: !GetAtt EcsExecutionRole.Arn
       TaskRoleArn: !GetAtt ApiTaskRole.Arn
       RuntimePlatform:
@@ -300,8 +286,8 @@ Resources:
       Family: !Sub "${EnvironmentName}-exchange-feed"
       RequiresCompatibilities: [FARGATE]
       NetworkMode: awsvpc
-      Cpu: !Ref FeedCpu
-      Memory: !Ref FeedMemory
+      Cpu: "512"
+      Memory: "1024"
       ExecutionRoleArn: !GetAtt EcsExecutionRole.Arn
       TaskRoleArn: !GetAtt FeedTaskRole.Arn
       RuntimePlatform:
