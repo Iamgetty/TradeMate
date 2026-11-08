@@ -29,7 +29,7 @@ jobs:
           python-version: "3.12"
       - name: Install cfn-lint
         run: python -m pip install --disable-pip-version-check cfn-lint
-      - name: Lint staging foundation
+      - name: Lint all staging CloudFormation templates
         run: cfn-lint infra/aws/staging/*.yaml
 
 # Intentionally no AWS credentials, CloudFormation change-set creation,
