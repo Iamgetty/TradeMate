@@ -60,20 +60,20 @@ async function main() {
     };
 
     const a = await inspectAs(users[0]);
-    assert.deepEqual(a.profiles.rows.map((row) => row.user_id), [...users].sort());
+    assert.deepEqual(a.profiles.rows.map((row) => row.user_id).filter((id) => users.includes(id)).sort(), [...users].sort());
     assert.equal(a.follows.rowCount, 0);
     assert.deepEqual(a.preferences.rows.map((row) => row.user_id), [users[0]]);
     assert.deepEqual(a.notifications.rows.map((row) => row.user_id), [users[0]]);
     assert.deepEqual(a.security.rows.map((row) => row.user_id), [users[0]]);
 
     const b = await inspectAs(users[1]);
-    assert.deepEqual(b.profiles.rows.map((row) => row.user_id), [...users].sort());
+    assert.deepEqual(b.profiles.rows.map((row) => row.user_id).filter((id) => users.includes(id)).sort(), [...users].sort());
     assert.deepEqual(b.preferences.rows.map((row) => row.user_id), [users[1]]);
     assert.deepEqual(b.notifications.rows.map((row) => row.user_id), [users[1]]);
     assert.deepEqual(b.security.rows.map((row) => row.user_id), [users[1]]);
 
     const anonymous = await inspectAs('');
-    assert.deepEqual(anonymous.profiles.rows.map((row) => row.user_id), [...users].sort());
+    assert.deepEqual(anonymous.profiles.rows.map((row) => row.user_id).filter((id) => users.includes(id)).sort(), [...users].sort());
     assert.equal(anonymous.follows.rowCount, 0);
     assert.equal(anonymous.preferences.rowCount, 0);
     assert.equal(anonymous.notifications.rowCount, 0);

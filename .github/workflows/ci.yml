@@ -1,10 +1,14 @@
 name: TradeMate CI
 
+# Keep only the newest validation run for a given pull request or branch.
+concurrency:
+  group: trademate-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
       - main
-      - "work/**"
   pull_request:
     branches:
       - main
@@ -49,6 +53,27 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: npm run db:migrate
+      - name: Verify organization document permissions and rollback through HTTP endpoints
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-organization-documents.js
+      - name: Verify two-party marketplace contract lifecycle and concurrency
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-marketplace-contracts.js
+      - name: Verify authentication audit atomicity and rollback
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+          TOTP_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        run: node scripts/test-auth-audit.js
+      - name: Verify Services and B2B draft authorization and audit rollback
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-marketplace-listings.js
       - name: Verify least-privilege PostgreSQL roles and grants
         working-directory: TradeMate-main/apps/api
         env:
@@ -82,6 +107,8 @@ jobs:
           node-version: 20
       - name: Validate TradeMate runtime JavaScript
         run: node --check TradeMate-main/apps/web/public/tm/app.js
+      - name: Verify connected account cache isolation
+        run: node TradeMate-main/apps/web/scripts/test-account-isolation.js
       - name: Install web dependencies
         working-directory: TradeMate-main/apps/web
         run: npm install --no-audit --no-fund
@@ -168,7 +195,34 @@ jobs:
       - name: Static application security testing
         run: semgrep scan --config p/default --error --timeout 15 --timeout-threshold 10 TradeMate-main/apps/api/src TradeMate-main/apps/api/scripts TradeMate-main/apps/api/database/security TradeMate-main/apps/web
 
+      - name: Fetch pull request base branch for secret scanning
+        if: github.event_name == 'pull_request'
+        run: git fetch origin "${{ github.base_ref }}:${{ github.base_ref }}" || true
+
       - name: Secret scanning
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  browser-e2e:
+    name: Browser app-shell smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+      - name: Install web and browser-test dependencies
+        working-directory: TradeMate-main/apps/web
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium and system dependencies
+        working-directory: TradeMate-main/apps/web
+        run: npx playwright install --with-deps chromium
+      - name: Run isolated browser smoke tests
+        working-directory: TradeMate-main/apps/web
+        env:
+          CI: true
+        run: npm run test:e2e
