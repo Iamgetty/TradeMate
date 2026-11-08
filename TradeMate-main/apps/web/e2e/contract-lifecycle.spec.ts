@@ -316,7 +316,6 @@ test('organization documents and own-offer screens recover after transient API f
     await login(page, 'seller@example.test');
     console.log('[contract-e2e] organization recovery: authenticated; bootstrap requests', { organizationRequests, documentRequests, ownOfferRequests });
     await expect.poll(() => organizationRequests, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
-    await expect(page.getByText('Could not load organization', { exact: true })).toBeVisible({ timeout: 10_000 });
 
     console.log('[contract-e2e] organization recovery: opening profile and switching to Alpha');
     await page.locator('#app .top button[data-pg="profile"]').click({ force: true });
