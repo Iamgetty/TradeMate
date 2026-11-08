@@ -1,23 +1,33 @@
-# AWS staging foundation
+# AWS backend and Cloudflare frontend foundation
 
-## Decision
+## Architecture decision
 
-AWS is the target cloud for TradeMate. This directory is the implementation entry point for the first AWS staging environment. Render remains available as the rollback environment until AWS production cutover is separately approved.
+TradeMate uses a split-cloud architecture:
 
-## Existing workload to migrate
+- **AWS is the primary application and data platform** for production backend workloads.
+- **Cloudflare hosts and serves the frontend** and provides DNS, WAF, DDoS protection and edge traffic controls.
+- **Render is retained as a secondary environment for staging, testing, QA and pre-release validation**. It is not the production source of truth or the primary production rollback platform.
+- GCP is outside the initial migration scope.
 
-| Render workload | AWS target |
+This directory is the implementation entry point for the AWS backend staging environment. This is a design and repository change only; it does not provision or modify cloud resources.
+
+## Workload placement
+
+| Existing workload | Target platform |
 |---|---|
-| `trademate-api` (NestJS, Node.js) | ECS Fargate service behind an Application Load Balancer |
-| `trademate-web` (Next.js, Node.js) | ECS Fargate service behind an Application Load Balancer; CloudFront can be added after cache and routing behaviour is verified |
-| `exchange-feed` (Node.js WebSocket service) | Separate ECS Fargate service with WebSocket-capable ALB routing and connection/drain testing |
+| `trademate-web` (Next.js, Node.js) | Cloudflare Workers using the OpenNext adapter, subject to compatibility/build validation; Cloudflare serves the frontend and static assets |
+| `trademate-api` (NestJS, Node.js) | AWS ECS Fargate behind an Application Load Balancer |
+| `exchange-feed` (Node.js WebSocket service) | AWS ECS Fargate behind WebSocket-capable ALB routing, subject to connection, idle-timeout and drain testing |
 | PostgreSQL 18 | Amazon RDS for PostgreSQL, private subnets, encrypted storage, automated backups and tested restore |
-| Render environment variables | AWS Secrets Manager for secrets; task environment only for non-secret configuration |
-| Render deploy history/logs | GitHub Actions release pipeline and CloudWatch logs/metrics/alarms |
+| Backend secrets and configuration | AWS Secrets Manager for secrets; task environment only for non-secret configuration |
+| Backend deploy history/logs | GitHub Actions release pipeline and CloudWatch logs/metrics/alarms |
+| Frontend deployment and edge delivery | Cloudflare Workers deployment pipeline, with Cloudflare-managed routing, TLS and edge controls |
 
-The first staging region is proposed as **us-west-2 (Oregon)** because the current API, web and PostgreSQL production resources are co-located in Render Oregon. This is a migration starting point, not a final global-region decision; validate user geography, latency and data-residency requirements before production placement. The existing Frankfurt feed must be load-tested before deciding whether to keep it in a second region or consolidate it.
+The Next.js deployment must be validated against the application's actual use of SSR, route handlers, middleware, image optimization, runtime APIs and Node-specific packages. Do not assume a static export is sufficient. If the application uses features unsupported by the selected Workers runtime, resolve compatibility before switching frontend traffic. Cloudflare Pages is not the default target for this SSR application; use the supported Workers/OpenNext path unless validation demonstrates a better fit.
 
-## Staging topology
+The first AWS staging region is proposed as **us-west-2 (Oregon)** because the current API and PostgreSQL production resources are co-located in Render Oregon. This is a migration starting point, not a final global-region decision; validate user geography, latency and data-residency requirements before production placement. The existing Frankfurt feed must be load-tested before deciding whether to keep it in a second region or consolidate it.
+
+## AWS backend staging topology
 
 - Dedicated AWS account or isolated staging account under AWS Organizations; do not mix staging and production resources.
 - VPC across at least two Availability Zones.
@@ -28,31 +38,36 @@ The first staging region is proposed as **us-west-2 (Oregon)** because the curre
 - KMS encryption for RDS, logs and secrets; task roles use least-privilege IAM.
 - Secrets Manager holds database credentials, TOTP encryption key and provider credentials. Never commit values or copy Render secret values into GitHub.
 - CloudWatch log groups have explicit retention; alarms cover task health/restarts, ALB 5xx/latency, RDS storage/connections/CPU and deployment failures.
-- Use immutable container images in ECR, tagged with the Git commit SHA. GitHub Actions builds/tests/scans and deploys staging only after required checks pass.
+- Use immutable container images in ECR, tagged with the Git commit SHA. GitHub Actions builds/tests/scans and deploys backend staging only after required checks pass.
 - Database migrations run as a one-off ECS task/release step, not automatically in every API replica's startup command.
 - Preserve WebSocket upgrade behaviour, idle timeouts, health checks and graceful connection draining for the exchange feed.
-- Cloudflare remains the DNS/WAF/DDoS edge layer. CloudFront is introduced only after origin access, cache policy and WebSocket routing boundaries are explicitly configured.
+- Configure the Cloudflare frontend's API origin, CORS allowlist, cookie domain/SameSite/Secure attributes, CSRF protections and authentication redirects deliberately. Do not expose private AWS service endpoints.
+- Cloudflare-to-AWS origin traffic must use TLS and a restricted, authenticated origin path where feasible. Do not rely on an obscured hostname as origin protection.
+- Keep API caching disabled by default for authenticated or user-specific responses; add explicit cache rules only after response semantics are reviewed.
 
 ## Migration execution gates
 
-1. **Foundation (this change):** record topology, workload mapping, region assumptions, security boundaries and operational gates.
-2. **Provision staging:** after AWS account access and region approval, create the staging VPC, IAM roles, ECR, ECS cluster/services, ALB, RDS and observability using reviewed infrastructure-as-code.
-3. **Build and deploy:** containerize each workload, pin runtime versions, configure health checks, secret references and staging-only GitHub OIDC deployment permissions.
-4. **Data rehearsal:** create an encrypted backup/export of staging data, restore to RDS, apply migrations, verify row counts and application invariants. Never use production data for staging without explicit data-handling approval and an approved sanitization process.
-5. **Acceptance:** test auth/session/TOTP, contracts, enquiries, feed/WebSockets, uploads, scheduled jobs, email/provider integrations, database recovery, load, security and rollback.
-6. **Production migration:** separate change plan and explicit approval required for production data transfer, DNS changes, secret rotation, service shutdown or traffic cutover.
+1. **Foundation (this change):** record platform responsibilities, workload mapping, region assumptions, security boundaries and operational gates.
+2. **Provision AWS backend staging:** after AWS account access and region approval, create the staging VPC, IAM roles, ECR, ECS cluster/services, ALB, RDS and observability using reviewed infrastructure-as-code.
+3. **Prepare Cloudflare frontend delivery:** validate Next.js/OpenNext compatibility, configure a separate staging Worker/environment, bind staging-only API origins and secrets, and add a reviewed frontend deployment workflow. Do not change production routes or DNS.
+4. **Build and deploy:** containerize backend workloads, pin runtime versions, configure health checks and secret references, and grant staging-only GitHub OIDC deployment permissions.
+5. **Data rehearsal:** create an encrypted backup/export of staging data, restore to RDS, apply migrations, verify row counts and application invariants. Never use production data for staging without explicit data-handling approval and an approved sanitization process.
+6. **Acceptance:** test auth/session/TOTP, contracts, enquiries, feed/WebSockets, uploads, scheduled jobs, email/provider integrations, frontend rendering/routing, CORS/CSRF, database recovery, load, security and rollback.
+7. **Production migration:** separate change plan and explicit approval required for production data transfer, Cloudflare production route/DNS changes, secret rotation, service shutdown or traffic cutover.
 
 ## Blocking inputs for provisioning
 
 - AWS account ID and confirmation that the account is ready for TradeMate.
-- Approval to use `us-west-2` for the first staging deployment.
+- Approval to use `us-west-2` for the first AWS staging deployment.
 - AWS access path: preferably GitHub Actions OIDC with a narrowly scoped staging deployment role; do not send access keys or secrets in chat.
-- Monthly staging budget ceiling and desired RDS/ECS availability profile.
+- Monthly AWS staging budget ceiling and desired RDS/ECS availability profile.
+- Cloudflare account access and an approved staging hostname/zone for the frontend deployment. Do not share API tokens in chat; use a secure secret-management flow.
 
 ## Guardrails
 
 - This repository change does not provision, modify or delete cloud resources.
-- No production Render resource, database, secret, DNS record or deployment is changed.
+- No production Render resource, database, secret, DNS record, Cloudflare route or deployment is changed.
 - No production database backup or customer data is copied.
-- Do not run `terraform apply`, deploy workflows, database migrations or DNS changes without the relevant explicit approval.
-- Keep Render available as rollback until AWS production acceptance and cutover are complete.
+- Do not run `terraform apply`, deploy workflows, database migrations, Cloudflare production route changes or DNS changes without the relevant explicit approval.
+- Keep Render available as a separate staging/testing/QA environment. Do not treat it as production or automatically synchronize production data/secrets into it.
+- AWS is the production backend source of truth; Cloudflare is the frontend hosting and edge delivery platform.
