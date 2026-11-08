@@ -30,10 +30,10 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const { path } = await context.params;
   const destination = `${apiBase}/api/${path.map(encodeURIComponent).join('/')}${request.nextUrl.search}`;
   const headers = new Headers();
-  const contentType = request.headers.get('content-type');
-  const cookie = request.headers.get('cookie');
-  if (contentType) headers.set('content-type', contentType);
-  if (cookie) headers.set('cookie', cookie);
+  for (const name of ['accept', 'authorization', 'content-type', 'cookie', 'x-csrf-token']) {
+    const value = request.headers.get(name);
+    if (value) headers.set(name, value);
+  }
   const method = request.method;
   const body = method === 'GET' || method === 'HEAD' ? undefined : await request.arrayBuffer();
 
@@ -46,8 +46,10 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       redirect: 'manual',
     });
     const responseHeaders = new Headers();
-    const upstreamType = upstream.headers.get('content-type');
-    if (upstreamType) responseHeaders.set('content-type', upstreamType);
+    for (const name of ['content-type', 'location', 'cache-control', 'content-disposition']) {
+      const value = upstream.headers.get(name);
+      if (value) responseHeaders.set(name, value);
+    }
     const setCookies = upstream.headers.getSetCookie?.() ?? [];
     for (const setCookie of setCookies) responseHeaders.append('set-cookie', setCookie);
     return new NextResponse(upstream.body, { status: upstream.status, headers: responseHeaders });
@@ -57,6 +59,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 }
 
 export const GET = proxy;
+export const HEAD = proxy;
 export const POST = proxy;
 export const PUT = proxy;
 export const PATCH = proxy;
