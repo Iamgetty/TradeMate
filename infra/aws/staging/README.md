@@ -45,7 +45,7 @@ The separate `services.yaml` template consumes outputs/IDs from the network foun
 
 ### Required service-stack inputs
 
-- VPC, public/private subnet, security-group and ECS cluster identifiers from the foundation stack outputs.
+- VPC, private application subnet, security-group and ECS cluster identifiers from the foundation stack outputs.
 - Immutable API and feed image URIs tagged with a Git commit SHA.
 - A separate migrator-role database URL secret ARN for `MigrationDatabaseUrlSecretArn`; never reuse the master or application-role secret.
 - A Cloudflare Tunnel token secret ARN for `CloudflareTunnelTokenSecretArn`, plus a `CloudflaredImageUri` pinned to an immutable image digest. The connector runs in private subnets and requires outbound connectivity through NAT.
