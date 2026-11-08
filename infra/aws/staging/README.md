@@ -8,7 +8,7 @@ This is an **un-deployed infrastructure template** for the first AWS staging fou
 - Two public subnets, two private application subnets and two isolated database subnets across the first two Availability Zones in the selected region.
 - Internet gateway and public routing.
 - One NAT gateway by default for private application egress. Set `NatGatewayCount=2` to use one NAT gateway per AZ.
-- Separate ALB, API, exchange-feed and PostgreSQL security groups. The database accepts TCP/5432 only from the API task security group.
+- Separate ALB, API, exchange-feed, one-off migration and PostgreSQL security groups. The database accepts TCP/5432 only from the API and dedicated migration task security groups.
 - ECS cluster with Container Insights.
 - Immutable ECR repositories with scan-on-push and 30-image lifecycle policies.
 - CloudWatch log groups with 30-day retention.
@@ -48,7 +48,7 @@ The separate `services.yaml` template consumes outputs/IDs from the network foun
 - An ACM certificate in the same AWS region covering both staging hostnames, plus the exact API/feed hostnames and Cloudflare staging frontend origin.
 - A Secrets Manager secret whose SecretString is the complete API `DATABASE_URL`, and a separate secret whose SecretString is the 64-character hex `TOTP_ENCRYPTION_KEY`. These are injected into the API task; do not put secret values in CloudFormation parameters, GitHub, or chat. For the first pass, use the AWS-managed Secrets Manager key unless a separately reviewed customer-managed KMS key policy is provided.
 
-The API's migration credential is intentionally **not** injected into the long-running API task. The database URL secret must use the least-privileged application DB role, not the migration/master role. Migrations remain a separately authorized one-off ECS task/release step after the database role bootstrap and migration rehearsal are ready.
+The API's migration credential is intentionally **not** injected into the long-running API task. The database URL secret must use the least-privileged application DB role, not the migration/master role. Migrations remain a separately authorized one-off ECS task/release step after the database role bootstrap and migration rehearsal are ready. The foundation exposes a dedicated migration security group; only tasks launched with that group can use its additional PostgreSQL ingress. Do not attach it to either long-running service.
 
 The services template does not create RDS, ACM certificates, DNS records, Cloudflare records, secret values, or images; it only references those prerequisites. Do not deploy until the exact staging hostnames, certificate, secrets, account permissions, region and cost are reviewed and separately approved.
 
@@ -59,6 +59,7 @@ The services template does not create RDS, ACM certificates, DNS records, Cloudf
 - NAT gateways, Elastic IPs, VPC endpoints, ECS Container Insights and CloudWatch log ingestion can incur charges. Review the AWS pricing calculator and set a budget before deployment.
 - Database subnets have no default internet route. Do not add public database access.
 - VPC Flow Logs are not configured yet; add them with an approved retention and cost policy before production.
+- The migration security group is a network permission boundary, not an authorization workflow by itself. A future one-off migration task must be manually/CI-authorized, run in private app subnets with that security group, receive only the migration credential, and be removed from the release path after successful completion. No migration task is created by this change.
 
 ## Validate without deploying
 
