@@ -276,7 +276,8 @@ jobs:
         working-directory: ${{ runner.temp }}/trademate-web
         run: |
           set -euo pipefail
-          npm run dev:vinext -- --host 127.0.0.1 --port 4173 > "$RUNNER_TEMP/vinext-runtime.log" 2>&1 &
+          # Exercise the built Worker preview, not Vite's development server.
+          npm run start:vinext -- --host 127.0.0.1 --port 4173 > "$RUNNER_TEMP/vinext-runtime.log" 2>&1 &
           server_pid=$!
           cleanup() {
             kill "$server_pid" 2>/dev/null || true
