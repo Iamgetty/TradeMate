@@ -285,7 +285,7 @@ jobs:
           trap cleanup EXIT
           ready=0
           for attempt in $(seq 1 60); do
-            if curl --silent --fail http://127.0.0.1:4173/ -o "$RUNNER_TEMP/vinext-home.html"; then
+            if curl --silent --show-error --location --max-redirs 5 --fail http://127.0.0.1:4173/ -o "$RUNNER_TEMP/vinext-home.html"; then
               ready=1
               break
             fi
