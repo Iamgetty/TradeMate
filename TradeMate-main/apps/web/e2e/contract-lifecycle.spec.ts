@@ -340,10 +340,12 @@ test('organization documents and own-offer screens recover after transient API f
     ownOfferFailureArmed = true;
     console.log('[contract-e2e] own-offer recovery: opening More; failure armed');
     await page.locator('#sbar [data-f="More"]').click({ force: true, timeout: 10_000 });
-    await page.locator('#app [data-f="Contract approvals"]').click({ force: true, timeout: 10_000 });
+    await page.locator('#pg [data-f="Contract approvals"]').click({ force: true, timeout: 10_000 });
     await expect(page.getByText('Could not load your offers', { exact: true })).toBeVisible();
+    const failedOfferRequestCount = ownOfferRequests;
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
-    await expect(page.getByText('No contracts awaiting approval', { exact: true })).toBeVisible();
+    await expect.poll(() => ownOfferRequests, { timeout: 10_000 }).toBeGreaterThan(failedOfferRequestCount);
+    await expect(page.getByText('No contracts awaiting approval', { exact: true })).toBeVisible({ timeout: 10_000 });
     expect(ownOfferRequests).toBeGreaterThanOrEqual(2);
   } finally {
     await context.close().catch(error => console.log('[contract-e2e] organization recovery cleanup:', String(error)));
