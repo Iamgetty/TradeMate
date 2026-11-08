@@ -154,6 +154,24 @@ jobs:
         working-directory: TradeMate-main/apps/api
         run: npm run test:security
 
+
+  container-images:
+    name: AWS API and exchange-feed container builds
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build API runtime image
+        run: docker build --pull -f TradeMate-main/apps/api/Dockerfile -t trademate-api:ci .
+      - name: Verify API image runs as non-root and includes migration assets
+        run: |
+          test "$(docker image inspect trademate-api:ci --format '{{.Config.User}}')" = "node"
+          docker run --rm --entrypoint node trademate-api:ci -e "const fs=require('fs'); if(!fs.existsSync('scripts/migrate.js') || !fs.existsSync('database/migrations/001_initial_marketplace.sql')) process.exit(1)"
+      - name: Build exchange-feed runtime image
+        run: docker build --pull -f TradeMate-main/exchange-feed/Dockerfile -t trademate-exchange-feed:ci .
+      - name: Verify exchange-feed image runs as non-root
+        run: test "$(docker image inspect trademate-exchange-feed:ci --format '{{.Config.User}}')" = "node"
+
   security:
     name: Security scanning (SAST, SCA and secrets)
     runs-on: ubuntu-latest
