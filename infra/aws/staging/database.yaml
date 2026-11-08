@@ -48,6 +48,10 @@ Parameters:
     AllowedValues: ["true", "false"]
     Description: Enable deletion protection for long-lived staging databases.
 
+Conditions:
+  EnableMultiAZ: !If [EnableMultiAZ, true, false]
+  EnableDeletionProtection: !If [EnableDeletionProtection, true, false]
+
 Resources:
   DatabaseSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
