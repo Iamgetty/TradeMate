@@ -211,7 +211,6 @@ Resources:
                 Resource:
                   - !Ref ApiDatabaseUrlSecretArn
                   - !Ref TotpEncryptionKeySecretArn
-                  - !Ref MigrationDatabaseUrlSecretArn
 
   ApiTaskRole:
     Type: AWS::IAM::Role
