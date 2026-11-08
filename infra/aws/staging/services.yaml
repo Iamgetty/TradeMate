@@ -578,4 +578,4 @@ Outputs:
   CloudflareTunnelTaskDefinitionArn:
     Value: !Ref CloudflareTunnelTaskDefinition
   CloudflareTunnelServiceName:
-    Value: !GetAtt CloudflareTunnelService.Name
+    Value: !Sub "${EnvironmentName}-cloudflare-tunnel"
