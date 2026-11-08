@@ -527,3 +527,68 @@ test('individual contract and enquiry messages recover after transient API failu
     await context.close().catch(() => undefined);
   }
 });
+
+test('community Feed recovers after a transient API failure and fits mobile screens', async ({ browser }) => {
+  test.setTimeout(75_000);
+  let authenticated = false;
+  let feedRequests = 0;
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+
+  await page.route('**/api/**', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname.replace(/^\/api/, '');
+    const method = request.method();
+
+    if (path === '/auth/me' && method === 'GET') {
+      await route.fulfill(authenticated
+        ? { status: 200, json: { user: { id: 'feed-mobile-user', email: 'feed@example.test', display_name: 'Feed Mobile User', country_code: 'NG' } } }
+        : { status: 401, json: { message: 'No active session' } });
+      return;
+    }
+    if (path === '/auth/login' && method === 'POST') {
+      authenticated = true;
+      await route.fulfill({ status: 200, json: { user: { id: 'feed-mobile-user', email: 'feed@example.test', display_name: 'Feed Mobile User', country_code: 'NG' } } });
+      return;
+    }
+    if (path === '/feed/posts' && method === 'GET') {
+      feedRequests += 1;
+      if (feedRequests === 1) {
+        await route.fulfill({ status: 503, json: { message: 'Community Feed temporarily unavailable' } });
+      } else {
+        await route.fulfill({ status: 200, json: { posts: [{
+          id: 'feed-mobile-post-001', post_type: 'post', author_name: 'Feed QA Member',
+          author_user_id: 'feed-qa-author', title: 'Feed retry acceptance post',
+          body: 'This post confirms the community Feed recovered after Retry.',
+          attachments: [], comment_count: 0, reaction_count: 0, reshare_count: 0,
+          pinned: false, created_at: '2026-11-08T09:00:00.000Z',
+        }] } });
+      }
+      return;
+    }
+    await route.fulfill({ status: 200, json: {} });
+  });
+
+  try {
+    await login(page, 'feed@example.test');
+    await page.locator('#sbar [data-tab="Feed"]').click({ force: true, timeout: 10_000 });
+    await expect(page.getByText('Feed unavailable', { exact: true })).toBeVisible({ timeout: 10_000 });
+    expect(feedRequests).toBe(1);
+
+    await page.getByRole('button', { name: 'Try again', exact: true }).click();
+    await expect(page.getByText('Feed retry acceptance post', { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Feed QA Member', { exact: true })).toBeVisible();
+    expect(feedRequests).toBe(2);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByText('Feed retry acceptance post', { exact: true })).toBeVisible();
+    const dimensions = await page.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      document: document.documentElement.scrollWidth,
+    }));
+    expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport + 2);
+  } finally {
+    await context.close().catch(() => undefined);
+  }
+});
