@@ -17,7 +17,7 @@ Parameters:
   EngineVersion:
     Type: String
     Description: Explicit PostgreSQL 18 minor version verified in the selected AWS region.
-    AllowedPattern: "^[0-9]+\.[0-9]+(\.[0-9]+)?$"
+    AllowedPattern: '^[0-9]+\.[0-9]+(\.[0-9]+)?$'
   DBInstanceClass:
     Type: String
     Default: db.t4g.small
