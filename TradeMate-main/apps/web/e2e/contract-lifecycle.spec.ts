@@ -319,7 +319,9 @@ test('organization documents and own-offer screens recover after transient API f
     organizationFailureArmed = true;
     documentFailureArmed = true;
     console.log('[contract-e2e] organization recovery: navigating; failure armed');
-    await page.locator('#sbar [data-f="Organization"]').click({ force: true, timeout: 10_000 });
+    await page.locator('#sbar [data-f="More"]').click({ force: true, timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: 'All services' })).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: 'Organization', exact: true }).click({ force: true, timeout: 10_000 });
     console.log('[contract-e2e] organization recovery: navigation returned', { organizationRequests, documentRequests });
     await expect(page.getByText('Could not load organization', { exact: true })).toBeVisible({ timeout: 10_000 });
     console.log('[contract-e2e] organization recovery: retrying organization', { organizationRequests, documentRequests });
@@ -417,7 +419,8 @@ test('contracts and enquiries lists recover after transient API failures', async
 
     console.log('[contract-e2e] list recovery: opening Conversations', { contractRequests, enquiryRequests });
     await page.locator('#sbar [data-f="More"]').click({ force: true, timeout: 10_000 });
-    await page.locator('#app [data-f="Conversations"]').click({ force: true, timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: 'All services' })).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: 'Conversations', exact: true }).click({ force: true, timeout: 10_000 });
     console.log('[contract-e2e] list recovery: opened Conversations', { contractRequests, enquiryRequests });
     await expect(page.getByText('Could not load conversations', { exact: true })).toBeVisible({ timeout: 10_000 });
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
