@@ -477,6 +477,7 @@ Resources:
       Cluster: !Ref EcsClusterName
       LaunchType: FARGATE
       PlatformVersion: LATEST
+      AvailabilityZoneRebalancing: ENABLED
       DesiredCount: !Ref TunnelDesiredCount
       DeploymentConfiguration:
         MinimumHealthyPercent: 50
