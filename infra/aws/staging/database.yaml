@@ -20,8 +20,7 @@ Parameters:
     AllowedPattern: '^[0-9]+\.[0-9]+(\.[0-9]+)?$'
   DBInstanceClass:
     Type: String
-    Default: db.t4g.small
-    Description: Select a class supported by the chosen PostgreSQL engine version and region.
+    Description: Required explicit choice. Verify this class supports the selected PostgreSQL 18 minor version in the target AWS region before deployment.
   AllocatedStorage:
     Type: Number
     Default: 20
