@@ -5,14 +5,14 @@
 ## Primary platform responsibilities
 
 - **Cloudflare is the primary frontend host.** The Next.js application is targeted for Cloudflare Workers after adapter compatibility, authentication, routing and runtime acceptance gates pass. Cloudflare owns frontend delivery, DNS/routing, TLS and edge security.
-- **AWS is the primary backend and data platform.** The initial target is ECS Fargate for the NestJS API and exchange-feed service, RDS for PostgreSQL, S3 where appropriate, Secrets Manager/KMS and CloudWatch.
+- **AWS is the primary backend and data platform for the initial migration.** The initial target is ECS Fargate for the NestJS API and exchange-feed service, RDS for PostgreSQL, S3 where appropriate, Secrets Manager/KMS and CloudWatch.
 - **Render remains secondary** for staging, testing, QA and pre-release validation. It is not the production source of truth.
+- **Google Cloud Platform (GCP) is recognized as an additional cloud platform** in TradeMate's architecture and longer-term cloud strategy. AWS remains the selected primary platform for the initial backend migration. GCP is not being deployed as a duplicate primary production stack in this phase; any GCP workload or service requires a separately documented use case, architecture, security/data-flow review, operating ownership and approved budget.
 - **Amazon CloudFront is optional, not the primary frontend host.** It may serve selected public/static assets from AWS origins such as S3 if measured performance, geographic delivery or origin requirements justify a separate distribution. Do not put CloudFront in front of the Cloudflare Workers frontend by default. Avoid double-proxying the same frontend hostname. Keep authenticated APIs, private downloads and user-specific responses out of public shared caches.
-- **GCF means Google Cloud Functions.** It is recorded as a possible future, narrowly scoped event-driven integration only when a concrete workload justifies cross-cloud operation. GCF is not part of the initial migration, does not make GCP a second primary cloud, and no GCF function or GCP resource is currently deployed or authorized.
 
-## GCF evaluation gate
+## GCP evaluation gate
 
-Before any GCF use, prepare a separate proposal naming the exact event-driven workload and explaining why AWS-native services are unsuitable or less appropriate. The proposal must cover workload identity and least privilege, event delivery/retries/idempotency, cross-cloud network exposure, data residency and transfer, secret handling, observability/on-call ownership, failure modes, vendor dependency and ongoing cost. Do not move core API functions, authoritative business state or primary database access to GCF by default.
+For any proposed GCP workload, document why it belongs on GCP rather than AWS or Cloudflare, the exact service and data processed, identity and least-privilege model, network exposure, data residency and cross-cloud transfer, secrets, event delivery/retries/idempotency where relevant, observability/on-call ownership, failure modes, vendor dependency and ongoing cost. Do not move core API functions, authoritative business state or primary database access to GCP by default. Do not create GCP resources or incur charges without separate explicit approval.
 
 ## CloudFront evaluation gate
 
@@ -20,4 +20,4 @@ Before creating a CloudFront distribution, identify the exact AWS origin and ass
 
 ## Safety and rollout boundaries
 
-This is an architecture decision record only. It does not provision resources, configure DNS, change production routing, move data, create GCF functions or CloudFront distributions, change billing, or authorize production cutover. Any provisioning, paid resource creation or production change requires separate explicit approval.
+This is an architecture decision record only. It does not provision AWS or GCP resources, configure DNS, change production routing, move data, create CloudFront distributions, change billing, or authorize production cutover. Any provisioning, paid resource creation or production change requires separate explicit approval.
