@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && mkdir -p .next/standalone/.next && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public",
-    "start": "node .next/standalone/server.js",
+    "build": "next build",
+    "start": "next start",
     "lint": "tsc --noEmit",
     "test:e2e": "playwright test"
   },
