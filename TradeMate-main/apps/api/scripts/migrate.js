@@ -26,6 +26,7 @@ const MIGRATIONS = [
   '018_enquiry_read_receipts.sql',
   '019_public_profiles_and_follows.sql',
   '020_immutable_audit_events.sql',
+  '021_p2p_public_payment_methods.sql',
   '021_totp_replay_protection.sql',
 ];
 
