@@ -24,6 +24,40 @@ Each division has its own categories, listing fields, participant permissions an
 
 This is the approved product architecture, not a claim that every division's publishing, verification, contract or payment workflow is already implemented. The current persistent marketplace contract workflow remains limited to its released Services and B2B paths; specialist divisions must be connected and tested in stages.
 
+## Approved marketplace structure
+
+TradeMate's marketplace direction is **hybrid**: one unified global marketplace for discovery and deal-making, organised into dedicated specialist divisions. Users should be able to explore opportunities across the whole marketplace or enter a specialist division with its own relevant categories, filters and transaction context.
+
+The current top-level marketplace divisions are:
+
+1. **Sports** — athlete and coach recruitment, transfers or loans where the sport permits them, representation, sponsorships, team partnerships and sports rights.
+2. **Entertainment & Media** — artists and creators, representation, music and recording agreements, publishing and royalties, film and television, art, production and live events.
+3. **Business & Corporate** — businesses for sale, acquisitions, mergers, franchises, joint ventures, distributors and strategic partnerships.
+4. **Real Estate & Property** — residential and commercial property, land, industrial property, development, property management, leases and concessions.
+5. **Technology & Intellectual Property** — software, SaaS, platforms, AI, APIs, patents, trademarks, copyrights, licensing and technology commercialisation.
+6. **Professional Services & Talent** — professional services, consultants, skilled specialists, recruitment, independent contractors and regulated professional services subject to licensing.
+7. **Industrial, Manufacturing & Trade** — manufacturing, machinery, raw materials, wholesale, import/export, logistics, warehousing, distribution and procurement.
+8. **Agriculture & Natural Resources** — farms, crops, livestock, fisheries, agricultural inputs, processing, mining, minerals, forestry and related supply partnerships.
+9. **Finance & Investment** — business funding, venture capital, private equity, financing, trade finance, insurance and investment-related mandates, subject to applicable regulation.
+10. **Institutions & Infrastructure** — government and public-sector procurement; energy and utilities; healthcare institutions; education and research; transport and aviation; telecommunications and digital infrastructure; construction and major development; environmental and climate infrastructure.
+
+### Shared deal-making model
+
+The marketplace division describes **what the opportunity is about**. The transaction type describes **what the parties intend to do**. Depending on the division and applicable rules, opportunities may involve a sale or acquisition, transfer, loan, lease, recruitment, representation, licence, investment, partnership or joint venture, service contract, supply agreement, tender/RFP, or concession/operating agreement. Not every transaction type is valid for every industry.
+
+The shared TradeMate experience is intended to support global discovery, specialist listings, appropriate participant and organisation verification, offers and counteroffers, private negotiation, deal rooms and documents, contract review and acceptance, fulfilment tracking, transaction records, reputation and dispute handling.
+
+### Important product principles
+
+- TradeMate is contract-first and opportunity-led, not a conventional product-cart marketplace.
+- Sportspeople, artists, creators and other individuals are not property. Listings concern voluntary recruitment, representation, services, rights and commercial agreements; the individual’s consent and applicable contract rules must be respected.
+- Industry-specific rules matter. For example, player transfers differ across sports, while artist agreements concern representation, recordings, publishing, licensing or bookings—not ownership of the artist.
+- Institutions & Infrastructure includes both public and private counterparties. Public procurement, concessions and institutional contracts require the relevant authority, tender and compliance checks.
+- Finance, investment, insurance, lending, healthcare, property, public procurement, payments and other regulated activities require jurisdiction-specific legal, licensing and provider review.
+- P2P crypto remains a separate workflow. Crypto and Forex market information does not turn TradeMate into a crypto or forex trading platform.
+
+This section records the approved product direction. It does **not** mean that every specialist division or transaction workflow is already implemented or available in production. The implementation status and release sequence remain tracked in [docs/roadmap.md](docs/roadmap.md).
+
 ## Metadusk ecosystem
 
 TradeMate is one distinct product in the wider Metadusk ecosystem, alongside Deukleinz Technologies and PharmaCore. The founder's current intended structure and brand rules are documented in [docs/company-ecosystem.md](docs/company-ecosystem.md).
