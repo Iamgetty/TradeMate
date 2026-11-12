@@ -16,6 +16,14 @@ TradeMate retains its independent product identity. **Metadusk Inc.** is the int
 - P2P cryptocurrency offers and wallet-related capabilities are a separate later-stage workstream, not the definition of TradeMate.
 - International use from day one, with country, currency, language and provider availability handled explicitly.
 
+## Approved marketplace architecture
+
+TradeMate's target marketplace structure is **hybrid**: one central discovery experience with dedicated specialist markets for each industry. The ten primary divisions are Sports; Entertainment & Media; Business & Corporate; Real Estate & Property; Technology & Intellectual Property; Professional Services & Talent; Industrial, Manufacturing & Trade; Agriculture & Natural Resources; Finance & Investment; and Institutions & Infrastructure.
+
+Each division has its own categories, listing fields, participant permissions and industry-specific transaction workflows, while sharing discovery, counterparty communication, offers, negotiation, contract records and fulfilment infrastructure. The detailed approved taxonomy is in [docs/marketplace-taxonomy.md](docs/marketplace-taxonomy.md).
+
+This is the approved product architecture, not a claim that every division's publishing, verification, contract or payment workflow is already implemented. The current persistent marketplace contract workflow remains limited to its released Services and B2B paths; specialist divisions must be connected and tested in stages.
+
 ## Metadusk ecosystem
 
 TradeMate is one distinct product in the wider Metadusk ecosystem, alongside Deukleinz Technologies and PharmaCore. The founder's current intended structure and brand rules are documented in [docs/company-ecosystem.md](docs/company-ecosystem.md).
