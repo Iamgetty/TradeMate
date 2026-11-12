@@ -218,9 +218,9 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
     await seller.locator('[data-act="mode"]').click();
     await seller.locator('#sbar [data-f="Contracts"]').click();
     await seller.getByRole('button', { name: /Two-account UI acceptance fixture/ }).click();
-    await seller.getByRole('button', { name: 'Accept contract' }).click();
+    await seller.getByRole('button', { name: 'Accept and agree' }).click();
     await expect(seller.getByText('Accepted', { exact: true })).toBeVisible();
-    await seller.getByRole('button', { name: 'Confirm fulfilment' }).click();
+    await seller.getByRole('button', { name: 'Reconfirm agreement and confirm fulfilment' }).click();
     await expect(seller.getByText('Waiting for the other party')).toBeVisible();
 
     console.log('[contract-e2e] seller accepted and confirmed; reloading buyer');
@@ -228,7 +228,7 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
     await expect(buyer.locator('#app .view')).toBeVisible();
     await buyer.locator('#sbar [data-f="Contracts"]').click();
     await buyer.getByRole('button', { name: /Two-account UI acceptance fixture/ }).click();
-    await expect(buyer.getByRole('button', { name: 'Confirm fulfilment' })).toBeVisible();
+    await expect(buyer.getByRole('button', { name: 'Reconfirm agreement and confirm fulfilment' })).toBeVisible();
     await buyer.getByRole('button', { name: 'Confirm fulfilment' }).click();
     await expect(buyer.getByText('Completed', { exact: true }).first()).toBeVisible();
     expect(contract.status).toBe('completed');
