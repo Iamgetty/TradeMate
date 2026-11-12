@@ -10,35 +10,6 @@ This roadmap records the current product direction. It is not a claim that each 
 - Product listings and product-cart commerce are out of scope for the current build. A dedicated product marketplace may be reconsidered in a future version, subject to a deliberate product decision. It must not silently reappear in the current app.
 - Keep P2P separate from the current marketplace contract workflow.
 
-## Approved marketplace architecture — hybrid
-
-The product owner selected a **hybrid marketplace**: a unified global marketplace for cross-industry discovery, with dedicated specialist markets inside each division. The ten primary divisions are:
-
-1. Sports.
-2. Entertainment & Media.
-3. Business & Corporate.
-4. Real Estate & Property.
-5. Technology & Intellectual Property.
-6. Professional Services & Talent.
-7. Industrial, Manufacturing & Trade.
-8. Agriculture & Natural Resources.
-9. Finance & Investment.
-10. Institutions & Infrastructure.
-
-The detailed category tree, transaction types and Institutions & Infrastructure breakdown are maintained in [marketplace-taxonomy.md](marketplace-taxonomy.md).
-
-### Shared transaction types
-
-The marketplace taxonomy distinguishes the subject of an opportunity from the transaction being proposed. Target transaction patterns include sale, acquisition, transfer (where permitted), loan, lease/rent, recruitment, representation, licensing, investment, partnership/joint venture, service contract, supply agreement, tender/request for proposal and concession/operating agreement.
-
-### Product and implementation boundaries
-
-- The central marketplace and specialist divisions share discovery and deal-making infrastructure, but each division must use appropriate listing fields, verification and contract workflows.
-- The internal key Institution & Infrastructure is retained for compatibility with existing app state and preference records; its user-facing name is **Institutions & Infrastructure**.
-- P2P remains a separate crypto workflow. Crypto and Forex quote screens remain market-information surfaces, not the definition of TradeMate's contract marketplace.
-- The expanded taxonomy is approved product direction, not evidence that all divisions are production-ready. The current persistent publishing/contract workflow remains limited to released Services and B2B paths. Specialist division publishing, verification and contract integrations must be delivered and verified incrementally.
-- Product-cart commerce remains out of scope; this expansion does not reintroduce conventional product checkout.
-
 ## Current implementation snapshot
 
 The following implementation is present in the merged application history and current production baseline to varying degrees. Deployment evidence and outstanding end-to-end verification are recorded separately below; code presence must not be treated as workflow acceptance.
