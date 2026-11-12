@@ -728,7 +728,7 @@ class PreferencesController {
         if (typeof value !== 'string' || !['NGN', 'USD', 'EUR', 'GBP', 'GHS', 'KES'].includes(value)) throw new BadRequestException('Choose a supported display currency.');
         update[key] = value;
       } else if (key === 'market') {
-        if (typeof value !== 'string' || !['Services', 'B2B', 'Real Estate', 'Software', 'NFTs', 'Forex', 'Crypto', 'P2P'].includes(value)) throw new BadRequestException('Choose a supported default market.');
+        if (typeof value !== 'string' || !['Services', 'B2B', 'Real Estate', 'Software', 'NFTs', 'Forex', 'Crypto', 'P2P', 'Industrial & Trade', 'Agriculture', 'Finance & Investment', 'Institution & Infrastructure', 'Sports', 'Entertainment'].includes(value)) throw new BadRequestException('Choose a supported default market.');
         update[key] = value;
       } else if (key === 'language') {
         if (typeof value !== 'string' || !['English', 'Français', 'Hausa', 'Yorùbá', 'Igbo', 'Kiswahili', 'Português', 'العربية'].includes(value)) throw new BadRequestException('Choose a supported language.');
