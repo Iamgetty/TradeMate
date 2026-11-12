@@ -78,8 +78,16 @@ test('account deletion cancellation requires a valid one-time token format', () 
   assert.equal(deletionCancelBodySchema.safeParse({ token: 'A'.repeat(43) }).success, true);
 });
 
-test('preferences reject unsupported keys and invalid value types', () => {
+test('preferences accept the expanded hybrid marketplace divisions and reject unknown markets', () => {
   assert.equal(preferencesBodySchema.safeParse({ orders: true }).success, true);
+  for (const market of [
+    'Services', 'B2B', 'Real Estate', 'Software', 'NFTs', 'Forex', 'Crypto', 'P2P',
+    'Industrial & Trade', 'Agriculture', 'Finance & Investment',
+    'Institution & Infrastructure', 'Sports', 'Entertainment',
+  ]) {
+    assert.equal(preferencesBodySchema.safeParse({ market }).success, true, market);
+  }
+  assert.equal(preferencesBodySchema.safeParse({ market: 'Unknown market' }).success, false);
   assert.equal(preferencesBodySchema.safeParse({ orders: 'yes' }).success, false);
   assert.equal(preferencesBodySchema.safeParse({ isAdmin: true }).success, false);
 });
