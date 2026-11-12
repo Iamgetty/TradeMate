@@ -960,26 +960,8 @@ var ORD=["Services","P2P","Real Estate","NFTs","Software","B2B","Industrial & Tr
 /* Contract categories (shown under "Contract categories"); the rest stay under "Marketplaces". */
 var CONTRACT_CATS=["Services","Real Estate","Software","B2B","Industrial & Trade","Agriculture","Finance & Investment","Institution & Infrastructure","Sports","Entertainment"];
 /* Display names only. Internal keys stay unchanged so saved data and the API keep working. */
-var MKL={
- Services:"Professional Services",
- B2B:"Business & Corporate",
- "Real Estate":"Real Estate",
- Software:"Technology",
- "Industrial & Trade":"Industrial & Trade",
- Agriculture:"Agriculture",
- "Finance & Investment":"Finance & Investment",
- "Institution & Infrastructure":"Institutions & Infrastructure",
- Sports:"Sports",
- Entertainment:"Entertainment"
-};
-var TILEL={
- Services:"Services",
- B2B:"Business",
- "Industrial & Trade":"Industrial",
- "Finance & Investment":"Finance",
- "Institution & Infrastructure":"Institutions",
- Entertainment:"Entertainment"
-};
+var MKL={Services:"Professional Services","Real Estate":"Real Estate",Software:"Technology"};
+var TILEL={Services:"Services","Industrial & Trade":"Industrial","Finance & Investment":"Finance","Institution & Infrastructure":"Institution",Entertainment:"Art"};
 function mkL(k){return MKL[k]||k}
 var MC={Services:"#2dd4bf","Real Estate":"#60a5fa",NFTs:"#a78bfa",Software:"#818cf8",B2B:"#fb7185",Forex:"#22d3ee",Crypto:"#94a3b8","Industrial & Trade":"#eab308",Agriculture:"#84cc16","Finance & Investment":"#10b981","Institution & Infrastructure":"#38bdf8",Sports:"#f97316",Entertainment:"#ec4899","Stock Indices":"#60a5fa",Commodities:"#f59e0b",Equities:"#34d399","Bonds & Treasuries":"#a78bfa"};
 var MI={Services:"brief",P2P:"swap","Real Estate":"estate",NFTs:"nft",Software:"code",B2B:"build",Forex:"fx",Crypto:"crypto","Industrial & Trade":"factory",Agriculture:"sprout","Finance & Investment":"finance","Institution & Infrastructure":"landmark",Sports:"sports",Entertainment:"film"};
@@ -988,32 +970,9 @@ var NEWC={
  "Industrial & Trade":{sub:"Manufacturing, supply and wholesale trade",ph:"e.g. Bulk packaging supply",cl:"Industrial category",meta:{t:"Industry and trade",d:"Manufacturing, wholesale, supply chains and logistics.",tag:"Manufacturing, supply & trade",e:"No industrial contracts yet",m:"Industrial and trade contracts published by TradeMate members will appear here."},g:[["Manufacturing","Manufacturing facilities|Machinery & equipment|Industrial maintenance"],["Trade","Wholesale|Import & export|Supply agreements|Raw materials"],["Logistics & construction","Logistics|Warehousing|Construction contractors"],["Other","Other (specify)"]]},
  Agriculture:{sub:"Produce, inputs, land and agro-processing",ph:"e.g. Seasonal maize supply",cl:"Agriculture category",meta:{t:"Farm to market",d:"Produce, livestock, farm inputs, land and processing.",tag:"Produce, inputs & land",e:"No agriculture contracts yet",m:"Agriculture contracts published by TradeMate members will appear here."},g:[["Farming","Farms|Crops|Livestock|Fisheries"],["Inputs & processing","Agricultural equipment|Food processing"],["Natural resources","Commodities|Mining & minerals|Forestry"],["Partnerships","Agricultural partnerships"],["Other","Other (specify)"]]},
  "Finance & Investment":{sub:"Funding, investment and financial partnerships",ph:"e.g. Joint venture for a retail expansion",cl:"Finance category",meta:{t:"Funding and partnerships",d:"Business funding, investment opportunities and financial services.",tag:"Funding, investment & advisory",e:"No finance contracts yet",m:"Finance and investment contracts published by TradeMate members will appear here."},g:[["Funding","Startup funding|Private equity|Venture capital|Business financing"],["Lending","Commercial loans|Trade finance|Asset financing|Debt & receivables financing"],["Other products","Insurance contracts|Investment partnerships"],["Other","Other (specify)"]]},
- "Institution & Infrastructure":{sub:"Major projects, procurement and institutional partnerships",ph:"e.g. International airport development tender",cl:"Institution and infrastructure category",meta:{t:"Institutions & infrastructure",d:"Government, essential services, major projects and institutional partnerships.",tag:"Projects, tenders & infrastructure",e:"No institutional or infrastructure opportunities yet",m:"Institutional and infrastructure opportunities published by TradeMate members will appear here."},g:[
- ["Government & public sector","Government procurement|Public tenders & RFPs|Public-private partnerships|Municipal services|Public asset concessions|Public construction projects|International development|Institutional supply contracts"],
- ["Energy & utilities","Electricity generation|Electricity distribution|Solar energy|Wind energy|Hydroelectric power|Oil & gas infrastructure|Energy storage|Water supply & treatment|Utility maintenance|Waste management"],
- ["Healthcare institutions","Hospitals & medical centres|Clinics & specialist facilities|Diagnostic laboratories|Pharmaceutical manufacturing & distribution|Medical equipment supply|Healthcare technology|Hospital construction & management|Clinical staffing|Medical research partnerships"],
- ["Education & research","Universities & colleges|Schools|Research institutions & laboratories|Vocational training centres|Education technology|Research commercialisation|University-industry partnerships|Institutional procurement|Academic recruitment"],
- ["Transport & aviation","Airports|Airlines & aviation operators|Aircraft leasing & maintenance|Seaports & terminals|Shipping infrastructure|Railway networks|Public transport systems|Roads & bridges|Logistics hubs|Freight terminals"],
- ["Telecommunications & digital infrastructure","Telecommunications operators|Mobile networks|Internet service providers|Fibre-optic networks|Data centres|Cloud infrastructure|Satellite communications|Internet exchange facilities|Network equipment|Tower leasing & management"],
- ["Construction & major development","Commercial developments|Residential developments|Industrial parks|Smart cities|Public housing|Roads & bridges|Engineering & construction|Project management|Infrastructure maintenance|Building contractors"],
- ["Environmental & climate infrastructure","Water treatment|Waste recycling|Waste disposal|Environmental remediation|Carbon reduction projects|Climate technology|Flood control|Coastal protection|Forestry & restoration projects"],
- ["Other","Other (specify)"]
- ]},
- Sports:{sub:"Athlete recruitment, transfers, loans, representation and sports partnerships",ph:"e.g. Player recruitment or sponsorship proposal",cl:"Sports category",meta:{t:"Sports talent and commercial deals",d:"Athletes, coaches, teams, recruitment, representation and sports partnerships.",tag:"Talent, recruitment & sports deals",e:"No sports opportunities yet",m:"Sports opportunities published by TradeMate members will appear here."},g:[
- ["Sports","Football|Basketball|American football|Baseball|Rugby|Cricket|Tennis|Ice hockey|Volleyball|Athletics|Boxing|MMA|Golf|Swimming|Motorsport|Esports|Other sport"],
- ["Talent & recruitment","Athlete recruitment|Player transfer (where permitted)|Player loan (where permitted)|Free-agent signing|Coach & technical staff recruitment"],
- ["Representation","Sports agent representation|Athlete management|Coaching representation"],
- ["Commercial & partnerships","Athlete sponsorship|Endorsements|Team & club partnerships|Broadcasting rights|Event hosting|Sports facility agreements"],
- ["Other","Other (specify)"]
- ]},
- Entertainment:{sub:"Artist, music, film, media, creator and art agreements",ph:"e.g. Artist recording or representation proposal",cl:"Entertainment category",meta:{t:"Entertainment talent and rights",d:"Artists, creators, music, film, media, art and representation agreements.",tag:"Talent, rights & productions",e:"No entertainment opportunities yet",m:"Entertainment opportunities published by TradeMate members will appear here."},g:[
- ["Talent & representation","Artists & musicians|Actors|Directors|Producers|Presenters|Talent agencies|Creator representation"],
- ["Music","Record labels|Recording agreements|Music publishing|Music rights & royalties|Music distribution|Artist bookings|Studio & production"],
- ["Film & television","Film rights|Film production|Television production|Distribution & licensing|Casting & crew|Broadcasting rights"],
- ["Art & design","Visual artists|Art galleries|Artist representation|Art sales & commissions|Exhibitions|Design licensing"],
- ["Live events","Concerts & festivals|Touring agreements|Event production|Venue partnerships"],
- ["Other","Other (specify)"]
- ]}
+ "Institution & Infrastructure":{sub:"Projects, procurement and institutional partnerships",ph:"e.g. Road maintenance tender",cl:"Project category",meta:{t:"Projects and institutions",d:"Public projects, infrastructure, construction and institutional partnerships.",tag:"Projects, tenders & institutions",e:"No infrastructure contracts yet",m:"Institution and infrastructure contracts published by TradeMate members will appear here."},g:[["Public sector","Government procurement|Public-private partnerships|International development"],["Social institutions","Healthcare institutions|Education & universities"],["Infrastructure","Energy & utilities|Telecommunications|Transport & aviation|Maritime & shipping|Environmental projects"],["Other","Other (specify)"]]},
+ Sports:{sub:"Player transfers, loans, coaches and representation",ph:"e.g. Match-day sponsorship package",cl:"Sports category",meta:{t:"Transfer market",d:"Players, coaches and clubs for sale, loan or signing.",tag:"Transfers, loans & signings",e:"No sports contracts yet",m:"Sports contracts published by TradeMate members will appear here."},g:[["Sport","Football|Basketball|American football|Baseball|Rugby|Cricket|Tennis|Volleyball"],["Transfers","Player sale|Player loan|Free agent signing|Coach & staff transfer"],["Representation","Agent & representation|Athlete sponsorship|Team & club partnership"],["Other","Other (specify)"]]},
+ Entertainment:{sub:"Artists, music, film and art contracts",ph:"e.g. Festival headline booking",cl:"Entertainment category",meta:{t:"Talent and rights",d:"Artists, actors, labels, music, film and art contracts.",tag:"Talent, music, film & art",e:"No entertainment contracts yet",m:"Entertainment contracts published by TradeMate members will appear here."},g:[["Talent","Artists & musicians|Actors|Directors|Producers|Talent agencies"],["Music","Record labels|Music rights & royalties|Artist bookings|Studio & production"],["Film & TV","Film rights|Distribution & licensing|Casting & crew"],["Art & live","Art sales & commissions|Exhibitions|Concerts & festivals"],["Other","Other (specify)"]]}
 };
 var NEWKEYS=Object.keys(NEWC);
 var items=[
@@ -1185,7 +1144,7 @@ function home(){
  return topbar()+'<div class="grid">'+HOMEF().map(function(o){return '<button class="opt" data-f="'+o[0]+'" style="--h:'+(HUE[o[0]]||"#ffb02e")+'">'+(o[0]==="Promotions"?'<span class="tag">HOT</span>':(o[0]==="Add Contract"||o[0]==="Create order")?'<span class="tag">NEW</span>':"")+'<span class="tile'+(o[0]==="Add Contract"||o[0]==="Create order"||o[0]==="Conversations"?" hl":"")+'">'+ic(o[1])+'</span>'+o[0]+'</button>'}).join("")+'</div>'+
  '<div class="banner"><span class="chip">FEATURED</span><h3>Your promotion could appear here</h3><p>Reserved for listings and announcements.</p><div class="orb"><img src="'+LOGO+'" alt=""></div><button class="btn sm cta" data-pg="promos">Advertise</button></div>'+
  '<div class="tabs"><button class="on" data-ht="Favorites">Favorites</button></div>'+
- (fv?'<div style="height:10px"></div>':'<div class="sub">'+["All"].concat(ORD).map(function(t){return '<button class="'+(hm===t?"on":"")+'" data-hm="'+t+'">'+esc(mkL(t))+'</button>'}).join("")+'</div>')+body}
+ (fv?'<div style="height:10px"></div>':'<div class="sub">'+["All"].concat(ORD).map(function(t){return '<button class="'+(hm===t?"on":"")+'" data-hm="'+t+'">'+t+'</button>'}).join("")+'</div>')+body}
 var NFTSORT="popular",NFTFAV={};try{NFTFAV=JSON.parse(localStorage.getItem("tm.nftfav")||"{}")}catch(e){NFTFAV={}}if(!NFTFAV||typeof NFTFAV!=="object"||Array.isArray(NFTFAV))NFTFAV={};
 var NFTLIVE=[],NFTLOADING=false,NFTQUERY="",NFTERROR="",NFTTIMER=null,NFTREQ=0,NFTCOLLECTION="azuki",NFTCHAIN="ethereum";var NFTSHOWN=false,NFTSTALE=false,NFTVIEW="collections",NFTCOLLECTIONS=[],NFTCOLLECTIONSCHAIN="",NFTCOLLECTIONSLOADING=false,NFTSELECTED=null,NFTITEMSCOLLECTION="",NFTITEMSREQ=0,NFTEXPLORECHAIN="",NFTEXPLORELOADING=false,NFTEXPLOREFAIL={};
 var NFT_SNAP="tm.nft.snapshot.v1.";
@@ -1375,7 +1334,7 @@ function markets(categoryPage){
  }
  var meta=MK_META[st.mm]||{};
  if(categoryPage){
-  var title=st.mm==="Forex"?fxGroup:mkL(st.mm),live=(st.mm==="Crypto"||st.mm==="Forex");
+  var title=st.mm==="Forex"?fxGroup:st.mm,live=(st.mm==="Crypto"||st.mm==="Forex");
   var total=list.length;
   var sortable=list.length>1&&list.some(function(i){return typeof i.c==="number"});
   if(sortable&&MKSORT!=="def"){var nv=function(x,dv){return typeof x==="number"?x:dv};list=list.slice().sort(MKSORT==="up"?function(a,b){return nv(b.c,-1e9)-nv(a.c,-1e9)}:MKSORT==="dn"?function(a,b){return nv(a.c,1e9)-nv(b.c,1e9)}:function(a,b){return String(a.n).localeCompare(String(b.n))})}
@@ -2433,7 +2392,7 @@ function flat(fs){var o=[];fs.forEach(function(f){if(f[0]==="2"){o.push(f[1],f[2
 function fieldHTML(f){var k=f[1];switch(f[0]){case "t":return Ftext(k,f[2],f[3],f[4],f[5]);case "a":return Farea(k,f[2],f[3],f[4]);case "s":return Fsel(k,f[2],f[3],f[4]);case "g":return Fselg(k,f[2],f[3],f[4]);case "p":return Fprice(k,f[2],f[3]);case "c":return Fchips(k,f[2],f[3]);case "u":return Fup(k,f[2]);case "2":return '<div class="f2">'+fieldHTML(f[1])+fieldHTML(f[2])+'</div>'}return ""}
 function fvalue(f){var k=f[1],v=fv(k);if(f[0]==="p")return v?(fv(k+"_c")||"NGN")+" "+v:"";if(f[0]==="c")return (v||[]).join(", ");if(/^Other/.test(v)&&fv(k+"_o"))return fv(k+"_o");return v}
 function openWiz(id){st.fv={};if(id==="pick"){pg("pick");return}st.cw={id:id,step:0,done:false};pg("wiz")}
-PG.pick=function(){return hdr("Add Contract")+'<p class="fine" style="padding:0 16px 12px">Professional Services and Business & Corporate offers use the current persistent contract workflow. The specialist divisions are organised here, but their publishing workflows are being connected in stages; drafts in unreleased divisions remain on this device. P2P remains a separate flow.</p>'+CT.map(function(t){return '<button class="ctype" data-pc="wz" data-arg="c:'+t[0]+'" style="--h:'+t[3]+'"><span class="tile" style="--h:'+t[3]+'">'+ic(t[1])+'</span><span><b>'+mkL(t[0])+'</b><small>'+t[2]+'</small></span><em>›</em></button>'}).join("")};
+PG.pick=function(){return hdr("Add Contract")+'<p class="fine" style="padding:0 16px 12px">Professional Services and B2B offers can be submitted for review. All other contract categories are saved on this device until their publishing workflows are released. P2P remains a separate flow.</p>'+CT.map(function(t){return '<button class="ctype" data-pc="wz" data-arg="c:'+t[0]+'" style="--h:'+t[3]+'"><span class="tile" style="--h:'+t[3]+'">'+ic(t[1])+'</span><span><b>'+mkL(t[0])+'</b><small>'+t[2]+'</small></span><em>›</em></button>'}).join("")};
 PC.wz=function(a){st.fv={};st.cw={id:a,step:0,done:false};st.stack.pop();pg("wiz")};
 PG.wiz=function(){var w=st.cw,c=wzCfg(w.id),n=c.steps.length,s=c.steps[w.step],last=w.step===n-1;
  if(w.done)return hdr(c.title)+'<div class="done"><div class="ok">'+ic("check")+'</div><h2>'+c.doneT+'</h2><p style="color:var(--mut);font-weight:600;margin:10px 0 24px">'+c.doneS+'</p><button class="btn wide" data-closeall>Done</button></div>';
