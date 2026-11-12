@@ -229,7 +229,7 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
     await buyer.locator('#sbar [data-f="Contracts"]').click();
     await buyer.getByRole('button', { name: /Two-account UI acceptance fixture/ }).click();
     await expect(buyer.getByRole('button', { name: 'Reconfirm agreement and confirm fulfilment' })).toBeVisible();
-    await buyer.getByRole('button', { name: 'Confirm fulfilment' }).click();
+    await buyer.getByRole('button', { name: 'Reconfirm agreement and confirm fulfilment' }).click();
     await expect(buyer.getByText('Completed', { exact: true }).first()).toBeVisible();
     expect(contract.status).toBe('completed');
     expect(contract.buyer_confirmed_at).not.toBeNull();
