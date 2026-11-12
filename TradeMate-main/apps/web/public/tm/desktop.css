@@ -1,7 +1,7 @@
 /* TradeMate — desktop web stylesheet (loaded by app.js on desktop browsers). */
 @media (min-width:900px){
-:root{--dk-side:264px;--dk-bg:#0a0f16;--dk-line:#1b232d;--dk-card:#10151c;--dk-pad:56px}
-html.tm-desktop body{background:#05070a}
+:root{--dk-side:264px;--dk-bg:var(--sbbg,#0a0f16);--dk-line:var(--line,#1b232d);--dk-card:var(--s1,var(--s1));--dk-pad:56px}
+html.tm-desktop body{background:var(--bg)}
 
 /* ---- sidebar ---- */
 .tm-desktop .sbar{display:flex!important;flex-direction:column;gap:0;position:fixed;left:0;top:0;bottom:0;width:var(--dk-side);z-index:6;transform:none!important;box-shadow:none!important;padding:22px 16px 16px;background:var(--dk-bg);border-right:1px solid var(--dk-line);overflow-y:auto;scrollbar-width:none}
@@ -9,22 +9,22 @@ html.tm-desktop body{background:#05070a}
 .tm-desktop .shandle,.tm-desktop .sscrim,.tm-desktop .mw-bar{display:none!important}
 .tm-desktop .dk-brand{display:flex;align-items:center;gap:12px;padding:0 10px 18px}
 .tm-desktop .dk-brand img{width:42px;height:42px;object-fit:contain;flex:none;display:block}
-.tm-desktop .dk-brand span{font:800 21px/1 'Bricolage Grotesque','Hanken Grotesk',system-ui,sans-serif;letter-spacing:-.02em;color:#fff}
+.tm-desktop .dk-brand span{font:800 21px/1 'Bricolage Grotesque','Hanken Grotesk',system-ui,sans-serif;letter-spacing:-.02em;color:var(--txt)}
 .tm-desktop .dk-grp{display:flex;flex-direction:column;gap:2px;padding:12px 0;border-top:1px solid var(--dk-line)}
 .tm-desktop .dk-brand+.dk-grp{border-top:0;padding-top:0}
-.tm-desktop .dk-lab{padding:4px 12px 8px;font:500 10px 'DM Mono',monospace;letter-spacing:.18em;text-transform:uppercase;color:#6b7683}
-.tm-desktop .sbar .dk-grp button{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:12px;width:100%;height:40px;padding:0 12px;border-radius:11px;border:1px solid transparent;background:none;color:#c3cad3;font:600 14px 'Hanken Grotesk',system-ui,sans-serif;text-align:left;transition:background .15s,color .15s}
-.tm-desktop .sbar .dk-grp button svg{width:18px;height:18px;flex:none;color:#9aa4b0}
+.tm-desktop .dk-lab{padding:4px 12px 8px;font:500 10px 'DM Mono',monospace;letter-spacing:.18em;text-transform:uppercase;color:var(--mut)}
+.tm-desktop .sbar .dk-grp button{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:12px;width:100%;height:40px;padding:0 12px;border-radius:11px;border:1px solid transparent;background:none;color:color-mix(in srgb,var(--txt) 80%,transparent);font:600 14px 'Hanken Grotesk',system-ui,sans-serif;text-align:left;transition:background .15s,color .15s}
+.tm-desktop .sbar .dk-grp button svg{width:18px;height:18px;flex:none;color:var(--mut)}
 .tm-desktop .sbar .dk-grp button span{white-space:nowrap}
-.tm-desktop .sbar .dk-grp button:hover{background:#ffffff0a;color:#fff}
-.tm-desktop .sbar .dk-grp button.on{background:#ff9f2e1c;border-color:#ff9f2e66;color:var(--am)}
+.tm-desktop .sbar .dk-grp button:hover{background:color-mix(in srgb,var(--txt) 6%,transparent);color:var(--txt)}
+.tm-desktop .sbar .dk-grp button.on{background:color-mix(in srgb,var(--am) 13%,transparent);border-color:color-mix(in srgb,var(--am) 42%,transparent);color:var(--am)}
 .tm-desktop .sbar .dk-grp button.on svg{color:var(--am)}
-.tm-desktop .dk-me{display:flex!important;flex-direction:row;align-items:center;gap:12px;margin-top:auto;width:100%;padding:12px;border-radius:14px;border:1px solid var(--dk-line);background:var(--dk-card);color:#fff;text-align:left;flex:none}
-.tm-desktop .dk-me>svg{width:36px;height:36px;padding:8px;border-radius:50%;background:#1b222b;color:#c3cad3;flex:none}
+.tm-desktop .dk-me{display:flex!important;flex-direction:row;align-items:center;gap:12px;margin-top:auto;width:100%;padding:12px;border-radius:14px;border:1px solid var(--dk-line);background:var(--dk-card);color:var(--txt);text-align:left;flex:none}
+.tm-desktop .dk-me>svg{width:36px;height:36px;padding:8px;border-radius:50%;background:var(--s2);color:color-mix(in srgb,var(--txt) 80%,transparent);flex:none}
 .tm-desktop .dk-me span{display:flex;flex-direction:column;gap:2px;min-width:0}
 .tm-desktop .dk-me b{font:700 13.5px/1.2 'Hanken Grotesk',system-ui,sans-serif}
-.tm-desktop .dk-me small{font:500 11.5px/1.2 'Hanken Grotesk',system-ui,sans-serif;color:#8d97a3}
-.tm-desktop .dk-me.on{border-color:#ff9f2e66}
+.tm-desktop .dk-me small{font:500 11.5px/1.2 'Hanken Grotesk',system-ui,sans-serif;color:var(--mut)}
+.tm-desktop .dk-me.on{border-color:color-mix(in srgb,var(--am) 42%,transparent)}
 .tm-desktop .sbar button.dk-me:hover{background:var(--dk-card)}
 
 /* ---- main column ---- */
@@ -40,30 +40,30 @@ html.tm-desktop body{background:#05070a}
 /* page headings */
 .tm-desktop .dk-head{padding:12px 16px 18px}
 .tm-desktop .dk-eye{font:500 11px 'DM Mono',monospace;letter-spacing:.2em;text-transform:uppercase;color:var(--am);margin-bottom:10px}
-.tm-desktop .dk-head h1{font:800 40px/1.05 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.03em;color:#fff;margin:0}
+.tm-desktop .dk-head h1{font:800 40px/1.05 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.03em;color:var(--txt);margin:0}
 .tm-desktop .dk-head p{margin:12px 0 0;font:500 15px/1.4 'Hanken Grotesk',sans-serif;color:var(--mut)}
 
 /* ---- home ---- */
 .tm-desktop .view:has(>.dk-head+.top){display:flex;flex-direction:column}
 .tm-desktop .view>.dk-head+.top{order:-1;display:flex;align-items:center;gap:10px;padding:0 16px 8px;margin:0}
-.tm-desktop .view>.dk-head+.top .srch{order:0;flex:0 1 680px;margin-right:auto;width:auto;height:48px;border-radius:12px;background:#0c1117;border:1px solid var(--dk-line);padding:0 16px;font-size:14px}
+.tm-desktop .view>.dk-head+.top .srch{order:0;flex:0 1 680px;margin-right:auto;width:auto;height:48px;border-radius:12px;background:var(--s1);border:1px solid var(--dk-line);padding:0 16px;font-size:14px}
 .tm-desktop .view>.dk-head+.top .avb{order:9;margin-left:0}
-.tm-desktop .view>.dk-head+.top .ib,.tm-desktop .view>.dk-head+.top .avb{width:46px;height:46px;border-radius:12px;background:#0c1117;border:1px solid var(--dk-line);display:grid;place-items:center;flex:none}
+.tm-desktop .view>.dk-head+.top .ib,.tm-desktop .view>.dk-head+.top .avb{width:46px;height:46px;border-radius:12px;background:var(--s1);border:1px solid var(--dk-line);display:grid;place-items:center;flex:none}
 .tm-desktop .view>.dk-head+.top .avb svg,.tm-desktop .view>.dk-head+.top .ib svg{width:20px;height:20px}
 .tm-desktop .view>.dk-head+.top .ib{position:relative}
 .tm-desktop .grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:12px;padding:0 16px;margin:6px 0 22px}
-.tm-desktop .grid .opt{position:relative;flex-direction:row;display:flex;align-items:center;justify-content:flex-start;gap:12px;height:68px;padding:0 14px;border-radius:14px;background:#0c1117;border:1px solid var(--dk-line);font:700 14px 'Hanken Grotesk',sans-serif;color:#fff;transition:border-color .2s,background .2s}
-.tm-desktop .grid .opt:hover{border-color:#ff9f2e66;background:#11171f}
-.tm-desktop .grid .opt .tile{width:38px;height:38px;border-radius:11px;flex:none;background:#161b22;border:0}
+.tm-desktop .grid .opt{position:relative;flex-direction:row;display:flex;align-items:center;justify-content:flex-start;gap:12px;height:68px;padding:0 14px;border-radius:14px;background:var(--s1);border:1px solid var(--dk-line);font:700 14px 'Hanken Grotesk',sans-serif;color:var(--txt);transition:border-color .2s,background .2s}
+.tm-desktop .grid .opt:hover{border-color:color-mix(in srgb,var(--am) 42%,transparent);background:var(--s2)}
+.tm-desktop .grid .opt .tile{width:38px;height:38px;border-radius:11px;flex:none;background:var(--s2);border:0}
 .tm-desktop .grid .opt .tile svg{width:19px;height:19px}
-.tm-desktop .grid .opt .tag{position:absolute;right:-2px;top:-9px;display:block;padding:2px 7px;border-radius:7px;background:var(--am);color:#1b1006;font:800 9.5px 'Hanken Grotesk',sans-serif;letter-spacing:.04em}
-.tm-desktop .banner{position:relative;display:grid;grid-template-columns:1fr auto auto;grid-template-areas:"chip orb cta" "h orb cta" "p orb cta";align-items:center;column-gap:22px;margin:0 16px 30px;min-height:150px;padding:24px 28px;border-radius:20px;background:radial-gradient(ellipse at 90% 40%,#2a1c0d,transparent 60%),#10141a;border:1px solid var(--dk-line)}
+.tm-desktop .grid .opt .tag{position:absolute;right:-2px;top:-9px;display:block;padding:2px 7px;border-radius:7px;background:var(--am);color:var(--ongrad,#1b1006);font:800 9.5px 'Hanken Grotesk',sans-serif;letter-spacing:.04em}
+.tm-desktop .banner{position:relative;display:grid;grid-template-columns:1fr auto auto;grid-template-areas:"chip orb cta" "h orb cta" "p orb cta";align-items:center;column-gap:22px;margin:0 16px 30px;min-height:150px;padding:24px 28px;border-radius:20px;background:radial-gradient(ellipse at 90% 40%,color-mix(in srgb,var(--am) 16%,transparent),transparent 60%),var(--s1);border:1px solid var(--dk-line)}
 .tm-desktop .banner .chip{grid-area:chip;align-self:end;justify-self:start;font:500 10.5px 'DM Mono',monospace;letter-spacing:.18em;color:var(--am)}
 .tm-desktop .banner h3{grid-area:h;font:800 28px/1.1 'Bricolage Grotesque',sans-serif;letter-spacing:-.02em;margin:8px 0 6px}
 .tm-desktop .banner p{grid-area:p;align-self:start;font:500 14px 'Hanken Grotesk',sans-serif;color:var(--mut);margin:0}
 .tm-desktop .banner .orb{grid-area:orb;width:96px;height:96px;margin:0!important;position:relative!important;right:auto!important;top:auto!important;inset:auto!important}
 .tm-desktop .banner .orb img{width:48px;height:48px}
-.tm-desktop .banner .cta{position:relative!important;inset:auto!important;transform:none!important;grid-area:cta;border-radius:999px;padding:11px 22px;background:var(--am);color:#1b1006;font-weight:800;font-size:13.5px;box-shadow:none}
+.tm-desktop .banner .cta{position:relative!important;inset:auto!important;transform:none!important;grid-area:cta;border-radius:999px;padding:11px 22px;background:var(--am);color:var(--ongrad,#1b1006);font-weight:800;font-size:13.5px;box-shadow:none}
 
 /* ---- explore / markets ---- */
 .tm-desktop .view:has(>.dk-head+.mk-livebar){position:relative}
@@ -75,8 +75,24 @@ html.tm-desktop body{background:#05070a}
 .tm-desktop .mk-sec h2{font-size:24px}
 .tm-desktop .mk-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:16px!important;padding:0 16px 20px!important}
 .tm-desktop .mk-card{align-items:flex-start!important;justify-content:space-between!important;text-align:left!important;aspect-ratio:auto!important;min-height:170px!important;padding:24px!important;border-radius:18px!important;background:var(--dk-card);border:1px solid var(--dk-line)}
-.tm-desktop .mk-ico{width:46px!important;height:46px!important;border-radius:13px!important;margin:0!important;display:grid;place-items:center;background:#181d25!important;color:var(--am)!important}
+.tm-desktop .mk-ico{width:46px!important;height:46px!important;border-radius:13px!important;margin:0!important;display:grid;place-items:center;background:var(--s2)!important;color:var(--am)!important}
 .tm-desktop .mk-ico svg{width:22px!important;height:22px!important}
-.tm-desktop .mk-card:hover .mk-ico,.tm-desktop .mk-card:focus-visible .mk-ico{background:var(--am)!important;color:#1b1006!important;transform:none!important}
-.tm-desktop .mk-name{font:800 24px/1.1 'Bricolage Grotesque',sans-serif!important;letter-spacing:-.02em;color:#fff;max-width:100%}
+.tm-desktop .mk-card:hover .mk-ico,.tm-desktop .mk-card:focus-visible .mk-ico{background:var(--am)!important;color:var(--ongrad,#1b1006)!important;transform:none!important}
+.tm-desktop .mk-name{font:800 24px/1.1 'Bricolage Grotesque',sans-serif!important;letter-spacing:-.02em;color:var(--txt);max-width:100%}
 }
+
+/* ---- theme-aware overrides (light / purple / dark) ---- */
+html[data-theme] .grid .opt .tile,html[data-theme] .grid .opt .tile.hl{width:38px!important;height:38px!important;border-radius:11px!important;background:var(--s2)!important;color:var(--txt)!important;box-shadow:none!important;border:0!important}
+html[data-theme] .grid .opt .tile svg,html[data-theme] .grid .opt .tile svg *,html[data-theme] .grid .opt .tile.hl svg,html[data-theme] .grid .opt .tile.hl svg *{stroke:var(--txt)!important;color:var(--txt)!important}
+html[data-theme] .grid .opt .tile svg{width:19px;height:19px}
+html[data-theme] .grid .opt{color:var(--txt)!important}
+html[data-theme] .sbar .dk-grp button{color:color-mix(in srgb,var(--txt) 78%,transparent)!important;background:none!important;box-shadow:none!important}
+html[data-theme] .sbar .dk-grp button svg{color:var(--mut)!important}
+html[data-theme] .sbar .dk-grp button.on{background:color-mix(in srgb,var(--am) 13%,transparent)!important;border-color:color-mix(in srgb,var(--am) 42%,transparent)!important;color:var(--am)!important}
+html[data-theme] .sbar .dk-grp button.on svg{color:var(--am)!important}
+html[data-theme] .sbar .dk-me,html[data-theme] .sbar .dk-me.on{background:var(--s1)!important;color:var(--txt)!important;box-shadow:none!important}
+html[data-theme] .sbar .dk-me.on{border-color:var(--am)!important}
+html[data-theme] .sbar .dk-me small{color:var(--mut)!important}
+html[data-theme] .nav button{color:var(--mut)!important}
+html[data-theme] .nav button.on{color:var(--am)!important}
+html[data-theme] .nav button.plus svg{background:var(--grad)!important;color:var(--ongrad,#1b1006)!important}
