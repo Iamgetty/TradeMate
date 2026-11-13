@@ -36,6 +36,7 @@ async function main() {
   process.env.TRADEMATE_REVIEW_API_KEY = 'test-review-key-' + randomUUID();
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.PGSSLMODE === 'require' ? true : undefined, max: 3 });
   let app;
+  let originalFetch;
   let triggerInstalled = false;
   try {
     const suffix = randomUUID();
@@ -63,7 +64,7 @@ async function main() {
     app.setGlobalPrefix('api');
     await app.listen(0, '127.0.0.1');
     const base = 'http://127.0.0.1:' + app.getHttpServer().address().port;
-    const originalFetch = global.fetch;
+    originalFetch = global.fetch;
     let lastVerificationCode = null;
     global.fetch = async (input, options) => {
       if (String(input) === 'https://api.resend.com/emails') {
