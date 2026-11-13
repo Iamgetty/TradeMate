@@ -30,6 +30,18 @@ async function openAuthenticatedApp(browser: Browser, actor: Actor) {
 
 async function openContract(page: Page, title: string) {
   await page.locator('#sbar [data-f="Contracts"]').click();
+  const view = page.locator('#app .view');
+  try {
+    await expect(view).toContainText(title, { timeout: 15_000 });
+  } catch (error) {
+    console.log('Contracts UI diagnostic:', JSON.stringify({
+      title,
+      viewText: (await view.innerText().catch(() => '')).slice(0, 5000),
+      contractCards: await page.locator('#app .view .lr').count(),
+      modeLabel: await page.locator('[data-act="mode"]').innerText().catch(() => ''),
+    }));
+    throw error;
+  }
   await page.locator('#app .view .lr').filter({ hasText: title }).click();
 }
 
