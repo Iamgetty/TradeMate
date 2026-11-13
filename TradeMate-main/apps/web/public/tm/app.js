@@ -1974,7 +1974,7 @@ function dkSidebarHTML(pt){
  h+='<button class="dk-me'+(pt==="profile"?" on":"")+'" data-pg="profile" aria-label="Profile">'+ic("person")+'<span><b>Your profile</b><small>Account and verification</small></span></button>';
  return h
 }
-var DKHEAD={Home:["Home","",""],Markets:["Explore","",""],Trade:["Trade","Trade",""],Portfolio:["Portfolio","Portfolio",""],Feed:null};
+var DKHEAD={Home:["Home","",""],Markets:["Explore","",""],Trade:["","Trade",""],Portfolio:["Portfolio","Portfolio",""],Feed:null};
 function dkHeadHTML(){if(TMENV.app)return"";var d=DKHEAD[st.tab];if(!d||(st.tab==="Markets"&&st.mm==="NFTs"))return"";return '<div class="dk-head"><div class="dk-eye">'+d[0]+'</div>'+(d[1]?'<h1>'+d[1]+'</h1>':"")+(d[2]?'<p>'+d[2]+'</p>':"")+'</div>'}
 function sbarHTML(){
  var pt=topPage();
