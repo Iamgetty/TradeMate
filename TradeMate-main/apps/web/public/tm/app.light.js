@@ -1052,7 +1052,7 @@ function lg(i){var a=i.n.split("/"),y=a[0].toLowerCase();
  }
  if(i.m==="Crypto"){var b=BR[a[0]];return '<span class="lgb" style="background:'+b[0]+';color:'+(a[0]==="SOL"||a[0]==="BNB"?"#111":"#fff")+'">'+b[1]+'</span>'+chainImg("lgi",[LOGOS[a[0]],"https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/svg/color/"+y+".svg","https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/svg/color/"+y+".svg","https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@master/svg/color/"+y+".svg"])}
  if(i.m==="Forex")return '<span class="lgb" style="background:#16222a;font-size:1.05em">'+(FLAG[a[0]]||"")+flag(a[0],"fl")+'</span><span class="lgq">'+(FLAG[a[1]]||"")+flag(a[1],"fl")+'</span>';
- return '<span class="lgb">'+ic(MI[i.m],"width:58%;height:58%")+'</span>'+(i.image?chainImg("lgi",[esc(i.image)],esc(i.n)):"")}")+'</span>'+(i.image?chainImg("lgi",[esc(i.image)],esc(i.n)):"")}
+ return '<span class="lgb">'+ic(MI[i.m],"width:58%;height:58%")+'</span>'+(i.image?chainImg("lgi",[esc(i.image)],esc(i.n)):"")}
 
 function money(n){return n>=1e12?"$"+(n/1e12).toFixed(2)+"T":n>=1e9?"$"+(n/1e9).toFixed(2)+"B":n>=1e6?"$"+(n/1e6).toFixed(2)+"M":"$"+fx2(n,n<100?2:0)}
 function val(i){if(i.m==="Crypto")return i.cap?"MCap "+money(i.cap):"";if(i.m==="Forex"||typeof i.p==="number")return "";
