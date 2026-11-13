@@ -18,6 +18,14 @@ async function main() {
   });
   let app;
 
+  const assertAudit = async (eventType, entityId) => {
+    const result = await rawPool.query(
+      'SELECT count(*)::int AS count FROM audit_events WHERE event_type=$1 AND entity_id=$2',
+      [eventType, entityId],
+    );
+    assert.equal(result.rows[0].count, 1, eventType + ' must have exactly one immutable audit event');
+  };
+
   try {
     const suffix = randomUUID();
     const actors = {};
@@ -56,7 +64,9 @@ async function main() {
         paymentMethods: ['Bank transfer'],
       });
       assert.equal(response.status, 201, 'seller must be able to create a P2P advertisement');
-      return (await response.json()).ad;
+      const ad = (await response.json()).ad;
+      await assertAudit('p2p.ad_created', ad.id);
+      return ad;
     };
     const placeOrder = (actor, adId, fiatAmount = '1000.00') =>
       call(actor, 'POST', '/api/p2p/orders', { adId, fiatAmount });
@@ -77,6 +87,8 @@ async function main() {
     assert.equal(cancelOrder.quantity, '2.000000000000', 'the reserved quantity must match the trade amount');
     const cancelled = await call('buyer', 'POST', '/api/p2p/orders/' + cancelOrder.id + '/cancel');
     assert.equal(cancelled.status, 201, 'the buyer must be able to cancel an unpaid order');
+    await assertAudit('p2p.order_created', cancelOrder.id);
+    await assertAudit('p2p.order_cancelled', cancelOrder.id);
     const restoredBook = await call(null, 'GET', '/api/p2p/book?asset=USDT&fiat=NGN');
     const restored = (await restoredBook.json()).data.find((ad) => ad.id === cancelAd.id);
     assert.equal(restored.quantity, '5.000000000000', 'unpaid cancellation must restore the reserved advertisement quantity');
@@ -87,12 +99,15 @@ async function main() {
     const completedOrder = (await completedResponse.json()).order;
     const paymentSent = await call('buyer', 'POST', '/api/p2p/orders/' + completedOrder.id + '/payment-sent', { reference: 'TEST-REFERENCE' });
     assert.equal(paymentSent.status, 201, 'buyer must be able to mark payment sent');
+    await assertAudit('p2p.order_created', completedOrder.id);
+    await assertAudit('p2p.payment_marked_sent', completedOrder.id);
     const duplicatePaymentSent = await call('buyer', 'POST', '/api/p2p/orders/' + completedOrder.id + '/payment-sent', { reference: 'TEST-REFERENCE' });
     assert.equal(duplicatePaymentSent.status, 409, 'payment-sent transition must not be replayed');
     const buyerCannotConfirm = await call('buyer', 'POST', '/api/p2p/orders/' + completedOrder.id + '/confirm-receipt');
     assert.equal(buyerCannotConfirm.status, 409, 'only the seller may confirm receipt');
     const sellerConfirmed = await call('seller', 'POST', '/api/p2p/orders/' + completedOrder.id + '/confirm-receipt');
     assert.equal(sellerConfirmed.status, 201, 'seller must be able to confirm receipt after buyer payment-sent');
+    await assertAudit('p2p.trade_completed', completedOrder.id);
     const sellerCannotConfirmAgain = await call('seller', 'POST', '/api/p2p/orders/' + completedOrder.id + '/confirm-receipt');
     assert.equal(sellerCannotConfirmAgain.status, 409, 'completed trade cannot be completed twice');
 
@@ -117,6 +132,9 @@ async function main() {
     assert.equal(disputePaymentSent.status, 201);
     const dispute = await call('buyer', 'POST', '/api/p2p/orders/' + disputeOrder.id + '/dispute', { reason: 'Seller has not confirmed receipt' });
     assert.equal(dispute.status, 201, 'either trade participant may open a dispute after payment-sent');
+    await assertAudit('p2p.order_created', disputeOrder.id);
+    await assertAudit('p2p.payment_marked_sent', disputeOrder.id);
+    await assertAudit('p2p.dispute_opened', disputeOrder.id);
     const duplicateDispute = await call('buyer', 'POST', '/api/p2p/orders/' + disputeOrder.id + '/dispute', { reason: 'Duplicate dispute request' });
     assert.equal(duplicateDispute.status, 409, 'dispute transition must not be replayed');
 
@@ -129,9 +147,38 @@ async function main() {
     assert.deepEqual(concurrentStatuses, [201, 409],
       'row locking must prevent two buyers from reserving the same final quantity');
 
-    console.log('P2P two-party authorization, reservation, cancellation, payment, completion, dispute and concurrency tests passed.');
+    const failureAd = await createAd('sell', '2');
+    await rawPool.query(`
+      CREATE OR REPLACE FUNCTION test_reject_p2p_audit() RETURNS trigger
+      LANGUAGE plpgsql AS $
+      BEGIN
+        IF NEW.event_type = 'p2p.order_created' THEN
+          RAISE EXCEPTION 'forced P2P audit insert failure';
+        END IF;
+        RETURN NEW;
+      END;
+      $;
+    `);
+    await rawPool.query('CREATE TRIGGER test_reject_p2p_audit_trigger BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION test_reject_p2p_audit()');
+    const rejectedByAudit = await placeOrder('buyer', failureAd.id, '1000.00');
+    assert.equal(rejectedByAudit.status, 500, 'audit failure must fail the P2P order request');
+    await rawPool.query('DROP TRIGGER test_reject_p2p_audit_trigger ON audit_events');
+    await rawPool.query('DROP FUNCTION test_reject_p2p_audit()');
+    const failedTrade = await rawPool.query('SELECT count(*)::int AS count FROM p2p_trades WHERE order_id=$1', [failureAd.id]);
+    assert.equal(failedTrade.rows[0].count, 0, 'failed audit insertion must roll back the P2P trade');
+    const unchangedAd = await rawPool.query('SELECT remaining_quantity::text FROM p2p_orders WHERE id=$1', [failureAd.id]);
+    assert.equal(unchangedAd.rows[0].remaining_quantity, '2.000000000000', 'failed audit insertion must roll back the reservation');
+
+    const cancelledAd = await createAd('sell', '1');
+    const cancelledAdResponse = await call('seller', 'DELETE', '/api/p2p/ads/' + cancelledAd.id);
+    assert.equal(cancelledAdResponse.status, 200, 'seller can cancel an unfilled advertisement');
+    await assertAudit('p2p.ad_cancelled', cancelledAd.id);
+
+    console.log('P2P authorization, lifecycle, immutable audit atomicity, rollback and concurrency tests passed.');
   } finally {
     if (app) await app.close();
+    await rawPool.query('DROP TRIGGER IF EXISTS test_reject_p2p_audit_trigger ON audit_events').catch(() => undefined);
+    await rawPool.query('DROP FUNCTION IF EXISTS test_reject_p2p_audit()').catch(() => undefined);
     await rawPool.end();
   }
 }
