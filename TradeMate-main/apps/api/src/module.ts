@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { Pool } from 'pg';
 import { createRlsAwarePool } from './database-context';
-import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
+import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -354,6 +354,107 @@ class AuthController {
     }
   }
 
+
+  @Post('password-reset/request')
+  @HttpCode(200)
+  async requestPasswordReset(@Body() body: { email?: string }, @Req() request: Request) {
+    parseBody(passwordResetRequestBodySchema, body);
+    if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
+    const email = String(body?.email || '').trim().toLowerCase();
+    const ip = request.ip || 'unknown';
+    const rateKey = tokenDigest(ip + '|password-reset|' + tokenDigest(email));
+    const rate = await databasePool.query(
+      "INSERT INTO auth_rate_limits (key_hash, window_started_at, attempts, blocked_until) VALUES ($1, now(), 1, NULL) ON CONFLICT (key_hash) DO UPDATE SET attempts = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END, window_started_at = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN now() ELSE auth_rate_limits.window_started_at END, blocked_until = CASE WHEN (CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END) >= 5 THEN now() + interval '15 minutes' ELSE auth_rate_limits.blocked_until END RETURNING attempts, blocked_until",
+      [rateKey],
+    );
+    if (rate.rows[0].attempts > 5 || (rate.rows[0].blocked_until && new Date(rate.rows[0].blocked_until).getTime() > Date.now())) {
+      throw new HttpException('Too many password reset requests. Please wait 15 minutes before trying again.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+    const account = await databasePool.query(
+      "SELECT id, email FROM users WHERE lower(email) = $1 AND status = 'active' LIMIT 1",
+      [email],
+    );
+    const webOrigin = process.env.TRADEMATE_WEB_ORIGIN || process.env.PUBLIC_APP_URL || '';
+    let resetOrigin = '';
+    try {
+      const parsed = new URL(webOrigin);
+      if (parsed.protocol === 'https:' || (parsed.protocol === 'http:' && process.env.NODE_ENV !== 'production')) resetOrigin = parsed.origin;
+    } catch { resetOrigin = ''; }
+    if (account.rowCount && resetOrigin) {
+      const rawToken = randomBytes(32).toString('base64url');
+      const client = await databasePool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1 OR expires_at <= now() OR used_at IS NOT NULL', [account.rows[0].id]);
+        await client.query(
+          "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '30 minutes')",
+          [account.rows[0].id, tokenDigest(rawToken)],
+        );
+        await client.query(
+          "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.password_reset_requested', 'user', $1, '{}'::jsonb)",
+          [account.rows[0].id],
+        );
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      } finally { client.release(); }
+      const resetUrl = resetOrigin + '/app?passwordReset=' + encodeURIComponent(rawToken);
+      const sent = await sendTransactionalEmail(
+        account.rows[0].email,
+        'Reset your TradeMate password',
+        '<p>We received a request to reset your TradeMate password.</p><p><a href="' + resetUrl + '">Reset your password</a></p><p>This link expires in 30 minutes and can be used once. If you did not request this, you can ignore this email.</p>',
+      );
+      if (!sent) {
+        await databasePool.query('DELETE FROM password_reset_tokens WHERE token_hash = $1', [tokenDigest(rawToken)]);
+      }
+    } else if (account.rowCount && !resetOrigin) {
+      console.warn('[auth] Password reset email was not sent because TRADEMATE_WEB_ORIGIN/PUBLIC_APP_URL is not configured with an allowed origin.');
+    }
+    return { success: true, message: 'If an active account exists for that email, a password reset link will be sent.' };
+  }
+
+  @Post('password-reset/complete')
+  @HttpCode(200)
+  async completePasswordReset(@Body() body: { token?: string; newPassword?: string }) {
+    parseBody(passwordResetCompleteBodySchema, body);
+    if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
+    const rawToken = String(body?.token || '');
+    const newPassword = String(body?.newPassword || '');
+    const nextHash = await passwordHash(newPassword);
+    const client = await databasePool.connect();
+    let email = '';
+    let userId = '';
+    try {
+      await client.query('BEGIN');
+      const reset = await client.query(
+        "SELECT t.id, t.user_id, u.email FROM password_reset_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = $1 AND t.used_at IS NULL AND t.expires_at > now() AND u.status = 'active' FOR UPDATE OF t, u",
+        [tokenDigest(rawToken)],
+      );
+      if (!reset.rowCount) throw new BadRequestException('This password reset link is invalid, expired, or already used.');
+      userId = reset.rows[0].user_id;
+      email = reset.rows[0].email;
+      const consumed = await client.query(
+        'UPDATE password_reset_tokens SET used_at = now() WHERE id = $1 AND used_at IS NULL AND expires_at > now() RETURNING id',
+        [reset.rows[0].id],
+      );
+      if (!consumed.rowCount) throw new BadRequestException('This password reset link is invalid, expired, or already used.');
+      await client.query('UPDATE user_credentials SET password_hash = $1, updated_at = now() WHERE user_id = $2', [nextHash, userId]);
+      await client.query('DELETE FROM user_sessions WHERE user_id = $1', [userId]);
+      await client.query('UPDATE auth_login_challenges SET consumed_at = now() WHERE user_id = $1 AND consumed_at IS NULL', [userId]);
+      await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1 AND id <> $2', [userId, reset.rows[0].id]);
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.password_reset_completed', 'user', $1, '{}'::jsonb)",
+        [userId],
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
+    if (email) void sendTransactionalEmail(email, 'Your TradeMate password was reset', '<p>Your TradeMate password was reset successfully. All existing sessions have been signed out.</p><p>If you did not make this change, contact TradeMate support immediately.</p>');
+    return { success: true, message: 'Your password has been reset. Sign in again with your new password.' };
+  }
 
   @Get('2fa/status')
   async twoFactorStatus(@Req() request: Request) {
