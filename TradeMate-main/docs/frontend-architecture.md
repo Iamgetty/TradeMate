@@ -80,3 +80,15 @@ The same-origin `/api/*` path remains the standard for TradeMate application API
 - Before changing quote ownership, trace which source is authoritative for each instrument, whether a direct CoinGecko refresh can overwrite an exchange-feed-derived value, and how stale/unavailable status is represented. Add deterministic tests for precedence and failure recovery before changing the runtime.
 
 This is an observed source-level exception, not a claim that the current quote refresh is broken or that provider freshness has been production-verified. Public static assets and third-party image/font URLs are separate presentation dependencies and are not application API clients.
+
+## Exchange-feed browser client source boundary
+
+Two independently maintained implementations of the browser-side feed client exist:
+
+- `apps/web/public/tm/feed-client.js` is the deployed web asset. `TradeMateRuntime.tsx` loads it from `/tm/feed-client.js?v=2`; the core app is designed to remain usable if this optional helper fails to load.
+- `exchange-feed/feed-client.js` is a separately maintained package-side copy. The exchange-feed package's `feed-client.test.js` imports both implementations and runs the reconnect lifecycle tests against each. The service's `server.js` does not import this browser helper; its Dockerfile copies the package directory as part of the service image.
+- Both copies currently receive the same reconnect tests for short-lived connections, sustained valid-data stability before resetting backoff, explicit close and duplicate close notifications. That shared test coverage does not establish full behavioural parity.
+- The deployed web asset has additional runtime protections not present in the package-side copy, including trade deduplication, snapshot validation, stale-state clearing on symbol/reconnect transitions and MT5 quote/broadcast handling.
+
+Treat the web asset as the source of truth for the currently deployed TradeMate browser runtime. Treat the package-side file as a separate reusable/example implementation and test target until its intended distribution contract is clarified. Do not overwrite either copy or claim they are interchangeable. Any future consolidation must first map the extra protections to explicit tests, define whether the package copy is a supported public integration surface, and verify both test suites and the web app-shell regression tests.
+
