@@ -109,3 +109,25 @@ test('conversation login returns to the thread and preserves a reply after sessi
   expect(logins).toBe(2);
   expect(replies).toBe(2);
 });
+
+
+test('same-origin return destination survives the two-factor login challenge', async ({ page }) => {
+  await page.route('**/api/market/listings/' + listingId, route => route.fulfill({ status: 200, json: { data: listing } }));
+  await page.route('**/api/auth/login', route => route.fulfill({ status: 200, json: { requiresTwoFactor: true, challengeToken: 'challenge-001' } }));
+  await page.route('**/api/auth/2fa/verify', route => route.fulfill({ status: 200, json: { success: true } }));
+
+  await page.goto('/auth?mode=login&returnTo=' + encodeURIComponent('/market/' + listingId));
+  await login(page);
+  await expect(page.getByRole('heading', { name: 'Verify it’s you.' })).toBeVisible();
+  await page.getByLabel('Authenticator code').fill('123456');
+  await page.getByRole('button', { name: /Verify and sign in/ }).click();
+  await expect(page).toHaveURL(new RegExp('/market/' + listingId + '$'));
+  await expect(page.getByRole('heading', { name: 'Bulk packaging materials' })).toBeVisible();
+});
+
+test('external post-login return destinations are rejected', async ({ page }) => {
+  await page.route('**/api/auth/login', route => route.fulfill({ status: 200, json: { user: { id: 'buyer-001', email: 'buyer@example.test' } } }));
+  await page.goto('/auth?mode=login&returnTo=' + encodeURIComponent('https://outside.example/steal-session'));
+  await login(page);
+  await expect.poll(() => new URL(page.url()).origin).toBe('http://127.0.0.1:3000');
+});
