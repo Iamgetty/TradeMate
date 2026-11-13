@@ -31,6 +31,8 @@ export default function EnquiryThreadPage() {
  const params = useParams<{ id: string }>();
  const id = params.id;
  const router = useRouter();
+ const loginHref='/auth?mode=login&returnTo='+encodeURIComponent('/messages/'+id);
+ const draftKey='tm:enquiry-reply-draft:'+id;
  const [enquiry, setEnquiry] = useState<Enquiry | null>(null);
  const [messages, setMessages] = useState<ThreadMessage[]>([]);
  const [draft, setDraft] = useState('');
@@ -43,7 +45,7 @@ export default function EnquiryThreadPage() {
   setError('');
   try {
    const response = await fetch(API_BASE + '/api/market/enquiries/' + encodeURIComponent(id) + '/messages', { credentials: 'include', cache: 'no-store' });
-   if (response.status === 401) { router.replace('/auth?mode=login'); return; }
+   if (response.status === 401) { router.replace(loginHref); return; }
    if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(body.message || 'Could not load this conversation.');
@@ -56,8 +58,9 @@ export default function EnquiryThreadPage() {
   } finally {
    setLoading(false);
   }
- }, [id, router]);
+ }, [id, loginHref, router]);
 
+ useEffect(() => { try { const saved=sessionStorage.getItem(draftKey); if(saved){setDraft(saved);sessionStorage.removeItem(draftKey)} } catch {} }, [draftKey]);
  useEffect(() => { void load(); }, [load]);
 
  async function send(event: FormEvent<HTMLFormElement>) {
@@ -70,8 +73,9 @@ export default function EnquiryThreadPage() {
     method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message }),
    });
    const body = await response.json().catch(() => ({}));
-   if (response.status === 401) { router.replace('/auth?mode=login'); return; }
+   if (response.status === 401) { try { sessionStorage.setItem(draftKey,message); } catch {} router.replace(loginHref); return; }
    if (!response.ok) throw new Error(body.message || 'Your reply could not be sent.');
+   try { sessionStorage.removeItem(draftKey); } catch {}
    setDraft('');
    setNotice('Reply sent.');
    await load();
