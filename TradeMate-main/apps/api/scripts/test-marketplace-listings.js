@@ -180,6 +180,51 @@ async function main() {
       [b2bEnquiryPayload.data.id],
     );
     assert.equal(b2bEnquiryAudit.rows[0].count, 1, 'B2B enquiry creation must write exactly one audit event');
+    const enquiryUrl = '/messages/' + b2bEnquiryPayload.data.id;
+    const initialNotifications = await rawPool.query(
+      'SELECT user_id, title, action_url FROM user_notifications WHERE action_url = $1 ORDER BY user_id',
+      [enquiryUrl],
+    );
+    assert.deepEqual(initialNotifications.rows.map((row) => row.user_id).sort(),
+      [actors.owner.userId, actors.admin.userId].sort(),
+      'new enquiries must notify seller owners/admins only, with a direct conversation link');
+
+    const sellerReply = await fetch(baseUrl + '/api/market/enquiries/' + b2bEnquiryPayload.data.id + '/messages', {
+      method: 'POST',
+      headers: {
+        cookie: 'trademate_session=' + encodeURIComponent(actors.owner.token),
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ message: 'Thank you. We can share the delivery schedule.' }),
+    });
+    assert.equal(sellerReply.status, 201, 'an authorized seller owner must be able to reply to an enquiry');
+    const buyerReplyNotice = await rawPool.query(
+      'SELECT title, action_url FROM user_notifications WHERE user_id = $1 AND action_url = $2',
+      [actors.outsider.userId, enquiryUrl],
+    );
+    assert.equal(buyerReplyNotice.rowCount, 1, 'a seller reply must notify the buyer with a conversation link');
+
+    const buyerReply = await fetch(baseUrl + '/api/market/enquiries/' + b2bEnquiryPayload.data.id + '/messages', {
+      method: 'POST',
+      headers: {
+        cookie: 'trademate_session=' + encodeURIComponent(actors.outsider.token),
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ message: 'Please send the schedule and proposed milestones.' }),
+    });
+    assert.equal(buyerReply.status, 201, 'the buyer must be able to continue the enquiry conversation');
+    const sellerReplyNotices = await rawPool.query(
+      'SELECT user_id FROM user_notifications WHERE action_url = $1 AND title = $2 ORDER BY user_id',
+      [enquiryUrl, 'New enquiry reply'],
+    );
+    assert.deepEqual(sellerReplyNotices.rows.map((row) => row.user_id).sort(),
+      [actors.owner.userId, actors.admin.userId, actors.outsider.userId].sort(),
+      'buyer replies must notify seller owners/admins while seller replies notify the buyer');
+    const memberNotice = await rawPool.query(
+      'SELECT count(*)::int AS count FROM user_notifications WHERE user_id = $1 AND action_url = $2',
+      [actors.member.userId, enquiryUrl],
+    );
+    assert.equal(memberNotice.rows[0].count, 0, 'ordinary seller members must not receive owner/admin enquiry notifications');
 
     const invalidServiceQuantity = await createDraft('owner', 'Invalid service quantity ' + suffix, 3);
     assert.equal(invalidServiceQuantity.status, 400, 'service offers must reject inventory quantities during draft creation');
@@ -282,6 +327,12 @@ async function main() {
       [createdDrafts.owner.id, actors.outsider.userId],
     );
     assert.equal(enquiryRows.rows[0].count, 0, 'enquiry rows must roll back when the matching audit insert fails');
+    const rolledBackNotifications = await rawPool.query(
+      'SELECT count(*)::int AS count FROM user_notifications WHERE action_url IN (SELECT \'/messages/\' || id::text FROM marketplace_enquiries WHERE listing_id = $1 AND buyer_user_id = $2)',
+      [createdDrafts.owner.id, actors.outsider.userId],
+    );
+    assert.equal(rolledBackNotifications.rows[0].count, 0,
+      'failed enquiry creation must not leave notification rows behind');
 
     console.log('Services/B2B organization profile, draft lifecycle and enquiry authorization and atomic audit rollback integration tests passed.');
   } finally {
