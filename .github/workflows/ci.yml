@@ -63,6 +63,11 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: node scripts/test-marketplace-contracts.js
+      - name: Verify two-party P2P lifecycle, privacy and concurrency
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-p2p-lifecycle.js
       - name: Verify authentication audit atomicity and rollback
         working-directory: TradeMate-main/apps/api
         env:
