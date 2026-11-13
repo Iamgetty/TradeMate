@@ -592,3 +592,80 @@ test('community Feed recovers after a transient API failure and fits mobile scre
     await context.close().catch(() => undefined);
   }
 });
+
+
+test('notification action marks the item read and opens its internal conversation link', async ({ page }) => {
+  test.setTimeout(45_000);
+  let authenticated = false;
+  let notificationRead = false;
+  const enquiryId = 'enquiry-notification-001';
+
+  await page.route('**/api/**', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname.startsWith('/api') ? url.pathname.slice(4) : url.pathname;
+    const method = request.method();
+
+    if (path === '/auth/me' && method === 'GET') {
+      await route.fulfill(authenticated
+        ? { status: 200, json: { user: { id: 'buyer-user-001', email: 'buyer@example.test', display_name: 'Buyer Test', country_code: 'NG' } } }
+        : { status: 401, json: { message: 'No active session' } });
+      return;
+    }
+    if (path === '/auth/login' && method === 'POST') {
+      authenticated = true;
+      await route.fulfill({ status: 200, json: { user: { id: 'buyer-user-001', email: 'buyer@example.test', display_name: 'Buyer Test', country_code: 'NG' } } });
+      return;
+    }
+    if (path === '/notifications' && method === 'GET') {
+      await route.fulfill({ status: 200, json: { notifications: [{
+        id: 'notification-001',
+        category: 'Contracts',
+        title: 'New marketplace enquiry',
+        body: 'A buyer enquired about a published offer.',
+        icon: 'message-square',
+        action_url: '/messages/' + enquiryId,
+        read_at: null,
+        created_at: '2026-11-13T05:00:00.000Z',
+      }], unread_count: 1 } });
+      return;
+    }
+    if (path === '/notifications/notification-001/read' && method === 'PATCH') {
+      notificationRead = true;
+      await route.fulfill({ status: 200, json: { success: true, notification: { id: 'notification-001', read_at: '2026-11-13T05:01:00.000Z' } } });
+      return;
+    }
+    if (path === '/market/enquiries/' + enquiryId + '/messages' && method === 'GET') {
+      await route.fulfill({ status: 200, json: { data: {
+        enquiry: {
+          id: enquiryId,
+          listing_id: 'listing-notification-001',
+          listing_title: 'Notification navigation fixture',
+          buyer_user_id: 'buyer-user-001',
+          buyer_name: 'Buyer Test',
+          seller_name: 'Seller Test',
+          status: 'open',
+        },
+        messages: [{
+          id: 'initial-' + enquiryId,
+          sender_user_id: 'buyer-user-001',
+          sender_name: 'Buyer Test',
+          message: 'Please share the next steps.',
+          created_at: '2026-11-13T05:00:00.000Z',
+          initial: true,
+        }],
+      } } });
+      return;
+    }
+    await route.fulfill({ status: 200, json: {} });
+  });
+
+  await login(page, 'buyer@example.test');
+  await page.locator('#app button[data-pg="notif"]').first().click();
+  await expect(page.locator('#pg .ncard')).toHaveCount(1);
+  await page.locator('#pg .ncard').click();
+
+  await expect(page).toHaveURL(url => url.pathname === '/messages/' + enquiryId);
+  await expect(page.getByRole('heading', { name: 'Notification navigation fixture.' })).toBeVisible();
+  expect(notificationRead).toBe(true);
+});
