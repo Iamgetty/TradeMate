@@ -47,6 +47,10 @@ async function main() {
       "INSERT INTO listings (seller_organization_id, title, description, listing_type, price_minor_units, currency_code, country_code, status) VALUES ($1, $2, 'A disposable live-browser acceptance service listing.', 'service', 125000, 'NGN', 'NG', 'published') RETURNING id",
       [organizationId, 'Live browser service ' + suffix],
     );
+    const b2bListing = await pool.query(
+      "INSERT INTO listings (seller_organization_id, title, description, listing_type, price_minor_units, currency_code, country_code, quantity_available, status) VALUES ($1, $2, 'A disposable B2B offer for live enquiry acceptance.', 'b2b', 250000, 'NGN', 'NG', 1250, 'published') RETURNING id",
+      [organizationId, 'Live browser B2B offer ' + suffix],
+    );
     const contract = await pool.query(
       "INSERT INTO marketplace_contracts (listing_id, buyer_user_id, seller_organization_id, title, scope, terms, amount_minor_units, currency_code, status) VALUES ($1, $2, $3, $4, $5, $6, 125000, 'NGN', 'proposed') RETURNING id",
       [listing.rows[0].id, actors.buyer.id, organizationId, 'Live two-account acceptance ' + suffix, 'Deliver the agreed service and provide the completed work.', 'Both parties review the deliverables and confirm fulfilment.'],
@@ -57,6 +61,8 @@ async function main() {
       seller: actors.seller,
       contractId: contract.rows[0].id,
       contractTitle: 'Live two-account acceptance ' + suffix,
+      b2bListingId: b2bListing.rows[0].id,
+      b2bListingTitle: 'Live browser B2B offer ' + suffix,
     };
     await writeFile(path.resolve(outputPath), JSON.stringify(fixture), { mode: 0o600 });
     console.log('Created disposable live-browser fixture for two independent accounts.');
