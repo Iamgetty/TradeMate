@@ -7,6 +7,8 @@ type Fixture = {
   seller: Actor;
   contractId: string;
   contractTitle: string;
+  b2bListingId: string;
+  b2bListingTitle: string;
 };
 
 async function openAuthenticatedApp(browser: Browser, actor: Actor) {
@@ -125,6 +127,77 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
     const sellerReload = await seller.request.get('/api/market/contracts/' + fixture.contractId);
     expect(sellerReload.status()).toBe(200);
     expect((await sellerReload.json()).data.status).toBe('completed');
+  } finally {
+    await Promise.allSettled([buyerContext?.close(), sellerContext?.close()]);
+  }
+});
+
+
+test('two real browser sessions exchange a PostgreSQL-backed B2B listing enquiry and reply', async ({ browser }) => {
+  test.setTimeout(90_000);
+  const fixturePath = process.env.TRADEMATE_E2E_FIXTURE;
+  if (!fixturePath) throw new Error('TRADEMATE_E2E_FIXTURE must point to the disposable database fixture.');
+  const fixture = JSON.parse(await readFile(fixturePath, 'utf8')) as Fixture;
+
+  let buyerContext: BrowserContext | undefined;
+  let sellerContext: BrowserContext | undefined;
+  try {
+    const buyerSession = await openAuthenticatedApp(browser, fixture.buyer);
+    buyerContext = buyerSession.context;
+    const buyer = buyerSession.page;
+    await buyer.goto('/market/' + fixture.b2bListingId);
+    await expect(buyer.getByRole('heading', { name: fixture.b2bListingTitle })).toBeVisible({ timeout: 20_000 });
+    await expect(buyer.getByText('1,250 available')).toBeVisible();
+    await buyer.getByLabel('Your message').fill('Please confirm the delivery schedule for this B2B offer.');
+    await buyer.getByRole('button', { name: 'Send enquiry' }).click();
+    await expect(buyer.getByRole('status')).toContainText('Your enquiry has been sent');
+
+    const buyerEnquiries = await buyer.request.get('/api/market/enquiries/mine');
+    expect(buyerEnquiries.status()).toBe(200);
+    const buyerEnquiryPayload = await buyerEnquiries.json();
+    const buyerEnquiry = (buyerEnquiryPayload.data || []).find(
+      (item: { listing_id: string }) => item.listing_id === fixture.b2bListingId,
+    );
+    expect(buyerEnquiry, 'the buyer must see the persisted B2B enquiry').toBeTruthy();
+
+    const sellerSession = await openAuthenticatedApp(browser, fixture.seller);
+    sellerContext = sellerSession.context;
+    const seller = sellerSession.page;
+    await seller.locator('#app .top button[data-pg="profile"]').click();
+    await seller.locator('[data-act="mode"]').click();
+    await seller.locator('#sbar [data-f="Conversations"]').click();
+    const sellerConversations = seller.locator('#pg .pgs[data-id="conversations"]');
+    await expect(sellerConversations).toContainText(fixture.b2bListingTitle, { timeout: 15_000 });
+    await sellerConversations.locator('.lr').filter({ hasText: fixture.b2bListingTitle }).click();
+    await expect(seller.locator('#dm')).toBeVisible();
+    await expect(seller.getByText('Please confirm the delivery schedule for this B2B offer.')).toBeVisible();
+    await seller.locator('#dm').fill('The delivery schedule is five business days after the contract is agreed.');
+    await seller.locator('[data-act="dmsend"]').click();
+    await expect(seller.getByText('The delivery schedule is five business days after the contract is agreed.')).toBeVisible();
+
+    const sellerEnquiries = await seller.request.get('/api/market/enquiries/mine');
+    expect(sellerEnquiries.status()).toBe(200);
+    const sellerEnquiryPayload = await sellerEnquiries.json();
+    const sellerEnquiry = (sellerEnquiryPayload.data || []).find(
+      (item: { id: string }) => item.id === buyerEnquiry.id,
+    );
+    expect(sellerEnquiry, 'the seller must see the same persisted enquiry').toBeTruthy();
+
+    await buyer.goto('/app');
+    await expect(buyer.locator('#app .view')).toBeVisible();
+    await buyer.locator('#sbar [data-f="Conversations"]').click();
+    const buyerConversations = buyer.locator('#pg .pgs[data-id="conversations"]');
+    await expect(buyerConversations).toContainText(fixture.b2bListingTitle, { timeout: 15_000 });
+    await buyerConversations.locator('.lr').filter({ hasText: fixture.b2bListingTitle }).click();
+    await expect(buyer.getByText('The delivery schedule is five business days after the contract is agreed.')).toBeVisible();
+
+    const durableMessages = await buyer.request.get('/api/market/enquiries/' + buyerEnquiry.id + '/messages');
+    expect(durableMessages.status()).toBe(200);
+    const messagePayload = await durableMessages.json();
+    expect(messagePayload.data.messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ message: 'Please confirm the delivery schedule for this B2B offer.' }),
+      expect.objectContaining({ message: 'The delivery schedule is five business days after the contract is agreed.' }),
+    ]));
   } finally {
     await Promise.allSettled([buyerContext?.close(), sellerContext?.close()]);
   }
