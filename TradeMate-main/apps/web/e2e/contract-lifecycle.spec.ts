@@ -592,3 +592,58 @@ test('community Feed recovers after a transient API failure and fits mobile scre
     await context.close().catch(() => undefined);
   }
 });
+
+
+test('notification action marks the item read and opens its internal conversation link', async ({ page }) => {
+  test.setTimeout(45_000);
+  let authenticated = false;
+  let notificationRead = false;
+  const enquiryId = 'enquiry-notification-001';
+
+  await page.route('**/api/**', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname.replace(/^\\/api/, '');
+    const method = request.method();
+
+    if (path === '/auth/me' && method === 'GET') {
+      await route.fulfill(authenticated
+        ? { status: 200, json: { user: { id: 'buyer-user-001', email: 'buyer@example.test', display_name: 'Buyer Test', country_code: 'NG' } } }
+        : { status: 401, json: { message: 'No active session' } });
+      return;
+    }
+    if (path === '/auth/login' && method === 'POST') {
+      authenticated = true;
+      await route.fulfill({ status: 200, json: { user: { id: 'buyer-user-001', email: 'buyer@example.test', display_name: 'Buyer Test', country_code: 'NG' } } });
+      return;
+    }
+    if (path === '/notifications' && method === 'GET') {
+      await route.fulfill({ status: 200, json: { notifications: [{
+        id: 'notification-001',
+        category: 'Contracts',
+        title: 'New marketplace enquiry',
+        body: 'A buyer enquired about a published offer.',
+        icon: 'message-square',
+        action_url: '/messages/' + enquiryId,
+        read_at: null,
+        created_at: '2026-11-13T05:00:00.000Z',
+      }], unread_count: 1 } });
+      return;
+    }
+    if (path === '/notifications/notification-001/read' && method === 'PATCH') {
+      notificationRead = true;
+      await route.fulfill({ status: 200, json: { success: true, notification: { id: 'notification-001', read_at: '2026-11-13T05:01:00.000Z' } } });
+      return;
+    }
+    await route.fulfill({ status: 200, json: {} });
+  });
+
+  await login(page, 'buyer@example.test');
+  await expect.poll(() => notificationRead).toBe(false);
+  await page.locator('#app button[data-pg="notif"]').first().click();
+  await expect(page.locator('#app .ncard')).toHaveCount(1);
+  await page.locator('#app .ncard').click();
+
+  await expect(page).toHaveURL(new RegExp('/messages/' + enquiryId + '$'));
+  expect(notificationRead).toBe(true);
+});
