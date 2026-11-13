@@ -422,3 +422,10 @@ This section records the five engineering observations raised during the ongoing
 - Include a direct `/messages/:id` action link and commit notifications in the same transaction as the enquiry/message and audit event.
 - Preserve the existing owner/admin notification audience for seller-side enquiries; do not notify every ordinary organization member.
 - Verify buyer/seller notification routing, audience isolation and rollback with PostgreSQL-backed integration tests.
+
+
+### Notification action-link navigation — follow-up
+
+- Make a notification click mark the item read and then follow its stored same-origin `action_url` when present; retain read-only behaviour for notifications without a destination.
+- Reject protocol-relative or backslash-containing destinations so notification clicks cannot redirect to an external origin.
+- Add browser coverage for a marketplace enquiry notification opening its conversation after the read request.
