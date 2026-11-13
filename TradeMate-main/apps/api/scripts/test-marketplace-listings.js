@@ -328,8 +328,8 @@ async function main() {
     );
     assert.equal(enquiryRows.rows[0].count, 0, 'enquiry rows must roll back when the matching audit insert fails');
     const rolledBackNotifications = await rawPool.query(
-      'SELECT count(*)::int AS count FROM user_notifications WHERE action_url IN (SELECT \'/messages/\' || id::text FROM marketplace_enquiries WHERE listing_id = $1 AND buyer_user_id = $2)',
-      [createdDrafts.owner.id, actors.outsider.userId],
+      'SELECT count(*)::int AS count FROM user_notifications WHERE body = $1 AND user_id = ANY($2::uuid[])',
+      ['A buyer enquired about Draft owner ' + suffix + '.', [actors.owner.userId, actors.admin.userId]],
     );
     assert.equal(rolledBackNotifications.rows[0].count, 0,
       'failed enquiry creation must not leave notification rows behind');
