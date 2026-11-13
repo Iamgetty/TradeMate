@@ -15,9 +15,36 @@ export default function ListingDetailPage(){
  const [message,setMessage]=useState('');
  const [sending,setSending]=useState(false);
  const [enquiryNotice,setEnquiryNotice]=useState<{kind:'success'|'error';text:string}|null>(null);
+ const [proposalAmount,setProposalAmount]=useState('');
+ const [proposalScope,setProposalScope]=useState('');
+ const [proposalTerms,setProposalTerms]=useState('');
+ const [proposalStartDate,setProposalStartDate]=useState('');
+ const [proposalCompletionDate,setProposalCompletionDate]=useState('');
+ const [proposalSending,setProposalSending]=useState(false);
+ const [proposalNotice,setProposalNotice]=useState<{kind:'success'|'error';text:string}|null>(null);
  const draftKey=params?.id?'tm:market-enquiry-draft:'+params.id:'';
+ const proposalDraftKey=params?.id?'tm:market-contract-draft:'+params.id:'';
  useEffect(()=>{if(!draftKey)return;try{const saved=sessionStorage.getItem(draftKey);if(saved){setMessage(saved);sessionStorage.removeItem(draftKey);setEnquiryNotice({kind:'success',text:'Your saved message is ready. Send it to complete your enquiry.'})}}catch{}},[draftKey]);
+ useEffect(()=>{if(!proposalDraftKey)return;try{const saved=sessionStorage.getItem(proposalDraftKey);if(saved){const draft=JSON.parse(saved) as {amount?:string;scope?:string;terms?:string;startDate?:string;completionDate?:string};setProposalAmount(draft.amount||'');setProposalScope(draft.scope||'');setProposalTerms(draft.terms||'');setProposalStartDate(draft.startDate||'');setProposalCompletionDate(draft.completionDate||'');sessionStorage.removeItem(proposalDraftKey);setProposalNotice({kind:'success',text:'Your saved proposal is ready. Review it and send it to complete your contract proposal.'})}}catch{}},[proposalDraftKey]);
  useEffect(()=>{if(!params?.id)return;let cancelled=false;(async()=>{try{const response=await fetch(API_BASE+'/api/market/listings/'+encodeURIComponent(params.id),{cache:'no-store'});if(!response.ok)throw new Error(response.status===404?'This offer is no longer available.':'Could not load this offer. Please try again.');const body=await response.json();if(!cancelled)setListing(body.data)}catch(e){if(!cancelled)setError(e instanceof Error?e.message:'Could not load this offer.')}finally{if(!cancelled)setLoading(false)}})();return()=>{cancelled=true}},[params?.id]);
+ async function sendContractProposal(event:FormEvent<HTMLFormElement>){
+  event.preventDefault();setProposalNotice(null);
+  const amount=proposalAmount.trim(),scope=proposalScope.trim(),terms=proposalTerms.trim();
+  if(!/^\\d{1,12}(\\.\\d{1,2})?$/.test(amount)||Number(amount)<=0){setProposalNotice({kind:'error',text:'Enter a valid positive amount with up to two decimal places.'});return}
+  if(scope.length<5||scope.length>5000){setProposalNotice({kind:'error',text:'Scope must be between 5 and 5,000 characters.'});return}
+  if(terms.length<5||terms.length>10000){setProposalNotice({kind:'error',text:'Contract terms must be between 5 and 10,000 characters.'});return}
+  if(proposalStartDate&&proposalCompletionDate&&proposalCompletionDate<proposalStartDate){setProposalNotice({kind:'error',text:'The target completion date cannot be before the start date.'});return}
+  if(!listing)return;setProposalSending(true);
+  try{
+   const response=await fetch(API_BASE+'/api/market/contracts',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({listingId:listing.id,amount,scope,terms,startDate:proposalStartDate||undefined,completionDate:proposalCompletionDate||undefined})});
+   const body=await response.json().catch(()=>({}));
+   if(!response.ok){if(response.status===401){try{sessionStorage.setItem(proposalDraftKey,JSON.stringify({amount,scope,terms,startDate:proposalStartDate,completionDate:proposalCompletionDate}))}catch{}setProposalNotice({kind:'error',text:'Your proposal has been saved on this device. Sign in and return here to review and send it.'});return}throw new Error(typeof body.message==='string'?body.message:'Your contract proposal could not be sent. Please try again.')}
+   try{sessionStorage.removeItem(proposalDraftKey)}catch{}
+   setProposalNotice({kind:'success',text:'Your contract proposal has been sent to the Alpha organization.'});
+   setProposalAmount('');setProposalScope('');setProposalTerms('');setProposalStartDate('');setProposalCompletionDate('');
+  }catch(e){setProposalNotice({kind:'error',text:e instanceof Error?e.message:'Could not connect to TradeMate. Please try again.'})}
+  finally{setProposalSending(false)}
+ }
  async function sendEnquiry(event:FormEvent<HTMLFormElement>){
   event.preventDefault();setEnquiryNotice(null);
   const clean=message.trim();
