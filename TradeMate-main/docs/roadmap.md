@@ -108,6 +108,26 @@ PR #22 is an audit source, not an integration target. Its original branch is sta
 
 P2P work begins only after the pre-P2P requirements are verified and the product owner has supplied the remaining instructions. Any live crypto trading, escrow, custody or payment feature requires jurisdiction-specific legal/compliance review, provider approval, threat modelling and independent security testing.
 
+### Controlled P2P foundation work — 13 November 2026
+
+The product owner has explicitly directed a limited P2P safety and lifecycle foundation audit while the broader pre-P2P acceptance register remains open. This is a scoped engineering exception for tests, precision, auditability and workflow design; it does **not** waive the pre-P2P release gates or authorize live crypto trading, escrow, custody, payment processing, refunds, settlement or transfers.
+
+- **PR #101 — lifecycle and financial-precision audit:** documented the original gaps and a safe implementation order.
+- **PR #102 — PostgreSQL lifecycle/concurrency tests:** added HTTP integration coverage for public/private access, self-trade prevention, quantity reservation/restoration, payment-state transitions, disputes, privacy and competing reservations.
+- **PR #103 — exact financial arithmetic:** replaced floating-point P2P calculations with fixed-point/BigInt handling and validation aligned to database precision (price 10dp, asset quantity 12dp, fiat 2dp).
+- **PR #104 — transactional audit events:** paired the covered P2P state changes with audit inserts in the same transaction and tested rollback when audit insertion fails.
+- **PR #105 — dispute-review design:** documented reviewer accountability, privacy and authorization requirements. The shared moderation API key is not sufficient to establish named reviewer identity; a separately authenticated and authorized reviewer model is still required before implementing resolution actions.
+- **PRs #106–#107 — limited UI scope:** PR #107 is the retained version. The homepage introductory copy removal and Services → Announcements navigation are retained; the other unrequested UI refinements were rolled back. PR #107 is merged and its Render web deployment is confirmed live. Event-triggered, audience-targeted announcement publishing remains unimplemented.
+
+**Next P2P engineering gates (not yet complete):**
+
+1. Define named reviewer identity, role/permission boundaries, case assignment, decision reasons, separation of duties, privacy and immutable audit requirements before adding dispute resolution endpoints. A review decision must not claim to reverse an external payment or release escrow.
+2. Specify advertisement and pending-order expiry rules before implementing jobs: distinguish unpaid orders from orders where payment was marked sent; define reservation restoration, dispute freezes, race handling, idempotency, audit events, retry/dead-letter behaviour and user notifications. Never auto-cancel a payment-sent or disputed order under an unapproved timeout rule.
+3. Add expiry implementation only after the state machine is approved and covered by PostgreSQL-backed concurrency, duplicate-job, crash/retry and audit-rollback tests.
+4. Keep all financial movement, wallet, deposit/withdrawal, remittance, escrow and custody capabilities gated by the legal/compliance, threat-model and independent-assessment requirements in S2–S5.
+
+The pre-P2P completion register above remains authoritative for broad product readiness. P2P foundation work does not mark Services/B2B, contract, Feed, Forex/Crypto/NFT, mobile or application-wide acceptance as complete.
+
 ## Future consideration: Product marketplace
 
 A product marketplace is a possible future feature only. It is not part of the current scope and should not be included in current navigation, search, publishing, checkout or contract flows unless explicitly approved in a future product decision.
