@@ -30,7 +30,7 @@ export default function ListingDetailPage(){
  async function sendContractProposal(event:FormEvent<HTMLFormElement>){
   event.preventDefault();setProposalNotice(null);
   const amount=proposalAmount.trim(),scope=proposalScope.trim(),terms=proposalTerms.trim();
-  if(!/^\\d{1,12}(\\.\\d{1,2})?$/.test(amount)||Number(amount)<=0){setProposalNotice({kind:'error',text:'Enter a valid positive amount with up to two decimal places.'});return}
+  if(!/^\d{1,12}(\.\d{1,2})?$/.test(amount)||Number(amount)<=0){setProposalNotice({kind:'error',text:'Enter a valid positive amount with up to two decimal places.'});return}
   if(scope.length<5||scope.length>5000){setProposalNotice({kind:'error',text:'Scope must be between 5 and 5,000 characters.'});return}
   if(terms.length<5||terms.length>10000){setProposalNotice({kind:'error',text:'Contract terms must be between 5 and 10,000 characters.'});return}
   if(proposalStartDate&&proposalCompletionDate&&proposalCompletionDate<proposalStartDate){setProposalNotice({kind:'error',text:'The target completion date cannot be before the start date.'});return}
