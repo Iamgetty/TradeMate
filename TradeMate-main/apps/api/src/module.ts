@@ -1731,7 +1731,7 @@ class EnquiriesController {
     try {
       await client.query('BEGIN');
       const listing = await client.query(
-        `SELECT l.id, l.seller_organization_id, o.name AS seller_name
+        `SELECT l.id, l.title AS listing_title, l.seller_organization_id, o.name AS seller_name
          FROM listings l
          JOIN organizations o ON o.id = l.seller_organization_id
          WHERE l.id = $1 AND l.status = 'published' AND o.status = 'active'
@@ -1754,6 +1754,10 @@ class EnquiriesController {
       await client.query(
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, $2, 'marketplace.enquiry_created', 'enquiry', $3, $4::jsonb)",
         [userId, target.seller_organization_id, created.rows[0].id, JSON.stringify({ listing_id: listingId })],
+      );
+      await client.query(
+        "INSERT INTO user_notifications (user_id, category, title, body, icon, action_url) SELECT om.user_id, 'Contracts', 'New marketplace enquiry', $1, 'message-square', $2 FROM organization_members om WHERE om.organization_id = $3 AND om.user_id <> $4 AND om.member_role IN ('owner','admin')",
+        ['A buyer enquired about ' + target.listing_title + '.', '/messages/' + created.rows[0].id, target.seller_organization_id, userId],
       );
       await client.query('COMMIT');
       return { data: { ...created.rows[0], seller_name: target.seller_name }, message: 'Enquiry sent to the seller.' };
@@ -1852,6 +1856,17 @@ class EnquiriesController {
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, $2, 'marketplace.enquiry_message_sent', 'enquiry', $3, $4::jsonb)",
         [userId, enquiry.seller_organization_id, id, JSON.stringify({ direction: isBuyer ? 'buyer_reply' : 'seller_reply' })],
       );
+      if (isBuyer) {
+        await client.query(
+          "INSERT INTO user_notifications (user_id, category, title, body, icon, action_url) SELECT om.user_id, 'Contracts', 'New enquiry reply', $1, 'message-square', $2 FROM organization_members om WHERE om.organization_id = $3 AND om.user_id <> $4 AND om.member_role IN ('owner','admin')",
+          ['A buyer replied about ' + enquiry.listing_title + '.', '/messages/' + id, enquiry.seller_organization_id, userId],
+        );
+      } else {
+        await client.query(
+          "INSERT INTO user_notifications (user_id, category, title, body, icon, action_url) VALUES ($1, 'Contracts', 'New enquiry reply', $2, 'message-square', $3)",
+          [enquiry.buyer_user_id, 'The seller replied about ' + enquiry.listing_title + '.', '/messages/' + id],
+        );
+      }
       await client.query('COMMIT');
       return { data: { ...inserted.rows[0], sender_name: sender.rows[0]?.display_name ?? 'TradeMate user' }, message: 'Reply sent.' };
     } catch (error) {
