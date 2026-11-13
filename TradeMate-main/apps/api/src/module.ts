@@ -2412,7 +2412,7 @@ class P2PMarketController {
        FROM p2p_public_book WHERE asset_code = $1 AND fiat_code = $2${sideClause}
        ORDER BY CASE WHEN side = 'buy' THEN price END DESC,
                 CASE WHEN side = 'sell' THEN price END ASC, created_at DESC
-       LIMIT ${values.length}`, values,
+       LIMIT $${values.length}`, values,
     );
     return { source: 'TradeMate P2P orders', as_of: new Date().toISOString(), data: result.rows };
   }
