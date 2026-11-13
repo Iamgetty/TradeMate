@@ -662,8 +662,8 @@ test('notification action marks the item read and opens its internal conversatio
 
   await login(page, 'buyer@example.test');
   await page.locator('#app button[data-pg="notif"]').first().click();
-  await expect(page.locator('#app .ncard')).toHaveCount(1);
-  await page.locator('#app .ncard').click();
+  await expect(page.locator('#pg .ncard')).toHaveCount(1);
+  await page.locator('#pg .ncard').click();
 
   await expect(page).toHaveURL(url => url.pathname === '/messages/' + enquiryId);
   await expect(page.getByRole('heading', { name: 'Notification navigation fixture.' })).toBeVisible();
