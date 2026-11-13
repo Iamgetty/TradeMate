@@ -352,6 +352,15 @@ This section records the five engineering observations raised during the ongoing
 - Document current local prerequisites, service startup commands, required environment-variable names (never secret values), database migration safety, test/build commands and the distinction between local development, staging and production.
 - Review this guide whenever service topology, scripts, authentication, migrations or deployment configuration changes. Documentation must distinguish implemented code from features that still require provider setup, deployment or end-to-end acceptance.
 
+### F. Exchange-feed reliability — audit findings 13 November 2026
+
+- The Render log sample shows recurring Binance spot and Bybit spot/linear WebSocket close/reconnect cycles; the sampled sockets recovered and Twelve Data refreshes succeeded. Treat this as connection churn requiring measurement, not proof of sustained outage.
+- The shared reconnect helper resets its retry counter on every socket open, so repeated short-lived sessions can retry at one-second intervals instead of reaching bounded exponential backoff.
+- `GET /health` reports process liveness with `ok: true` regardless of upstream feed availability. Add separate feed readiness/diagnostics; do not make platform liveness depend on third-party provider uptime.
+- Existing feed tests cover MT5 quote validation but no dedicated reconnect/backoff, feed readiness, provider silence or stale-book recovery suite was found.
+- Next: extract deterministic reconnect/health logic, test repeated open/close cycles and recovery with fake sockets, add per-provider last-message age and stale-book diagnostics, then deploy the exchange-feed service independently after CI. Do not claim continuous market-data acceptance from successful reconnect logs alone.
+- See [exchange-feed operational reliability audit](exchange-feed-operational-audit.md). No live provider configuration, secrets, runtime behaviour or production data were changed by the audit.
+
 ### E. Deployment verification — three-service acceptance gate
 
 - Treat the Render Blueprint as three separately verifiable services: trademate-api, trademate-web and exchange-feed. Verify each service's actual deployed commit, build/release result, health endpoint, environment configuration by variable name/presence only, logs and dependency connectivity.
