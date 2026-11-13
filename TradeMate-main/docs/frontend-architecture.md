@@ -70,3 +70,13 @@ These tests do not replace authenticated two-account end-to-end acceptance again
 - The current Playwright mobile smoke test previously changed only the viewport while retaining a desktop user agent. It therefore did not exercise `TMENV.mw`; the revised test uses an iPhone browser context.
 - Startup diagnostics intentionally do not subscribe to the global `unhandledrejection` event: `app.js` contains many independent asynchronous feature requests, so a global listener can misclassify a feature-level rejection as a fatal boot failure. Boot-script synchronous errors, script load failures and the render watchdog remain covered. The browser suite includes a regression that dispatches an unrelated rejection after the public app has rendered and verifies that the app remains visible.
 - The app integration guide must be kept in sync with auth lifecycle changes, including email verification, and should link back to this ownership document.
+## Data-access exceptions found during source audit
+
+The same-origin `/api/*` path remains the standard for TradeMate application API calls, but the legacy runtime has an explicit public-provider exception that must not be hidden by the general rule:
+
+- `liveRefresh()` in `apps/web/public/tm/app.js` calls CoinGecko's public markets endpoint directly from the browser. It runs on startup and every 90 seconds while the document is visible and the selected tab is Home, Markets, Trade, Portfolio or P2P. The request updates matching in-memory market items and silently ignores request failures.
+- NFT discovery requests use same-origin `/api/nfts`, `/api/nft-collections` and `/api/nft-collection` routes. Forex reference quotes use the same-origin `/api/market/quotes` route.
+- The CoinGecko exception means browser availability, provider rate limits/CORS and the provider response are part of that refresh path; it is not covered by the NestJS API proxy's upstream handling. Do not treat it as authenticated application API traffic or move it casually without verifying quote precedence, fallback/snapshot behaviour and the exchange-feed contract.
+- Before changing quote ownership, trace which source is authoritative for each instrument, whether a direct CoinGecko refresh can overwrite an exchange-feed-derived value, and how stale/unavailable status is represented. Add deterministic tests for precedence and failure recovery before changing the runtime.
+
+This is an observed source-level exception, not a claim that the current quote refresh is broken or that provider freshness has been production-verified. Public static assets and third-party image/font URLs are separate presentation dependencies and are not application API clients.
