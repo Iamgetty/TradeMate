@@ -72,7 +72,6 @@ jobs:
         working-directory: TradeMate-main/apps/api
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-          TOTP_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
         run: node scripts/test-auth-audit.js
       - name: Verify Services and B2B draft authorization and audit rollback
         working-directory: TradeMate-main/apps/api
@@ -228,9 +227,23 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   browser-e2e:
-    name: Browser app-shell smoke tests
+    name: Browser app-shell and live API acceptance tests
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: trademate_test
+          POSTGRES_DB: trademate_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d trademate_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -238,17 +251,58 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
+      - name: Install API dependencies
+        working-directory: TradeMate-main/apps/api
+        run: npm install --no-audit --no-fund
+      - name: Build API for live browser acceptance
+        working-directory: TradeMate-main/apps/api
+        run: npm run build
+      - name: Apply migrations to disposable browser-test database
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: npm run db:migrate
+      - name: Seed independent browser accounts and a proposed contract
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/create-live-browser-contract-fixture.js "$RUNNER_TEMP/trademate-e2e-fixture.json"
+      - name: Start API against disposable PostgreSQL
+        working-directory: TradeMate-main/apps/api
+        env:
+          NODE_ENV: test
+          PORT: 4000
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: |
+          export TOTP_ENCRYPTION_KEY="$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))")"
+          nohup npm run start:prod > "$RUNNER_TEMP/trademate-api.log" 2>&1 &
+          for attempt in $(seq 1 40); do
+            if curl --silent --fail http://127.0.0.1:4000/api/health >/dev/null; then
+              echo "Disposable API is ready."
+              exit 0
+            fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/trademate-api.log"
+          exit 1
       - name: Install web and browser-test dependencies
         working-directory: TradeMate-main/apps/web
         run: npm install --no-audit --no-fund
       - name: Install Chromium and system dependencies
         working-directory: TradeMate-main/apps/web
         run: npx playwright install --with-deps chromium
-      - name: Run isolated browser smoke tests
+      - name: Run mocked smoke tests and live two-account browser acceptance
         working-directory: TradeMate-main/apps/web
         env:
           CI: true
-        run: npm run test:e2e
+          TRADEMATE_API_ORIGIN: http://127.0.0.1:4000
+          TRADEMATE_E2E_FIXTURE: ${{ runner.temp }}/trademate-e2e-fixture.json
+        run: |
+          npm run test:e2e || {
+            echo '--- Disposable API log tail ---'
+            tail -n 120 "$RUNNER_TEMP/trademate-api.log"
+            exit 1
+          }
 
   cloudflare-workers:
     name: Isolated Cloudflare Workers frontend build and runtime
