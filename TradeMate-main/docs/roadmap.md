@@ -414,3 +414,11 @@ This section records the five engineering observations raised during the ongoing
 - Render the API's persisted `quantity_available` on public B2B offer detail pages; distinguish a real zero from an unspecified quantity and do not show a B2B inventory label on Services offers.
 - Add browser coverage for numeric inventory and missing inventory so the publishing wizard, listing API and counterparty detail stay connected.
 - This is a read-only presentation change; it does not reserve, decrement or otherwise mutate inventory and does not introduce stock-control semantics.
+
+
+### Marketplace enquiry and reply notifications — follow-up
+
+- Send persistent in-app notifications to seller organization owners/admins when a buyer creates an enquiry, and notify the opposite party when a conversation reply arrives.
+- Include a direct `/messages/:id` action link and commit notifications in the same transaction as the enquiry/message and audit event.
+- Preserve the existing owner/admin notification audience for seller-side enquiries; do not notify every ordinary organization member.
+- Verify buyer/seller notification routing, audience isolation and rollback with PostgreSQL-backed integration tests.
