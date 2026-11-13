@@ -362,13 +362,18 @@ class AuthController {
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const email = String(body?.email || '').trim().toLowerCase();
     const ip = request.ip || 'unknown';
-    const rateKey = tokenDigest(ip + '|password-reset|' + tokenDigest(email));
-    const rate = await databasePool.query(
-      "INSERT INTO auth_rate_limits (key_hash, window_started_at, attempts, blocked_until) VALUES ($1, now(), 1, NULL) ON CONFLICT (key_hash) DO UPDATE SET attempts = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END, window_started_at = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN now() ELSE auth_rate_limits.window_started_at END, blocked_until = CASE WHEN (CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END) >= 5 THEN now() + interval '15 minutes' ELSE auth_rate_limits.blocked_until END RETURNING attempts, blocked_until",
-      [rateKey],
-    );
-    if (rate.rows[0].attempts > 5 || (rate.rows[0].blocked_until && new Date(rate.rows[0].blocked_until).getTime() > Date.now())) {
-      throw new HttpException('Too many password reset requests. Please wait 15 minutes before trying again.', HttpStatus.TOO_MANY_REQUESTS);
+    const rateKeys = [
+      { key: tokenDigest(ip + '|password-reset-ip'), limit: 10 },
+      { key: tokenDigest(ip + '|password-reset-email|' + tokenDigest(email)), limit: 3 },
+    ];
+    for (const rateKey of rateKeys) {
+      const rate = await databasePool.query(
+        "INSERT INTO auth_rate_limits (key_hash, window_started_at, attempts, blocked_until) VALUES ($1, now(), 1, NULL) ON CONFLICT (key_hash) DO UPDATE SET attempts = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END, window_started_at = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN now() ELSE auth_rate_limits.window_started_at END, blocked_until = CASE WHEN (CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END) >= $2 THEN now() + interval '15 minutes' ELSE auth_rate_limits.blocked_until END RETURNING attempts, blocked_until",
+        [rateKey.key, rateKey.limit],
+      );
+      if (rate.rows[0].attempts > rateKey.limit || (rate.rows[0].blocked_until && new Date(rate.rows[0].blocked_until).getTime() > Date.now())) {
+        throw new HttpException('Too many password reset requests. Please wait 15 minutes before trying again.', HttpStatus.TOO_MANY_REQUESTS);
+      }
     }
     const account = await databasePool.query(
       "SELECT id, email FROM users WHERE lower(email) = $1 AND status = 'active' LIMIT 1",
@@ -385,6 +390,7 @@ class AuthController {
       const client = await databasePool.connect();
       try {
         await client.query('BEGIN');
+        await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [account.rows[0].id]);
         await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1 OR expires_at <= now() OR used_at IS NOT NULL', [account.rows[0].id]);
         await client.query(
           "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '30 minutes')",
@@ -416,12 +422,19 @@ class AuthController {
 
   @Post('password-reset/complete')
   @HttpCode(200)
-  async completePasswordReset(@Body() body: { token?: string; newPassword?: string }) {
+  async completePasswordReset(@Body() body: { token?: string; newPassword?: string }, @Req() request: Request) {
     parseBody(passwordResetCompleteBodySchema, body);
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const rawToken = String(body?.token || '');
     const newPassword = String(body?.newPassword || '');
-    const nextHash = await passwordHash(newPassword);
+    const resetRateKey = tokenDigest((request.ip || 'unknown') + '|password-reset-complete|' + tokenDigest(rawToken));
+    const rate = await databasePool.query(
+      "INSERT INTO auth_rate_limits (key_hash, window_started_at, attempts, blocked_until) VALUES ($1, now(), 1, NULL) ON CONFLICT (key_hash) DO UPDATE SET attempts = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END, window_started_at = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN now() ELSE auth_rate_limits.window_started_at END, blocked_until = CASE WHEN (CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END) >= 5 THEN now() + interval '15 minutes' ELSE auth_rate_limits.blocked_until END RETURNING attempts, blocked_until",
+      [resetRateKey],
+    );
+    if (rate.rows[0].attempts > 5 || (rate.rows[0].blocked_until && new Date(rate.rows[0].blocked_until).getTime() > Date.now())) {
+      throw new HttpException('Too many password reset attempts. Please request a new link later.', HttpStatus.TOO_MANY_REQUESTS);
+    }
     const client = await databasePool.connect();
     let email = '';
     let userId = '';
@@ -434,6 +447,7 @@ class AuthController {
       if (!reset.rowCount) throw new BadRequestException('This password reset link is invalid, expired, or already used.');
       userId = reset.rows[0].user_id;
       email = reset.rows[0].email;
+      const nextHash = await passwordHash(newPassword);
       const consumed = await client.query(
         'UPDATE password_reset_tokens SET used_at = now() WHERE id = $1 AND used_at IS NULL AND expires_at > now() RETURNING id',
         [reset.rows[0].id],
