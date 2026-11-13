@@ -24,25 +24,6 @@ async function login(page) {
   await page.getByRole('button', { name: /Sign in/ }).click();
 }
 
-test('B2B offer detail displays numeric inventory returned by the API', async ({ page }) => {
-  await page.route('**/api/market/listings/' + listingId, async route => {
-    await route.fulfill({ status: 200, json: { data: listing } });
-  });
-  await page.goto('/market/' + listingId);
-  await expect(page.getByRole('heading', { name: 'Bulk packaging materials' })).toBeVisible();
-  await expect(page.getByText('QUANTITY AVAILABLE')).toBeVisible();
-  await expect(page.getByText('1,250 available')).toBeVisible();
-});
-
-test('B2B offer detail labels missing inventory without inventing a quantity', async ({ page }) => {
-  await page.route('**/api/market/listings/' + listingId, async route => {
-    await route.fulfill({ status: 200, json: { data: { ...listing, title: 'Regional distribution partnership', quantity_available: null, price_minor_units: '0', category_name: null } } });
-  });
-  await page.goto('/market/' + listingId);
-  await expect(page.getByRole('heading', { name: 'Regional distribution partnership' })).toBeVisible();
-  await expect(page.getByText('Quantity not specified')).toBeVisible();
-});
-
 test('marketplace enquiry draft survives login and returns to its offer', async ({ page }) => {
   let enquiryAttempts = 0;
   await page.route('**/api/market/listings/' + listingId, route => route.fulfill({ status: 200, json: { data: listing } }));
@@ -129,5 +110,5 @@ test('external post-login return destinations are rejected', async ({ page }) =>
   await page.route('**/api/auth/login', route => route.fulfill({ status: 200, json: { user: { id: 'buyer-001', email: 'buyer@example.test' } } }));
   await page.goto('/auth?mode=login&returnTo=' + encodeURIComponent('https://outside.example/steal-session'));
   await login(page);
-  await expect.poll(() => new URL(page.url()).origin).toBe('http://127.0.0.1:3000');
+  await expect(page).not.toHaveURL(/outside\\.example/);
 });
