@@ -437,3 +437,11 @@ This section records the five engineering observations raised during the ongoing
 - Use bounded equal-jitter exponential reconnect delays, prevent duplicate reconnect timers, and cancel pending reconnect/stability timers when the client is explicitly closed.
 - Add deterministic fake-WebSocket and fake-timer tests for repeated short-lived connections, stable recovery, duplicate close events and explicit shutdown.
 - This complements the exchange-feed server reconnect policy; it does not claim provider freshness or change upstream credentials/configuration.
+
+
+### Marketplace authentication return and draft continuity — follow-up
+
+- Preserve a same-origin return path through login and the optional two-factor challenge so unauthenticated users return to the marketplace offer or enquiry conversation they were trying to access.
+- Preserve unsent marketplace enquiries and conversation replies in tab-scoped session storage when a request returns 401; restore the draft on return and clear it after a successful send.
+- Reject external, protocol-relative and backslash-containing return destinations to prevent open redirects.
+- Add browser coverage for login return, marketplace enquiry draft restoration and expired-session conversation reply recovery.
