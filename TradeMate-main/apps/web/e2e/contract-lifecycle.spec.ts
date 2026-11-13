@@ -635,15 +635,39 @@ test('notification action marks the item read and opens its internal conversatio
       await route.fulfill({ status: 200, json: { success: true, notification: { id: 'notification-001', read_at: '2026-11-13T05:01:00.000Z' } } });
       return;
     }
+    if (path === '/market/enquiries/' + enquiryId + '/messages' && method === 'GET') {
+      await route.fulfill({ status: 200, json: { data: {
+        enquiry: {
+          id: enquiryId,
+          listing_id: 'listing-notification-001',
+          listing_title: 'Notification navigation fixture',
+          buyer_user_id: 'buyer-user-001',
+          buyer_name: 'Buyer Test',
+          seller_name: 'Seller Test',
+          status: 'open',
+        },
+        messages: [{
+          id: 'initial-' + enquiryId,
+          sender_user_id: 'buyer-user-001',
+          sender_name: 'Buyer Test',
+          message: 'Please share the next steps.',
+          created_at: '2026-11-13T05:00:00.000Z',
+          initial: true,
+        }],
+      } } });
+      return;
+    }
     await route.fulfill({ status: 200, json: {} });
   });
 
   await login(page, 'buyer@example.test');
-  await expect.poll(() => notificationRead).toBe(false);
   await page.locator('#app button[data-pg="notif"]').first().click();
   await expect(page.locator('#app .ncard')).toHaveCount(1);
   await page.locator('#app .ncard').click();
 
-  await expect(page).toHaveURL(new RegExp('/messages/' + enquiryId + '$'));
+  await expect(page).toHaveURL(new RegExp('/messages/' + enquiryId + '
+});
+));
+  await expect(page.getByRole('heading', { name: 'Notification navigation fixture.' })).toBeVisible();
   expect(notificationRead).toBe(true);
 });
