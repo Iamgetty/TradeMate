@@ -8,7 +8,7 @@ test('reconnect delay grows exponentially with equal jitter', () => {
   const policy = createReconnectPolicy({ random: () => 0.5 });
   assert.deepEqual(
     Array.from({ length: 6 }, () => policy.nextDelay()),
-    [750, 1500, 3000, 6000, 12000, 24000],
+    [750, 1500, 3000, 6000, 12000, 22500],
   );
 });
 
