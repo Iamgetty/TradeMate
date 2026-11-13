@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, randomInt, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { Pool } from 'pg';
 import { createRlsAwarePool } from './database-context';
+import { decimalToUnits, fiatCentsToQuantityUnits, productToFiatCents, unitsToDecimal } from './p2p-decimal';
 import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
@@ -2446,12 +2447,19 @@ class P2PMarketController {
     parseBody(p2pAdBodySchema, body);
     const userId = await this.authenticatedUser(request);
     const side = String(body?.side || '').toLowerCase(), asset = String(body?.asset || '').trim().toUpperCase(), fiat = String(body?.fiat || '').trim().toUpperCase();
-    const price = Number(body?.price), quantity = Number(body?.quantity), min = Number(body?.minFiatAmount ?? 0), max = Number(body?.maxFiatAmount ?? price * quantity);
+    let priceUnits: bigint, quantityUnits: bigint, minCents: bigint, maxCents: bigint;
+    try {
+      priceUnits = decimalToUnits(body.price, 10, 'Price');
+      quantityUnits = decimalToUnits(body.quantity, 12, 'Quantity');
+      minCents = decimalToUnits(body.minFiatAmount ?? '0', 2, 'Minimum fiat amount');
+      maxCents = body.maxFiatAmount === undefined ? productToFiatCents(priceUnits, quantityUnits) : decimalToUnits(body.maxFiatAmount, 2, 'Maximum fiat amount');
+    } catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Enter valid P2P amounts.'); }
     const methods = Array.isArray(body?.paymentMethods) ? body.paymentMethods.map((v: unknown) => String(v).trim()).filter(Boolean) : [];
     if (!['buy','sell'].includes(side) || !/^[A-Z0-9]{2,16}$/.test(asset) || !/^[A-Z]{3}$/.test(fiat)) throw new BadRequestException('Choose a valid side, asset and fiat currency.');
-    if (!(price > 0) || !(quantity > 0) || !Number.isFinite(price * quantity) || min < 0 || max < min || max <= 0 || max > price * quantity + 0.01) throw new BadRequestException('Enter valid price, quantity and fiat limits.');
+    const totalCents = productToFiatCents(priceUnits, quantityUnits);
+    if (priceUnits <= 0n || quantityUnits <= 0n || minCents < 0n || maxCents < minCents || maxCents <= 0n || maxCents > totalCents) throw new BadRequestException('Enter valid price, quantity and fiat limits.');
     if (methods.length > 10 || methods.some((v: string) => v.length > 60)) throw new BadRequestException('Invalid payment methods.');
-    const result = await databasePool!.query('INSERT INTO p2p_orders (user_id,side,asset_code,fiat_code,price,quantity,remaining_quantity,min_fiat_amount,max_fiat_amount,payment_methods) VALUES ($1,$2,$3,$4,$5,$6,$6,$7,$8,$9::jsonb) RETURNING id,side,asset_code,fiat_code,price::text,quantity::text,remaining_quantity::text,min_fiat_amount::text,max_fiat_amount::text,payment_methods,status,created_at', [userId,side,asset,fiat,String(price),String(quantity),String(min),String(max),JSON.stringify(methods)]);
+    const result = await databasePool!.query('INSERT INTO p2p_orders (user_id,side,asset_code,fiat_code,price,quantity,remaining_quantity,min_fiat_amount,max_fiat_amount,payment_methods) VALUES ($1,$2,$3,$4,$5,$6,$6,$7,$8,$9::jsonb) RETURNING id,side,asset_code,fiat_code,price::text,quantity::text,remaining_quantity::text,min_fiat_amount::text,max_fiat_amount::text,payment_methods,status,created_at', [userId,side,asset,fiat,unitsToDecimal(priceUnits,10),unitsToDecimal(quantityUnits,12),unitsToDecimal(minCents,2),unitsToDecimal(maxCents,2),JSON.stringify(methods)]);
     return { ad: result.rows[0] };
   }
 
@@ -2474,8 +2482,11 @@ class P2PMarketController {
   @Post('orders')
   async placeOrder(@Req() request: Request, @Body() body: any) {
     parseBody(p2pOrderBodySchema, body);
-    const userId = await this.authenticatedUser(request), adId = String(body?.adId || ''), fiatAmount = Number(body?.fiatAmount);
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(adId) || !(fiatAmount > 0) || !Number.isFinite(fiatAmount)) throw new BadRequestException('Choose an offer and enter a valid fiat amount.');
+    const userId = await this.authenticatedUser(request), adId = String(body?.adId || '');
+    let fiatCents: bigint;
+    try { fiatCents = decimalToUnits(body.fiatAmount, 2, 'Fiat amount'); }
+    catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Enter a valid fiat amount.'); }
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(adId) || fiatCents <= 0n) throw new BadRequestException('Choose an offer and enter a valid fiat amount.');
     const client = await databasePool!.connect();
     try {
       await client.query('BEGIN');
@@ -2484,13 +2495,17 @@ class P2PMarketController {
       const ad = locked.rows[0];
       if (ad.user_id === userId) throw new BadRequestException('You cannot order from your own advertisement.');
       if (!['open','partially_filled'].includes(ad.status)) throw new ConflictException('Advertisement is no longer available.');
-      if (fiatAmount < Number(ad.min_fiat_amount) || fiatAmount > Number(ad.max_fiat_amount)) throw new BadRequestException('Amount is outside the advertisement limits.');
-      const qty = fiatAmount / Number(ad.price);
-      if (qty <= 0 || qty > Number(ad.remaining_quantity)) throw new ConflictException('Insufficient quantity remains.');
+      const priceUnits = decimalToUnits(String(ad.price), 10, 'Stored price');
+      const remainingUnits = decimalToUnits(String(ad.remaining_quantity), 12, 'Stored remaining quantity');
+      const minCents = decimalToUnits(String(ad.min_fiat_amount), 2, 'Stored minimum fiat amount');
+      const maxCents = decimalToUnits(String(ad.max_fiat_amount), 2, 'Stored maximum fiat amount');
+      if (fiatCents < minCents || fiatCents > maxCents) throw new BadRequestException('Amount is outside the advertisement limits.');
+      const quantityUnits = fiatCentsToQuantityUnits(fiatCents, priceUnits);
+      if (quantityUnits <= 0n || quantityUnits > remainingUnits) throw new ConflictException('Insufficient quantity remains at the supported asset precision.');
       const buyer = ad.side === 'sell' ? userId : ad.user_id, seller = ad.side === 'sell' ? ad.user_id : userId;
-      const trade = await client.query("INSERT INTO p2p_trades (order_id,buyer_user_id,seller_user_id,asset_code,fiat_code,price,quantity,fiat_total,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending') RETURNING id,order_id,asset_code,fiat_code,price::text,quantity::text,fiat_total::text,status,created_at",[adId,buyer,seller,ad.asset_code,ad.fiat_code,ad.price,qty.toFixed(12),fiatAmount.toFixed(2)]);
-      const remaining = Math.max(0,Number(ad.remaining_quantity)-qty);
-      await client.query("UPDATE p2p_orders SET remaining_quantity=$1::numeric,status=CASE WHEN $1::numeric<=0 THEN 'filled' ELSE 'partially_filled' END,updated_at=now() WHERE id=$2",[remaining.toFixed(12),adId]);
+      const trade = await client.query("INSERT INTO p2p_trades (order_id,buyer_user_id,seller_user_id,asset_code,fiat_code,price,quantity,fiat_total,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending') RETURNING id,order_id,asset_code,fiat_code,price::text,quantity::text,fiat_total::text,status,created_at",[adId,buyer,seller,ad.asset_code,ad.fiat_code,ad.price,unitsToDecimal(quantityUnits,12),unitsToDecimal(fiatCents,2)]);
+      const remaining = remainingUnits - quantityUnits;
+      await client.query("UPDATE p2p_orders SET remaining_quantity=$1::numeric,status=CASE WHEN $1::numeric<=0 THEN 'filled' ELSE 'partially_filled' END,updated_at=now() WHERE id=$2",[unitsToDecimal(remaining,12),adId]);
       await client.query('COMMIT');
       return { order: trade.rows[0], message: 'Order created. TradeMate does not hold funds or provide escrow.' };
     } catch (error) { await client.query('ROLLBACK').catch(()=>undefined); throw error; } finally { client.release(); }
@@ -2536,12 +2551,12 @@ class P2PMarketController {
       const trade = locked.rows[0];
       if (trade.buyer_user_id !== userId) throw new ForbiddenException('Only the buyer can cancel this unpaid order.');
       if (trade.status !== 'pending' || trade.buyer_payment_sent_at) throw new ConflictException('An order cannot be cancelled after payment is marked sent or a dispute is opened.');
-      const ad = await client.query('SELECT id,quantity::numeric AS quantity,remaining_quantity::numeric AS remaining_quantity,status FROM p2p_orders WHERE id=$1 FOR UPDATE',[trade.order_id]);
+      const ad = await client.query('SELECT id,quantity::text AS quantity,remaining_quantity::text AS remaining_quantity,status FROM p2p_orders WHERE id=$1 FOR UPDATE',[trade.order_id]);
       if (!ad.rowCount) throw new NotFoundException('Original advertisement not found.');
-      const restored = Number(ad.rows[0].remaining_quantity) + Number(trade.quantity);
-      const total = Number(ad.rows[0].quantity);
-      if (!Number.isFinite(restored) || restored > total + 1e-9) throw new ConflictException('Reserved quantity could not be safely restored.');
-      await client.query("UPDATE p2p_orders SET remaining_quantity=$1,status=CASE WHEN status IN ('cancelled','expired') THEN status WHEN $1 >= quantity THEN 'open' ELSE 'partially_filled' END,updated_at=now() WHERE id=$2",[restored.toFixed(12),trade.order_id]);
+      const restored = decimalToUnits(String(ad.rows[0].remaining_quantity),12,'Stored remaining quantity') + decimalToUnits(String(trade.quantity),12,'Trade quantity');
+      const total = decimalToUnits(String(ad.rows[0].quantity),12,'Stored total quantity');
+      if (restored > total) throw new ConflictException('Reserved quantity could not be safely restored.');
+      await client.query("UPDATE p2p_orders SET remaining_quantity=$1::numeric,status=CASE WHEN status IN ('cancelled','expired') THEN status WHEN $1::numeric >= quantity THEN 'open' ELSE 'partially_filled' END,updated_at=now() WHERE id=$2",[unitsToDecimal(restored,12),trade.order_id]);
       const cancelled = await client.query("UPDATE p2p_trades SET status='cancelled',cancelled_by=$1,updated_at=now() WHERE id=$2 AND status='pending' AND buyer_payment_sent_at IS NULL RETURNING id,status,updated_at",[userId,id]);
       if (!cancelled.rowCount) throw new ConflictException('Order state changed; refresh and try again.');
       await client.query('COMMIT');
