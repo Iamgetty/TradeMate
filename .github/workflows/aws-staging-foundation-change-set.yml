@@ -1,0 +1,78 @@
+name: AWS staging foundation change set
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_change_set:
+        description: Create a CloudFormation change set only; do not execute it.
+        type: choice
+        required: true
+        options:
+          - "no"
+          - "yes"
+      nat_gateway_count:
+        description: NAT gateways for staging (1 is cheaper; 2 improves AZ independence).
+        type: choice
+        required: true
+        default: "1"
+        options:
+          - "1"
+          - "2"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: aws-staging-foundation-change-set
+  cancel-in-progress: false
+
+jobs:
+  create-change-set:
+    if: ${{ inputs.confirm_change_set == 'yes' }}
+    runs-on: ubuntu-latest
+    environment: aws-staging
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Validate deployment role configuration
+        env:
+          AWS_STAGING_DEPLOY_ROLE_ARN: ${{ vars.AWS_STAGING_DEPLOY_ROLE_ARN }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${AWS_STAGING_DEPLOY_ROLE_ARN}" =~ ^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$ ]]; then
+            echo "::error::Configure the aws-staging environment variable AWS_STAGING_DEPLOY_ROLE_ARN with the dedicated staging deployment role ARN."
+            exit 1
+          fi
+
+      - name: Configure AWS credentials through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.2.1
+        with:
+          role-to-assume: ${{ vars.AWS_STAGING_DEPLOY_ROLE_ARN }}
+          aws-region: eu-north-1
+          role-session-name: trademate-staging-foundation-change-set
+
+      - name: Confirm assumed AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Create foundation change set without executing it
+        run: |
+          set -euo pipefail
+          aws cloudformation deploy \
+            --template-file infra/aws/staging/foundation.yaml \
+            --stack-name trademate-staging-foundation \
+            --region eu-north-1 \
+            --no-execute-changeset \
+            --parameter-overrides \
+              EnvironmentName=trademate-staging \
+              NatGatewayCount="${{ inputs.nat_gateway_count }}" \
+            --tags Environment=staging Project=TradeMate ManagedBy=CloudFormation
+
+      - name: Print pending foundation change sets
+        run: |
+          aws cloudformation list-change-sets \
+            --stack-name trademate-staging-foundation \
+            --region eu-north-1 \
+            --query 'Summaries[].[ChangeSetName,Status,ExecutionStatus,CreationTime]' \
+            --output table
