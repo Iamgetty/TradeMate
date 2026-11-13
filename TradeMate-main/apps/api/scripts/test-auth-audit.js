@@ -69,7 +69,7 @@ async function main() {
     global.fetch = async (input, options) => {
       if (String(input) === 'https://api.resend.com/emails') {
         const payload = JSON.parse(options.body);
-        const match = String(payload.html).match(/letter-spacing:8px">([0-9]{6})<\\/p>/);
+        const match = String(payload.html).match(/letter-spacing:8px">([0-9]{6})<\/p>/);
         assert.ok(match, 'verification email must contain a six-digit code');
         lastVerificationCode = match[1];
         return new Response(JSON.stringify({ id: 'test-email-id' }), {
