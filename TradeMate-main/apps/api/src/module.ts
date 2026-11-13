@@ -2412,7 +2412,7 @@ class P2PMarketController {
        FROM p2p_public_book WHERE asset_code = $1 AND fiat_code = $2${sideClause}
        ORDER BY CASE WHEN side = 'buy' THEN price END DESC,
                 CASE WHEN side = 'sell' THEN price END ASC, created_at DESC
-       LIMIT ${values.length}`, values,
+       LIMIT $${values.length}`, values,
     );
     return { source: 'TradeMate P2P orders', as_of: new Date().toISOString(), data: result.rows };
   }
@@ -2490,7 +2490,7 @@ class P2PMarketController {
       const buyer = ad.side === 'sell' ? userId : ad.user_id, seller = ad.side === 'sell' ? ad.user_id : userId;
       const trade = await client.query("INSERT INTO p2p_trades (order_id,buyer_user_id,seller_user_id,asset_code,fiat_code,price,quantity,fiat_total,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending') RETURNING id,order_id,asset_code,fiat_code,price::text,quantity::text,fiat_total::text,status,created_at",[adId,buyer,seller,ad.asset_code,ad.fiat_code,ad.price,qty.toFixed(12),fiatAmount.toFixed(2)]);
       const remaining = Math.max(0,Number(ad.remaining_quantity)-qty);
-      await client.query("UPDATE p2p_orders SET remaining_quantity=$1,status=CASE WHEN $1<=0 THEN 'filled' ELSE 'partially_filled' END,updated_at=now() WHERE id=$2",[remaining.toFixed(12),adId]);
+      await client.query("UPDATE p2p_orders SET remaining_quantity=$1::numeric,status=CASE WHEN $1::numeric<=0 THEN 'filled' ELSE 'partially_filled' END,updated_at=now() WHERE id=$2",[remaining.toFixed(12),adId]);
       await client.query('COMMIT');
       return { order: trade.rows[0], message: 'Order created. TradeMate does not hold funds or provide escrow.' };
     } catch (error) { await client.query('ROLLBACK').catch(()=>undefined); throw error; } finally { client.release(); }
