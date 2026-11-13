@@ -60,7 +60,7 @@ The Next.js route does not load `public/tm/index.html`; `/app` mounts the React 
 
 `apps/web/e2e/app-shell.spec.ts` covers root redirect, public landing, desktop/mobile app-shell startup and the optional feed-helper failure path. The API is stubbed to return 503 so the browser suite cannot mutate or authenticate against a live service.
 
-`apps/web/scripts/test-account-isolation.js` statically checks connected-mode cache allowlisting, session bootstrap failure behaviour, request-generation isolation, account-switch cleanup, logout handling and server-side email verification wiring.
+`apps/web/scripts/test-account-isolation.js` statically checks connected-mode cache allowlisting, session bootstrap failure behaviour, request-generation isolation, account-switch cleanup, logout handling and server-side email verification wiring. `apps/web/e2e/api-proxy.spec.ts` separately exercises proxy origin validation, method/body/header forwarding, cookie propagation, redirects and upstream failure handling.
 
 These tests do not replace authenticated two-account end-to-end acceptance against an isolated API/database fixture. Feature-level migration and parity work must add that coverage before changing ownership.
 
@@ -68,4 +68,5 @@ These tests do not replace authenticated two-account end-to-end acceptance again
 
 - `app.js` remains the primary application implementation and is very large; splitting it should begin with inventory and dependency mapping, not moving arbitrary code into React components.
 - The current Playwright mobile smoke test previously changed only the viewport while retaining a desktop user agent. It therefore did not exercise `TMENV.mw`; the revised test uses an iPhone browser context.
+- The runtime currently treats any unhandled promise rejection during its startup-watchdog window as a fatal startup issue, without checking whether the rejection originated in the boot scripts. This could turn an unrelated early asynchronous error into a full-screen startup failure. It is an audit finding, not yet changed; trace real rejection sources and add a targeted regression before narrowing or removing the handler.
 - The app integration guide must be kept in sync with auth lifecycle changes, including email verification, and should link back to this ownership document.
