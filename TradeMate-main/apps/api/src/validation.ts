@@ -28,6 +28,11 @@ export const displayNameBodySchema = z.object({
   displayName: z.string().trim().min(2).max(24),
 }).strict();
 
+export const emailVerificationBodySchema = z.object({
+  email: z.string().trim().email('Enter a valid email address.').max(254),
+  code: z.string().regex(/^\\d{6}$/, 'Enter the six-digit email verification code.'),
+}).strict();
+
 export const passwordResetRequestBodySchema = z.object({
   email: z.string().trim().email('Enter a valid email address.').max(254),
 }).strict();
