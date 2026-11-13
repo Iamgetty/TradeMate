@@ -233,7 +233,7 @@ test('environment validation rejects malformed URLs, origins and key formats', (
 });
 
 test('P2P decimal inputs enforce database precision and fiat scale', () => {
-  const ad = { side: 'sell', asset: 'BTC', fiat: 'USD', price: '65000.1234567890', quantity: '0.000000010001', minFiatAmount: '1.00', maxFiatAmount: '100.00' };
+  const ad = { side: 'sell', asset: 'BTC', fiat: 'USD', price: '65000.1234567890', quantity: '0.000000010001', minFiatAmount: '0.01', maxFiatAmount: '0.65' };
   assert.equal(p2pAdBodySchema.safeParse(ad).success, true);
   assert.equal(p2pAdBodySchema.safeParse({ ...ad, price: '1.12345678901' }).success, false);
   assert.equal(p2pAdBodySchema.safeParse({ ...ad, quantity: '0.0000000000001' }).success, false);
