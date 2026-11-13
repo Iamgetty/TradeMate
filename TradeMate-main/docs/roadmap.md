@@ -431,6 +431,14 @@ This section records the five engineering observations raised during the ongoing
 - Add browser coverage for a marketplace enquiry notification opening its conversation after the read request.
 
 
+### Browser exchange-feed client reconnect resilience — follow-up
+
+- Keep the browser client's retry counter across short-lived successful handshakes; reset it only after a sustained connection has delivered valid feed data.
+- Use bounded equal-jitter exponential reconnect delays, prevent duplicate reconnect timers, and cancel pending reconnect/stability timers when the client is explicitly closed.
+- Add deterministic fake-WebSocket and fake-timer tests for repeated short-lived connections, stable recovery, duplicate close events and explicit shutdown.
+- This complements the exchange-feed server reconnect policy; it does not claim provider freshness or change upstream credentials/configuration.
+
+
 ### Marketplace authentication return and draft continuity — follow-up
 
 - Preserve a same-origin return path through login and the optional two-factor challenge so unauthenticated users return to the marketplace offer or enquiry conversation they were trying to access.
