@@ -197,7 +197,7 @@ export const contractMessageBodySchema = z.object({
 
 const fixedDecimalInput = (scale: number, maxIntegerDigits: number, allowZero: boolean) => z.union([z.number(), z.string()]).refine((value) => {
   const input = String(value).trim();
-  const match = /^(?:0|[1-9]\d*)(?:\\.(\d+))?$/.exec(input);
+  const match = /^(?:0|[1-9]\d*)(?:\.(\d+))?$/.exec(input);
   if (!match || input.split('.')[0].length > maxIntegerDigits || (match[1] || '').length > scale) return false;
   return allowZero || /[1-9]/.test(input);
 }, `Enter a valid amount with no more than ${scale} decimal places.`);
