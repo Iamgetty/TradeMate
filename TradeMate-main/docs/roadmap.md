@@ -189,14 +189,27 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 
 ### Cloud infrastructure migration programme — planned, not yet deployed
 
+#### 0. Read-only discovery and baseline audit — first gate
+
+- Confirm the intended Render workspace before inspecting live resources; inventory web services, private services, workers, cron jobs, PostgreSQL, Key Value, regions, plans, linked repositories/branches, deploy policies, health checks, domains and current live deploy IDs.
+- Record environment-variable **names and presence only**. Never retrieve, export, print, commit or copy secret values. Map each variable to its owning service and classify it as secret, public build-time configuration or operational setting.
+- Inventory database engine/version, region, size, extensions, connection limits, backup/PITR configuration, retention, restore evidence, migration process, roles/privileges and application connection paths. Do not run data-changing SQL.
+- Inventory public domains, DNS provider/records, TLS certificates, origin exposure, CDN/proxy/cache behaviour, object/file storage, uploads, scheduled tasks, queues, WebSocket/feed dependencies and third-party integrations.
+- Establish a baseline for request volume, p50/p95 latency, 4xx/5xx rates, CPU, memory, bandwidth, database connections, storage growth, deploy frequency/failure rate, incident history and current monthly spend. Use available historical metrics and label missing telemetry explicitly.
+- Review GitHub Actions workflows, required checks, deployment triggers, environment protection, artifact provenance, dependency/image/IaC scans and rollback process. Verify which workflow actually deploys each Render service.
+- Produce a dependency/data-flow diagram, current-state inventory, risk register, cost baseline, regional/data-residency questions and evidence-backed gap list. No production configuration or data is changed during this gate.
+- **Workspace selection is required before the live Render audit can continue** if more than one workspace is available. Record the selected workspace ID in the audit evidence; do not infer it from a service name.
+
+
 **Objective:** move TradeMate from its current Render-hosted application and managed PostgreSQL foundation to a production-grade cloud architecture with managed networking, database, caching/queues, real-time connectivity, CDN and operational controls. This work is planned for an upcoming migration. No AWS or GCP deployment, CloudFront distribution, dedicated WebSocket service, Redis deployment or queue-worker fleet is confirmed as active today.
 
 #### 1. Cloud provider decision and landing zone
 
-- Evaluate **AWS** and **Google Cloud Platform (GCP)** against total cost, regional availability/latency for TradeMate's users and providers, managed PostgreSQL compatibility, networking, security services, operational complexity, support and exit/migration costs.
-- Select one primary cloud provider for the initial migration. Do not deploy duplicate AWS and GCP production stacks without a documented multi-cloud requirement, resilience case and operating budget.
-- AWS target option: a managed landing zone with separate production/staging environments or accounts, IAM roles, VPC/private subnets, security groups, centralized audit logs, KMS, secrets management, budgets and policy guardrails.
-- GCP target option: an equivalent organization/folder/project structure, IAM, VPC/private networking, Cloud KMS, Secret Manager, centralized audit logs, budgets and policy guardrails.
+- **Approved direction: hybrid edge + AWS primary.** Use AWS as the primary application/cloud platform; Cloudflare for authoritative DNS, WAF, DDoS mitigation, bot controls and edge security; and Amazon CloudFront for AWS-origin static assets and explicitly approved cacheable content. Define one owner for each DNS, proxy, TLS, WAF and cache responsibility to avoid overlapping Cloudflare/CloudFront behaviour.
+- Keep **GCP optional**, not a parallel production stack. Evaluate a specific GCP service only when a measured capability, regional, resilience or commercial advantage justifies the added operational and compliance burden. Do not duplicate the core production platform across AWS and GCP by default.
+- Compare AWS regions and service choices against TradeMate's actual user/provider geography, latency, data-residency obligations, PostgreSQL compatibility, availability, support, operational complexity, exit costs and a workload-based total-cost model before selecting a region or provisioning resources.
+- This architecture direction is not authorization to create cloud accounts/resources, change DNS, copy production data, alter secrets, or cut over production. Those actions require separate explicit approval.
+- AWS target: a managed landing zone with separate production/staging accounts or equivalent isolation, IAM roles, VPC/private subnets, security groups, centralized audit logs, KMS, secrets management, budgets and policy guardrails.
 - Document the target architecture, regions, data residency, threat model, service ownership, recovery objectives (RPO/RTO), cost model and rollback strategy before provisioning.
 - Keep staging and production isolated. Never copy production secrets into staging or development.
 
