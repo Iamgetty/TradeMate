@@ -29,6 +29,7 @@ const MIGRATIONS = [
   '021_p2p_public_payment_methods.sql',
   '021_totp_replay_protection.sql',
   '022_password_reset_tokens.sql',
+  '023_email_verification.sql',
 ];
 
 async function main() {
