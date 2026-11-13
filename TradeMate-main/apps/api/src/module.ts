@@ -224,20 +224,23 @@ class AuthController {
     }
     const account = await databasePool.query("SELECT id, email FROM users WHERE lower(email) = $1 AND email_verified_at IS NULL AND status = 'pending' LIMIT 1", [email]);
     if (account.rowCount) {
-      const code = String(randomInt(0, 1000000)).padStart(6, '0');
+      let code: string | null = null;
       const client = await databasePool.connect();
       try {
         await client.query('BEGIN');
-        await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [account.rows[0].id]);
-        await client.query('DELETE FROM email_verification_codes WHERE user_id = $1 OR expires_at <= now() OR used_at IS NOT NULL', [account.rows[0].id]);
-        await client.query("INSERT INTO email_verification_codes (user_id, code_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes')", [account.rows[0].id, tokenDigest(code)]);
-        await client.query("INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.email_verification_requested', 'user', $1, '{}'::jsonb)", [account.rows[0].id]);
+        const stillPending = await client.query("SELECT id FROM users WHERE id = $1 AND email_verified_at IS NULL AND status = 'pending' FOR UPDATE", [account.rows[0].id]);
+        if (stillPending.rowCount) {
+          code = String(randomInt(0, 1000000)).padStart(6, '0');
+          await client.query('DELETE FROM email_verification_codes WHERE user_id = $1 OR expires_at <= now() OR used_at IS NOT NULL', [account.rows[0].id]);
+          await client.query("INSERT INTO email_verification_codes (user_id, code_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes')", [account.rows[0].id, tokenDigest(code)]);
+          await client.query("INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.email_verification_requested', 'user', $1, '{}'::jsonb)", [account.rows[0].id]);
+        }
         await client.query('COMMIT');
       } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
       finally { client.release(); }
       // Keep this response generic even when delivery fails so resend cannot be used
       // to distinguish pending accounts from addresses with no account.
-      await sendTransactionalEmail(email, 'Your TradeMate verification code', '<p>Your TradeMate verification code is:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">' + code + '</p><p>This code expires in 10 minutes and can only be used once.</p>');
+      if (code) await sendTransactionalEmail(email, 'Your TradeMate verification code', '<p>Your TradeMate verification code is:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">' + code + '</p><p>This code expires in 10 minutes and can only be used once.</p>');
     }
     return { success: true, message: 'If this account is awaiting verification, a new code has been sent.' };
   }
