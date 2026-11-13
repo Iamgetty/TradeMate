@@ -363,7 +363,9 @@ async function main() {
     });
     assert.equal(resend.status, 200, 'pending accounts must be able to request a replacement code');
     const replacementCode = lastVerificationCode;
-    assert.notEqual(replacementCode, issuedCode, 'resend must replace the prior one-time code');
+    const replacementRecord = await pool.query('SELECT code_hash, attempts FROM email_verification_codes WHERE user_id = (SELECT id FROM users WHERE lower(email) = $1) ORDER BY created_at DESC LIMIT 1', [attemptsEmail]);
+    assert.equal(replacementRecord.rows[0].code_hash, digest(replacementCode), 'resend must persist the replacement code digest');
+    assert.equal(replacementRecord.rows[0].attempts, 0, 'replacement code must start with a fresh attempt budget');
     const resentConfirm = await fetch(base + '/api/auth/email-verification/confirm', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: attemptsEmail, code: replacementCode }),
