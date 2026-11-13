@@ -6,6 +6,8 @@ const {
   registerBodySchema,
   loginBodySchema,
   changePasswordBodySchema,
+  passwordResetRequestBodySchema,
+  passwordResetCompleteBodySchema,
   totpCodeBodySchema,
   totpChallengeBodySchema,
   deletionCancelBodySchema,
@@ -54,6 +56,19 @@ test('registration rejects short passwords, invalid email and unexpected keys', 
 test('login rejects malformed and overlong credentials', () => {
   assert.equal(loginBodySchema.safeParse({ email: 'bad', password: 'secret' }).success, false);
   assert.equal(loginBodySchema.safeParse({ email: 'trader@example.com', password: 'x'.repeat(129) }).success, false);
+});
+
+test('password reset requests normalize email and reject unexpected fields', () => {
+  assert.equal(passwordResetRequestBodySchema.safeParse({ email: ' Trader@Example.com ' }).success, true);
+  assert.equal(passwordResetRequestBodySchema.safeParse({ email: 'not-an-email' }).success, false);
+  assert.equal(passwordResetRequestBodySchema.safeParse({ email: 'trader@example.com', userId: 'attacker' }).success, false);
+});
+
+test('password reset completion requires a bounded opaque token and strong password', () => {
+  assert.equal(passwordResetCompleteBodySchema.safeParse({ token: 'A'.repeat(43), newPassword: 'a sufficiently long password' }).success, true);
+  assert.equal(passwordResetCompleteBodySchema.safeParse({ token: 'short', newPassword: 'a sufficiently long password' }).success, false);
+  assert.equal(passwordResetCompleteBodySchema.safeParse({ token: 'A'.repeat(43), newPassword: 'short' }).success, false);
+  assert.equal(passwordResetCompleteBodySchema.safeParse({ token: 'A'.repeat(43), newPassword: 'a sufficiently long password', admin: true }).success, false);
 });
 
 test('password change requires a different strong password', () => {

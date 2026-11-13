@@ -28,6 +28,7 @@ const MIGRATIONS = [
   '020_immutable_audit_events.sql',
   '021_p2p_public_payment_methods.sql',
   '021_totp_replay_protection.sql',
+  '022_password_reset_tokens.sql',
 ];
 
 async function main() {

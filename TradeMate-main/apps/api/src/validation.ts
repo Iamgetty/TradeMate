@@ -28,6 +28,15 @@ export const displayNameBodySchema = z.object({
   displayName: z.string().trim().min(2).max(24),
 }).strict();
 
+export const passwordResetRequestBodySchema = z.object({
+  email: z.string().trim().email('Enter a valid email address.').max(254),
+}).strict();
+
+export const passwordResetCompleteBodySchema = z.object({
+  token: z.string().regex(/^[A-Za-z0-9_-]{40,60}$/, 'This password reset link is invalid or expired.'),
+  newPassword: z.string().min(12, 'Use a password between 12 and 128 characters.').max(128),
+}).strict();
+
 export const changePasswordBodySchema = z.object({
   currentPassword: z.string().min(1).max(128),
   newPassword: z.string().min(12).max(128),
