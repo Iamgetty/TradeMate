@@ -450,7 +450,8 @@ class AuthController {
         [reset.rows[0].id],
       );
       if (!consumed.rowCount) throw new BadRequestException('This password reset link is invalid, expired, or already used.');
-      await client.query('UPDATE user_credentials SET password_hash = $1, updated_at = now() WHERE user_id = $2', [nextHash, userId]);
+      const credentialUpdate = await client.query('UPDATE user_credentials SET password_hash = $1, updated_at = now() WHERE user_id = $2', [nextHash, userId]);
+      if (!credentialUpdate.rowCount) throw new NotFoundException('Account credentials could not be updated.');
       await client.query('DELETE FROM user_sessions WHERE user_id = $1', [userId]);
       await client.query('UPDATE auth_login_challenges SET consumed_at = now() WHERE user_id = $1 AND consumed_at IS NULL', [userId]);
       await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1 AND id <> $2', [userId, reset.rows[0].id]);
