@@ -129,7 +129,7 @@ function section(startText, endText) {
     "registration must wait for email verification instead of entering a session");
   assert.match(source, /email-verification\/resend/,
     "unverified login must offer the resend flow");
-  assert.doesNotMatch(section("function verify(code)", "function kindOk()"), /Local mode: no server configured, this device only\");enter\(\)\}\}/,
+  assert.ok(!section("function verify(code)", "function kindOk()").includes('if(!CONNECTED){window.toast("Local mode: no server configured, this device only");enter();return}'),
     "connected verification must not accept a local preview code");
 })();
 
