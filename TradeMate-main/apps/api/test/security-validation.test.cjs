@@ -7,6 +7,7 @@ const {
   loginBodySchema,
   changePasswordBodySchema,
   passwordResetRequestBodySchema,
+  emailVerificationBodySchema,
   passwordResetCompleteBodySchema,
   totpCodeBodySchema,
   totpChallengeBodySchema,
@@ -56,6 +57,13 @@ test('registration rejects short passwords, invalid email and unexpected keys', 
 test('login rejects malformed and overlong credentials', () => {
   assert.equal(loginBodySchema.safeParse({ email: 'bad', password: 'secret' }).success, false);
   assert.equal(loginBodySchema.safeParse({ email: 'trader@example.com', password: 'x'.repeat(129) }).success, false);
+});
+
+test('email verification requires a normalized email and exactly six numeric digits', () => {
+  assert.equal(emailVerificationBodySchema.safeParse({ email: ' Trader@Example.com ', code: '012345' }).success, true);
+  assert.equal(emailVerificationBodySchema.safeParse({ email: 'trader@example.com', code: '12345' }).success, false);
+  assert.equal(emailVerificationBodySchema.safeParse({ email: 'trader@example.com', code: '12a456' }).success, false);
+  assert.equal(emailVerificationBodySchema.safeParse({ email: 'trader@example.com', code: '123456', userId: 'attacker' }).success, false);
 });
 
 test('password reset requests normalize email and reject unexpected fields', () => {
