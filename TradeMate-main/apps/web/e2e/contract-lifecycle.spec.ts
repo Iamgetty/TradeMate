@@ -64,6 +64,17 @@ async function login(page: Page, email: string) {
   console.log(`[contract-e2e] ${email}: authenticated app visible`);
 }
 
+async function expectNoHorizontalOverflow(page: Page, surface: string) {
+  const dimensions = await page.evaluate(() => ({
+    viewport: document.documentElement.clientWidth,
+    document: document.documentElement.scrollWidth,
+  }));
+  expect(
+    dimensions.document,
+    surface + ' must not introduce horizontal page overflow on mobile',
+  ).toBeLessThanOrEqual(dimensions.viewport + 2);
+}
+
 test('two separate accounts complete a contract through the Clients and Alpha UI', async ({ browser }) => {
   test.setTimeout(90_000);
 
@@ -197,6 +208,7 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
   try {
     console.log('[contract-e2e] buyer login starting');
     await login(buyer, 'buyer@example.test');
+    await buyer.setViewportSize({ width: 390, height: 844 });
     await expect.poll(() => buyerListingRequests, { timeout: 10_000 }).toBe(1);
     await expect(buyer.locator('#sbar [data-tab="Markets"]')).toBeVisible();
     await buyer.locator('#sbar [data-tab="Markets"]').click();
@@ -210,16 +222,20 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
     await buyer.locator('#sbar [data-f="Contracts"]').click();
     await buyer.getByRole('button', { name: /Two-account UI acceptance fixture/ }).click();
     await expect(buyer.getByText('Awaiting response')).toBeVisible();
+    await expectNoHorizontalOverflow(buyer, 'Clients contract detail');
 
     console.log('[contract-e2e] seller login starting');
     await login(seller, 'seller@example.test');
+    await seller.setViewportSize({ width: 390, height: 844 });
     console.log('[contract-e2e] seller login complete; switching to Alpha');
     await seller.locator('#app .top button[data-pg="profile"]').click();
     await seller.locator('[data-act="mode"]').click();
     await seller.locator('#sbar [data-f="Contracts"]').click();
     await seller.getByRole('button', { name: /Two-account UI acceptance fixture/ }).click();
+    await expectNoHorizontalOverflow(seller, 'Alpha contract detail');
     await seller.getByRole('button', { name: 'Accept and agree' }).click();
     await expect(seller.getByText('Accepted', { exact: true })).toBeVisible();
+    await expectNoHorizontalOverflow(seller, 'Alpha accepted contract');
     await seller.getByRole('button', { name: 'Reconfirm agreement and confirm fulfilment' }).click();
     await expect(seller.getByText('Waiting for the other party')).toBeVisible();
 
@@ -231,6 +247,7 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
     await expect(buyer.getByRole('button', { name: 'Reconfirm agreement and confirm fulfilment' })).toBeVisible();
     await buyer.getByRole('button', { name: 'Reconfirm agreement and confirm fulfilment' }).click();
     await expect(buyer.getByText('Completed', { exact: true }).first()).toBeVisible();
+    await expectNoHorizontalOverflow(buyer, 'Clients completed contract');
     expect(contract.status).toBe('completed');
     expect(contract.buyer_confirmed_at).not.toBeNull();
     expect(contract.seller_confirmed_at).not.toBeNull();
