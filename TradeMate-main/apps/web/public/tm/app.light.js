@@ -1025,7 +1025,8 @@ var CG={BTC:"bitcoin",ETH:"ethereum",SOL:"solana",BNB:"binancecoin",XRP:"ripple"
  SUP={BTC:19.8e6,ETH:120.7e6,SOL:470e6,BNB:145e6,XRP:58e9,DOGE:146e9,USDC:60e9},
  BR={BTC:["#f7931a","₿"],ETH:["#627eea","Ξ"],SOL:["#14f195","◎"],BNB:["#f3ba2f","B"],XRP:["#f5f5f5","✕"],DOGE:["#c2a633","Ð"],USDT:["#26a17b","U"],USDC:["#2775ca","U"],ADA:["#0033ad","A"],TRX:["#ef0027","T"],TON:["#0098ea","T"],AVAX:["#e84142","A"],DOT:["#e6007a","D"],LINK:["#2a5ada","L"],POL:["#8247e5","P"],LTC:["#345d9d","L"],BCH:["#0ac18e","B"],XLM:["#14b6e7","X"],ATOM:["#f5f5f5","A"],NEAR:["#00c08b","N"],UNI:["#ff007a","U"],SHIB:["#e42d04","S"],DAI:["#f5ac37","D"],ETC:["#328332","E"]},
  FLAG={USD:"🇺🇸",NGN:"🇳🇬",EUR:"🇪🇺",GBP:"🇬🇧",GHS:"🇬🇭",KES:"🇰🇪",AUD:"🇦🇺",JPY:"🇯🇵",CHF:"🇨🇭",CAD:"🇨🇦",NZD:"🇳🇿",ZAR:"🇿🇦"},LOGOS=Object.assign({},EMB);
-items.forEach(function(ivar FC={USD:"us",NGN:"ng",EUR:"eu",GBP:"gb",GHS:"gh",KES:"ke",AUD:"au",JPY:"jp",CHF:"ch",CAD:"ca",NZD:"nz",ZAR:"za"};
+items.forEach(function(i){if(i.m==="Crypto"){var b=i.n.split("/")[0];i.cap=i.p*SUP[b]}});
+var FC={USD:"us",NGN:"ng",EUR:"eu",GBP:"gb",GHS:"gh",KES:"ke",AUD:"au",JPY:"jp",CHF:"ch",CAD:"ca",NZD:"nz",ZAR:"za"};
 function nx(i){var l=(i.dataset.s||"").split("|");l.shift();if(l.length&&l[0]){i.dataset.s=l.join("|");i.src=l[0]}else i.remove()}
 function chainImg(cls,urls,alt){urls=urls.filter(Boolean);return urls.length?'<img class="'+cls+'" data-s="'+urls.join("|")+'" src="'+urls[0]+'" alt="'+(alt||"")+'" referrerpolicy="no-referrer" onerror="nx(this)">':""}
 function flag(c,cls){var k=FC[c];return k?chainImg(cls,["https://flagcdn.com/w80/"+k+".png","https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/flags/4x3/"+k+".svg"]):""}
