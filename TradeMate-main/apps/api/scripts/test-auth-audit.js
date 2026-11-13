@@ -40,11 +40,11 @@ async function main() {
   try {
     const suffix = randomUUID();
     const user = await pool.query(
-      "INSERT INTO users (email, display_name, status) VALUES ($1, $2, 'active') RETURNING id",
+      "INSERT INTO users (email, display_name, status, email_verified_at) VALUES ($1, $2, 'active', now()) RETURNING id",
       ['auth-audit-' + suffix + '@example.invalid', 'Auth audit test'],
     );
     const userId = user.rows[0].id;
-    const target = await pool.query("INSERT INTO users (email, display_name, status) VALUES ($1, $2, 'active') RETURNING id", ['auth-audit-target-' + suffix + '@example.invalid', 'Follow target']);
+    const target = await pool.query("INSERT INTO users (email, display_name, status, email_verified_at) VALUES ($1, $2, 'active', now()) RETURNING id", ['auth-audit-target-' + suffix + '@example.invalid', 'Follow target']);
     const targetId = target.rows[0].id;
     const currentToken = 'auth-audit-current-' + suffix;
     const otherToken = 'auth-audit-other-' + suffix;
@@ -63,6 +63,20 @@ async function main() {
     app.setGlobalPrefix('api');
     await app.listen(0, '127.0.0.1');
     const base = 'http://127.0.0.1:' + app.getHttpServer().address().port;
+    const originalFetch = global.fetch;
+    let lastVerificationCode = null;
+    global.fetch = async (input, options) => {
+      if (String(input) === 'https://api.resend.com/emails') {
+        const payload = JSON.parse(options.body);
+        const match = String(payload.html).match(/letter-spacing:8px">([0-9]{6})<\\/p>/);
+        assert.ok(match, 'verification email must contain a six-digit code');
+        lastVerificationCode = match[1];
+        return new Response(JSON.stringify({ id: 'test-email-id' }), {
+          status: 200, headers: { 'content-type': 'application/json' },
+        });
+      }
+      return originalFetch(input, options);
+    };
     const call = (method, path, body, extraHeaders = {}) => fetch(base + path, {
       method,
       headers: { cookie: 'trademate_session=' + encodeURIComponent(currentToken),
@@ -281,13 +295,65 @@ async function main() {
       body: JSON.stringify({ email: 'auth-audit-' + suffix + '@example.invalid', password: 'a newly chosen secure password' }),
     });
     assert.equal(loginAfterReset.status, 200, 'the new password must authenticate after reset');
-    console.log('Auth audit atomicity, logout recovery and password reset checks passed.');
+
+    // New registrations remain pending and cannot sign in until the emailed code is confirmed.
+    process.env.RESEND_API_KEY = 'test-resend-key';
+    process.env.RESEND_FROM_EMAIL = 'TradeMate Test <test@example.invalid>';
+    const verificationEmail = 'email-verification-' + suffix + '@example.invalid';
+    const registration = await fetch(base + '/api/auth/register', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: verificationEmail, password: 'a secure verification password', displayName: 'Email Verification' }),
+    });
+    assert.equal(registration.status, 201, 'registration must issue a verification code');
+    assert.equal(registration.headers.get('set-cookie'), null, 'registration must not create a session before verification');
+    const registrationBody = await registration.json();
+    assert.equal(registrationBody.requiresEmailVerification, true, 'registration must direct the client to email verification');
+    const pendingAccount = await pool.query('SELECT id, status, email_verified_at FROM users WHERE lower(email) = $1', [verificationEmail]);
+    assert.equal(pendingAccount.rows[0].status, 'pending', 'new account must remain pending');
+    assert.equal(pendingAccount.rows[0].email_verified_at, null, 'new account must remain unverified');
+    let pendingSessions = await pool.query('SELECT id FROM user_sessions WHERE user_id = $1', [pendingAccount.rows[0].id]);
+    assert.equal(pendingSessions.rowCount, 0, 'pending account must have no session');
+    const blockedLogin = await fetch(base + '/api/auth/login', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: verificationEmail, password: 'a secure verification password' }),
+    });
+    assert.equal(blockedLogin.status, 403, 'unverified account must not sign in');
+    assert.ok(lastVerificationCode, 'registration must deliver a verification code');
+    const confirmed = await fetch(base + '/api/auth/email-verification/confirm', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: verificationEmail, code: lastVerificationCode }),
+    });
+    assert.equal(confirmed.status, 200, 'valid email code must verify the account');
+    assert.match(confirmed.headers.get('set-cookie') || '', /trademate_session=/, 'verification must issue the first session');
+    const verifiedAccount = await pool.query('SELECT status, email_verified_at FROM users WHERE id = $1', [pendingAccount.rows[0].id]);
+    assert.equal(verifiedAccount.rows[0].status, 'active', 'verified account must become active');
+    assert.ok(verifiedAccount.rows[0].email_verified_at, 'verification timestamp must be recorded');
+    pendingSessions = await pool.query('SELECT id FROM user_sessions WHERE user_id = $1', [pendingAccount.rows[0].id]);
+    assert.equal(pendingSessions.rowCount, 1, 'verified account must have one new session');
+    const replay = await fetch(base + '/api/auth/email-verification/confirm', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: verificationEmail, code: lastVerificationCode }),
+    });
+    assert.equal(replay.status, 401, 'a consumed email code must not be reusable');
+
+    // A code that has expired must be rejected even if its digest matches.
+    const expiredEmail = 'expired-verification-' + suffix + '@example.invalid';
+    const expiredUser = await pool.query("INSERT INTO users (email, display_name, status) VALUES ($1, 'Expired verification', 'pending') RETURNING id", [expiredEmail]);
+    await pool.query("INSERT INTO email_verification_codes (user_id, code_hash, expires_at) VALUES ($1, $2, now() - interval '1 minute')", [expiredUser.rows[0].id, digest('123456')]);
+    const expiredConfirm = await fetch(base + '/api/auth/email-verification/confirm', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: expiredEmail, code: '123456' }),
+    });
+    assert.equal(expiredConfirm.status, 401, 'expired email code must be rejected');
+
+    console.log('Auth audit atomicity, logout recovery and password reset and email verification checks passed.');
   } finally {
     if (triggerInstalled) {
       await pool.query('DROP TRIGGER IF EXISTS test_reject_auth_audit_trigger ON audit_events').catch(() => undefined);
       await pool.query('DROP FUNCTION IF EXISTS test_reject_auth_audit()').catch(() => undefined);
     }
     if (app) await app.close();
+    if (typeof originalFetch === 'function') global.fetch = originalFetch;
     await pool.end();
   }
 }
