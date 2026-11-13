@@ -256,7 +256,9 @@ class AuthController {
       if (!account.rowCount || account.rows[0].email_verified_at || account.rows[0].status !== 'pending') throw new UnauthorizedException('This verification code is invalid or expired. Request a new one.');
       const verification = await client.query("SELECT id, code_hash, expires_at, attempts FROM email_verification_codes WHERE user_id = $1 AND used_at IS NULL ORDER BY created_at DESC LIMIT 1 FOR UPDATE", [account.rows[0].id]);
       if (!verification.rowCount || new Date(verification.rows[0].expires_at).getTime() <= Date.now() || verification.rows[0].attempts >= 5) throw new UnauthorizedException('This verification code is invalid or expired. Request a new one.');
-      if (tokenDigest(code) !== verification.rows[0].code_hash) {
+      const suppliedCodeHash = Buffer.from(tokenDigest(code), 'hex');
+      const expectedCodeHash = Buffer.from(verification.rows[0].code_hash, 'hex');
+      if (suppliedCodeHash.length !== expectedCodeHash.length || !timingSafeEqual(suppliedCodeHash, expectedCodeHash)) {
         await client.query('UPDATE email_verification_codes SET attempts = attempts + 1 WHERE id = $1', [verification.rows[0].id]);
         await client.query('COMMIT');
         throw new UnauthorizedException('The verification code is incorrect.');
@@ -290,8 +292,9 @@ class AuthController {
     }
     const result = await databasePool.query("SELECT u.id, u.email, u.display_name, u.country_code, u.status, u.email_verified_at, c.password_hash FROM users u JOIN user_credentials c ON c.user_id = u.id WHERE lower(u.email) = $1 LIMIT 1", [email]);
     const user = result.rows[0];
-    if (!user || user.status !== 'active' || !(await passwordMatches(password, user.password_hash))) throw new UnauthorizedException('Email or password is incorrect.');
+    if (!user || !(await passwordMatches(password, user.password_hash))) throw new UnauthorizedException('Email or password is incorrect.');
     if (!user.email_verified_at) throw new ForbiddenException('Verify your email address before signing in. Use Resend to receive a new code.');
+    if (user.status !== 'active') throw new UnauthorizedException('Email or password is incorrect.');
     const security = await databasePool.query('SELECT totp_enabled FROM user_auth_security WHERE user_id = $1 LIMIT 1', [user.id]);
     if (security.rows[0]?.totp_enabled) {
       const challengeToken = randomBytes(32).toString('base64url');
