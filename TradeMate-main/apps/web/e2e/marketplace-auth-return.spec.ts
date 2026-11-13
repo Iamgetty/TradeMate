@@ -111,5 +111,5 @@ test('external post-login return destinations are rejected', async ({ page }) =>
   await page.route('**/api/auth/login', route => route.fulfill({ status: 200, json: { user: { id: 'buyer-001', email: 'buyer@example.test' } } }));
   await page.goto('/auth?mode=login&returnTo=' + encodeURIComponent('https://outside.example/steal-session'));
   await login(page);
-  await expect(page).not.toHaveURL(/outside\\.example/);
+  await expect.poll(() => new URL(page.url()).hostname).not.toBe('outside.example');
 });
