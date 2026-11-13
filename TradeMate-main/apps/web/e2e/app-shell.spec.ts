@@ -66,3 +66,22 @@ test('the core app still renders when the optional exchange-feed browser helper 
   await expectPublicLanding(page);
   await expect(page.locator('main[role="alert"]')).toHaveCount(0);
 });
+
+test('an unrelated unhandled promise rejection does not replace the rendered app with a startup failure', async ({ page }) => {
+  await isolateApi(page);
+  await page.goto('/app');
+  await expectPublicLanding(page);
+
+  // Simulate a rejection from an unrelated feature request while the app is
+  // already running. It must not be misclassified as a boot-script failure.
+  await page.evaluate(() => {
+    const event = new Event('unhandledrejection');
+    Object.defineProperty(event, 'reason', {
+      value: new Error('Synthetic unrelated feature rejection'),
+    });
+    window.dispatchEvent(event);
+  });
+
+  await expect(page.locator('main[role="alert"]')).toHaveCount(0);
+  await expect(page.locator('#land')).toBeVisible();
+});

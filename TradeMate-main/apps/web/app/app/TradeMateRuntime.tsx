@@ -39,13 +39,11 @@ export default function TradeMateRuntime() {
         fail('TradeMate could not start', [event.message || 'A JavaScript startup error occurred.', event.filename ? `${event.filename}:${event.lineno || 0}:${event.colno || 0}` : '', event.error instanceof Error && event.error.stack ? event.error.stack : ''].filter(Boolean).join('\n'));
       }
     };
-    const onRejection = (event: PromiseRejectionEvent) => {
-      const reason = event.reason;
-      const detail = reason instanceof Error ? reason.stack || reason.message : String(reason ?? 'Unknown promise rejection');
-      fail('TradeMate startup failed', detail);
-    };
+    // Do not promote arbitrary application-level promise rejections to a
+    // full-screen startup failure. The legacy app intentionally handles many
+    // feature requests asynchronously; script errors, load errors and the
+    // render watchdog below are the startup-specific diagnostics.
     window.addEventListener('error', onError);
-    window.addEventListener('unhandledrejection', onRejection);
 
     const app = document.createElement('script');
     app.src = '/tm/app.js?v=83';
