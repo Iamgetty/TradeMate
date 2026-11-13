@@ -390,3 +390,12 @@ This section records the five engineering observations raised during the ongoing
 - Verify a buyer cannot cancel after seller acceptance and that unauthorized attempts leave the durable contract state unchanged.
 - Keep owner/admin decision and fulfilment permissions explicit; do not widen seller-member authority without a product-owner decision.
 - These tests validate the existing contract state machine; they do not add payment, escrow, e-signature, dispute resolution or funds movement.
+
+
+### Services/B2B moderation and discovery acceptance coverage — follow-up
+
+- Extend the PostgreSQL-backed listing integration test beyond Services drafts to exercise B2B inventory creation and own-offer visibility.
+- Verify the existing organization-member submission policy, deny unrelated-account submission, and check the atomic submission audit event.
+- Verify pending-review B2B offers remain hidden from public browse, the reviewer credential protects the moderation queue, and approval records its audit event before the offer becomes publicly discoverable.
+- Verify a second account can open the approved B2B detail and create an enquiry, with the enquiry audit event persisted.
+- This is automated integration coverage, not proof of production user acceptance. It does not change organization-member publishing permissions or the unresolved multi-organization product decision.
