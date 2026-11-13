@@ -399,3 +399,11 @@ This section records the five engineering observations raised during the ongoing
 - Verify pending-review B2B offers remain hidden from public browse, the reviewer credential protects the moderation queue, and approval records its audit event before the offer becomes publicly discoverable.
 - Verify a second account can open the approved B2B detail and create an enquiry, with the enquiry audit event persisted.
 - This is automated integration coverage, not proof of production user acceptance. It does not change organization-member publishing permissions or the unresolved multi-organization product decision.
+
+
+### B2B publishing wizard inventory handoff — follow-up
+
+- Pass a whole-number B2B quantity from the publishing wizard into the API's `quantityAvailable` field so the published offer exposes inventory consistently with the backend and discovery UI.
+- Preserve non-numeric quantity/scope text (for example, regions or scope of work) in the offer description rather than coercing it into inventory.
+- Services publishing remains unchanged; numeric inventory is displayed separately and not duplicated in the description.
+- This is a frontend data-mapping correction only; no schema, permissions, moderation policy, or production data changes.

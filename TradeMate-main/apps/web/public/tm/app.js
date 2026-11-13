@@ -2755,8 +2755,11 @@ function publishServer(w,f){var t=w.id.slice(2),title=(f.title||"").trim(),price
  if(!price)return Promise.reject(new Error("Enter a valid price (numbers, up to 2 decimals)."));
  return loadOrg().then(function(){var o=st.org;if(!o){var e=new Error("Register your organization first.");e.noorg=1;throw e}
   if(cur!==o.default_currency)throw new Error("Your business space sells in "+o.default_currency+". Choose that currency.");
-  var q=null;
-  var rows=rowsOf(w.id),desc=((f.desc||"").trim()+(rows.length?"\n\n"+rows.map(function(r){return r[0]+": "+r[1]}).join("\n"):"")).slice(0,5000);
+  var q=null,qtyText=String(f.qty||"").trim();
+  if(t==="B2B"&&/^\d{1,12}$/.test(qtyText))q=qtyText;
+  var rows=rowsOf(w.id);
+  if(q!==null)rows=rows.filter(function(r){return r[0]!=="Quantity / scope"});
+  var desc=((f.desc||"").trim()+(rows.length?"\n\n"+rows.map(function(r){return r[0]+": "+r[1]}).join("\n"):"")).slice(0,5000);
   return api("POST","/market/listings",{title:title,description:desc,listingType:SRV[t],price:price,quantityAvailable:q})}).then(function(r){
   return api("POST","/market/listings/"+r.listing.id+"/submit").catch(function(e){if(e&&e.staleAccountRequest)throw e;throw new Error("Saved as a draft, but could not submit: "+e.message+" Open Business space to submit it.")})})}
 function publishLocal(id,f){var t=id.slice(2),rows=rowsOf(id).map(function(r){return [r[0],esc(r[1])]}),who=st.me.nick||"Member";
