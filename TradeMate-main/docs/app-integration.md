@@ -1,12 +1,18 @@
 # TradeMate app integration
 
-The mobile-style TradeMate app (`apps/web/public/tm/app.js`) is served by the Next.js route at **`/app`** through `TradeMateRuntime.tsx`. It calls the NestJS API through the same-origin `/api/*` proxy. Sessions use the existing HTTP-only cookie; browser JavaScript does not store session tokens.
+The supported web app is served by the Next.js route at **`/app`**. The Next.js App Router owns the document shell, route and same-origin API proxy. `TradeMateRuntime.tsx` mounts the existing legacy runtime in `apps/web/public/tm/app.js`; that file currently owns the feature UI, navigation, state and feature-level API client. The separate `feed-client.js` is an optional WebSocket data helper with no UI. Desktop and mobile-web presentation is supplied by `desktop.css` and `mobileweb.css` respectively.
+
+See [frontend architecture and ownership boundaries](frontend-architecture.md) before adding or migrating frontend features. Avoid implementing duplicate screens, state or API clients across React and the legacy runtime.
+
+The app calls the NestJS API through the same-origin `/api/*` proxy. Sessions use the existing HTTP-only cookie; browser JavaScript must not store session tokens.
 
 ## Connected features and API
 
 | App feature | API |
 |---|---|
 | Sign up / sign in, session lookup, sign out | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout` |
+| New-account email verification and resend | `POST /api/auth/email-verification/confirm`, `POST /api/auth/email-verification/resend` |
+| Password reset | `POST /api/auth/password-reset/request`, `POST /api/auth/password-reset/complete` |
 | Services and B2B offer discovery | `GET /api/market/listings` |
 | Business spaces | `GET/POST /api/organizations` |
 | Create, view, edit and submit an offer draft | `POST /api/market/listings`, `GET /api/market/listings/mine`, `POST /api/market/listings/:id/submit`, `DELETE /api/market/listings/:id` |
@@ -20,6 +26,14 @@ The mobile-style TradeMate app (`apps/web/public/tm/app.js`) is served by the Ne
 | Feed posts, titles and attachments | `GET/POST /api/feed/posts`, `GET /api/feed/posts/:id/attachments/:attachmentId` |
 | Feed comments and reports | `GET/POST /api/feed/posts/:id/comments`, `POST /api/feed/reports` |
 | Health | `GET /api/health`, `GET /api/health/db` |
+
+## Authentication lifecycle
+
+- New registrations remain pending until the user confirms a six-digit, server-issued, one-time email verification code. Registration does not establish a session before confirmation.
+- The code expires and is attempt-limited. Resend requests are handled server-side and use a generic response to reduce account enumeration.
+- Login does not allow an unverified account to establish a session. Password reset is a separate one-time-token flow.
+- Existing accounts grandfathered as verified remain subject to the normal account and session checks.
+- TOTP verification remains server-backed; do not treat client-side code entry as authentication.
 
 ## Contract model
 
