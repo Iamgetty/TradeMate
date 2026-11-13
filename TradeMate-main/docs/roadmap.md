@@ -373,3 +373,12 @@ This section records the five engineering observations raised during the ongoing
 - Email verification for new registrations was merged in PR #97 (merge commit 41a2cdffa5a9d47b43e6d2dbfd6ea0f80ac6ff59) after all exact-head CI workflows passed. The migration is registered and clean-database migration integration passed; applying it to a live database and verifying the deployed email-provider configuration remain outstanding.
 - The production database-role/RLS work remains open under Phase S1; this section clarifies the production activation gate rather than marking it complete.
 - Live deployment verification remains outstanding until all three Render services have individually recorded deployment and end-to-end connectivity evidence.
+
+
+### Exchange-feed readiness diagnostics — implementation gate
+
+- Preserve `GET /health` as process liveness for Render; upstream-provider outages must not cause platform restart loops.
+- Add a separate `GET /ready` diagnostic that reports active/total upstream feeds, per-provider last-message age, observed/fresh/stale order-book counts and FX quote freshness without exposing provider error text, credentials or account details.
+- Readiness is successful only when at least one upstream feed is receiving recent market data and at least one order book is fresh. Partial provider availability remains explicitly `degraded`; FX freshness is reported separately and does not determine crypto-book readiness.
+- Keep readiness out of the Render restart health-check configuration. Use it for monitoring/diagnostics until an explicit alerting and service-level policy is approved.
+- Require deterministic unit tests for healthy, partial, silent and stale states, plus exact-head CI and a feed-only deployment. Verify recovery and freshness from runtime diagnostics before marking operational acceptance complete.
