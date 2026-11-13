@@ -82,8 +82,8 @@ PR #22 is an audit source, not an integration target. Its original branch is sta
 
 ### Next execution order
 
-1. **Exact-head CI and browser QA — CI gate passed; review and acceptance remain.** Exact PR #79 head `2940e1f115fbf914f003264768c11e92d01f996d` passed all six CI jobs in run [42423414076](https://github.com/Iamgetty/TradeMate/actions/runs/42423414076), including the marketplace listing retry/failure-injection browser test alongside desktop/mobile app-shell and the mocked two-account contract lifecycle test. PR #79 remains open and unmerged pending review and explicit approval. CI does not establish production deployment or live API/database end-to-end acceptance.
-2. Services/B2B draft creation writes the listing and `listing.draft_created` audit event in one database transaction. The PostgreSQL-backed migration/integration job passed on exact PR #79 head `28bbded27ccd32af918419e5c89d6a8624562e48` in run `42224040295`; preserve this as CI evidence, while two-account publishing/moderation/discovery acceptance remains outstanding.
+1. **Exact-head CI and browser QA — merged baseline; live acceptance remains.** PR #79 was merged on 8 November 2026 as `2eec784074647936975954eab9fc854922638ee6`; its six-job CI and browser retry/two-account mocked contract tests are historical regression evidence, not outstanding review work. Subsequent PRs have extended the baseline. The latest feed-client source-boundary audit, PR #125, is merged as `eca423b3c952a27a8d4d32070d4d2980c7368361`; all eight CI jobs passed in run [43375530510](https://github.com/Iamgetty/TradeMate/actions/runs/43375530510), including database migration integration, browser app-shell smoke tests, API/web builds, security scanning, Cloudflare frontend, exchange-feed/MT5 and container builds. CI does not establish live two-account API/database acceptance or production user acceptance.
+2. **Services/B2B API/database coverage — integration tests present; production acceptance remains.** `apps/api/scripts/test-marketplace-listings.js` exercises Services/B2B draft creation, member authorization, moderation, public discovery, enquiries, owner/admin notifications and rollback on audit failure against PostgreSQL. `apps/api/scripts/test-marketplace-contracts.js` exercises contract access, messaging, seller decisions, cancellation, dual fulfilment confirmation and closed-state behaviour against PostgreSQL. Preserve these as automated integration evidence; the browser two-account contract journey still uses mocked API responses, so live UI-to-API-to-database acceptance across two real accounts remains outstanding.
 3. Current draft-creation policy permits any organization member (owner/admin/member) and denies unrelated accounts. This is the observed existing policy, not a new authorization decision. Product-owner confirmation is still needed before changing member publishing/submission permissions.
 4. The organization lookup and listing-draft creation paths currently select the most recently created organization for a user. Multi-organization account behaviour is therefore not explicitly selectable in the current publishing flow; decide whether TradeMate supports multiple organizations per user and, if so, add explicit organization selection and authorization tests. Do not assume this is resolved by the single-organization flow.
 5. Verify recoverable states/retry handling for market listings, organization/documents, own offers, contracts and enquiry conversations through browser failure-injection tests, without changing established marketplace/NFT layout dimensions. These UI recovery paths still need failure-injection and mobile acceptance evidence.
@@ -107,6 +107,26 @@ PR #22 is an audit source, not an integration target. Its original branch is sta
 ## Later-stage P2P
 
 P2P work begins only after the pre-P2P requirements are verified and the product owner has supplied the remaining instructions. Any live crypto trading, escrow, custody or payment feature requires jurisdiction-specific legal/compliance review, provider approval, threat modelling and independent security testing.
+
+### Controlled P2P foundation work — 13 November 2026
+
+The product owner has explicitly directed a limited P2P safety and lifecycle foundation audit while the broader pre-P2P acceptance register remains open. This is a scoped engineering exception for tests, precision, auditability and workflow design; it does **not** waive the pre-P2P release gates or authorize live crypto trading, escrow, custody, payment processing, refunds, settlement or transfers.
+
+- **PR #101 — lifecycle and financial-precision audit:** documented the original gaps and a safe implementation order.
+- **PR #102 — PostgreSQL lifecycle/concurrency tests:** added HTTP integration coverage for public/private access, self-trade prevention, quantity reservation/restoration, payment-state transitions, disputes, privacy and competing reservations.
+- **PR #103 — exact financial arithmetic:** replaced floating-point P2P calculations with fixed-point/BigInt handling and validation aligned to database precision (price 10dp, asset quantity 12dp, fiat 2dp).
+- **PR #104 — transactional audit events:** paired the covered P2P state changes with audit inserts in the same transaction and tested rollback when audit insertion fails.
+- **PR #105 — dispute-review design:** documented reviewer accountability, privacy and authorization requirements. The shared moderation API key is not sufficient to establish named reviewer identity; a separately authenticated and authorized reviewer model is still required before implementing resolution actions.
+- **PRs #106–#107 — limited UI scope:** PR #107 is the retained version. The homepage introductory copy removal and Services → Announcements navigation are retained; the other unrequested UI refinements were rolled back. PR #107 is merged and its Render web deployment is confirmed live. Event-triggered, audience-targeted announcement publishing remains unimplemented.
+
+**Next P2P engineering gates (not yet complete):**
+
+1. Define named reviewer identity, role/permission boundaries, case assignment, decision reasons, separation of duties, privacy and immutable audit requirements before adding dispute resolution endpoints. A review decision must not claim to reverse an external payment or release escrow.
+2. Specify advertisement and pending-order expiry rules before implementing jobs: distinguish unpaid orders from orders where payment was marked sent; define reservation restoration, dispute freezes, race handling, idempotency, audit events, retry/dead-letter behaviour and user notifications. Never auto-cancel a payment-sent or disputed order under an unapproved timeout rule.
+3. Add expiry implementation only after the state machine is approved and covered by PostgreSQL-backed concurrency, duplicate-job, crash/retry and audit-rollback tests.
+4. Keep all financial movement, wallet, deposit/withdrawal, remittance, escrow and custody capabilities gated by the legal/compliance, threat-model and independent-assessment requirements in S2–S5.
+
+The pre-P2P completion register above remains authoritative for broad product readiness. P2P foundation work does not mark Services/B2B, contract, Feed, Forex/Crypto/NFT, mobile or application-wide acceptance as complete.
 
 ## Future consideration: Product marketplace
 
@@ -186,13 +206,10 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 #### 1. Cloud provider decision and landing zone
 
 - **Approved direction: hybrid edge + AWS primary.** Use AWS as the primary application/cloud platform; Cloudflare for authoritative DNS, WAF, DDoS mitigation, bot controls and edge security; and Amazon CloudFront for AWS-origin static assets and explicitly approved cacheable content. Define one owner for each DNS, proxy, TLS, WAF and cache responsibility to avoid overlapping Cloudflare/CloudFront behaviour.
-- Keep **GCP optional**, not a parallel production stack. Evaluate a specific GCP service (for example analytics or a distinct AI/ML workload) only when a measured capability, regional, resilience or commercial advantage justifies the added operational and compliance burden. Do not duplicate the core production platform across AWS and GCP by default.
+- Keep **GCP optional**, not a parallel production stack. Evaluate a specific GCP service only when a measured capability, regional, resilience or commercial advantage justifies the added operational and compliance burden. Do not duplicate the core production platform across AWS and GCP by default.
 - Compare AWS regions and service choices against TradeMate's actual user/provider geography, latency, data-residency obligations, PostgreSQL compatibility, availability, support, operational complexity, exit costs and a workload-based total-cost model before selecting a region or provisioning resources.
-- The hybrid direction is an architecture decision, not authorization to create cloud accounts/resources, change DNS, copy production data, alter secrets, or cut over production. Those actions require separate explicit approval.
-- AWS target option: a managed landing zone with separate production/staging accounts or equivalent isolation, IAM roles, VPC/private subnets, security groups, centralized audit logs, KMS, secrets management, budgets and policy guardrails.
-- GCP target option: only a separately approved project/workload with equivalent IAM, VPC/private networking, Cloud KMS, Secret Manager, centralized audit logs, budgets and policy guardrails.
-- AWS target option: a managed landing zone with separate production/staging environments or accounts, IAM roles, VPC/private subnets, security groups, centralized audit logs, KMS, secrets management, budgets and policy guardrails.
-- GCP target option: an equivalent organization/folder/project structure, IAM, VPC/private networking, Cloud KMS, Secret Manager, centralized audit logs, budgets and policy guardrails.
+- This architecture direction is not authorization to create cloud accounts/resources, change DNS, copy production data, alter secrets, or cut over production. Those actions require separate explicit approval.
+- AWS target: a managed landing zone with separate production/staging accounts or equivalent isolation, IAM roles, VPC/private subnets, security groups, centralized audit logs, KMS, secrets management, budgets and policy guardrails.
 - Document the target architecture, regions, data residency, threat model, service ownership, recovery objectives (RPO/RTO), cost model and rollback strategy before provisioning.
 - Keep staging and production isolated. Never copy production secrets into staging or development.
 
@@ -313,3 +330,131 @@ This programme is a procurement and readiness roadmap, not evidence that any aud
 - Complete S4 and S5 hardening and independent assurance before high-risk financial features go live.
 - RLS must not be bulk-enabled until runtime roles, tenant/user context, transaction boundaries and connection-pool behaviour are tested.
 - No security phase is considered complete based only on code being committed; require passing tests, deployment verification and recorded evidence.
+
+## Engineering maintainability and deployment assurance backlog — 13 November 2026
+
+This section records the five engineering observations raised during the ongoing repository audit. It supplements the existing roadmap and does not reorder product phases or authorize production changes.
+
+### A. Frontend architecture — planned audit and incremental cleanup
+
+- Preserve the current Next.js application shell and the established legacy JavaScript runtime as distinct, documented layers while both remain in use. Do not replace, duplicate or bypass existing flows merely to introduce a new page or component.
+- Map ownership of routes, navigation, authentication/session state, API access, shared UI state, styles and runtime bootstrapping across Next.js pages/components and the legacy bundle.
+- Establish explicit integration contracts for data/configuration/events between the Next.js shell and legacy runtime; document which layer owns each feature and its source of truth.
+- Before adding functionality, search both layers for an existing implementation and reuse or deliberately migrate it rather than creating parallel screens, handlers, state stores or API calls.
+- Add regression coverage for route loading, authentication hand-off, navigation, desktop/mobile breakpoints, API failures and runtime startup. Refactor in small, independently testable slices; retain a rollback path and protect the working app shell from blank-screen regressions.
+- Do not undertake a wholesale rewrite or remove the legacy runtime until feature parity, accessibility, performance and end-to-end acceptance are demonstrated.
+
+### B. Backend maintainability — gradual NestJS module extraction
+
+- The current NestJS API has a large central module implementation. Gradually separate cohesive domains into independently testable NestJS modules/providers/controllers: Authentication & Identity, Marketplace/Listings, Contracts, P2P, Feed and Moderation.
+- First document the existing route, service, database, authorization, validation, audit-event and transaction ownership for each domain. Extract without changing endpoint contracts, permissions, schema semantics or user-visible behaviour.
+- Keep shared database context, session/authentication guards, validation, audit primitives and common infrastructure explicit; avoid circular module dependencies and duplicated business logic.
+- Move one domain at a time behind compatibility-preserving module boundaries. Add unit and PostgreSQL-backed HTTP integration tests for lifecycle, authorization, transaction rollback, concurrency and audit atomicity before and after each extraction.
+- Preserve migration history and keep P2P financial/escrow functionality gated by the existing legal, compliance, threat-modelling and independent-audit requirements. Do not split into independently deployed microservices merely for code organization; deployment separation requires a measured operational/security case.
+
+### C. Production database security — outstanding release gate
+
+- Continue the existing S1 gates: provision distinct least-privilege Render runtime, migration and worker credentials; verify grants and connection URLs in the deployed environment; keep migration privileges out of the API runtime identity.
+- Complete the sensitive-table RLS inventory and CI-only policy pilot, including registration/login/TOTP bootstrap and organization membership context. Test authenticated and unauthenticated access, cross-user and cross-organization isolation, transaction-local identity, rollback and pooled-connection reuse.
+- Verify append-only audit-event permissions under the actual runtime role. Record deployment evidence and a rollback/forward-fix plan.
+- Activate production RLS/FORCE RLS only after the complete test matrix passes and the owner explicitly approves the production change. CI success or the existence of policies is not production activation evidence.
+
+### D. Contributor documentation — required correction
+
+- Keep README-LOCAL-SETUP.md aligned with the actual Next.js/React web app, NestJS API, PostgreSQL-backed migrations/authentication/marketplace workflows, and the separate exchange-feed service. The former landing-page-only description is obsolete.
+- Document current local prerequisites, service startup commands, required environment-variable names (never secret values), database migration safety, test/build commands and the distinction between local development, staging and production.
+- Review this guide whenever service topology, scripts, authentication, migrations or deployment configuration changes. Documentation must distinguish implemented code from features that still require provider setup, deployment or end-to-end acceptance.
+
+### F. Exchange-feed reliability — audit findings 13 November 2026
+
+- The Render log sample shows recurring Binance spot and Bybit spot/linear WebSocket close/reconnect cycles; the sampled sockets recovered and Twelve Data refreshes succeeded. Treat this as connection churn requiring measurement, not proof of sustained outage.
+- The shared reconnect helper resets its retry counter on every socket open, so repeated short-lived sessions can retry at one-second intervals instead of reaching bounded exponential backoff.
+- `GET /health` reports process liveness with `ok: true` regardless of upstream feed availability. Add separate feed readiness/diagnostics; do not make platform liveness depend on third-party provider uptime.
+- Existing feed tests cover MT5 quote validation but no dedicated reconnect/backoff, feed readiness, provider silence or stale-book recovery suite was found.
+- Next: extract deterministic reconnect/health logic, test repeated open/close cycles and recovery with fake sockets, add per-provider last-message age and stale-book diagnostics, then deploy the exchange-feed service independently after CI. Do not claim continuous market-data acceptance from successful reconnect logs alone.
+- See [exchange-feed operational reliability audit](exchange-feed-operational-audit.md). No live provider configuration, secrets, runtime behaviour or production data were changed by the audit.
+
+### E. Deployment verification — three-service acceptance gate
+
+- Treat the Render Blueprint as three separately verifiable services: trademate-api, trademate-web and exchange-feed. Verify each service's actual deployed commit, build/release result, health endpoint, environment configuration by variable name/presence only, logs and dependency connectivity.
+- Verify the web-to-API origin/proxy, API-to-PostgreSQL access, and web/API-to-exchange-feed data path, including authentication/CORS where applicable, feed freshness, stale-data handling and recoverable outage behaviour.
+- Record deployment IDs, commit SHAs, timestamps, health results and smoke-test evidence for each service. A Blueprint definition, successful CI run or one healthy service does not establish that all three are live and correctly connected.
+- Keep production migrations separately permissioned and explicitly approved. Do not trigger a deployment, migration, DNS cutover or production configuration change as part of this roadmap audit alone.
+
+### Current cross-reference status
+
+- Email verification for new registrations was merged in PR #97 (merge commit 41a2cdffa5a9d47b43e6d2dbfd6ea0f80ac6ff59) after all exact-head CI workflows passed. The migration is registered and clean-database migration integration passed; applying it to a live database and verifying the deployed email-provider configuration remain outstanding.
+- The production database-role/RLS work remains open under Phase S1; this section clarifies the production activation gate rather than marking it complete.
+- Live deployment verification remains outstanding until all three Render services have individually recorded deployment and end-to-end connectivity evidence.
+
+
+### Exchange-feed readiness diagnostics — implementation gate
+
+- Preserve `GET /health` as process liveness for Render; upstream-provider outages must not cause platform restart loops.
+- Add a separate `GET /ready` diagnostic that reports active/total upstream feeds, per-provider last-message age, observed/fresh/stale order-book counts and FX quote freshness without exposing provider error text, credentials or account details.
+- Readiness is successful only when at least one upstream feed is receiving recent market data and at least one order book is fresh. Partial provider availability remains explicitly `degraded`; FX freshness is reported separately and does not determine crypto-book readiness.
+- Keep readiness out of the Render restart health-check configuration. Use it for monitoring/diagnostics until an explicit alerting and service-level policy is approved.
+- Require deterministic unit tests for healthy, partial, silent and stale states, plus exact-head CI and a feed-only deployment. Verify recovery and freshness from runtime diagnostics before marking operational acceptance complete.
+
+
+### Contract lifecycle acceptance coverage — follow-up
+
+- Expand the PostgreSQL-backed two-account integration matrix to verify ordinary seller members cannot confirm fulfilment, unauthorized parties cannot cancel, and rejected/cancelled/completed contracts reject further messages.
+- Verify a buyer cannot cancel after seller acceptance and that unauthorized attempts leave the durable contract state unchanged.
+- Keep owner/admin decision and fulfilment permissions explicit; do not widen seller-member authority without a product-owner decision.
+- These tests validate the existing contract state machine; they do not add payment, escrow, e-signature, dispute resolution or funds movement.
+
+
+### Services/B2B moderation and discovery acceptance coverage — follow-up
+
+- Extend the PostgreSQL-backed listing integration test beyond Services drafts to exercise B2B inventory creation and own-offer visibility.
+- Verify the existing organization-member submission policy, deny unrelated-account submission, and check the atomic submission audit event.
+- Verify pending-review B2B offers remain hidden from public browse, the reviewer credential protects the moderation queue, and approval records its audit event before the offer becomes publicly discoverable.
+- Verify a second account can open the approved B2B detail and create an enquiry, with the enquiry audit event persisted.
+- This is automated integration coverage, not proof of production user acceptance. It does not change organization-member publishing permissions or the unresolved multi-organization product decision.
+
+
+### B2B publishing wizard inventory handoff — follow-up
+
+- Pass a whole-number B2B quantity from the publishing wizard into the API's `quantityAvailable` field so the published offer exposes inventory consistently with the backend and discovery UI.
+- Preserve non-numeric quantity/scope text (for example, regions or scope of work) in the offer description rather than coercing it into inventory.
+- Services publishing remains unchanged; numeric inventory is displayed separately and not duplicated in the description.
+- This is a frontend data-mapping correction only; no schema, permissions, moderation policy, or production data changes.
+
+
+### B2B public offer detail inventory presentation — follow-up
+
+- Render the API's persisted `quantity_available` on public B2B offer detail pages; distinguish a real zero from an unspecified quantity and do not show a B2B inventory label on Services offers.
+- Add browser coverage for numeric inventory and missing inventory so the publishing wizard, listing API and counterparty detail stay connected.
+- This is a read-only presentation change; it does not reserve, decrement or otherwise mutate inventory and does not introduce stock-control semantics.
+
+
+### Marketplace enquiry and reply notifications — follow-up
+
+- Send persistent in-app notifications to seller organization owners/admins when a buyer creates an enquiry, and notify the opposite party when a conversation reply arrives.
+- Include a direct `/messages/:id` action link and commit notifications in the same transaction as the enquiry/message and audit event.
+- Preserve the existing owner/admin notification audience for seller-side enquiries; do not notify every ordinary organization member.
+- Verify buyer/seller notification routing, audience isolation and rollback with PostgreSQL-backed integration tests.
+
+
+### Notification action-link navigation — follow-up
+
+- Make a notification click mark the item read and then follow its stored same-origin `action_url` when present; retain read-only behaviour for notifications without a destination.
+- Reject protocol-relative or backslash-containing destinations so notification clicks cannot redirect to an external origin.
+- Add browser coverage for a marketplace enquiry notification opening its conversation after the read request.
+
+
+### Browser exchange-feed client reconnect resilience — follow-up
+
+- Keep the browser client's retry counter across short-lived successful handshakes; reset it only after a sustained connection has delivered valid feed data.
+- Use bounded equal-jitter exponential reconnect delays, prevent duplicate reconnect timers, and cancel pending reconnect/stability timers when the client is explicitly closed.
+- Add deterministic fake-WebSocket and fake-timer tests for repeated short-lived connections, stable recovery, duplicate close events and explicit shutdown.
+- This complements the exchange-feed server reconnect policy; it does not claim provider freshness or change upstream credentials/configuration.
+
+
+### Marketplace authentication return and draft continuity — follow-up
+
+- Preserve a same-origin return path through login and the optional two-factor challenge so unauthenticated users return to the marketplace offer or enquiry conversation they were trying to access.
+- Preserve unsent marketplace enquiries and conversation replies in tab-scoped session storage when a request returns 401; restore the draft on return and clear it after a successful send.
+- Reject external, protocol-relative and backslash-containing return destinations to prevent open redirects.
+- Add browser coverage for login return, marketplace enquiry draft restoration and expired-session conversation reply recovery.
