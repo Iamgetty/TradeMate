@@ -1117,7 +1117,7 @@ function liveRefresh(){
  if(document.hidden||["Home","Markets","Trade","Portfolio","P2P"].indexOf(st.tab)<0)return;
  var updated=false;
  var coins=fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids="+Object.keys(CG).map(function(k){return CG[k]}).join(",")+"&price_change_percentage=24h").then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){
-  d.forEach(function(c){var k=Object.keys(CG).filter(function(x){return CG[x]===c.id})[0],it=k&&byName(k+"/USDT");if(!it||!(c.current_price>0))return;it.p=c.current_price;it.c=c.price_change_percentage_24h_in_currency!=null?c.price_change_percentage_24h_in_currency:(c.price_change_percentage_24h||0);if(c.market_cap)it.cap=c.market_cap;if(c.image&&!EMB[k])LOGOS[k]=c.image});st.live=true;updated=true
+  d.forEach(function(c){var k=Object.keys(CG).filter(function(x){return CG[x]===c.id})[0],it=k&&byName(k+"/USDT");if(!it||!(c.current_price>0))return;/* CoinGecko supplies change/market metadata only; the exchange feed owns the displayed spot price. */it.c=c.price_change_percentage_24h_in_currency!=null?c.price_change_percentage_24h_in_currency:(c.price_change_percentage_24h||0);if(c.market_cap)it.cap=c.market_cap;if(c.image&&!EMB[k])LOGOS[k]=c.image});st.live=true;updated=true
  }).catch(function(){});
 
  Promise.all([coins]).then(function(){if(updated)softDraw()})
