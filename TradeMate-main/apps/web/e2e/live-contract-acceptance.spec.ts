@@ -30,19 +30,23 @@ async function openAuthenticatedApp(browser: Browser, actor: Actor) {
 
 async function openContract(page: Page, title: string) {
   await page.locator('#sbar [data-f="Contracts"]').click();
-  const view = page.locator('#app .view');
+  // Feature pages render in the dedicated #pg layer, not inside the Home/Markets
+  // content root (#app .view). Wait for the actual Contracts page before locating
+  // its cards; checking #app .view can silently keep observing the Home screen.
+  const contractPage = page.locator('#pg .pgs[data-id="contracts"]');
   try {
-    await expect(view).toContainText(title, { timeout: 15_000 });
+    await expect(contractPage).toContainText(title, { timeout: 15_000 });
   } catch (error) {
     console.log('Contracts UI diagnostic:', JSON.stringify({
       title,
-      viewText: (await view.innerText().catch(() => '')).slice(0, 5000),
-      contractCards: await page.locator('#app .view .lr').count(),
+      pageText: (await page.locator('#pg').innerText().catch(() => '')).slice(0, 5000),
+      homeText: (await page.locator('#app .view').innerText().catch(() => '')).slice(0, 1500),
+      contractCards: await page.locator('#pg .pgs .lr').count(),
       modeLabel: await page.locator('[data-act="mode"]').innerText().catch(() => ''),
     }));
     throw error;
   }
-  await page.locator('#app .view .lr').filter({ hasText: title }).click();
+  await contractPage.locator('.lr').filter({ hasText: title }).click();
 }
 
 async function expectNoHorizontalOverflow(page: Page, surface: string) {
