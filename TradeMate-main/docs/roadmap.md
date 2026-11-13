@@ -382,3 +382,11 @@ This section records the five engineering observations raised during the ongoing
 - Readiness is successful only when at least one upstream feed is receiving recent market data and at least one order book is fresh. Partial provider availability remains explicitly `degraded`; FX freshness is reported separately and does not determine crypto-book readiness.
 - Keep readiness out of the Render restart health-check configuration. Use it for monitoring/diagnostics until an explicit alerting and service-level policy is approved.
 - Require deterministic unit tests for healthy, partial, silent and stale states, plus exact-head CI and a feed-only deployment. Verify recovery and freshness from runtime diagnostics before marking operational acceptance complete.
+
+
+### Contract lifecycle acceptance coverage — follow-up
+
+- Expand the PostgreSQL-backed two-account integration matrix to verify ordinary seller members cannot confirm fulfilment, unauthorized parties cannot cancel, and rejected/cancelled/completed contracts reject further messages.
+- Verify a buyer cannot cancel after seller acceptance and that unauthorized attempts leave the durable contract state unchanged.
+- Keep owner/admin decision and fulfilment permissions explicit; do not widen seller-member authority without a product-owner decision.
+- These tests validate the existing contract state machine; they do not add payment, escrow, e-signature, dispute resolution or funds movement.

@@ -121,6 +121,12 @@ async function main() {
     assert.equal(buyerConfirmed.status, 200);
     assert.equal((await buyerConfirmed.json()).data.status, 'accepted',
       'one party confirmation must not complete the contract');
+    const memberConfirm = await confirm('member', completionId);
+    assert.equal(memberConfirm.status, 404,
+      'ordinary seller members must not confirm fulfilment for the organization');
+    const stillAccepted = await call('buyer', 'GET', '/api/market/contracts/' + completionId);
+    assert.equal((await stillAccepted.json()).data.status, 'accepted',
+      'an unauthorized seller confirmation must not change contract state');
     const sellerConfirmed = await confirm('owner', completionId);
     assert.equal(sellerConfirmed.status, 200);
     assert.equal((await sellerConfirmed.json()).data.status, 'completed',
@@ -129,18 +135,39 @@ async function main() {
       message: 'This message must be rejected after completion.',
     });
     assert.equal(closedMessage.status, 409, 'completed contracts must reject new messages');
+    const closedSellerMessage = await call('member', 'POST', '/api/market/contracts/' + completionId + '/messages', {
+      message: 'A seller member must also be blocked after completion.',
+    });
+    assert.equal(closedSellerMessage.status, 409,
+      'completed contracts must reject messages from every participant');
 
     const rejectedId = await createContract();
     const rejected = await respond('admin', rejectedId, 'reject');
     assert.equal(rejected.status, 200, 'seller admin must be able to reject');
     assert.equal((await rejected.json()).data.status, 'rejected');
+    const rejectedMessage = await call('buyer', 'POST', '/api/market/contracts/' + rejectedId + '/messages', {
+      message: 'A rejected proposal must be closed.',
+    });
+    assert.equal(rejectedMessage.status, 409, 'rejected proposals must reject further messages');
 
     const cancelledId = await createContract();
+    const outsiderCancel = await call('outsider', 'PATCH', '/api/market/contracts/' + cancelledId + '/cancel');
+    assert.equal(outsiderCancel.status, 404, 'unrelated accounts must not cancel a proposal');
     const cancelled = await call('buyer', 'PATCH', '/api/market/contracts/' + cancelledId + '/cancel');
     assert.equal(cancelled.status, 200, 'buyer must be able to cancel a pending proposal');
     assert.equal((await cancelled.json()).data.status, 'cancelled');
     const respondAfterCancel = await respond('owner', cancelledId, 'accept');
     assert.equal(respondAfterCancel.status, 409, 'cancelled proposals must not be accepted');
+    const cancelledMessage = await call('buyer', 'POST', '/api/market/contracts/' + cancelledId + '/messages', {
+      message: 'A cancelled proposal must be closed.',
+    });
+    assert.equal(cancelledMessage.status, 409, 'cancelled proposals must reject further messages');
+
+    const acceptedNotCancellableId = await createContract();
+    const acceptedNotCancellable = await respond('owner', acceptedNotCancellableId, 'accept');
+    assert.equal(acceptedNotCancellable.status, 200);
+    const cancelAccepted = await call('buyer', 'PATCH', '/api/market/contracts/' + acceptedNotCancellableId + '/cancel');
+    assert.equal(cancelAccepted.status, 409, 'buyers must not cancel after seller acceptance');
 
     const concurrentId = await createContract();
     const outcomes = await Promise.all([
