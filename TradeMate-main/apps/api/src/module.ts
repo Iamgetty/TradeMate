@@ -336,7 +336,8 @@ class AuthController {
     const client = await databasePool.connect();
     try {
       await client.query('BEGIN');
-      await client.query('UPDATE user_credentials SET password_hash = $1, updated_at = now() WHERE user_id = $2', [nextHash, userId]);
+      const credentialUpdate = await client.query('UPDATE user_credentials SET password_hash = $1, updated_at = now() WHERE user_id = $2', [nextHash, userId]);
+      if (!credentialUpdate.rowCount) throw new NotFoundException('Account credentials could not be updated.');
       await client.query('DELETE FROM user_sessions WHERE user_id = $1 AND token_hash <> $2', [userId, tokenDigest(token)]);
       await client.query(
         "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.password_changed', 'user', $1, '{}'::jsonb)",
@@ -405,15 +406,12 @@ class AuthController {
         await client.query('ROLLBACK').catch(() => undefined);
         throw error;
       } finally { client.release(); }
-      const resetUrl = resetOrigin + '/app?passwordReset=' + encodeURIComponent(rawToken);
-      const sent = await sendTransactionalEmail(
+      const resetUrl = resetOrigin + '/app#passwordReset=' + encodeURIComponent(rawToken);
+      void sendTransactionalEmail(
         account.rows[0].email,
         'Reset your TradeMate password',
         '<p>We received a request to reset your TradeMate password.</p><p><a href="' + resetUrl + '">Reset your password</a></p><p>This link expires in 30 minutes and can be used once. If you did not request this, you can ignore this email.</p>',
-      );
-      if (!sent) {
-        await databasePool.query('DELETE FROM password_reset_tokens WHERE token_hash = $1', [tokenDigest(rawToken)]);
-      }
+      ).then((sent) => sent ? undefined : databasePool?.query('DELETE FROM password_reset_tokens WHERE token_hash = $1', [tokenDigest(rawToken)]).catch(() => undefined));
     } else if (account.rowCount && !resetOrigin) {
       console.warn('[auth] Password reset email was not sent because TRADEMATE_WEB_ORIGIN/PUBLIC_APP_URL is not configured with an allowed origin.');
     }
