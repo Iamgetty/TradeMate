@@ -235,8 +235,9 @@ class AuthController {
         await client.query('COMMIT');
       } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
       finally { client.release(); }
-      const delivered = await sendTransactionalEmail(email, 'Your TradeMate verification code', '<p>Your TradeMate verification code is:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">' + code + '</p><p>This code expires in 10 minutes and can only be used once.</p>');
-      if (!delivered) throw new HttpException('The verification email could not be sent. Please try again later.', HttpStatus.SERVICE_UNAVAILABLE);
+      // Keep this response generic even when delivery fails so resend cannot be used
+      // to distinguish pending accounts from addresses with no account.
+      await sendTransactionalEmail(email, 'Your TradeMate verification code', '<p>Your TradeMate verification code is:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">' + code + '</p><p>This code expires in 10 minutes and can only be used once.</p>');
     }
     return { success: true, message: 'If this account is awaiting verification, a new code has been sent.' };
   }
