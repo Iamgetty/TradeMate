@@ -379,7 +379,7 @@ class AuthController {
       "SELECT id, email FROM users WHERE lower(email) = $1 AND status = 'active' LIMIT 1",
       [email],
     );
-    const webOrigin = process.env.TRADEMATE_WEB_ORIGIN || process.env.PUBLIC_APP_URL || '';
+    const webOrigin = process.env.TRADEMATE_WEB_ORIGIN || process.env.PUBLIC_APP_URL || (process.env.WEB_ORIGIN || '').split(',')[0].trim();
     let resetOrigin = '';
     try {
       const parsed = new URL(webOrigin);
