@@ -87,7 +87,7 @@ test('retry counter resets only after a sustained connection receives valid feed
   assert.equal(h.sockets.length, 2);
   h.sockets[1].open();
   h.sockets[1].drop();
-  h.advance(749);
+  h.advance(1499);
   assert.equal(h.sockets.length, 2);
   h.advance(1);
   assert.equal(h.sockets.length, 3);
