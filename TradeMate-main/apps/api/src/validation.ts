@@ -197,7 +197,7 @@ export const contractMessageBodySchema = z.object({
 
 const fixedDecimalInput = (scale: number, maxIntegerDigits: number, allowZero: boolean) => z.union([z.number(), z.string()]).refine((value) => {
   const input = String(value).trim();
-  const match = /^(?:0|[1-9]\\d*)(?:\\.(\\d+))?$/.exec(input);
+  const match = /^(?:0|[1-9]\d*)(?:\\.(\d+))?$/.exec(input);
   if (!match || input.split('.')[0].length > maxIntegerDigits || (match[1] || '').length > scale) return false;
   return allowZero || /[1-9]/.test(input);
 }, `Enter a valid amount with no more than ${scale} decimal places.`);
@@ -215,7 +215,7 @@ export const p2pAdBodySchema = z.object({
 
 export const p2pOrderBodySchema = z.object({
   adId: z.string().uuid(),
-  fiatAmount: fixedDecimalInput(2, 26, false),
+  fiatAmount: fixedDecimalInput(2, 22, false),
 }).strict();
 
 export const p2pPaymentSentBodySchema = z.object({
