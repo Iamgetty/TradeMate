@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { randomUUID, createHash, createHmac } = require('node:crypto');
+const { randomUUID, createHash, createHmac, scryptSync } = require('node:crypto');
 const { Pool } = require('pg');
 const { NestFactory } = require('@nestjs/core');
 const { json } = require('express');
@@ -255,7 +255,44 @@ async function main() {
     sessionCheck = await pool.query('SELECT id FROM user_sessions WHERE id = $1', [currentSession.rows[0].id]);
     assert.equal(sessionCheck.rowCount, 0, 'successful logout must revoke the server-side session');
 
-    console.log('Auth audit atomicity and logout recovery checks passed.');
+    const resetSalt = Buffer.alloc(16, 7);
+    const oldPasswordHash = scryptSync('old password for reset test', resetSalt, 64, { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
+    const encodedOldPassword = ['scrypt', '16384', '8', '1', resetSalt.toString('hex'), oldPasswordHash.toString('hex')].join('
+  } finally {
+    if (triggerInstalled) {
+      await pool.query('DROP TRIGGER IF EXISTS test_reject_auth_audit_trigger ON audit_events').catch(() => undefined);
+      await pool.query('DROP FUNCTION IF EXISTS test_reject_auth_audit()').catch(() => undefined);
+    }
+    if (app) await app.close();
+    await pool.end();
+  }
+}
+main().catch((error) => { console.error('Auth audit integration test failed:', error); process.exitCode = 1; });
+);
+    await pool.query('INSERT INTO user_credentials (user_id, password_hash) VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE SET password_hash = EXCLUDED.password_hash', [userId, encodedOldPassword]);
+    const resetToken = 'password-reset-test-' + suffix;
+    await pool.query(
+      "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '30 minutes')",
+      [userId, digest(resetToken)],
+    );
+    const resetOk = await call('POST', '/api/auth/password-reset/complete', {
+      token: resetToken, newPassword: 'a newly chosen secure password',
+    });
+    assert.equal(resetOk.status, 200, 'a valid one-time password reset token must reset the password');
+    sessionCheck = await pool.query('SELECT id FROM user_sessions WHERE user_id = $1', [userId]);
+    assert.equal(sessionCheck.rowCount, 0, 'password reset must revoke every existing session');
+    const tokenCheck = await pool.query('SELECT used_at FROM password_reset_tokens WHERE token_hash = $1', [digest(resetToken)]);
+    assert.ok(tokenCheck.rows[0]?.used_at, 'password reset token must be consumed');
+    const resetReplay = await call('POST', '/api/auth/password-reset/complete', {
+      token: resetToken, newPassword: 'another newly chosen secure password',
+    });
+    assert.equal(resetReplay.status, 400, 'a consumed password reset token must not be reusable');
+    const loginAfterReset = await fetch(base + '/api/auth/login', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'auth-audit-' + suffix + '@example.invalid', password: 'a newly chosen secure password' }),
+    });
+    assert.equal(loginAfterReset.status, 200, 'the new password must authenticate after reset');
+    console.log('Auth audit atomicity, logout recovery and password reset checks passed.');
   } finally {
     if (triggerInstalled) {
       await pool.query('DROP TRIGGER IF EXISTS test_reject_auth_audit_trigger ON audit_events').catch(() => undefined);
