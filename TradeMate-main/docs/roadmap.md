@@ -297,3 +297,50 @@ This programme is a procurement and readiness roadmap, not evidence that any aud
 - Complete S4 and S5 hardening and independent assurance before high-risk financial features go live.
 - RLS must not be bulk-enabled until runtime roles, tenant/user context, transaction boundaries and connection-pool behaviour are tested.
 - No security phase is considered complete based only on code being committed; require passing tests, deployment verification and recorded evidence.
+
+## Engineering maintainability and deployment assurance backlog — 13 November 2026
+
+This section records the five engineering observations raised during the ongoing repository audit. It supplements the existing roadmap and does not reorder product phases or authorize production changes.
+
+### A. Frontend architecture — planned audit and incremental cleanup
+
+- Preserve the current Next.js application shell and the established legacy JavaScript runtime as distinct, documented layers while both remain in use. Do not replace, duplicate or bypass existing flows merely to introduce a new page or component.
+- Map ownership of routes, navigation, authentication/session state, API access, shared UI state, styles and runtime bootstrapping across Next.js pages/components and the legacy bundle.
+- Establish explicit integration contracts for data/configuration/events between the Next.js shell and legacy runtime; document which layer owns each feature and its source of truth.
+- Before adding functionality, search both layers for an existing implementation and reuse or deliberately migrate it rather than creating parallel screens, handlers, state stores or API calls.
+- Add regression coverage for route loading, authentication hand-off, navigation, desktop/mobile breakpoints, API failures and runtime startup. Refactor in small, independently testable slices; retain a rollback path and protect the working app shell from blank-screen regressions.
+- Do not undertake a wholesale rewrite or remove the legacy runtime until feature parity, accessibility, performance and end-to-end acceptance are demonstrated.
+
+### B. Backend maintainability — gradual NestJS module extraction
+
+- The current NestJS API has a large central module implementation. Gradually separate cohesive domains into independently testable NestJS modules/providers/controllers: Authentication & Identity, Marketplace/Listings, Contracts, P2P, Feed and Moderation.
+- First document the existing route, service, database, authorization, validation, audit-event and transaction ownership for each domain. Extract without changing endpoint contracts, permissions, schema semantics or user-visible behaviour.
+- Keep shared database context, session/authentication guards, validation, audit primitives and common infrastructure explicit; avoid circular module dependencies and duplicated business logic.
+- Move one domain at a time behind compatibility-preserving module boundaries. Add unit and PostgreSQL-backed HTTP integration tests for lifecycle, authorization, transaction rollback, concurrency and audit atomicity before and after each extraction.
+- Preserve migration history and keep P2P financial/escrow functionality gated by the existing legal, compliance, threat-modelling and independent-audit requirements. Do not split into independently deployed microservices merely for code organization; deployment separation requires a measured operational/security case.
+
+### C. Production database security — outstanding release gate
+
+- Continue the existing S1 gates: provision distinct least-privilege Render runtime, migration and worker credentials; verify grants and connection URLs in the deployed environment; keep migration privileges out of the API runtime identity.
+- Complete the sensitive-table RLS inventory and CI-only policy pilot, including registration/login/TOTP bootstrap and organization membership context. Test authenticated and unauthenticated access, cross-user and cross-organization isolation, transaction-local identity, rollback and pooled-connection reuse.
+- Verify append-only audit-event permissions under the actual runtime role. Record deployment evidence and a rollback/forward-fix plan.
+- Activate production RLS/FORCE RLS only after the complete test matrix passes and the owner explicitly approves the production change. CI success or the existence of policies is not production activation evidence.
+
+### D. Contributor documentation — required correction
+
+- Keep README-LOCAL-SETUP.md aligned with the actual Next.js/React web app, NestJS API, PostgreSQL-backed migrations/authentication/marketplace workflows, and the separate exchange-feed service. The former landing-page-only description is obsolete.
+- Document current local prerequisites, service startup commands, required environment-variable names (never secret values), database migration safety, test/build commands and the distinction between local development, staging and production.
+- Review this guide whenever service topology, scripts, authentication, migrations or deployment configuration changes. Documentation must distinguish implemented code from features that still require provider setup, deployment or end-to-end acceptance.
+
+### E. Deployment verification — three-service acceptance gate
+
+- Treat the Render Blueprint as three separately verifiable services: trademate-api, trademate-web and exchange-feed. Verify each service's actual deployed commit, build/release result, health endpoint, environment configuration by variable name/presence only, logs and dependency connectivity.
+- Verify the web-to-API origin/proxy, API-to-PostgreSQL access, and web/API-to-exchange-feed data path, including authentication/CORS where applicable, feed freshness, stale-data handling and recoverable outage behaviour.
+- Record deployment IDs, commit SHAs, timestamps, health results and smoke-test evidence for each service. A Blueprint definition, successful CI run or one healthy service does not establish that all three are live and correctly connected.
+- Keep production migrations separately permissioned and explicitly approved. Do not trigger a deployment, migration, DNS cutover or production configuration change as part of this roadmap audit alone.
+
+### Current cross-reference status
+
+- Email verification for new registrations was merged in PR #97 (merge commit 41a2cdffa5a9d47b43e6d2dbfd6ea0f80ac6ff59) after all exact-head CI workflows passed. The migration is registered and clean-database migration integration passed; applying it to a live database and verifying the deployed email-provider configuration remain outstanding.
+- The production database-role/RLS work remains open under Phase S1; this section clarifies the production activation gate rather than marking it complete.
+- Live deployment verification remains outstanding until all three Render services have individually recorded deployment and end-to-end connectivity evidence.
