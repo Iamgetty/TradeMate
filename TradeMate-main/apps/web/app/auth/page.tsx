@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 const API_BASE = ''; // Use the same-origin Next.js proxy so session cookies persist.
 function safeReturnTo(value:string|null){
- if(!value||!value.startsWith('/')||value.startsWith('//')||value.includes('\\\\'))return '/terminal';
+ if(!value||!value.startsWith('/')||value.startsWith('//')||value.includes('\\'))return '/terminal';
  try{const target=new URL(value,window.location.origin);return target.origin===window.location.origin?target.pathname+target.search+target.hash:'/terminal'}catch{return '/terminal'}
 }
 export default function AuthPage(){
