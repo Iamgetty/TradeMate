@@ -129,8 +129,11 @@ function section(startText, endText) {
     "registration must wait for email verification instead of entering a session");
   assert.match(source, /email-verification\/resend/,
     "unverified login must offer the resend flow");
-  assert.ok(!section("function verify(code)", "function kindOk()").includes('if(!CONNECTED){window.toast("Local mode: no server configured, this device only");enter();return}'),
-    "connected verification must not accept a local preview code");
+  const verifyBlock = section("function verify(code)", "function kindOk()");
+  assert.match(verifyBlock, /api\("POST","\/auth\/email-verification\/confirm"/,
+    "connected verification must call the server confirmation endpoint");
+  assert.ok(verifyBlock.indexOf('if(!CONNECTED)') < verifyBlock.indexOf('api("POST","/auth/email-verification/confirm"'),
+    "the local preview fallback must be isolated before the connected API call");
 })();
 
 console.log("Account isolation source regression checks passed.");
