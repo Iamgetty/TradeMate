@@ -195,10 +195,10 @@ export const contractMessageBodySchema = z.object({
   message: z.string().trim().min(1).max(2000),
 }).strict();
 
-const fixedDecimalInput = (scale: number, allowZero: boolean) => z.union([z.number(), z.string()]).refine((value) => {
+const fixedDecimalInput = (scale: number, maxIntegerDigits: number, allowZero: boolean) => z.union([z.number(), z.string()]).refine((value) => {
   const input = String(value).trim();
   const match = /^(?:0|[1-9]\\d*)(?:\\.(\\d+))?$/.exec(input);
-  if (!match || (match[1] || '').length > scale) return false;
+  if (!match || input.split('.')[0].length > maxIntegerDigits || (match[1] || '').length > scale) return false;
   return allowZero || /[1-9]/.test(input);
 }, `Enter a valid amount with no more than ${scale} decimal places.`);
 
@@ -206,16 +206,16 @@ export const p2pAdBodySchema = z.object({
   side: z.enum(['buy', 'sell']),
   asset: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,16}$/),
   fiat: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/),
-  price: fixedDecimalInput(10, false),
-  quantity: fixedDecimalInput(12, false),
-  minFiatAmount: fixedDecimalInput(2, true).optional(),
-  maxFiatAmount: fixedDecimalInput(2, true).optional(),
+  price: fixedDecimalInput(10, 14, false),
+  quantity: fixedDecimalInput(12, 16, false),
+  minFiatAmount: fixedDecimalInput(2, 22, true).optional(),
+  maxFiatAmount: fixedDecimalInput(2, 22, true).optional(),
   paymentMethods: z.array(z.string().trim().min(1).max(60)).max(10).optional(),
 }).strict();
 
 export const p2pOrderBodySchema = z.object({
   adId: z.string().uuid(),
-  fiatAmount: fixedDecimalInput(2, false),
+  fiatAmount: fixedDecimalInput(2, 26, false),
 }).strict();
 
 export const p2pPaymentSentBodySchema = z.object({
