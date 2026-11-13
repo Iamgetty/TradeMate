@@ -382,7 +382,7 @@ test('contracts and enquiries lists recover after transient API failures', async
   // Fail the initial bootstrap attempts even if the app issues overlapping requests;
   // the explicit Retry action must be the first successful response.
   let contractFailuresRemaining = 2;
-  let enquiryFailuresRemaining = 2;
+  let enquiryFailuresRemaining = 3;
   const context = await browser.newContext();
   const page = await context.newPage();
   page.on('pageerror', error => console.log('[contract-e2e] list recovery pageerror:', error.stack || error.message));
