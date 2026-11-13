@@ -120,4 +120,17 @@ function section(startText, endText) {
     "failed logout must distinguish local sign-out from unconfirmed server revocation");
 })();
 
+(function emailVerificationUsesServerSideOneTimeCodes() {
+  assert.match(source, /api\("POST","\/auth\/email-verification\/confirm",\{email:em,code:code\}/,
+    "six-digit email codes must be verified by the API");
+  assert.match(source, /api\("POST","\/auth\/email-verification\/resend",\{email:S\.id\.trim\(\)\.toLowerCase\(\)\}/,
+    "resending must request a fresh server-issued code");
+  assert.match(source, /requiresEmailVerification/,
+    "registration must wait for email verification instead of entering a session");
+  assert.match(source, /email-verification\/resend/,
+    "unverified login must offer the resend flow");
+  assert.doesNotMatch(section("function verify(code)", "function kindOk()"), /Local mode: no server configured, this device only\");enter\(\)\}\}/,
+    "connected verification must not accept a local preview code");
+})();
+
 console.log("Account isolation source regression checks passed.");
