@@ -603,7 +603,7 @@ test('notification action marks the item read and opens its internal conversatio
   await page.route('**/api/**', async route => {
     const request = route.request();
     const url = new URL(request.url());
-    const path = url.pathname.replace(/^\\/api/, '');
+    const path = url.pathname.startsWith('/api') ? url.pathname.slice(4) : url.pathname;
     const method = request.method();
 
     if (path === '/auth/me' && method === 'GET') {
@@ -665,9 +665,7 @@ test('notification action marks the item read and opens its internal conversatio
   await expect(page.locator('#app .ncard')).toHaveCount(1);
   await page.locator('#app .ncard').click();
 
-  await expect(page).toHaveURL(new RegExp('/messages/' + enquiryId + '
-});
-));
+  await expect(page).toHaveURL(url => url.pathname === '/messages/' + enquiryId);
   await expect(page.getByRole('heading', { name: 'Notification navigation fixture.' })).toBeVisible();
   expect(notificationRead).toBe(true);
 });
