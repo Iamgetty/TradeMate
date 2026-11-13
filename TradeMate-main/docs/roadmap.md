@@ -407,3 +407,10 @@ This section records the five engineering observations raised during the ongoing
 - Preserve non-numeric quantity/scope text (for example, regions or scope of work) in the offer description rather than coercing it into inventory.
 - Services publishing remains unchanged; numeric inventory is displayed separately and not duplicated in the description.
 - This is a frontend data-mapping correction only; no schema, permissions, moderation policy, or production data changes.
+
+
+### B2B public offer detail inventory presentation — follow-up
+
+- Render the API's persisted `quantity_available` on public B2B offer detail pages; distinguish a real zero from an unspecified quantity and do not show a B2B inventory label on Services offers.
+- Add browser coverage for numeric inventory and missing inventory so the publishing wizard, listing API and counterparty detail stay connected.
+- This is a read-only presentation change; it does not reserve, decrement or otherwise mutate inventory and does not introduce stock-control semantics.
