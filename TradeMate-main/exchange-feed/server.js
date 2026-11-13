@@ -10,6 +10,7 @@ const http = require('http');
 const WebSocket = require('ws');
 const crypto = require('crypto');
 const { createMt5QuoteStore } = require('./mt5-quotes');
+const { createReconnectPolicy } = require('./reconnect-policy');
 const mt5QuoteStore = createMt5QuoteStore();
 // Public MT5 broadcasting stays disabled until broker redistribution permission is confirmed.
 const mt5RedistributionPermissionConfirmed = process.env.MT5_REDISTRIBUTION_PERMISSION_CONFIRMED === 'true';
@@ -105,12 +106,15 @@ function addTrade(exchange, market, symbol, t) {
 // ---- Resilient WebSocket helper (auto-reconnect with backoff) --------------
 function connect(name, url, onOpen, onMessage, opts = {}) {
   feedStatus.set(name, false);
-  let attempt = 0;
+  const reconnect = createReconnectPolicy();
+  const stableConnectionMs = 60000;
+  let reconnectTimer = null;
   const start = () => {
     const ws = new WebSocket(url);
     let pingTimer;
+    let openedAt = 0;
     ws.on('open', () => {
-      attempt = 0;
+      openedAt = Date.now();
       feedStatus.set(name, false); // count as live only after messages arrive
       console.log(`[${name}] connected; awaiting market data`);
       onOpen(ws);
@@ -123,6 +127,9 @@ function connect(name, url, onOpen, onMessage, opts = {}) {
         if (opts.isMarketData && opts.isMarketData(message)) {
           feedLastMessage.set(name, Date.now());
           feedStatus.set(name, true);
+          // A successful handshake alone is not stability. Reset backoff only
+          // after this socket has delivered market data for a sustained period.
+          if (openedAt && Date.now() - openedAt >= stableConnectionMs) reconnect.reset();
         }
       } catch (e) { console.error(`[${name}] parse error:`, e.message); }
     });
@@ -130,9 +137,13 @@ function connect(name, url, onOpen, onMessage, opts = {}) {
     ws.on('close', () => {
       clearInterval(pingTimer);
       feedStatus.set(name, false);
-      const delay = Math.min(30000, 1000 * 2 ** attempt++);
+      if (reconnectTimer) return;
+      const delay = reconnect.nextDelay();
       console.log(`[${name}] closed, reconnecting in ${delay} ms`);
-      setTimeout(start, delay);
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        start();
+      }, delay);
     });
   };
   start();
