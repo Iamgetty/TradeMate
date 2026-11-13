@@ -150,14 +150,14 @@ async function main() {
     const failureAd = await createAd('sell', '2');
     await rawPool.query(`
       CREATE OR REPLACE FUNCTION test_reject_p2p_audit() RETURNS trigger
-      LANGUAGE plpgsql AS $
+      LANGUAGE plpgsql AS $p2p$
       BEGIN
         IF NEW.event_type = 'p2p.order_created' THEN
           RAISE EXCEPTION 'forced P2P audit insert failure';
         END IF;
         RETURN NEW;
       END;
-      $;
+      $p2p$;
     `);
     await rawPool.query('CREATE TRIGGER test_reject_p2p_audit_trigger BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION test_reject_p2p_audit()');
     const rejectedByAudit = await placeOrder('buyer', failureAd.id, '1000.00');
