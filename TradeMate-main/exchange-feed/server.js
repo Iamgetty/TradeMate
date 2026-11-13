@@ -11,6 +11,7 @@ const WebSocket = require('ws');
 const crypto = require('crypto');
 const { createMt5QuoteStore } = require('./mt5-quotes');
 const { createReconnectPolicy } = require('./reconnect-policy');
+const { buildReadiness } = require('./readiness');
 const mt5QuoteStore = createMt5QuoteStore();
 // Public MT5 broadcasting stays disabled until broker redistribution permission is confirmed.
 const mt5RedistributionPermissionConfirmed = process.env.MT5_REDISTRIBUTION_PERMISSION_CONFIRMED === 'true';
@@ -435,6 +436,14 @@ function authorizedMt5Request(req) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 const server = http.createServer((req, res) => {
+  if (req.method === 'GET' && req.url === '/ready') {
+    const readiness = buildReadiness({
+      feedStatus, feedLastMessage, books: [...books.values()], now: Date.now(),
+      feedIdleMs: FEED_IDLE_MS, staleMs: STALE_MS,
+      fxStatus: { ...fxStatus, quoteCount: fxQuotes.size },
+    });
+    return sendJson(res, readiness.ready ? 200 : 503, readiness);
+  }
   if (req.method === 'GET' && req.url === '/health') {
     return sendJson(res, 200, { ok: true, feeds: feedsInfo(), books: books.size, mt5Quotes: mt5QuoteStore.size, mt5PublicBroadcastEnabled, mt5RedistributionPermissionConfirmed, fx: { ...fxStatus, quotes: fxQuotes.size } });
   }
