@@ -2502,6 +2502,7 @@ class P2PMarketController {
       if (fiatCents < minCents || fiatCents > maxCents) throw new BadRequestException('Amount is outside the advertisement limits.');
       const quantityUnits = fiatCentsToQuantityUnits(fiatCents, priceUnits);
       if (quantityUnits <= 0n || quantityUnits > remainingUnits) throw new ConflictException('Insufficient quantity remains at the supported asset precision.');
+      if (productToFiatCents(priceUnits, quantityUnits) !== fiatCents) throw new BadRequestException('This fiat amount cannot be represented exactly at the supported asset precision.');
       const buyer = ad.side === 'sell' ? userId : ad.user_id, seller = ad.side === 'sell' ? ad.user_id : userId;
       const trade = await client.query("INSERT INTO p2p_trades (order_id,buyer_user_id,seller_user_id,asset_code,fiat_code,price,quantity,fiat_total,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending') RETURNING id,order_id,asset_code,fiat_code,price::text,quantity::text,fiat_total::text,status,created_at",[adId,buyer,seller,ad.asset_code,ad.fiat_code,ad.price,unitsToDecimal(quantityUnits,12),unitsToDecimal(fiatCents,2)]);
       const remaining = remainingUnits - quantityUnits;
