@@ -48,6 +48,9 @@ async function main() {
       }
     }
 
+    const reviewKey = 'listing-review-test-' + suffix;
+    process.env.TRADEMATE_REVIEW_API_KEY = reviewKey;
+
     app = await NestFactory.create(AppModule, { logger: false, bodyParser: false });
     app.use(json({ limit: '28mb' }));
     app.use(databaseRequestContextMiddleware);
@@ -55,7 +58,7 @@ async function main() {
     await app.listen(0, '127.0.0.1');
     const address = app.getHttpServer().address();
     const baseUrl = 'http://127.0.0.1:' + address.port;
-    const createDraft = (role, title, quantityAvailable = null) => fetch(baseUrl + '/api/market/listings', {
+    const createDraft = (role, title, quantityAvailable = null, listingType = 'service') => fetch(baseUrl + '/api/market/listings', {
       method: 'POST',
       headers: {
         cookie: 'trademate_session=' + encodeURIComponent(actors[role].token),
@@ -64,10 +67,19 @@ async function main() {
       body: JSON.stringify({
         title,
         description: 'Integration-test Services offer',
-        listingType: 'service',
+        listingType,
         price: '100.00',
         quantityAvailable,
       }),
+    });
+
+    const reviewCall = (method, path, body) => fetch(baseUrl + path, {
+      method,
+      headers: {
+        'x-review-key': reviewKey,
+        ...(body ? { 'content-type': 'application/json' } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
     });
 
     const createdDrafts = {};
@@ -83,6 +95,91 @@ async function main() {
       );
       assert.equal(audit.rows[0].count, 1, 'successful draft creation must have exactly one audit event');
     }
+
+
+    // Exercise the distinct B2B inventory path from draft through moderation and public discovery.
+    const b2bTitle = 'B2B lifecycle ' + suffix;
+    const b2bDraftResponse = await createDraft('member', b2bTitle, 25, 'b2b');
+    assert.equal(b2bDraftResponse.status, 201, 'an organization member may create a B2B draft under the existing membership policy');
+    const b2bDraft = (await b2bDraftResponse.json()).listing;
+    assert.equal(b2bDraft.listing_type, 'b2b', 'B2B must persist as its own listing type');
+    assert.equal(Number(b2bDraft.quantity_available), 25, 'B2B inventory quantity must persist');
+    const memberOffers = await fetch(baseUrl + '/api/market/listings/mine', {
+      headers: { cookie: 'trademate_session=' + encodeURIComponent(actors.member.token) },
+    });
+    assert.equal(memberOffers.status, 200);
+    assert.ok((await memberOffers.json()).data.some((offer) => offer.id === b2bDraft.id),
+      'the creating organization member must see the B2B draft in their own offers');
+
+    const outsiderSubmit = await fetch(baseUrl + '/api/market/listings/' + b2bDraft.id + '/submit', {
+      method: 'POST',
+      headers: { cookie: 'trademate_session=' + encodeURIComponent(actors.outsider.token) },
+    });
+    assert.equal(outsiderSubmit.status, 404, 'an unrelated account must not submit another organization’s B2B draft');
+
+    const submitB2b = await fetch(baseUrl + '/api/market/listings/' + b2bDraft.id + '/submit', {
+      method: 'POST',
+      headers: { cookie: 'trademate_session=' + encodeURIComponent(actors.member.token) },
+    });
+    assert.equal(submitB2b.status, 201, 'an organization member may submit a B2B draft under the existing membership policy');
+    assert.equal((await submitB2b.json()).listing.status, 'pending_review');
+    const submitAudit = await rawPool.query(
+      "SELECT count(*)::int AS count FROM audit_events WHERE event_type = 'listing.submitted_for_review' AND entity_id = $1",
+      [b2bDraft.id],
+    );
+    assert.equal(submitAudit.rows[0].count, 1, 'B2B submission must write exactly one audit event');
+
+    const hiddenB2b = await fetch(baseUrl + '/api/market/listings?type=b2b&q=' + encodeURIComponent(b2bTitle));
+    assert.equal(hiddenB2b.status, 200);
+    assert.ok(!(await hiddenB2b.json()).data.some((offer) => offer.id === b2bDraft.id),
+      'a B2B offer pending moderation must not be publicly discoverable');
+
+    const deniedQueue = await fetch(baseUrl + '/api/moderation/listings');
+    assert.equal(deniedQueue.status, 401, 'the moderation queue must require its reviewer credential');
+    const queue = await reviewCall('GET', '/api/moderation/listings');
+    assert.equal(queue.status, 200, 'an authorized reviewer must be able to inspect the listing queue');
+    assert.ok((await queue.json()).data.some((offer) => offer.id === b2bDraft.id),
+      'the submitted B2B offer must appear in the moderation queue');
+
+    const approvedB2b = await reviewCall('POST', '/api/moderation/listings/' + b2bDraft.id + '/review', {
+      decision: 'approved',
+      note: 'Integration test approval.',
+    });
+    assert.equal(approvedB2b.status, 201, 'an authorized reviewer must be able to approve the B2B offer');
+    assert.equal((await approvedB2b.json()).listing.status, 'published');
+    const reviewAudit = await rawPool.query(
+      "SELECT count(*)::int AS count FROM audit_events WHERE event_type = 'listing.reviewed' AND entity_id = $1",
+      [b2bDraft.id],
+    );
+    assert.equal(reviewAudit.rows[0].count, 1, 'B2B moderation must write exactly one review audit event');
+
+    const publicB2b = await fetch(baseUrl + '/api/market/listings?type=b2b&q=' + encodeURIComponent(b2bTitle));
+    assert.equal(publicB2b.status, 200);
+    const publicB2bPayload = await publicB2b.json();
+    assert.ok(publicB2bPayload.data.some((offer) => offer.id === b2bDraft.id),
+      'an approved B2B offer must appear in public discovery');
+    const b2bDetail = await fetch(baseUrl + '/api/market/listings/' + b2bDraft.id);
+    assert.equal(b2bDetail.status, 200, 'an approved B2B offer must have a public detail view');
+
+    const b2bEnquiry = await fetch(baseUrl + '/api/market/enquiries', {
+      method: 'POST',
+      headers: {
+        cookie: 'trademate_session=' + encodeURIComponent(actors.outsider.token),
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        listingId: b2bDraft.id,
+        message: 'Please share the next steps for this B2B offer.',
+      }),
+    });
+    assert.equal(b2bEnquiry.status, 201, 'a different account must be able to enquire about a published B2B offer');
+    const b2bEnquiryPayload = await b2bEnquiry.json();
+    assert.equal(b2bEnquiryPayload.data.listing_id, b2bDraft.id);
+    const b2bEnquiryAudit = await rawPool.query(
+      "SELECT count(*)::int AS count FROM audit_events WHERE event_type = 'marketplace.enquiry_created' AND entity_id = $1",
+      [b2bEnquiryPayload.data.id],
+    );
+    assert.equal(b2bEnquiryAudit.rows[0].count, 1, 'B2B enquiry creation must write exactly one audit event');
 
     const invalidServiceQuantity = await createDraft('owner', 'Invalid service quantity ' + suffix, 3);
     assert.equal(invalidServiceQuantity.status, 400, 'service offers must reject inventory quantities during draft creation');
