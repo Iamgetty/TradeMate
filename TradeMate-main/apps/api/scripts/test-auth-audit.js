@@ -257,18 +257,7 @@ async function main() {
 
     const resetSalt = Buffer.alloc(16, 7);
     const oldPasswordHash = scryptSync('old password for reset test', resetSalt, 64, { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
-    const encodedOldPassword = ['scrypt', '16384', '8', '1', resetSalt.toString('hex'), oldPasswordHash.toString('hex')].join('
-  } finally {
-    if (triggerInstalled) {
-      await pool.query('DROP TRIGGER IF EXISTS test_reject_auth_audit_trigger ON audit_events').catch(() => undefined);
-      await pool.query('DROP FUNCTION IF EXISTS test_reject_auth_audit()').catch(() => undefined);
-    }
-    if (app) await app.close();
-    await pool.end();
-  }
-}
-main().catch((error) => { console.error('Auth audit integration test failed:', error); process.exitCode = 1; });
-);
+    const encodedOldPassword = ['scrypt', '16384', '8', '1', resetSalt.toString('hex'), oldPasswordHash.toString('hex')].join(String.fromCharCode(36));
     await pool.query('INSERT INTO user_credentials (user_id, password_hash) VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE SET password_hash = EXCLUDED.password_hash', [userId, encodedOldPassword]);
     const resetToken = 'password-reset-test-' + suffix;
     await pool.query(
