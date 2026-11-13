@@ -337,6 +337,39 @@ async function main() {
     });
     assert.equal(replay.status, 401, 'a consumed email code must not be reusable');
 
+    const attemptsEmail = 'attempts-verification-' + suffix + '@example.invalid';
+    const attemptsRegistration = await fetch(base + '/api/auth/register', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: attemptsEmail, password: 'another secure verification password', displayName: 'Attempts Verification' }),
+    });
+    assert.equal(attemptsRegistration.status, 201, 'second verification test account must register');
+    const issuedCode = lastVerificationCode;
+    const wrongCode = issuedCode === '000000' ? '000001' : '000000';
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const wrong = await fetch(base + '/api/auth/email-verification/confirm', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: attemptsEmail, code: wrongCode }),
+      });
+      assert.equal(wrong.status, 401, 'incorrect email codes must be rejected');
+    }
+    const lockedCode = await fetch(base + '/api/auth/email-verification/confirm', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: attemptsEmail, code: issuedCode }),
+    });
+    assert.equal(lockedCode.status, 401, 'a code must be locked after five incorrect attempts');
+    const resend = await fetch(base + '/api/auth/email-verification/resend', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: attemptsEmail }),
+    });
+    assert.equal(resend.status, 200, 'pending accounts must be able to request a replacement code');
+    const replacementCode = lastVerificationCode;
+    assert.notEqual(replacementCode, issuedCode, 'resend must replace the prior one-time code');
+    const resentConfirm = await fetch(base + '/api/auth/email-verification/confirm', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: attemptsEmail, code: replacementCode }),
+    });
+    assert.equal(resentConfirm.status, 200, 'a replacement code must verify the account');
+
     // A code that has expired must be rejected even if its digest matches.
     const expiredEmail = 'expired-verification-' + suffix + '@example.invalid';
     const expiredUser = await pool.query("INSERT INTO users (email, display_name, status) VALUES ($1, 'Expired verification', 'pending') RETURNING id", [expiredEmail]);
