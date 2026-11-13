@@ -142,17 +142,3 @@ html[data-theme] .nft-toolbar-select,html[data-theme] .nft-toolbar-select select
 .view .pfr{width:calc(100% - 32px)}
 }
 
-
-/* TradeMate UI refinements: centered feed filters and resilient shortcut labels. */
-.view>.feed-filters{display:flex!important;justify-content:center!important;align-items:center!important;flex-wrap:wrap!important;gap:8px!important;padding:0 16px 10px!important;overflow:visible!important;width:100%;box-sizing:border-box}
-.view>.feed-filters button{flex:0 1 auto;min-width:0}
-.grid .opt{min-width:0}
-.grid .opt .opt-label{display:block;min-width:0;max-width:100%;line-height:1.15;text-align:left;overflow-wrap:anywhere;word-break:normal}
-@media(max-width:380px){.grid .opt .opt-label{font-size:12px;letter-spacing:-.02em}.grid .opt{gap:8px!important;padding-left:10px!important;padding-right:10px!important}}
-
-/* Keep the live-feed status aligned with the preserved Trade heading. */
-.view:has(>.dk-head+.thd){position:relative}
-.view>.dk-head+.thd{position:static!important}
-.view>.dk-head+.thd .live{position:absolute;top:28px;right:16px;margin:0;z-index:2}
-.view:has(>.dk-head+.thd)>.dk-head{padding-right:150px}
-@media(max-width:420px){.view:has(>.dk-head+.thd)>.dk-head{padding-right:125px}.view>.dk-head+.thd .live{font-size:8px;letter-spacing:.06em}}
