@@ -165,7 +165,8 @@ test('two real browser sessions exchange a PostgreSQL-backed B2B listing enquiry
     const seller = sellerSession.page;
     await seller.locator('#app .top button[data-pg="profile"]').click();
     await seller.locator('[data-act="mode"]').click();
-    await seller.locator('#sbar [data-f="Conversations"]').click();
+    await seller.locator('#sbar [data-f="More"]').click();
+    await seller.getByRole('button', { name: 'Conversations', exact: true }).click();
     const sellerConversations = seller.locator('#pg .pgs[data-id="conversations"]');
     await expect(sellerConversations).toContainText(fixture.b2bListingTitle, { timeout: 15_000 });
     await sellerConversations.locator('.lr').filter({ hasText: fixture.b2bListingTitle }).click();
@@ -185,7 +186,8 @@ test('two real browser sessions exchange a PostgreSQL-backed B2B listing enquiry
 
     await buyer.goto('/app');
     await expect(buyer.locator('#app .view')).toBeVisible();
-    await buyer.locator('#sbar [data-f="Conversations"]').click();
+    await buyer.locator('#sbar [data-f="More"]').click();
+    await buyer.getByRole('button', { name: 'Conversations', exact: true }).click();
     const buyerConversations = buyer.locator('#pg .pgs[data-id="conversations"]');
     await expect(buyerConversations).toContainText(fixture.b2bListingTitle, { timeout: 15_000 });
     await buyerConversations.locator('.lr').filter({ hasText: fixture.b2bListingTitle }).click();
