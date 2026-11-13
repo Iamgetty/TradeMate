@@ -18,10 +18,10 @@ const listing = {
   media: [],
 };
 
-async function login(page) {
+async function login(page: import('@playwright/test').Page) {
   await expect(page.getByRole('button', { name: /Sign in/ })).toBeVisible();
   await page.getByLabel('Email address').fill('buyer@example.test');
-  await page.getByLabel('Password').fill('correct-horse-battery');
+  await page.getByLabel('Password').fill('example-password');
   await page.getByRole('button', { name: /Sign in/ }).click();
 }
 
