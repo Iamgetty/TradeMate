@@ -2387,6 +2387,13 @@ class MarketplaceTradesController {
 
 @Controller('p2p')
 class P2PMarketController {
+  private async writeP2PAudit(client: any, actorId: string, eventType: string, entityType: string, entityId: string, metadata: Record<string, unknown> = {}) {
+    await client.query(
+      'INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, $2, $3, $4, $5::jsonb)',
+      [actorId, eventType, entityType, entityId, JSON.stringify(metadata)],
+    );
+  }
+
   private filters(asset?: string, fiat?: string, limit?: string) {
     const assetCode = (asset || 'USDT').trim().toUpperCase();
     const fiatCode = (fiat || 'NGN').trim().toUpperCase();
@@ -2459,8 +2466,19 @@ class P2PMarketController {
     const totalCents = productToFiatCents(priceUnits, quantityUnits);
     if (priceUnits <= 0n || quantityUnits <= 0n || minCents < 0n || maxCents < minCents || maxCents <= 0n || maxCents > totalCents) throw new BadRequestException('Enter valid price, quantity and fiat limits.');
     if (methods.length > 10 || methods.some((v: string) => v.length > 60)) throw new BadRequestException('Invalid payment methods.');
-    const result = await databasePool!.query('INSERT INTO p2p_orders (user_id,side,asset_code,fiat_code,price,quantity,remaining_quantity,min_fiat_amount,max_fiat_amount,payment_methods) VALUES ($1,$2,$3,$4,$5,$6,$6,$7,$8,$9::jsonb) RETURNING id,side,asset_code,fiat_code,price::text,quantity::text,remaining_quantity::text,min_fiat_amount::text,max_fiat_amount::text,payment_methods,status,created_at', [userId,side,asset,fiat,unitsToDecimal(priceUnits,10),unitsToDecimal(quantityUnits,12),unitsToDecimal(minCents,2),unitsToDecimal(maxCents,2),JSON.stringify(methods)]);
-    return { ad: result.rows[0] };
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query('INSERT INTO p2p_orders (user_id,side,asset_code,fiat_code,price,quantity,remaining_quantity,min_fiat_amount,max_fiat_amount,payment_methods) VALUES ($1,$2,$3,$4,$5,$6,$6,$7,$8,$9::jsonb) RETURNING id,side,asset_code,fiat_code,price::text,quantity::text,remaining_quantity::text,min_fiat_amount::text,max_fiat_amount::text,payment_methods,status,created_at', [userId,side,asset,fiat,unitsToDecimal(priceUnits,10),unitsToDecimal(quantityUnits,12),unitsToDecimal(minCents,2),unitsToDecimal(maxCents,2),JSON.stringify(methods)]);
+      await this.writeP2PAudit(client, userId, 'p2p.ad_created', 'p2p_ad', result.rows[0].id, { side, asset_code: asset, fiat_code: fiat, price: unitsToDecimal(priceUnits,10), quantity: unitsToDecimal(quantityUnits,12) });
+      await client.query('COMMIT');
+      return { ad: result.rows[0] };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Get('my-ads')
@@ -2474,9 +2492,20 @@ class P2PMarketController {
   async cancelAd(@Param('id') id: string, @Req() request: Request) {
     parseUuidParam(id);
     const userId = await this.authenticatedUser(request);
-    const result = await databasePool!.query("UPDATE p2p_orders SET status='cancelled',updated_at=now() WHERE id=$1 AND user_id=$2 AND status IN ('open','partially_filled') RETURNING id",[id,userId]);
-    if (!result.rowCount) throw new NotFoundException('Open advertisement not found.');
-    return { message: 'Advertisement cancelled.' };
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query("UPDATE p2p_orders SET status='cancelled',updated_at=now() WHERE id=$1 AND user_id=$2 AND status IN ('open','partially_filled') RETURNING id",[id,userId]);
+      if (!result.rowCount) throw new NotFoundException('Open advertisement not found.');
+      await this.writeP2PAudit(client, userId, 'p2p.ad_cancelled', 'p2p_ad', id);
+      await client.query('COMMIT');
+      return { message: 'Advertisement cancelled.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Post('orders')
@@ -2507,6 +2536,7 @@ class P2PMarketController {
       const trade = await client.query("INSERT INTO p2p_trades (order_id,buyer_user_id,seller_user_id,asset_code,fiat_code,price,quantity,fiat_total,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending') RETURNING id,order_id,asset_code,fiat_code,price::text,quantity::text,fiat_total::text,status,created_at",[adId,buyer,seller,ad.asset_code,ad.fiat_code,ad.price,unitsToDecimal(quantityUnits,12),unitsToDecimal(fiatCents,2)]);
       const remaining = remainingUnits - quantityUnits;
       await client.query("UPDATE p2p_orders SET remaining_quantity=$1::numeric,status=CASE WHEN $1::numeric<=0 THEN 'filled' ELSE 'partially_filled' END,updated_at=now() WHERE id=$2",[unitsToDecimal(remaining,12),adId]);
+      await this.writeP2PAudit(client, userId, 'p2p.order_created', 'p2p_trade', trade.rows[0].id, { advertisement_id: adId, asset_code: ad.asset_code, fiat_code: ad.fiat_code, quantity: unitsToDecimal(quantityUnits,12), fiat_total: unitsToDecimal(fiatCents,2) });
       await client.query('COMMIT');
       return { order: trade.rows[0], message: 'Order created. TradeMate does not hold funds or provide escrow.' };
     } catch (error) { await client.query('ROLLBACK').catch(()=>undefined); throw error; } finally { client.release(); }
@@ -2525,18 +2555,40 @@ class P2PMarketController {
     parseBody(p2pPaymentSentBodySchema, body);
     const userId = await this.authenticatedUser(request), ref = typeof body?.reference === 'string' ? body.reference.trim() : '';
     if (ref.length > 160) throw new BadRequestException('Reference is too long.');
-    const result = await databasePool!.query("UPDATE p2p_trades SET buyer_payment_sent_at=now(),payment_reference=NULLIF($1,''),updated_at=now() WHERE id=$2 AND buyer_user_id=$3 AND status='pending' AND buyer_payment_sent_at IS NULL RETURNING id,status,buyer_payment_sent_at",[ref,id,userId]);
-    if (!result.rowCount) throw new ConflictException('Order cannot be marked as paid.');
-    return { order: result.rows[0], message: 'Seller confirmation is still required.' };
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query("UPDATE p2p_trades SET buyer_payment_sent_at=now(),payment_reference=NULLIF($1,''),updated_at=now() WHERE id=$2 AND buyer_user_id=$3 AND status='pending' AND buyer_payment_sent_at IS NULL RETURNING id,status,buyer_payment_sent_at",[ref,id,userId]);
+      if (!result.rowCount) throw new ConflictException('Order cannot be marked as paid.');
+      await this.writeP2PAudit(client, userId, 'p2p.payment_marked_sent', 'p2p_trade', id, { reference_provided: Boolean(ref) });
+      await client.query('COMMIT');
+      return { order: result.rows[0], message: 'Seller confirmation is still required.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Post('orders/:id/confirm-receipt')
   async confirmReceipt(@Param('id') id: string, @Req() request: Request) {
     parseUuidParam(id);
     const userId = await this.authenticatedUser(request);
-    const result = await databasePool!.query("UPDATE p2p_trades SET seller_payment_confirmed_at=now(),status='completed',completed_at=now(),updated_at=now() WHERE id=$1 AND seller_user_id=$2 AND status='pending' AND buyer_payment_sent_at IS NOT NULL AND seller_payment_confirmed_at IS NULL RETURNING id,status,completed_at",[id,userId]);
-    if (!result.rowCount) throw new ConflictException('Buyer must first mark payment sent; order must still be pending.');
-    return { order: result.rows[0] };
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query("UPDATE p2p_trades SET seller_payment_confirmed_at=now(),status='completed',completed_at=now(),updated_at=now() WHERE id=$1 AND seller_user_id=$2 AND status='pending' AND buyer_payment_sent_at IS NOT NULL AND seller_payment_confirmed_at IS NULL RETURNING id,status,completed_at",[id,userId]);
+      if (!result.rowCount) throw new ConflictException('Buyer must first mark payment sent; order must still be pending.');
+      await this.writeP2PAudit(client, userId, 'p2p.trade_completed', 'p2p_trade', id);
+      await client.query('COMMIT');
+      return { order: result.rows[0] };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Post('orders/:id/cancel')
@@ -2560,6 +2612,7 @@ class P2PMarketController {
       await client.query("UPDATE p2p_orders SET remaining_quantity=$1::numeric,status=CASE WHEN status IN ('cancelled','expired') THEN status WHEN $1::numeric >= quantity THEN 'open' ELSE 'partially_filled' END,updated_at=now() WHERE id=$2",[unitsToDecimal(restored,12),trade.order_id]);
       const cancelled = await client.query("UPDATE p2p_trades SET status='cancelled',cancelled_by=$1,updated_at=now() WHERE id=$2 AND status='pending' AND buyer_payment_sent_at IS NULL RETURNING id,status,updated_at",[userId,id]);
       if (!cancelled.rowCount) throw new ConflictException('Order state changed; refresh and try again.');
+      await this.writeP2PAudit(client, userId, 'p2p.order_cancelled', 'p2p_trade', id, { advertisement_id: trade.order_id, quantity: String(trade.quantity) });
       await client.query('COMMIT');
       return { order: cancelled.rows[0], message: 'Order cancelled. The reserved advertisement quantity was restored where the offer remains active.' };
     } catch (error) { await client.query('ROLLBACK').catch(()=>undefined); throw error; }
@@ -2573,9 +2626,20 @@ class P2PMarketController {
     const userId = await this.authenticatedUser(request), reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('id must be a valid order UUID.');
     if (reason.length < 5 || reason.length > 1000) throw new BadRequestException('Dispute reason must be 5 to 1,000 characters.');
-    const result = await databasePool!.query("UPDATE p2p_trades SET status='disputed',dispute_reason=$1,updated_at=now() WHERE id=$2 AND (buyer_user_id=$3 OR seller_user_id=$3) AND status='pending' AND buyer_payment_sent_at IS NOT NULL RETURNING id,status,dispute_reason",[reason,id,userId]);
-    if (!result.rowCount) throw new ConflictException('A dispute can only be opened by a participant after the buyer marks payment sent.');
-    return { order: result.rows[0] };
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query("UPDATE p2p_trades SET status='disputed',dispute_reason=$1,updated_at=now() WHERE id=$2 AND (buyer_user_id=$3 OR seller_user_id=$3) AND status='pending' AND buyer_payment_sent_at IS NOT NULL RETURNING id,status,dispute_reason",[reason,id,userId]);
+      if (!result.rowCount) throw new ConflictException('A dispute can only be opened by a participant after the buyer marks payment sent.');
+      await this.writeP2PAudit(client, userId, 'p2p.dispute_opened', 'p2p_trade', id, { reason_length: reason.length });
+      await client.query('COMMIT');
+      return { order: result.rows[0] };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
 
