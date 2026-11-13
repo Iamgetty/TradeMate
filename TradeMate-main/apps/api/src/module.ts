@@ -1,9 +1,9 @@
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, HttpCode, HttpException, HttpStatus, Module, NotFoundException, OnModuleDestroy, Param, Post, Patch, Delete, Query, Req, Res, UnauthorizedException } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, randomInt, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { Pool } from 'pg';
 import { createRlsAwarePool } from './database-context';
-import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
+import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -189,19 +189,87 @@ class AuthController {
     const client = await databasePool.connect();
     try {
       await client.query('BEGIN');
-      const created = await client.query("INSERT INTO users (email, display_name, status) VALUES ($1, $2, 'active') RETURNING id, email, display_name, country_code, created_at", [email, displayName]);
+      const created = await client.query("INSERT INTO users (email, display_name, status) VALUES ($1, $2, 'pending') RETURNING id, email, display_name, country_code, created_at", [email, displayName]);
       await client.query('INSERT INTO user_credentials (user_id, password_hash) VALUES ($1, $2)', [created.rows[0].id, hash]);
-      const token = randomBytes(32).toString('base64url');
-      const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
-      await client.query('INSERT INTO user_sessions (user_id, token_hash, expires_at, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5)', [created.rows[0].id, tokenDigest(token), expiresAt, request.ip || null, request.get('user-agent')?.slice(0, 500) || null]);
+      const code = String(randomInt(0, 1000000)).padStart(6, '0');
+      await client.query("INSERT INTO email_verification_codes (user_id, code_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes')", [created.rows[0].id, tokenDigest(code)]);
+      await client.query("INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.email_verification_requested', 'user', $1, '{}'::jsonb)", [created.rows[0].id]);
       await client.query('COMMIT');
-      response.cookie(SESSION_COOKIE, token, cookieOptions());
-      return { user: created.rows[0] };
+      const delivered = await sendTransactionalEmail(email, 'Verify your TradeMate email', '<p>Your TradeMate verification code is:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">' + code + '</p><p>This code expires in 10 minutes and can only be used once.</p>');
+      if (!delivered) throw new HttpException('Your account was created, but the verification email could not be sent. Use Resend to try again.', HttpStatus.SERVICE_UNAVAILABLE);
+      return { requiresEmailVerification: true, email, expiresInSeconds: 600 };
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       if ((error as { code?: string })?.code === '23505') throw new ConflictException('An account with this email already exists.');
       throw error;
     } finally { client.release(); }
+  }
+
+  @Post('email-verification/resend')
+  @HttpCode(200)
+  async resendEmailVerification(@Body() body: { email?: string }, @Req() request: Request) {
+    parseBody(passwordResetRequestBodySchema, body);
+    if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
+    const email = String(body?.email || '').trim().toLowerCase();
+    const ip = request.ip || 'unknown';
+    for (const item of [
+      { key: tokenDigest(ip + '|email-verify-ip'), limit: 10 },
+      { key: tokenDigest(ip + '|email-verify|' + tokenDigest(email)), limit: 3 },
+    ]) {
+      const rate = await databasePool.query(
+        "INSERT INTO auth_rate_limits (key_hash, window_started_at, attempts, blocked_until) VALUES ($1, now(), 1, NULL) ON CONFLICT (key_hash) DO UPDATE SET attempts = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END, window_started_at = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN now() ELSE auth_rate_limits.window_started_at END, blocked_until = CASE WHEN (CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END) >= $2 THEN now() + interval '15 minutes' ELSE auth_rate_limits.blocked_until END RETURNING attempts, blocked_until",
+        [item.key, item.limit],
+      );
+      if (rate.rows[0].attempts > item.limit || (rate.rows[0].blocked_until && new Date(rate.rows[0].blocked_until).getTime() > Date.now())) throw new HttpException('Too many verification requests. Please wait 15 minutes.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+    const account = await databasePool.query("SELECT id, email FROM users WHERE lower(email) = $1 AND email_verified_at IS NULL AND status = 'pending' LIMIT 1", [email]);
+    if (account.rowCount) {
+      const code = String(randomInt(0, 1000000)).padStart(6, '0');
+      const client = await databasePool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [account.rows[0].id]);
+        await client.query('DELETE FROM email_verification_codes WHERE user_id = $1 OR expires_at <= now() OR used_at IS NOT NULL', [account.rows[0].id]);
+        await client.query("INSERT INTO email_verification_codes (user_id, code_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes')", [account.rows[0].id, tokenDigest(code)]);
+        await client.query("INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.email_verification_requested', 'user', $1, '{}'::jsonb)", [account.rows[0].id]);
+        await client.query('COMMIT');
+      } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
+      finally { client.release(); }
+      const delivered = await sendTransactionalEmail(email, 'Your TradeMate verification code', '<p>Your TradeMate verification code is:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">' + code + '</p><p>This code expires in 10 minutes and can only be used once.</p>');
+      if (!delivered) throw new HttpException('The verification email could not be sent. Please try again later.', HttpStatus.SERVICE_UNAVAILABLE);
+    }
+    return { success: true, message: 'If this account is awaiting verification, a new code has been sent.' };
+  }
+
+  @Post('email-verification/confirm')
+  @HttpCode(200)
+  async confirmEmailVerification(@Body() body: { email?: string; code?: string }, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    parseBody(emailVerificationBodySchema, body);
+    if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
+    const email = String(body.email || '').trim().toLowerCase();
+    const code = String(body.code || '');
+    const client = await databasePool.connect();
+    const sessionToken = randomBytes(32).toString('base64url');
+    try {
+      await client.query('BEGIN');
+      const account = await client.query("SELECT id, email, display_name, country_code, status, email_verified_at FROM users WHERE lower(email) = $1 FOR UPDATE", [email]);
+      if (!account.rowCount || account.rows[0].email_verified_at || account.rows[0].status !== 'pending') throw new UnauthorizedException('This verification code is invalid or expired. Request a new one.');
+      const verification = await client.query("SELECT id, code_hash, expires_at, attempts FROM email_verification_codes WHERE user_id = $1 AND used_at IS NULL ORDER BY created_at DESC LIMIT 1 FOR UPDATE", [account.rows[0].id]);
+      if (!verification.rowCount || new Date(verification.rows[0].expires_at).getTime() <= Date.now() || verification.rows[0].attempts >= 5) throw new UnauthorizedException('This verification code is invalid or expired. Request a new one.');
+      if (tokenDigest(code) !== verification.rows[0].code_hash) {
+        await client.query('UPDATE email_verification_codes SET attempts = attempts + 1 WHERE id = $1', [verification.rows[0].id]);
+        await client.query('COMMIT');
+        throw new UnauthorizedException('The verification code is incorrect.');
+      }
+      await client.query('UPDATE email_verification_codes SET used_at = now() WHERE id = $1', [verification.rows[0].id]);
+      const verified = await client.query("UPDATE users SET email_verified_at = now(), status = 'active', updated_at = now() WHERE id = $1 RETURNING id, email, display_name, country_code", [account.rows[0].id]);
+      await client.query("INSERT INTO user_sessions (user_id, token_hash, expires_at, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5)", [account.rows[0].id, tokenDigest(sessionToken), new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000), request.ip || null, request.get('user-agent')?.slice(0, 500) || null]);
+      await client.query("INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.email_verified', 'user', $1, '{}'::jsonb)", [account.rows[0].id]);
+      await client.query('COMMIT');
+      response.cookie(SESSION_COOKIE, sessionToken, cookieOptions());
+      return { user: verified.rows[0] };
+    } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
+    finally { client.release(); }
   }
 
   @Post('login')
@@ -220,9 +288,10 @@ class AuthController {
     if (rate.rows[0].attempts > 10 || (rate.rows[0].blocked_until && new Date(rate.rows[0].blocked_until).getTime() > Date.now())) {
       throw new HttpException('Too many sign-in attempts. Please wait 15 minutes before trying again.', HttpStatus.TOO_MANY_REQUESTS);
     }
-    const result = await databasePool.query("SELECT u.id, u.email, u.display_name, u.country_code, u.status, c.password_hash FROM users u JOIN user_credentials c ON c.user_id = u.id WHERE lower(u.email) = $1 LIMIT 1", [email]);
+    const result = await databasePool.query("SELECT u.id, u.email, u.display_name, u.country_code, u.status, u.email_verified_at, c.password_hash FROM users u JOIN user_credentials c ON c.user_id = u.id WHERE lower(u.email) = $1 LIMIT 1", [email]);
     const user = result.rows[0];
     if (!user || user.status !== 'active' || !(await passwordMatches(password, user.password_hash))) throw new UnauthorizedException('Email or password is incorrect.');
+    if (!user.email_verified_at) throw new ForbiddenException('Verify your email address before signing in. Use Resend to receive a new code.');
     const security = await databasePool.query('SELECT totp_enabled FROM user_auth_security WHERE user_id = $1 LIMIT 1', [user.id]);
     if (security.rows[0]?.totp_enabled) {
       const challengeToken = randomBytes(32).toString('base64url');
