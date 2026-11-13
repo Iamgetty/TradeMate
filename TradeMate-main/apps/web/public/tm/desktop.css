@@ -96,3 +96,48 @@ html[data-theme] .sbar .dk-me small{color:var(--mut)!important}
 html[data-theme] .nav button{color:var(--mut)!important}
 html[data-theme] .nav button.on{color:var(--am)!important}
 html[data-theme] .nav button.plus svg{background:var(--grad)!important;color:var(--ongrad,#1b1006)!important}
+
+@media (min-width:900px){
+/* ---- shared page components (same look on every page and theme) ---- */
+/* Portfolio */
+.view .wtabs{display:flex;gap:4px;margin:14px 16px 4px;padding:4px;border-radius:14px;background:var(--s1);border:1px solid var(--line)}
+.view .wtabs button{flex:1 1 0!important;padding:0!important;text-align:center;min-width:0;height:38px;border-radius:10px;border:0;background:none;color:var(--mut);font:700 14px 'Hanken Grotesk',system-ui,sans-serif}
+.view .wtabs button.on{background:var(--s3);color:var(--txt)}
+.view .wval{margin:14px 16px 0;padding:0!important}
+.view .wval small{font:600 13px 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.view .wval b{display:block;font:800 36px/1.1 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.02em;color:var(--txt);margin:8px 0 4px}
+.view .wval span{font:600 14px 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.view .acts{display:flex;gap:10px;margin:16px 16px 6px;padding:0!important}
+.view .acts .btn{flex:1;height:44px;border-radius:999px;font:800 14px 'Hanken Grotesk',sans-serif}
+.view .pf{display:flex;align-items:center;justify-content:space-between;margin:22px 16px 10px;padding:0!important;font:800 20px 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.02em;color:var(--txt)}
+.view .pfr{display:flex;align-items:center;justify-content:space-between;width:calc(100% - 32px);margin:0 16px 10px;padding:12px 14px;border-radius:16px;background:var(--s1);border:1px solid var(--line);color:var(--txt);font:700 15px 'Hanken Grotesk',sans-serif;text-align:left}
+.view .pfr span{display:flex;align-items:center;gap:12px}
+.view .pfr span>svg{width:40px!important;height:40px!important;padding:10px;border-radius:12px;background:var(--s2);color:var(--txt)!important;flex:none;box-sizing:border-box}
+.view .pfr em{display:flex;align-items:center;gap:6px;font:600 14px 'Hanken Grotesk',sans-serif;font-style:normal;color:var(--mut)}
+.view .pfr em svg{width:16px;height:16px}
+.view>.fine{margin:12px 16px;font:500 12.5px/1.45 'Hanken Grotesk',sans-serif;color:var(--mut)}
+/* Feed / Notifications / filter tabs share one pill style */
+.view>.sub{display:flex;gap:8px;padding:0 16px 8px;overflow-x:auto}
+.view>.sub button{height:38px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--s1);color:var(--mut);font:700 14px 'Hanken Grotesk',sans-serif;white-space:nowrap}
+.view>.sub button.on{background:color-mix(in srgb,var(--am) 14%,transparent);border-color:color-mix(in srgb,var(--am) 45%,transparent);color:var(--am)}
+.view>.empty{margin:8px 16px;border-radius:18px}
+/* NFT hub header matches the other page headers */
+.nft-topline{display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:12px!important;height:auto!important;padding:14px 0 6px!important;margin-bottom:6px!important}
+.nft-hub{padding:0 8px!important}
+.nft-topline .nft-back{position:static!important;transform:none!important}
+.nft-topline .nft-back{width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--s1);color:var(--txt);display:grid;place-items:center;flex:none}
+.nft-topline>b{position:static!important;transform:none!important;flex:1;text-align:left!important;font:800 30px/1.05 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.03em;color:var(--txt)}
+.nft-topline .nft-top-chain{margin-left:auto;display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;background:var(--s1);border:1px solid var(--line);font:700 12px 'Hanken Grotesk',sans-serif;color:var(--txt)}
+}
+@media (min-width:900px){
+html[data-theme] .view>.sub button.on{background:color-mix(in srgb,var(--am) 14%,transparent)!important;border-color:color-mix(in srgb,var(--am) 45%,transparent)!important;color:var(--am)!important;box-shadow:none!important}
+html[data-theme] .view>.sub button{background:var(--s1)!important;border:1px solid var(--line)!important;color:var(--mut)!important;box-shadow:none!important}
+html[data-theme] .seg button.on{background:var(--s3)!important;color:var(--txt)!important;box-shadow:none!important}
+html[data-theme] .nft-toolbar-select,html[data-theme] .nft-toolbar-select select{background:var(--s1)!important;color:var(--txt)!important;border-color:var(--line)!important}
+}
+@media (min-width:900px){
+.view .acts,.view .wtabs{max-width:520px}
+.view .acts{margin-right:auto}.view .wtabs{margin-right:auto}
+.view .cw,.view .pfr,.view .pf{max-width:760px}
+.view .pfr{width:calc(100% - 32px)}
+}
