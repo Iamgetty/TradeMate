@@ -12,7 +12,7 @@
 (function (root) {
   const USD_LIKE = ['USD', 'USDT', 'USDC', 'BUSD'];
 
-  function createFeedClient(opts) {
+  function createFeedClient(opts, runtime = {}) {
     const o = Object.assign({
       url: '',
       base: 'BTC',
@@ -22,11 +22,19 @@
       levels: 12,               // rows per side
       tick: 0,                  // price grouping step, e.g. 0.5; 0 = exact prices
       maxTrades: 50,
+      reconnectBaseMs: 1000,
+      reconnectMaxMs: 30000,
+      stableConnectionMs: 30000,
       onUpdate() {},
       onStatus() {},            // called with true/false when the socket connects/disconnects
     }, opts);
 
+    const WebSocketImpl = runtime.WebSocket || root.WebSocket;
+    const setTimer = runtime.setTimeout || setTimeout;
+    const clearTimer = runtime.clearTimeout || clearTimeout;
+    const random = runtime.random || Math.random;
     let ws, attempt = 0, closed = false, trades = [];
+    let reconnectTimer = null, stableTimer = null;
     const seenTradeIds = new Set();
     const tradeKey = (t) => t.id != null && t.id !== ''
       ? [t.exchange, t.market, t.symbol, t.id].join('|')
@@ -124,26 +132,72 @@
       if (ws && ws.readyState === 1) ws.send(JSON.stringify({ op: 'watch', base: o.base }));
     }
 
+    function clearStableTimer() {
+      if (stableTimer !== null) clearTimer(stableTimer);
+      stableTimer = null;
+    }
+
+    function scheduleReconnect() {
+      if (closed || reconnectTimer !== null) return;
+      const ceiling = Math.min(o.reconnectMaxMs, o.reconnectBaseMs * (2 ** attempt));
+      attempt += 1;
+      const sample = Math.max(0, Math.min(1, Number(random()) || 0));
+      const delay = Math.floor(ceiling / 2 + sample * ceiling / 2);
+      reconnectTimer = setTimer(() => {
+        reconnectTimer = null;
+        open();
+      }, delay);
+    }
+
     function open() {
+      if (closed) return;
+      let socket;
       try {
-        ws = new WebSocket(o.url);
+        socket = new WebSocketImpl(o.url);
       } catch (e) {
         o.onStatus(false);
-        if (!closed) setTimeout(open, Math.min(15000, 1000 * 2 ** attempt++));
+        scheduleReconnect();
         return;
       }
-      ws.onopen = () => { attempt = 0; watch(); o.onStatus(true); };
-      ws.onmessage = (ev) => { try { handle(JSON.parse(ev.data)); } catch (e) { console.error('feed parse error', e); } };
-      ws.onclose = () => {
+      ws = socket;
+      let receivedMessage = false;
+      socket.onopen = () => {
+        watch();
+        o.onStatus(true);
+        clearStableTimer();
+        stableTimer = setTimer(() => {
+          stableTimer = null;
+          // A handshake alone is not evidence of a healthy feed. Reset only
+          // after a sustained connection has also delivered valid data.
+          if (!closed && ws === socket && socket.readyState === 1 && receivedMessage) attempt = 0;
+        }, o.stableConnectionMs);
+      };
+      socket.onmessage = (ev) => {
+        try {
+          const message = JSON.parse(ev.data);
+          handle(message);
+          if (message && Array.isArray(message.books) && message.feeds && typeof message.feeds === 'object') receivedMessage = true;
+        } catch (e) {
+          console.error('feed parse error', e);
+        }
+      };
+      socket.onclose = () => {
         clearMarketData();
         o.onStatus(false);
-        if (!closed) setTimeout(open, Math.min(15000, 1000 * 2 ** attempt++));
+        clearStableTimer();
+        scheduleReconnect();
       };
     }
     open();
 
     return {
-      close() { closed = true; if (ws) ws.close(); },
+      close() {
+        closed = true;
+        if (reconnectTimer !== null) clearTimer(reconnectTimer);
+        reconnectTimer = null;
+        clearStableTimer();
+        if (ws) ws.close();
+      },
       setSymbol(base, quote) {
         if (o.base === base && o.quote === quote) return;
         o.base = base; o.quote = quote;

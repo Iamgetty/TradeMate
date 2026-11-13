@@ -429,3 +429,11 @@ This section records the five engineering observations raised during the ongoing
 - Make a notification click mark the item read and then follow its stored same-origin `action_url` when present; retain read-only behaviour for notifications without a destination.
 - Reject protocol-relative or backslash-containing destinations so notification clicks cannot redirect to an external origin.
 - Add browser coverage for a marketplace enquiry notification opening its conversation after the read request.
+
+
+### Browser exchange-feed client reconnect resilience — follow-up
+
+- Keep the browser client's retry counter across short-lived successful handshakes; reset it only after a sustained connection has delivered valid feed data.
+- Use bounded equal-jitter exponential reconnect delays, prevent duplicate reconnect timers, and cancel pending reconnect/stability timers when the client is explicitly closed.
+- Add deterministic fake-WebSocket and fake-timer tests for repeated short-lived connections, stable recovery, duplicate close events and explicit shutdown.
+- This complements the exchange-feed server reconnect policy; it does not claim provider freshness or change upstream credentials/configuration.
