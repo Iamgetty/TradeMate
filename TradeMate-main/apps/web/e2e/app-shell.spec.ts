@@ -43,7 +43,9 @@ test('direct app route renders on a real mobile-user-agent context', async ({ br
     await page.goto('/app');
     await expectPublicLanding(page);
     await expect(page.locator('html')).toHaveClass(/tm-mw/);
-    await expect(page.locator('#mwbar')).toBeVisible();
+    // Connected-mode auth gating intentionally keeps app chrome hidden until a session is verified.
+    // The mobile runtime should still create its header on the public landing.
+    await expect(page.locator('#mwbar')).toHaveCount(1);
     await expect(page.locator('link[href^="/tm/mobileweb.css"]')).toHaveCount(1);
     await expect(page.locator('link[href^="/tm/desktop.css"]')).toHaveCount(0);
 
