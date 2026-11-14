@@ -462,7 +462,7 @@ This section records the five engineering observations raised during the ongoing
 
 ## Legacy app.js upload review — 14 November 2026
 
-The direct upload commit `a909c4e678edf974ac94d2b8623ad11c7a874d92` changed `apps/web/public/tm/app.js` by 2,339 additions and 213 deletions (file grew from approximately 1.04 MB / 2,925 lines to 1.68 MB / 5,051 lines). It also changed desktop and mobile stylesheet files. This was a direct `Add files via upload` commit rather than a reviewed pull request. No GitHub Actions workflow runs were returned for this exact commit at the time of this audit. Do not infer production deployment from the commit alone.
+The direct upload commit `a909c4e678edf974ac94d2b8623ad11c7a874d92` changed `apps/web/public/tm/app.js` by 2,339 additions and 213 deletions (file grew from approximately 1.04 MB / 2,925 lines to 1.68 MB / 5,051 lines). It also changed desktop and mobile stylesheet files. This was a direct `Add files via upload` commit rather than a reviewed pull request. GitHub Actions run [43650745685](https://github.com/Iamgetty/TradeMate/actions/runs/43650745685) ran on this exact commit: 6/8 jobs passed and 2/8 failed. Do not infer production deployment from the commit alone.
 
 ### A. Immediate regression: Conversations enquiry refresh
 
@@ -493,7 +493,7 @@ A comparison against the preceding post-PR #129 app.js blob confirms that the up
 1. Keep the legacy bundle operational while documenting feature ownership between Next.js and `app.js`. At 1.68 MB and approximately 5,051 lines, the bundle has materially expanded; inventory every new page, event handler, API call, local-state store, external provider and dynamically injected style. Extract cohesive features incrementally behind tested boundaries rather than attempting a wholesale rewrite.
 2. Add focused tests for Portfolio Manager, Contract Scout, wallet/assets, deposit/transfer, KYC, rewards/referrals/promotions, Explore/Search, support/feedback and the redesigned Contracts/Conversations views. Cover both themes, keyboard/accessibility, reduced-motion behaviour, mobile breakpoints, loading/error/empty states and account switching.
 3. Audit external data sources and runtime dependencies, including public Binance REST/WebSocket calls, image/CDN assets and dynamically injected CSS. Verify CSP/CORS, provider rate limits, retry/backoff, data freshness, graceful degradation, privacy and absence of credentials or sensitive user data in the bundle.
-4. Require exact-head CI, source diff review and a pull request for future large app.js changes. The direct upload commit had no workflow run evidence returned in this audit. Verify web/API/Cloudflare builds and the relevant browser/API/database tests before merge.
+4. Require exact-head CI, source diff review and a pull request for future large app.js changes. The exact direct-upload commit did run CI [43650745685](https://github.com/Iamgetty/TradeMate/actions/runs/43650745685): six of eight jobs passed, while the Web build/runtime regression suite and Browser app-shell/live API acceptance suite failed. The JavaScript syntax check itself passed; the web job failed in `test-account-isolation.js`, and the browser job exposed the startup exception documented below. Verify web/API/Cloudflare builds and the relevant browser/API/database tests before merge.
 5. Verify the actual deployed web commit and run smoke/acceptance tests before claiming any of these screens are live. This review did not deploy the upload or change production services, data, secrets or wallet configuration.
 
 ### D. Follow-up sequencing
@@ -504,3 +504,13 @@ A comparison against the preceding post-PR #129 app.js blob confirms that the up
 4. Correct Contract Scout positioning or build the documented recommendation capability; do not present synthetic sparkline data as historical market performance.
 5. Complete a route-by-route API and permission matrix for the remaining new screens, then add browser and PostgreSQL-backed acceptance tests.
 6. Reconcile open PR #130 against this newer main-branch upload before merging it; its public listing contract proposal work must be tested against the latest `app.js` and the Next.js/legacy navigation boundary.
+
+
+### E. Exact-head CI failures — run 43650745685
+
+The exact upload commit had eight checks. API TypeScript build, database migration integration, exchange-feed/MT5 tests, security scanning, Cloudflare Workers build/runtime and AWS container builds passed. Two checks failed:
+
+- **Browser app-shell and live API acceptance:** 12 browser tests failed and 13 passed. The web server repeatedly logged `Uncaught TypeError: Cannot read properties of null (reading 'textContent')` at `/tm/app.js?v=85:2143:131`. The failure is in the responsive stylesheet loader: it calls `document.getElementById(id).textContent` for `tm-css-d` and `tm-css-mw` without checking that those elements exist. The app shell then never renders `#app .view`, causing the app-shell, contract lifecycle, recovery and live two-account tests to fail at startup.
+- **Web build and runtime syntax:** `node --check apps/web/public/tm/app.js` passed, but `apps/web/scripts/test-account-isolation.js` failed because its reset-state assertion expects `st.pins=[]` to be cleared alongside other account-scoped state. The current `resetSession()` omits that field. Compare the previous implementation and the test's intended account-scope policy before changing it; this failure should be fixed or the test contract corrected explicitly.
+
+**Release gate:** the missing stylesheet elements are a confirmed browser startup blocker and must be fixed first. Restore a self-contained, guarded stylesheet-loading contract that works in the Next.js shell, then rerun all eight jobs and the live browser acceptance suite. Keep the Conversations PR #129 regression as a separate required fix/test; do not assume correcting startup also restores enquiry refresh behaviour.
