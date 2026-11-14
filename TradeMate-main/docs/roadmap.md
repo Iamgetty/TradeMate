@@ -458,3 +458,49 @@ This section records the five engineering observations raised during the ongoing
 - Preserve unsent marketplace enquiries and conversation replies in tab-scoped session storage when a request returns 401; restore the draft on return and clear it after a successful send.
 - Reject external, protocol-relative and backslash-containing return destinations to prevent open redirects.
 - Add browser coverage for login return, marketplace enquiry draft restoration and expired-session conversation reply recovery.
+
+
+## Legacy app.js upload review — 14 November 2026
+
+The direct upload commit `a909c4e678edf974ac94d2b8623ad11c7a874d92` changed `apps/web/public/tm/app.js` by 2,339 additions and 213 deletions (file grew from approximately 1.04 MB / 2,925 lines to 1.68 MB / 5,051 lines). It also changed desktop and mobile stylesheet files. This was a direct `Add files via upload` commit rather than a reviewed pull request. No GitHub Actions workflow runs were returned for this exact commit at the time of this audit. Do not infer production deployment from the commit alone.
+
+### A. Immediate regression: Conversations enquiry refresh
+
+A comparison against the preceding post-PR #129 app.js blob confirms that the upload reintroduced the enquiry refresh defect fixed by PR #129:
+
+- Navigation mapping changed from a handler that opens Conversations and calls `loadEnquiries()` to the plain string `"conversations"`; the initial enquiry fetch is no longer triggered by that navigation action.
+- `loadEnquiries()` now calls `softDraw()` unconditionally after a successful response instead of redrawing the active Conversations / enquiry / deal stack page with `drawPage()`.
+- Its failure path redraws only `conversations` and `deals`, omitting the active `deal` page.
+- The preceding merged implementation handled all three active stack pages and preserved the correct redraw path.
+
+**Priority: restore the PR #129 behaviour before treating this upload as accepted.** Add regression tests for opening Conversations from navigation, refreshing while a conversation list is active, refreshing while an individual deal is open, and rendering a load failure/retry on each active page. Re-run the existing live two-account PostgreSQL-backed enquiry/reply acceptance test. Do not overwrite the full bundle to fix this; make a minimal, reviewed patch.
+
+### B. New UI surfaces and their verified integration boundaries
+
+- **Portfolio Manager:** `PMD` contains sample portfolio figures (including a displayed $24,750.50 total) and `PMH` contains an explicitly labelled sample BTC/ETH/SOL/BNB/USDT allocation. Public Binance price endpoints and WebSockets update the sample valuation; they do not establish the user's holdings or a TradeMate ledger balance. Treat this as demonstration data, not an account balance or performance record. Before release, either label and isolate it as a demo or connect it to an authoritative, permission-checked ledger/portfolio source with valuation timestamps, asset ownership, precision and reconciliation tests.
+- **Contract Scout:** the scan progression is a local timer/animation. Recommendations are sorted from available instrument prices and 24-hour percentage changes; the sparkline is generated deterministically from the instrument name and movement direction. No profile-based suitability, contract matching, risk engine or recommendation service is evidenced in this bundle. Rename/reposition it as a market-movers view or design a real, explainable recommendation service with source timestamps, methodology, risk disclosures and tests. Do not imply that it has scanned global contracts or evaluated user suitability.
+- **Wallet and assets:** the client initializes `WALLET` as empty `Crypto` and `Fiat` maps; the visible balance page reads from that object. Wallet connection controls explicitly report that connection is not enabled. The asset overview derives its non-empty value from accepted/completed contract totals, which must not be conflated with withdrawable wallet funds.
+- **Deposits and transfers:** fiat deposit submission and transfer review currently display disconnected/not-ready messages; transfer available balance is shown as unavailable. The crypto deposit UI must also be verified end-to-end for address generation, network/asset matching, confirmation accounting and duplicate/replay handling before it is presented as operational. No wallet/deposit/withdrawal/transfer API integration was found in the reviewed client bundle.
+- **Identity verification:** KYC progress is held in client-side `st.idv` state and document selection/preview is handled in the browser. For connected accounts, the submit handler explicitly reports that identity verification is not open yet. Do not show a real submitted, under-review or verified status until a provider-backed API, secure document storage, reviewer workflow, retention/deletion policy and audit trail exist. Do not persist identity documents or sensitive personal data in ordinary browser storage.
+- **Rewards and referrals:** the Rewards Hub uses fixed zero counters and static task definitions. The referral code is derived from the current user identifier and displayed invite/reward totals are fixed zeroes; no reward ledger or referral attribution API is evidenced. Define programme eligibility, attribution, fraud controls, point/commission accounting, reversals, terms and auditable payout policy before promising rewards.
+- **Earn, promotions and advertising:** Earn and promotion content is static; the promotion list is hardcoded and the advertising screen is a request form. Verify whether any backend submission exists before describing a promotion as joined, a campaign as submitted, or a commission as earned. Add server-side ownership, moderation, terms, status and audit requirements if these programmes are approved.
+- **Contracts and Conversations redesign:** the redesigned contract cards/proposal UI and split-pane Conversations layout use existing contract, enquiry and listing APIs. They still require full desktop/mobile, Clients/Alpha, permissions, retry, stale-session and two-account live acceptance coverage against the latest bundle. The enquiry-refresh regression above is a blocker for this workstream.
+- **Explore/Search:** the new discovery UI includes market/category filters, recent searches and trending cards. Verify whether Services/B2B results are loaded from the authoritative listings API and remain permission/moderation filtered; local in-memory market filtering is not proof of complete global search.
+- **Support and feedback:** the UI references existing support-ticket and feedback endpoints. Verify attachment claims, ticket creation/replies, feedback persistence, account isolation, retry and notification routing against the API; the new visual surface alone is not acceptance evidence.
+
+### C. Frontend architecture, security and QA gates
+
+1. Keep the legacy bundle operational while documenting feature ownership between Next.js and `app.js`. At 1.68 MB and approximately 5,051 lines, the bundle has materially expanded; inventory every new page, event handler, API call, local-state store, external provider and dynamically injected style. Extract cohesive features incrementally behind tested boundaries rather than attempting a wholesale rewrite.
+2. Add focused tests for Portfolio Manager, Contract Scout, wallet/assets, deposit/transfer, KYC, rewards/referrals/promotions, Explore/Search, support/feedback and the redesigned Contracts/Conversations views. Cover both themes, keyboard/accessibility, reduced-motion behaviour, mobile breakpoints, loading/error/empty states and account switching.
+3. Audit external data sources and runtime dependencies, including public Binance REST/WebSocket calls, image/CDN assets and dynamically injected CSS. Verify CSP/CORS, provider rate limits, retry/backoff, data freshness, graceful degradation, privacy and absence of credentials or sensitive user data in the bundle.
+4. Require exact-head CI, source diff review and a pull request for future large app.js changes. The direct upload commit had no workflow run evidence returned in this audit. Verify web/API/Cloudflare builds and the relevant browser/API/database tests before merge.
+5. Verify the actual deployed web commit and run smoke/acceptance tests before claiming any of these screens are live. This review did not deploy the upload or change production services, data, secrets or wallet configuration.
+
+### D. Follow-up sequencing
+
+1. Restore and test the PR #129 Conversations refresh/navigation behaviour first.
+2. Clearly label, disable or remove misleading sample Portfolio Manager balances until connected to a real ledger.
+3. Keep deposits, transfers, wallet connection and KYC non-operational until their backend, security, legal/compliance and operational gates are approved.
+4. Correct Contract Scout positioning or build the documented recommendation capability; do not present synthetic sparkline data as historical market performance.
+5. Complete a route-by-route API and permission matrix for the remaining new screens, then add browser and PostgreSQL-backed acceptance tests.
+6. Reconcile open PR #130 against this newer main-branch upload before merging it; its public listing contract proposal work must be tested against the latest `app.js` and the Next.js/legacy navigation boundary.
