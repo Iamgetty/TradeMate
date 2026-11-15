@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 
 const API_BASE = '';
 type Business = { name: string; country_code: string; default_currency: string; status: string };
-type SavedOffer = { id: string; title: string; status: string; currency_code: string; price_minor_units: string };
+type SavedOffer = { id: string; title: string; status: string; currency_code: string; price_minor_units: string; listing_type: 'b2b' | 'service'; quantity_available: number | null };
 const money = (minor: string, currency: string) => {
   try { return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(Number(minor) / 100); }
   catch { return currency + ' ' + (Number(minor) / 100).toFixed(2); }
@@ -19,6 +19,7 @@ export default function NewOfferPage() {
   const [description, setDescription] = useState('');
   const [listingType, setListingType] = useState('service');
   const [price, setPrice] = useState('');
+  const [quantityAvailable, setQuantityAvailable] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -49,7 +50,7 @@ export default function NewOfferPage() {
       const response = await fetch('/api/market/listings', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, listingType, price, quantityAvailable: null }),
+        body: JSON.stringify({ title, description, listingType, price, quantityAvailable: listingType === 'b2b' && quantityAvailable.trim() ? quantityAvailable.trim() : null }),
       });
       const data = await response.json().catch(() => ({}));
       if (response.status === 401) { router.replace('/auth?mode=login'); return; }
@@ -70,17 +71,18 @@ export default function NewOfferPage() {
           <div className="section-kicker" style={{marginTop:24}}><span/> DRAFT SAVED</div>
           <h1>Your offer is <span>taking shape.</span></h1>
           <p className="business-intro">“{saved.title}” has been saved to your business space as a draft.</p>
-          <div className="account-card"><div><strong>{money(saved.price_minor_units, saved.currency_code)}</strong><span>{saved.title}</span><small>OFFER STATUS · {saved.status.toUpperCase()}</small></div></div>
+          <div className="account-card"><div><strong>{money(saved.price_minor_units, saved.currency_code)}</strong><span>{saved.title}</span><small>OFFER STATUS · {saved.status.toUpperCase()}</small>{saved.listing_type === 'b2b' && <small>{saved.quantity_available === null ? 'Quantity not specified' : Number(saved.quantity_available).toLocaleString() + ' available'}</small>}</div></div>
           <p className="business-footnote">This draft is private. Public publishing requires the review workflow.</p>
           <Link className="cta-primary detail-back" href="/offers">View my offers ↗</Link><Link className="account-secondary-link" href="/account">Return to your space</Link>
-          <button type="button" className="retry-btn" onClick={() => { setSaved(null); setTitle(''); setDescription(''); setPrice(''); }}>Create another draft ↻</button>
+          <button type="button" className="retry-btn" onClick={() => { setSaved(null); setTitle(''); setDescription(''); setPrice(''); setQuantityAvailable(''); }}>Create another draft ↻</button>
         </> : <>
           <h1>Put your offer <span>out there.</span></h1>
           <p className="business-intro">Start with the essentials. Prepare a Services or B2B opportunity for a contract-led conversation.</p>
           {loading ? <div className="market-state"><h3>Loading your business space…</h3></div> : business && <>
             <div className="detail-note">BUSINESS · {business.name} · {business.country_code} <br/>Currency: {business.default_currency} · Business status: {business.status}</div>
             <form className="auth-form" onSubmit={submit}>
-              <label>What are you offering?<select value={listingType} onChange={e => setListingType(e.target.value)}><option value="service">Services</option><option value="b2b">B2B opportunity</option></select></label>
+              <label>What are you offering?<select value={listingType} onChange={e => { setListingType(e.target.value); if (e.target.value === 'service') setQuantityAvailable(''); }}><option value="service">Services</option><option value="b2b">B2B opportunity</option></select></label>
+              {listingType === 'b2b' && <label>Quantity available (optional)<input type="number" inputMode="numeric" min="0" step="1" value={quantityAvailable} onChange={e => setQuantityAvailable(e.target.value)} placeholder="e.g. 250"/><small>Enter a whole number. Leave blank if the quantity is not specified.</small></label>}
               <label>Offer title<input value={title} onChange={e => setTitle(e.target.value)} minLength={3} maxLength={140} placeholder="e.g. Brand identity design or wholesale supply partnership" required/></label>
               <label>Description<textarea className="offer-description-input" value={description} onChange={e => setDescription(e.target.value)} maxLength={5000} rows={4} placeholder="Describe the scope, expectations and commercial context for this offer."/></label>
               <label>Price ({business.default_currency})<input type="number" inputMode="decimal" min="0" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" required/><small>Uses your business's default currency: {business.default_currency}.</small></label>
