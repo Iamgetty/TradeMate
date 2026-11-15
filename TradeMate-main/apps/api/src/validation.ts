@@ -84,6 +84,7 @@ const profileImageSchema = z.string().max(900000).refine(
 );
 
 export const publicProfileBodySchema = z.object({
+  username: z.string().trim().toLowerCase().min(3).max(24).regex(/^[a-z0-9][a-z0-9_]{2,23}$/).optional(),
   bio: z.string().max(160).optional(),
   instagramUsername: z.string().trim().max(30).regex(/^[A-Za-z0-9._]*$/).optional(),
   xUsername: z.string().trim().max(15).regex(/^[A-Za-z0-9_]*$/).optional(),
