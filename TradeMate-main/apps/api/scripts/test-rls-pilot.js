@@ -22,7 +22,7 @@ async function main() {
       const userId = created.rows[0].id;
       users.push(userId);
       await pool.query(
-        'UPDATE user_profiles SET bio = $2 WHERE user_id = $1',
+        'INSERT INTO user_profiles (user_id, bio) VALUES ($1, $2)',
         [userId, `Public bio ${label}`],
       );
       await pool.query(

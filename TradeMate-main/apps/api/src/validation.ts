@@ -83,10 +83,6 @@ const profileImageSchema = z.string().max(900000).refine(
   'Profile images must be JPEG, PNG or WebP and smaller than 650 KB each.',
 );
 
-export const usernameBodySchema = z.object({
-  username: z.string().trim().toLowerCase().min(3).max(24).regex(/^[a-z0-9][a-z0-9_]*$/, 'Use 3–24 lowercase letters, numbers or underscores.'),
-}).strict();
-
 export const publicProfileBodySchema = z.object({
   bio: z.string().max(160).optional(),
   instagramUsername: z.string().trim().max(30).regex(/^[A-Za-z0-9._]*$/).optional(),

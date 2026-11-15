@@ -14,7 +14,6 @@ const {
   deletionCancelBodySchema,
   preferencesBodySchema,
   publicProfileBodySchema,
-  usernameBodySchema,
   feedPostBodySchema,
   supportTicketBodySchema,
   organizationDocumentManagerRoleSchema,
@@ -33,16 +32,6 @@ const {
   feedPostsQuerySchema,
   marketQuotesQuerySchema,
 } = require('../dist/validation');
-
-test('usernames are normalized and restricted to unique-handle syntax', () => {
-  const valid = usernameBodySchema.safeParse({ username: '  Trader_2026 ' });
-  assert.equal(valid.success, true);
-  assert.equal(valid.data.username, 'trader_2026');
-  assert.equal(usernameBodySchema.safeParse({ username: 'ab' }).success, false);
-  assert.equal(usernameBodySchema.safeParse({ username: 'bad-name' }).success, false);
-  assert.equal(usernameBodySchema.safeParse({ username: 'has space' }).success, false);
-  assert.equal(usernameBodySchema.safeParse({ username: 'trader', extra: true }).success, false);
-});
 
 test('registration accepts normalized valid account data', () => {
   const result = registerBodySchema.safeParse({
