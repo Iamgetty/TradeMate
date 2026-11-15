@@ -91,6 +91,7 @@ const verifyTotp = (secret: string, code: string): number | null => {
 };
 
 const tokenDigest = (token: string) => createHash('sha256').update(token).digest('hex');
+const defaultPublicUsername = (userId: string) => 'tm_' + userId.replace(/-/g, '').slice(0, 21);
 
 const sendTransactionalEmail = async (to: string, subject: string, html: string) => {
   const apiKey = process.env.RESEND_API_KEY;
@@ -191,7 +192,10 @@ class AuthController {
     try {
       await client.query('BEGIN');
       const created = await client.query("INSERT INTO users (email, display_name, status) VALUES ($1, $2, 'pending') RETURNING id, email, display_name, country_code, created_at", [email, displayName]);
-      await client.query('INSERT INTO user_credentials (user_id, password_hash) VALUES ($1, $2)', [created.rows[0].id, hash]);
+      const userId = created.rows[0].id as string;
+      await client.query("SELECT set_config('app.user_id', $1, true)", [userId]);
+      await client.query('INSERT INTO user_profiles (user_id, username) VALUES ($1, $2) ON CONFLICT (user_id) DO NOTHING', [userId, defaultPublicUsername(userId)]);
+      await client.query('INSERT INTO user_credentials (user_id, password_hash) VALUES ($1, $2)', [userId, hash]);
       const code = String(randomInt(0, 1000000)).padStart(6, '0');
       await client.query("INSERT INTO email_verification_codes (user_id, code_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes')", [created.rows[0].id, tokenDigest(code)]);
       await client.query("INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.email_verification_requested', 'user', $1, '{}'::jsonb)", [created.rows[0].id]);
@@ -2679,7 +2683,7 @@ class PublicProfilesController {
     const viewerId = await this.currentUser(request);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid profile id.');
     const result = await databasePool!.query(
-      `SELECT u.id, u.display_name, p.bio, p.instagram_username, p.x_username, p.website_url,
+      `SELECT u.id, COALESCE(NULLIF(p.username, ''), 'tm_' || left(replace(u.id::text, '-', ''), 21)) AS username, p.bio, p.instagram_username, p.x_username, p.website_url,
               p.profile_photo_data, p.cover_photo_data, p.highlights,
               (SELECT count(*)::int FROM feed_posts fp WHERE fp.author_user_id = u.id AND fp.status = 'published') AS post_count,
               (SELECT count(*)::int FROM user_follows f WHERE f.followed_user_id = u.id) AS follower_count,
@@ -2695,9 +2699,10 @@ class PublicProfilesController {
   }
 
   @Patch('me')
-  async updateMyProfile(@Req() request: Request, @Body() body: { bio?: string; instagramUsername?: string; xUsername?: string; websiteUrl?: string; profilePhotoData?: string; coverPhotoData?: string; highlights?: unknown[] }) {
+  async updateMyProfile(@Req() request: Request, @Body() body: { username?: string; bio?: string; instagramUsername?: string; xUsername?: string; websiteUrl?: string; profilePhotoData?: string; coverPhotoData?: string; highlights?: unknown[] }) {
     parseBody(publicProfileBodySchema, body);
     const userId = await this.currentUser(request);
+    const requestedUsername = typeof body?.username === 'string' ? body.username.trim().toLowerCase() : '';
     const bio = typeof body?.bio === 'string' ? body.bio.trim() : '';
     const instagram = typeof body?.instagramUsername === 'string' ? body.instagramUsername.trim() : '';
     const x = typeof body?.xUsername === 'string' ? body.xUsername.trim() : '';
@@ -2717,14 +2722,16 @@ class PublicProfilesController {
     const client = await databasePool!.connect();
     try {
       await client.query('BEGIN');
+      const existingProfile = await client.query('SELECT username FROM user_profiles WHERE user_id=$1 FOR UPDATE', [userId]);
+      const username = requestedUsername || existingProfile.rows[0]?.username || defaultPublicUsername(userId);
       const result = await client.query(
-        `INSERT INTO user_profiles (user_id, bio, instagram_username, x_username, website_url, profile_photo_data, cover_photo_data, highlights)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)
-         ON CONFLICT (user_id) DO UPDATE SET bio=EXCLUDED.bio, instagram_username=EXCLUDED.instagram_username,
+        `INSERT INTO user_profiles (user_id, username, bio, instagram_username, x_username, website_url, profile_photo_data, cover_photo_data, highlights)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)
+         ON CONFLICT (user_id) DO UPDATE SET username=EXCLUDED.username, bio=EXCLUDED.bio, instagram_username=EXCLUDED.instagram_username,
            x_username=EXCLUDED.x_username, website_url=EXCLUDED.website_url, profile_photo_data=EXCLUDED.profile_photo_data,
            cover_photo_data=EXCLUDED.cover_photo_data, highlights=EXCLUDED.highlights, updated_at=now()
-         RETURNING bio, instagram_username, x_username, website_url, profile_photo_data, cover_photo_data, highlights`,
-        [userId, bio, instagram, x, website, photo, cover, JSON.stringify(highlights)],
+         RETURNING username, bio, instagram_username, x_username, website_url, profile_photo_data, cover_photo_data, highlights`,
+        [userId, username, bio, instagram, x, website, photo, cover, JSON.stringify(highlights)],
       );
       await client.query(
         "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.public_details_updated', 'user', $1, '{}'::jsonb)",
@@ -2734,6 +2741,7 @@ class PublicProfilesController {
       return { profile: result.rows[0] };
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
+      if ((error as { code?: string })?.code === '23505') throw new ConflictException('That public username is already taken.');
       throw error;
     } finally {
       client.release();
@@ -2832,13 +2840,13 @@ class CommunityFeedController {
     const limit = Math.min(50, Math.max(1, Number.parseInt(rawLimit || '30', 10) || 30));
     const result = await databasePool.query(
       `SELECT p.id, p.author_user_id, p.post_type, p.title, p.body, p.pinned, p.created_at,
-              COALESCE(u.display_name, 'TradeMate Team') AS author_name,
+              COALESCE(up.username, 'tm_' || left(replace(p.author_user_id::text, '-', ''), 21)) AS author_username,
               (SELECT count(*)::int FROM feed_comments c WHERE c.post_id = p.id AND c.status = 'published') AS comment_count,
               (SELECT count(*)::int FROM feed_post_reactions r WHERE r.post_id = p.id) AS reaction_count,
               (SELECT count(*)::int FROM feed_post_reshares rs WHERE rs.post_id = p.id) AS reshare_count,
               COALESCE((SELECT json_agg(json_build_object('id', a.id, 'file_name', a.file_name, 'content_type', a.content_type, 'byte_size', a.byte_size) ORDER BY a.created_at)
                         FROM feed_attachments a WHERE a.post_id = p.id), '[]'::json) AS attachments
-       FROM feed_posts p LEFT JOIN users u ON u.id = p.author_user_id
+       FROM feed_posts p LEFT JOIN user_profiles up ON up.user_id = p.author_user_id
        WHERE p.status = 'published' AND ($1::text IS NULL OR p.post_type = $1)
        ORDER BY p.pinned DESC, p.created_at DESC LIMIT $2`,
       [normalized, limit],
@@ -2892,8 +2900,9 @@ class CommunityFeedController {
         "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'feed.post.created', 'feed_post', $2, $3::jsonb)",
         [userId, result.rows[0].id, JSON.stringify({ post_type: type, attachment_count: prepared.length })],
       );
+      const authorProfile = await client.query('SELECT username FROM user_profiles WHERE user_id=$1', [userId]);
       await client.query('COMMIT');
-      return { post: { ...result.rows[0], author_name: 'You', comment_count: 0, attachments: prepared.map((f) => ({ file_name: f.name, content_type: f.mime, byte_size: f.bytes.length })) } };
+      return { post: { ...result.rows[0], author_user_id: userId, author_username: authorProfile.rows[0]?.username || defaultPublicUsername(userId), comment_count: 0, attachments: prepared.map((f) => ({ file_name: f.name, content_type: f.mime, byte_size: f.bytes.length })) } };
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;
@@ -2928,8 +2937,9 @@ class CommunityFeedController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid post id.');
     const result = await databasePool.query(
-      `SELECT c.id, c.body, c.created_at, u.display_name AS author_name
-       FROM feed_comments c JOIN users u ON u.id = c.author_user_id
+      `SELECT c.id, c.author_user_id, c.body, c.created_at,
+              COALESCE(up.username, 'tm_' || left(replace(c.author_user_id::text, '-', ''), 21)) AS author_username
+       FROM feed_comments c LEFT JOIN user_profiles up ON up.user_id = c.author_user_id
        JOIN feed_posts p ON p.id = c.post_id
        WHERE c.post_id = $1 AND c.status = 'published' AND p.status = 'published'
        ORDER BY c.created_at ASC LIMIT 200`,
@@ -2952,7 +2962,8 @@ class CommunityFeedController {
       [id, userId, content],
     );
     if (!result.rowCount) throw new NotFoundException('Published post not found.');
-    return { comment: { ...result.rows[0], author_name: 'You' } };
+    const authorProfile = await databasePool!.query('SELECT username FROM user_profiles WHERE user_id=$1', [userId]);
+    return { comment: { ...result.rows[0], author_user_id: userId, author_username: authorProfile.rows[0]?.username || defaultPublicUsername(userId) } };
   }
 
   @Post('posts/:id/reactions')
