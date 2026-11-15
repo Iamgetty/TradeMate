@@ -138,28 +138,31 @@ function section(startText, endText) {
 
 
 (function legacyMarketplaceUsesB2BApiContracts() {
-  assert.ok(source.includes('var ORD=["Services","B2B","Products"'),
-    "B2B must have its own marketplace division");
+  assert.match(source, /var ORD=\[[^\]]*"B2B"/,
+    "the deployed runtime must include a dedicated B2B marketplace division");
+  assert.match(source, /var CONTRACT_CATS=\[[^\]]*"B2B"/,
+    "B2B must remain a contract category");
   assert.ok(source.includes('SRV={Services:"service",B2B:"b2b"}'),
-    "only Services and B2B may be submitted through the live listing API");
+    "the live publishing flow must use the supported service and b2b API types");
   const wizard = section("function wzCfg(id)", "function flat(fs)");
   assert.match(wizard, /B2B:\[\{n:"Basics"/,
-    "the live wizard must expose a B2B offer form");
+    "the live wizard must expose the B2B contract form");
+  assert.match(wizard, /T\("qty","Quantity \/ scope"/,
+    "the B2B wizard must collect quantity or non-numeric scope");
   const publish = section("function publishServer(w,f)", "function publishLocal(id,f)");
-  assert.match(publish, /var q=t==="B2B"&&f\.qty/,
-    "B2B numeric inventory must map to quantityAvailable");
-  const rows = section("function rowsOf(id)", "function publishServer(w,f)");
-  assert.match(rows, /id\.slice\(2\)==="B2B"&&x\[1\]==="qty"/,
-    "numeric inventory must not be duplicated in the description");
+  assert.match(publish, /if\(t==="B2B"&&\/\^\\d\{1,12\}\$\/.test\(qtyText\)\)q=qtyText/,
+    "only a whole-number B2B quantity may populate quantityAvailable");
+  assert.match(publish, /if\(q!==null\)rows=rows\.filter\(function\(r\)\{return r\[0\]!=="Quantity \/ scope"\}\)/,
+    "numeric inventory must be removed from description text when sent separately");
+  assert.match(publish, /listingType:SRV\[t\].*quantityAvailable:q/,
+    "B2B publishing must send the API listing type and inventory field");
   const browse = section("function mapListing(l,i)", "function loadMarket()");
-  assert.match(browse, /l\.listing_type==="service"\?"Services":"B2B"/,
-    "public B2B listings must not be classified as Products");
+  assert.match(browse, /l\.listing_type==="b2b"\?"B2B":"Services"/,
+    "public B2B listings must be mapped to the B2B division");
   assert.match(browse, /"B2B opportunity"/,
-    "B2B listing details must identify the correct contract type");
-  assert.match(wizard, /t!=="B2B"/,
-    "B2B offers must not inherit product-style purchase controls");
-  assert.match(source, /B2B:\["order"\]/,
-    "B2B listings must use the enquiry action rather than product checkout");
+    "public listing details must identify B2B opportunities correctly");
+  assert.match(source, /var SELL=\{Services:\["contract"\],B2B:\["contract"\]\}/,
+    "B2B listings must use contract proposal actions");
 })();
 
 console.log("Account isolation source regression checks passed.");
