@@ -198,9 +198,9 @@ test('notification action links reject protocol-relative and backslash destinati
   ], calls);
 
   await page.locator('.nf-card').nth(0).click();
-  await expect(page).toHaveURL(/\\/app$/);
+  await expect(page).toHaveURL(/\/app$/);
   await page.locator('.nf-card').nth(1).click();
-  await expect(page).toHaveURL(/\\/app$/);
+  await expect(page).toHaveURL(/\/app$/);
   expect(calls.filter(call => call === 'read')).toHaveLength(2);
   expect(calls).not.toContain('conversation');
 });
