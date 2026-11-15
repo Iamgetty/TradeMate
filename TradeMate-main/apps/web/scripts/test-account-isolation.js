@@ -156,6 +156,8 @@ function section(startText, endText) {
     "public B2B listings must not be classified as Products");
   assert.match(browse, /"B2B opportunity"/,
     "B2B listing details must identify the correct contract type");
+  assert.match(wizard, /t!=="B2B"/,
+    "B2B offers must not inherit product-style purchase controls");
   assert.match(source, /B2B:\["order"\]/,
     "B2B listings must use the enquiry action rather than product checkout");
 })();
