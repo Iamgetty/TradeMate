@@ -5,14 +5,213 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 const API_BASE = ''; // Use the same-origin Next.js proxy so session cookies persist.
-function safeReturnTo(value:string|null){
- if(!value||!value.startsWith('/')||value.startsWith('//')||value.includes('\\'))return '/terminal';
- try{const target=new URL(value,window.location.origin);return target.origin===window.location.origin?target.pathname+target.search+target.hash:'/terminal'}catch{return '/terminal'}
+
+function safeReturnTo(value: string | null) {
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return '/terminal';
+  try {
+    const target = new URL(value, window.location.origin);
+    return target.origin === window.location.origin ? target.pathname + target.search + target.hash : '/terminal';
+  } catch {
+    return '/terminal';
+  }
 }
-export default function AuthPage(){
- const router=useRouter(); const [mode,setMode]=useState<'register'|'login'>('register'); const [returnTo,setReturnTo]=useState('/terminal');
- useEffect(()=>{const search=new URLSearchParams(window.location.search);const requestedMode=search.get('mode');setReturnTo(safeReturnTo(search.get('returnTo')));if(requestedMode==='login')setMode('login');else if(requestedMode==='register')setMode('register')},[]);
- const [displayName,setDisplayName]=useState(''); const [email,setEmail]=useState(''); const [password,setPassword]=useState(''); const [busy,setBusy]=useState(false); const [error,setError]=useState(''); const [challengeToken,setChallengeToken]=useState(''); const [code,setCode]=useState('');
- async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();setBusy(true);setError('');try{const response=await fetch(API_BASE+'/api/auth/'+mode,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(mode==='register'?{displayName,email,password}:{email,password})});const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(body.message||'We could not complete your request. Please try again.');if(mode==='login'&&body.requiresTwoFactor){setChallengeToken(body.challengeToken);setCode('');return;}window.location.assign(returnTo);}catch(e){setError(e instanceof Error?e.message:'A connection issue occurred. Please try again.')}finally{setBusy(false)}}
- return <main className="web3-shell auth-shell"><header className="top-nav"><Link className="wordmark" href="/"><span className="logo-glyph">T<span>↗</span></span><span>TradeMate</span></Link><Link className="nav-pill" href="/#market">Explore marketplace <span>↗</span></Link></header><section className="auth-stage"><div className="auth-art"><div className="auth-art-orbit auth-art-one"/><div className="auth-art-orbit auth-art-two"/><div className="auth-art-core">T</div><span className="auth-chip chip-one">GLOBAL BY DESIGN</span><span className="auth-chip chip-two">TRADE SMART ↗</span></div><div className="auth-panel"><div className="section-kicker"><span/> YOUR NEXT CONNECTION STARTS HERE</div><h1>{challengeToken?'Verify it’s you.':mode==='register'?'Make room for opportunity.':'Welcome back.'}</h1><p className="auth-intro">{challengeToken?'Your account has two-factor authentication enabled. Confirm the code from your authenticator app to finish signing in.':mode==='register'?'Create your TradeMate account and get ready to connect across markets.':'Sign in to continue your TradeMate journey.'}</p>{challengeToken?<form className="auth-form" onSubmit={async e=>{e.preventDefault();setBusy(true);setError('');try{const response=await fetch(API_BASE+'/api/auth/2fa/verify',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({challengeToken,code})});const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(body.message||'The authenticator code could not be verified.');window.location.assign(returnTo);}catch(e){setError(e instanceof Error?e.message:'A connection issue occurred. Please try again.')}finally{setBusy(false)}}}><label>Authenticator code<input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,'').slice(0,6))} placeholder="6-digit code" pattern="[0-9]{6}" minLength={6} maxLength={6} required/><small>Enter the current six-digit code from your authenticator app. This sign-in challenge expires in five minutes.</small></label>{error&&<div className="auth-error" role="alert">{error}</div>}<button className="auth-submit" disabled={busy||code.length!==6}>{busy?'Verifying…':'Verify and sign in'} <span>↗</span></button><button type="button" className="auth-switch" onClick={()=>{setChallengeToken('');setCode('');setError('')}}>Cancel and return to sign in</button></form>:<form className="auth-form" onSubmit={submit}>{mode==='register'&&<label>Full name<input autoComplete="name" value={displayName} onChange={e=>setDisplayName(e.target.value)} placeholder="How should we call you?" minLength={2} maxLength={80} required/></label>}<label>Email address<input type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" maxLength={254} required/></label><label>Password<input type="password" autoComplete={mode==='register'?'new-password':'current-password'} value={password} onChange={e=>setPassword(e.target.value)} placeholder={mode==='register'?'At least 12 characters':'Your password'} minLength={mode==='register'?12:1} maxLength={128} required/><small>{mode==='register'?'Use at least 12 characters.':'Your password is never shown or shared.'}</small></label>{error&&<div className="auth-error" role="alert">{error}</div>}<button className="auth-submit" disabled={busy}>{busy?'Please wait…':mode==='register'?'Create my account':'Sign in'} <span>↗</span></button></form>}{!challengeToken&&<div className="auth-switch">{mode==='register'?'Already have an account?':'New to TradeMate?'} <button type="button" onClick={()=>{setMode(mode==='register'?'login':'register');setError('')}}>{mode==='register'?'Sign in':'Create an account'}</button></div>}<p className="auth-legal">By continuing, you agree to use TradeMate responsibly. Email verification and password recovery will be added before public launch.</p></div></section><footer className="footer3"><Link className="wordmark" href="/"><span className="logo-glyph">T<span>↗</span></span><span>TradeMate</span></Link><span>TRADE SMART. TRADE DIRECT.</span><Link href="/#top">BACK TO MARKET ↑</Link></footer></main>;
+
+export default function AuthPage() {
+  const router = useRouter();
+  const [mode, setMode] = useState<'register' | 'login'>('register');
+  const [returnTo, setReturnTo] = useState('/terminal');
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [verificationPending, setVerificationPending] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [challengeToken, setChallengeToken] = useState('');
+  const [code, setCode] = useState('');
+
+  useEffect(() => {
+    const search = new URLSearchParams(window.location.search);
+    const requestedMode = search.get('mode');
+    setReturnTo(safeReturnTo(search.get('returnTo')));
+    if (requestedMode === 'login') setMode('login');
+    else if (requestedMode === 'register') setMode('register');
+  }, []);
+
+  async function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      const response = await fetch(API_BASE + '/api/auth/' + mode, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(mode === 'register' ? { displayName, email, password } : { email, password }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.message || 'We could not complete your request. Please try again.');
+      if (mode === 'register' && body.requiresEmailVerification) {
+        setVerificationPending(true);
+        setVerificationCode('');
+        setMessage('We sent a six-digit verification code to your email address. Enter it below to activate your account.');
+        return;
+      }
+      if (mode === 'login' && body.requiresTwoFactor) {
+        setChallengeToken(body.challengeToken);
+        setCode('');
+        return;
+      }
+      window.location.assign(returnTo);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'A connection issue occurred. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verifyEmail(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      const response = await fetch(API_BASE + '/api/auth/email-verification/confirm', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code: verificationCode }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.message || 'We could not verify that code. Request a new one and try again.');
+      if (!body.user) throw new Error('Email verification succeeded but no account session was returned. Please sign in.');
+      window.location.assign(returnTo);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'A connection issue occurred. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resendVerification() {
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      const response = await fetch(API_BASE + '/api/auth/email-verification/resend', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.message || 'We could not resend the verification code. Please try again.');
+      setMessage(body.message || 'If this account is awaiting verification, a new code has been sent.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'A connection issue occurred. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verifyTwoFactor(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      const response = await fetch(API_BASE + '/api/auth/2fa/verify', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challengeToken, code }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.message || 'The authenticator code could not be verified.');
+      window.location.assign(returnTo);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'A connection issue occurred. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="web3-shell auth-shell">
+      <header className="top-nav">
+        <Link className="wordmark" href="/"><span className="logo-glyph">T<span>↗</span></span><span>TradeMate</span></Link>
+        <Link className="nav-pill" href="/#market">Explore marketplace <span>↗</span></Link>
+      </header>
+      <section className="auth-stage">
+        <div className="auth-art">
+          <div className="auth-art-orbit auth-art-one" />
+          <div className="auth-art-orbit auth-art-two" />
+          <div className="auth-art-core">T</div>
+          <span className="auth-chip chip-one">GLOBAL BY DESIGN</span>
+          <span className="auth-chip chip-two">TRADE SMART ↗</span>
+        </div>
+        <div className="auth-panel">
+          <div className="section-kicker"><span /> YOUR NEXT CONNECTION STARTS HERE</div>
+          <h1>{challengeToken ? 'Verify it’s you.' : verificationPending ? 'Check your inbox.' : mode === 'register' ? 'Make room for opportunity.' : 'Welcome back.'}</h1>
+          <p className="auth-intro">
+            {challengeToken
+              ? 'Your account has two-factor authentication enabled. Confirm the code from your authenticator app to finish signing in.'
+              : verificationPending
+                ? 'Your account is nearly ready. Verify your email address to activate it and sign in.'
+                : mode === 'register'
+                  ? 'Create your TradeMate account and get ready to connect across markets.'
+                  : 'Sign in to continue your TradeMate journey.'}
+          </p>
+
+          {challengeToken ? (
+            <form className="auth-form" onSubmit={verifyTwoFactor}>
+              <label>Authenticator code
+                <input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-digit code" pattern="[0-9]{6}" minLength={6} maxLength={6} required />
+                <small>Enter the current six-digit code from your authenticator app. This sign-in challenge expires in five minutes.</small>
+              </label>
+              {error && <div className="auth-error" role="alert">{error}</div>}
+              <button className="auth-submit" disabled={busy || code.length !== 6}>{busy ? 'Verifying…' : 'Verify and sign in'} <span>↗</span></button>
+              <button type="button" className="auth-switch" onClick={() => { setChallengeToken(''); setCode(''); setError(''); }}>Cancel and return to sign in</button>
+            </form>
+          ) : verificationPending ? (
+            <form className="auth-form" onSubmit={verifyEmail}>
+              <label>Email address
+                <input type="email" value={email} readOnly />
+              </label>
+              <label>Verification code
+                <input inputMode="numeric" autoComplete="one-time-code" value={verificationCode} onChange={e => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-digit code" pattern="[0-9]{6}" minLength={6} maxLength={6} required />
+                <small>Enter the code sent to your inbox. It expires after 10 minutes.</small>
+              </label>
+              {message && <p className="auth-intro" role="status">{message}</p>}
+              {error && <div className="auth-error" role="alert">{error}</div>}
+              <button className="auth-submit" disabled={busy || verificationCode.length !== 6}>{busy ? 'Verifying…' : 'Verify email and continue'} <span>↗</span></button>
+              <button type="button" className="auth-switch" disabled={busy} onClick={resendVerification}>Resend verification code</button>
+              <button type="button" className="auth-switch" disabled={busy} onClick={() => { setVerificationPending(false); setVerificationCode(''); setMessage(''); setError(''); }}>Back to sign up</button>
+            </form>
+          ) : (
+            <form className="auth-form" onSubmit={submit}>
+              {mode === 'register' && <label>Full name<input autoComplete="name" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="How should we call you?" minLength={2} maxLength={80} required /></label>}
+              <label>Email address<input type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" maxLength={254} required /></label>
+              <label>Password<input type="password" autoComplete={mode === 'register' ? 'new-password' : 'current-password'} value={password} onChange={e => setPassword(e.target.value)} placeholder={mode === 'register' ? 'At least 12 characters' : 'Your password'} minLength={mode === 'register' ? 12 : 1} maxLength={128} required /><small>{mode === 'register' ? 'Use at least 12 characters.' : 'Your password is never shown or shared.'}</small></label>
+              {error && <div className="auth-error" role="alert">{error}</div>}
+              <button className="auth-submit" disabled={busy}>{busy ? 'Please wait…' : mode === 'register' ? 'Create my account' : 'Sign in'} <span>↗</span></button>
+            </form>
+          )}
+
+          {!challengeToken && !verificationPending && (
+            <div className="auth-switch">
+              {mode === 'register' ? 'Already have an account?' : 'New to TradeMate?'}{' '}
+              <button type="button" onClick={() => { setMode(mode === 'register' ? 'login' : 'register'); setError(''); setMessage(''); }}>{mode === 'register' ? 'Sign in' : 'Create an account'}</button>
+            </div>
+          )}
+          <p className="auth-legal">New accounts must verify their email address before signing in.</p>
+        </div>
+      </section>
+      <footer className="footer3">
+        <Link className="wordmark" href="/"><span className="logo-glyph">T<span>↗</span></span><span>TradeMate</span></Link>
+        <span>TRADE SMART. TRADE DIRECT.</span>
+        <Link href="/#top">BACK TO MARKET ↑</Link>
+      </footer>
+    </main>
+  );
 }
