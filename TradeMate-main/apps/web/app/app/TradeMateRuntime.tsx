@@ -94,7 +94,44 @@ export default function TradeMateRuntime() {
     // the legacy runtime owns the DOM and its WebSocket lifecycle.
   }, []);
 
-  if (!issue) return null;
+  if (!issue) {
+    return (
+      <main
+        id="trademate-startup"
+        aria-live="polite"
+        aria-busy="true"
+        style={{
+          minHeight: '100vh',
+          display: 'grid',
+          placeItems: 'center',
+          padding: 24,
+          background: '#070a0e',
+          color: '#f2f6fa',
+          fontFamily: 'system-ui, sans-serif',
+        }}
+      >
+        <section style={{ width: 'min(100%, 420px)', textAlign: 'center' }}>
+          <div
+            aria-hidden="true"
+            style={{
+              width: 34,
+              height: 34,
+              margin: '0 auto 18px',
+              border: '3px solid #26343d',
+              borderTopColor: '#9effc7',
+              borderRadius: '50%',
+              animation: 'trademate-spin .8s linear infinite',
+            }}
+          />
+          <p style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Opening TradeMate</p>
+          <p style={{ margin: '8px 0 0', color: '#8996a6', fontSize: 12 }}>
+            Connecting your workspace…
+          </p>
+          <style>{'@keyframes trademate-spin{to{transform:rotate(360deg)}}'}</style>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main role="alert" style={{
