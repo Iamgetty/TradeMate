@@ -4419,7 +4419,7 @@ function toBottom(){var e=document.querySelector(".pgs");if(e)e.scrollTop=e.scro
 function loadMsgs(d){var q=captureAccountRequest();return api("GET","/market/enquiries/"+d.eid+"/messages").then(function(r){
  if(!isCurrentAccountRequest(q)||findDeal(d.id)!==d)return null;
  var ms=(r.data.messages||[]).map(function(m){return {me:m.sender_user_id===q.userId,t:m.message,time:fmtT(m.created_at)}}),grew=ms.length!==d.msgs.length||!d.loaded;
- d.unread_count=0;d.messagesError="";if(!grew)return;d.msgs=ms;d.loaded=true;var t=st.stack[st.stack.length-1];
+ d.unread_count=0;d.messagesError="";d.msgs=ms;d.loaded=true;var t=st.stack[st.stack.length-1];
  if(t&&t.id==="deal"&&t.a===d.id){var i=$("dm"),v=i?i.value:"",f=i&&document.activeElement===i;drawPage();i=$("dm");if(i&&v){i.value=v;if(f)i.focus()}toBottom()}}).catch(function(e){if(!isCurrentAccountRequest(q)||findDeal(d.id)!==d)return null;d.messagesError=e&&e.message?e.message:"Could not load messages. Please try again.";var t=st.stack[st.stack.length-1];if(t&&t.id==="deal"&&t.a===d.id)drawPage();return null})}
 var _pg=pg;pg=function(id,a){_pg(id,a);if(id==="deal"){var d=findDeal(a);if(d&&d.eid)loadMsgs(d)}if(id==="subacct"&&CONNECTED)loadOrg().then(loadMine).then(function(){var t=st.stack[st.stack.length-1];if(t&&t.id==="subacct")drawPage()})};
 dmAdd=function(id,t){var d=findDeal(id);t=(t||"").trim();if(!d||!t)return;
