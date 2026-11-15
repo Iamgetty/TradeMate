@@ -12,7 +12,7 @@ type Offer = {
   price_minor_units: string;
   currency_code: string;
   country_code: string;
-  quantity_available: number | null;
+  quantity_available: number | string | null;
   status: string;
   created_at: string;
   updated_at: string;
@@ -36,6 +36,7 @@ export default function MyOffersPage() {
   const [description, setDescription] = useState('');
   const [listingType, setListingType] = useState<'b2b' | 'service'>('service');
   const [price, setPrice] = useState('');
+  const [quantityAvailable, setQuantityAvailable] = useState('');
 
   async function loadOffers() {
     setLoading(true);
@@ -64,6 +65,7 @@ export default function MyOffersPage() {
     setDescription(offer.description || '');
     setListingType(offer.listing_type);
     setPrice((Number(offer.price_minor_units) / 100).toFixed(2));
+    setQuantityAvailable(offer.quantity_available === null ? '' : String(offer.quantity_available));
   }
 
   async function saveEdit(event: FormEvent<HTMLFormElement>) {
@@ -76,7 +78,7 @@ export default function MyOffersPage() {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, listingType, price, quantityAvailable: null }),
+        body: JSON.stringify({ title, description, listingType, price, quantityAvailable: listingType === 'b2b' && quantityAvailable.trim() ? quantityAvailable.trim() : null }),
       });
       const result = await response.json().catch(() => ({}));
       if (response.status === 401) { router.replace('/auth?mode=login'); return; }
@@ -139,13 +141,14 @@ export default function MyOffersPage() {
             {editingId === offer.id ? <form className="offer-edit-form" onSubmit={saveEdit}>
               <label>Offer title<input value={title} onChange={e => setTitle(e.target.value)} minLength={3} maxLength={140} required/></label>
               <label>Description<textarea value={description} onChange={e => setDescription(e.target.value)} maxLength={5000} rows={3}/></label>
-              <label>Offer type<select value={listingType} onChange={e => setListingType(e.target.value as 'b2b' | 'service')}><option value="service">Services</option><option value="b2b">B2B</option></select></label>
+              <label>Offer type<select value={listingType} onChange={e => { const next = e.target.value as 'b2b' | 'service'; setListingType(next); if (next === 'service') setQuantityAvailable(''); }}><option value="service">Services</option><option value="b2b">B2B</option></select></label>
+              {listingType === 'b2b' && <label>Quantity available (optional)<input type="number" inputMode="numeric" min="0" step="1" value={quantityAvailable} onChange={e => setQuantityAvailable(e.target.value)} placeholder="e.g. 250"/><small>Enter a whole number. Leave blank if the quantity is not specified.</small></label>}
               <label>Price ({offer.currency_code})<input type="number" min="0" step="0.01" value={price} onChange={e => setPrice(e.target.value)} required/></label>
               <div className="offer-actions"><button className="offer-action-primary" type="submit" disabled={busyId === offer.id}>{busyId === offer.id ? 'Saving…' : 'Save changes'}</button><button className="offer-action-secondary" type="button" onClick={() => { setEditingId(''); setActionError(''); }}>Cancel</button></div>
             </form> : <>
               <h2>{offer.title}</h2>
               <p>{offer.description || 'No description added yet.'}</p>
-              <small>{offer.country_code} · Created {new Date(offer.created_at).toLocaleDateString()}</small>
+              <small>{offer.country_code} · Created {new Date(offer.created_at).toLocaleDateString()}{offer.listing_type === 'b2b' ? ' · ' + (offer.quantity_available === null ? 'Quantity not specified' : Number(offer.quantity_available).toLocaleString() + ' available') : ''}</small>
             </>}
           </div>
           <div className="offer-row-price"><strong>{money(offer.price_minor_units, offer.currency_code)}</strong><span>{offer.listing_type === 'service' ? 'Service offer' : 'B2B opportunity'}</span>
