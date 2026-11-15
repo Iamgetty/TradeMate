@@ -166,7 +166,7 @@ export default function AuthPage() {
           {challengeToken ? (
             <form className="auth-form" onSubmit={verifyTwoFactor}>
               <label>Authenticator code
-                <input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={e => setCode(e.target.value.replace(/\\D/g, '').slice(0, 6))} placeholder="6-digit code" pattern="[0-9]{6}" minLength={6} maxLength={6} required />
+                <input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-digit code" pattern="[0-9]{6}" minLength={6} maxLength={6} required />
                 <small>Enter the current six-digit code from your authenticator app. This sign-in challenge expires in five minutes.</small>
               </label>
               {error && <div className="auth-error" role="alert">{error}</div>}
@@ -179,7 +179,7 @@ export default function AuthPage() {
                 <input type="email" value={email} readOnly />
               </label>
               <label>Verification code
-                <input inputMode="numeric" autoComplete="one-time-code" value={verificationCode} onChange={e => setVerificationCode(e.target.value.replace(/\\D/g, '').slice(0, 6))} placeholder="6-digit code" pattern="[0-9]{6}" minLength={6} maxLength={6} required />
+                <input inputMode="numeric" autoComplete="one-time-code" value={verificationCode} onChange={e => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-digit code" pattern="[0-9]{6}" minLength={6} maxLength={6} required />
                 <small>Enter the code sent to your inbox. It expires after 10 minutes.</small>
               </label>
               {message && <p className="auth-intro" role="status">{message}</p>}
