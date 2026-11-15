@@ -38,9 +38,9 @@ services:
     runtime: node
     plan: free
     rootDir: TradeMate-main/apps/web
-    buildCommand: npm install && npm run build
-    startCommand: npm run start
+    buildCommand: npm install && npm run build && mkdir -p .next/standalone/public .next/standalone/.next && cp -R public/. .next/standalone/public/ && cp -R .next/static .next/standalone/.next/
+    startCommand: node .next/standalone/server.js
     autoDeployTrigger: checksPass
     envVars:
-      - key: NEXT_PUBLIC_API_URL
+      - key: TRADEMATE_API_ORIGIN
         value: https://trademate-api-toip.onrender.com
