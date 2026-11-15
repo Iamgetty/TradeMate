@@ -53,10 +53,8 @@ test('B2B offer creation passes the entered whole-number inventory to the API', 
   await page.getByRole('button', { name: /Save offer as draft/ }).click();
 
   await expect(page.getByRole('heading', { name: /Your offer is/ })).toBeVisible();
-  expect(submitted).toMatchObject({
-    listingType: 'b2b',
-    quantityAvailable: '1250',
-  });
+  expect(submitted?.listingType).toBe('b2b');
+  expect(submitted?.quantityAvailable).toBe('1250');
   await expect(page.getByText('1,250 available')).toBeVisible();
 });
 
@@ -78,10 +76,8 @@ test('Services offer creation does not expose or send B2B inventory', async ({ p
   await page.getByLabel(/^Price/).fill('1250');
   await page.getByRole('button', { name: /Save offer as draft/ }).click();
 
-  expect(submitted).toMatchObject({
-    listingType: 'service',
-    quantityAvailable: null,
-  });
+  expect(submitted?.listingType).toBe('service');
+  expect(submitted?.quantityAvailable).toBeNull();
 });
 
 test('editing a B2B draft retains and submits its current inventory value', async ({ page }) => {
@@ -110,8 +106,6 @@ test('editing a B2B draft retains and submits its current inventory value', asyn
   await quantity.fill('900');
   await page.getByRole('button', { name: 'Save changes' }).click();
 
-  expect(savedPayload).toMatchObject({
-    listingType: 'b2b',
-    quantityAvailable: '900',
-  });
+  expect(savedPayload?.listingType).toBe('b2b');
+  expect(savedPayload?.quantityAvailable).toBe('900');
 });
