@@ -4,7 +4,7 @@ import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, 
 import { Pool } from 'pg';
 import { createRlsAwarePool } from './database-context';
 import { decimalToUnits, fiatCentsToQuantityUnits, productToFiatCents, unitsToDecimal } from './p2p-decimal';
-import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
+import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, usernameBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -2673,13 +2673,21 @@ class PublicProfilesController {
     return result.rows[0].id as string;
   }
 
+  @Get('me')
+  async getMyProfile(@Req() request: Request) {
+    const userId = await this.currentUser(request);
+    const result = await databasePool!.query("SELECT u.id, u.display_name, p.username FROM users u LEFT JOIN user_profiles p ON p.user_id = u.id WHERE u.id = $1 AND u.status = 'active' LIMIT 1", [userId]);
+    if (!result.rowCount) throw new NotFoundException('Profile not found.');
+    return { profile: result.rows[0] };
+n  }
+
   @Get(':id')
   async getProfile(@Param('id') id: string, @Req() request: Request) {
     parseUuidParam(id);
     const viewerId = await this.currentUser(request);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid profile id.');
     const result = await databasePool!.query(
-      `SELECT u.id, u.display_name, p.bio, p.instagram_username, p.x_username, p.website_url,
+      `SELECT u.id, u.display_name, p.username, p.bio, p.instagram_username, p.x_username, p.website_url,
               p.profile_photo_data, p.cover_photo_data, p.highlights,
               (SELECT count(*)::int FROM feed_posts fp WHERE fp.author_user_id = u.id AND fp.status = 'published') AS post_count,
               (SELECT count(*)::int FROM user_follows f WHERE f.followed_user_id = u.id) AS follower_count,
@@ -2692,6 +2700,31 @@ class PublicProfilesController {
     if (!result.rowCount) throw new NotFoundException('Profile not found.');
     const p = result.rows[0];
     return { profile: { ...p, bio: p.bio || '', instagram_username: p.instagram_username || '', x_username: p.x_username || '', website_url: p.website_url || '', profile_photo_data: p.profile_photo_data || '', cover_photo_data: p.cover_photo_data || '', highlights: p.highlights || [] } };
+  }
+
+  @Patch('me/username')
+  async updateMyUsername(@Req() request: Request, @Body() body: { username?: string }) {
+    parseBody(usernameBodySchema, body);
+    const userId = await this.currentUser(request);
+    const username = String(body.username || '').trim().toLowerCase();
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const updated = await client.query('UPDATE user_profiles SET username = $1, updated_at = now() WHERE user_id = $2 RETURNING username', [username, userId]);
+      if (!updated.rowCount) throw new NotFoundException('Profile not found.');
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'profile.username_updated', 'user', $1, '{}'::jsonb)",
+        [userId],
+      );
+      await client.query('COMMIT');
+      return { profile: updated.rows[0] };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      if ((error as any)?.code === '23505') throw new ConflictException('That username is already taken. Choose another one.');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Patch('me')
@@ -2832,7 +2865,6 @@ class CommunityFeedController {
     const limit = Math.min(50, Math.max(1, Number.parseInt(rawLimit || '30', 10) || 30));
     const result = await databasePool.query(
       `SELECT p.id, p.author_user_id, p.post_type, p.title, p.body, p.pinned, p.created_at,
-              COALESCE(u.display_name, 'TradeMate Team') AS author_name,
               (SELECT count(*)::int FROM feed_comments c WHERE c.post_id = p.id AND c.status = 'published') AS comment_count,
               (SELECT count(*)::int FROM feed_post_reactions r WHERE r.post_id = p.id) AS reaction_count,
               (SELECT count(*)::int FROM feed_post_reshares rs WHERE rs.post_id = p.id) AS reshare_count,
