@@ -136,4 +136,28 @@ function section(startText, endText) {
     "the local preview fallback must be isolated before the connected API call");
 })();
 
+
+(function legacyMarketplaceUsesB2BApiContracts() {
+  assert.ok(source.includes('var ORD=["Services","B2B","Products"'),
+    "B2B must have its own marketplace division");
+  assert.ok(source.includes('SRV={Services:"service",B2B:"b2b"}'),
+    "only Services and B2B may be submitted through the live listing API");
+  const wizard = section("function wzCfg(id)", "function flat(fs)");
+  assert.match(wizard, /B2B:\[\{n:"Basics"/,
+    "the live wizard must expose a B2B offer form");
+  const publish = section("function publishServer(w,f)", "function publishLocal(id,f)");
+  assert.match(publish, /var q=t==="B2B"&&f\.qty/,
+    "B2B numeric inventory must map to quantityAvailable");
+  const rows = section("function rowsOf(id)", "function publishServer(w,f)");
+  assert.match(rows, /id\.slice\(2\)==="B2B"&&x\[1\]==="qty"/,
+    "numeric inventory must not be duplicated in the description");
+  const browse = section("function mapListing(l,i)", "function loadMarket()");
+  assert.match(browse, /l\.listing_type==="service"\?"Services":"B2B"/,
+    "public B2B listings must not be classified as Products");
+  assert.match(browse, /"B2B opportunity"/,
+    "B2B listing details must identify the correct contract type");
+  assert.match(source, /B2B:\["order"\]/,
+    "B2B listings must use the enquiry action rather than product checkout");
+})();
+
 console.log("Account isolation source regression checks passed.");
