@@ -213,7 +213,7 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
     await buyer.locator('#sbar [data-tab="Markets"]').click();
     await expect(buyer.locator('#app [data-mm="Services"]')).toBeVisible();
     await buyer.locator('#app [data-mm="Services"]').first().click();
-    await expect(buyer.getByText('Could not load marketplace listings')).toBeVisible();
+    await expect(buyer.getByText('Could not load marketplace contracts')).toBeVisible();
     await buyer.getByRole('button', { name: 'Retry', exact: true }).click();
     await expect(buyer.getByText('Retry recovered service')).toBeVisible();
     expect(buyerListingRequests).toBe(2);
@@ -681,8 +681,8 @@ test('notification action marks the item read and opens its internal conversatio
 
   await login(page, 'buyer@example.test');
   await page.locator('#app button[data-pg="notif"]').first().click();
-  await expect(page.locator('#pg .ncard')).toHaveCount(1);
-  await page.locator('#pg .ncard').click();
+  await expect(page.locator('#pg .nf-card')).toHaveCount(1);
+  await page.locator('#pg .nf-card').click();
 
   await expect(page).toHaveURL(url => url.pathname === '/messages/' + enquiryId);
   await expect(page.getByRole('heading', { name: 'Notification navigation fixture.' })).toBeVisible();
