@@ -2679,7 +2679,7 @@ class PublicProfilesController {
     const result = await databasePool!.query("SELECT u.id, u.display_name, p.username FROM users u LEFT JOIN user_profiles p ON p.user_id = u.id WHERE u.id = $1 AND u.status = 'active' LIMIT 1", [userId]);
     if (!result.rowCount) throw new NotFoundException('Profile not found.');
     return { profile: result.rows[0] };
-n  }
+  }
 
   @Get(':id')
   async getProfile(@Param('id') id: string, @Req() request: Request) {
@@ -2870,7 +2870,7 @@ class CommunityFeedController {
               (SELECT count(*)::int FROM feed_post_reshares rs WHERE rs.post_id = p.id) AS reshare_count,
               COALESCE((SELECT json_agg(json_build_object('id', a.id, 'file_name', a.file_name, 'content_type', a.content_type, 'byte_size', a.byte_size) ORDER BY a.created_at)
                         FROM feed_attachments a WHERE a.post_id = p.id), '[]'::json) AS attachments
-       FROM feed_posts p LEFT JOIN users u ON u.id = p.author_user_id
+       FROM feed_posts p
        WHERE p.status = 'published' AND ($1::text IS NULL OR p.post_type = $1)
        ORDER BY p.pinned DESC, p.created_at DESC LIMIT $2`,
       [normalized, limit],
