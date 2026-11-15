@@ -2751,12 +2751,12 @@ class PublicProfilesController {
     try {
       await client.query('BEGIN');
       const result = await client.query(
-        `INSERT INTO user_profiles (user_id, bio, instagram_username, x_username, website_url, profile_photo_data, cover_photo_data, highlights)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)
+        `INSERT INTO user_profiles (user_id, username, bio, instagram_username, x_username, website_url, profile_photo_data, cover_photo_data, highlights)
+         VALUES ($1, 'trader_' || left(replace($1::text, '-', ''), 12), $2,$3,$4,$5,$6,$7,$8::jsonb)
          ON CONFLICT (user_id) DO UPDATE SET bio=EXCLUDED.bio, instagram_username=EXCLUDED.instagram_username,
            x_username=EXCLUDED.x_username, website_url=EXCLUDED.website_url, profile_photo_data=EXCLUDED.profile_photo_data,
            cover_photo_data=EXCLUDED.cover_photo_data, highlights=EXCLUDED.highlights, updated_at=now()
-         RETURNING bio, instagram_username, x_username, website_url, profile_photo_data, cover_photo_data, highlights`,
+         RETURNING username, bio, instagram_username, x_username, website_url, profile_photo_data, cover_photo_data, highlights`,
         [userId, bio, instagram, x, website, photo, cover, JSON.stringify(highlights)],
       );
       await client.query(
