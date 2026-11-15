@@ -377,12 +377,10 @@ test('contracts and enquiries lists recover after transient API failures', async
   let authenticated = false;
   let contractRequests = 0;
   let enquiryRequests = 0;
-  // These endpoints are fetched during authenticated bootstrap. Arm failures
-  // before login so the first real request exercises the error/retry UI.
-  // Fail the initial bootstrap attempts even if the app issues overlapping requests;
-  // the explicit Retry action must be the first successful response.
+  // Contracts are fetched during authenticated bootstrap. Conversations are
+  // fetched again when that screen opens, so arm that failure only at navigation.
   let contractFailuresRemaining = 2;
-  let enquiryFailuresRemaining = 3;
+  let failNextEnquiryRequest = false;
   const context = await browser.newContext();
   const page = await context.newPage();
   page.on('pageerror', error => console.log('[contract-e2e] list recovery pageerror:', error.stack || error.message));
@@ -417,8 +415,8 @@ test('contracts and enquiries lists recover after transient API failures', async
     }
     if (path === '/market/enquiries/mine' && method === 'GET') {
       enquiryRequests += 1;
-      if (enquiryFailuresRemaining > 0) {
-        enquiryFailuresRemaining -= 1;
+      if (failNextEnquiryRequest) {
+        failNextEnquiryRequest = false;
         await route.fulfill({ status: 503, json: { message: 'Enquiry service temporarily unavailable' } });
       } else {
         await route.fulfill({ status: 200, json: { data: [] } });
@@ -444,7 +442,10 @@ test('contracts and enquiries lists recover after transient API failures', async
     console.log('[contract-e2e] list recovery: opening Conversations', { contractRequests, enquiryRequests });
     await page.locator('#sbar [data-f="More"]').click({ force: true, timeout: 10_000 });
     await expect(page.getByRole('heading', { name: 'All services' })).toBeVisible({ timeout: 10_000 });
+    failNextEnquiryRequest = true;
+    const enquiryRequestsBeforeOpen = enquiryRequests;
     await page.getByRole('button', { name: 'Conversations', exact: true }).click({ force: true, timeout: 10_000 });
+    await expect.poll(() => enquiryRequests, { timeout: 10_000 }).toBeGreaterThan(enquiryRequestsBeforeOpen);
     console.log('[contract-e2e] list recovery: opened Conversations', { contractRequests, enquiryRequests });
     await expect(page.getByText('Could not load conversations', { exact: true })).toBeVisible({ timeout: 10_000 });
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
@@ -459,6 +460,7 @@ test('individual contract and enquiry messages recover after transient API failu
   test.setTimeout(75_000);
   let authenticated = false;
   let contractMessageRequests = 0;
+  let enquiryListRequests = 0;
   let enquiryMessageRequests = 0;
   const contractId = 'message-retry-contract-001';
   const enquiryId = 'message-retry-enquiry-001';
@@ -502,6 +504,7 @@ test('individual contract and enquiry messages recover after transient API failu
       return;
     }
     if (path === '/market/enquiries/mine' && method === 'GET') {
+      enquiryListRequests += 1;
       await route.fulfill({ status: 200, json: { data: [{
         id: enquiryId, listing_id: 'message-retry-listing', listing_title: 'Enquiry message retry fixture',
         seller_name: 'Seller Fixture', buyer_name: 'Message Retry User', direction: 'sent',
@@ -534,8 +537,12 @@ test('individual contract and enquiry messages recover after transient API failu
 
     await page.locator('#sbar [data-f="More"]').click({ force: true, timeout: 10_000 });
     await expect(page.getByRole('heading', { name: 'All services' })).toBeVisible({ timeout: 10_000 });
+    const enquiryListsBeforeOpen = enquiryListRequests;
     await page.getByRole('button', { name: 'Conversations', exact: true }).click({ force: true, timeout: 10_000 });
-    await page.getByRole('button', { name: /Enquiry message retry fixture/ }).click();
+    await expect.poll(() => enquiryListRequests, { timeout: 10_000 }).toBeGreaterThan(enquiryListsBeforeOpen);
+    const enquiryRow = page.getByRole('button', { name: /Enquiry message retry fixture/ });
+    await expect(enquiryRow).toBeVisible({ timeout: 10_000 });
+    await enquiryRow.click();
     await expect(page.getByText('Could not load messages', { exact: true })).toBeVisible({ timeout: 10_000 });
     expect(enquiryMessageRequests).toBe(1);
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
