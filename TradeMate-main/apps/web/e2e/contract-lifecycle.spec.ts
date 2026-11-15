@@ -444,7 +444,7 @@ test('contracts and enquiries lists recover after transient API failures', async
     await expect(page.getByRole('heading', { name: 'All services' })).toBeVisible({ timeout: 10_000 });
     failNextEnquiryRequest = true;
     const enquiryRequestsBeforeOpen = enquiryRequests;
-    await page.locator('#pg [data-pg="conversations"]').click({ force: true, timeout: 10_000 });
+    await page.locator('#pg [data-pg="conversations"]').dispatchEvent('click', undefined, { timeout: 10_000 });
     await expect.poll(() => enquiryRequests, { timeout: 10_000 }).toBeGreaterThan(enquiryRequestsBeforeOpen);
     console.log('[contract-e2e] list recovery: opened Conversations', { contractRequests, enquiryRequests });
     await expect(page.getByText('Could not load conversations', { exact: true })).toBeVisible({ timeout: 10_000 });
@@ -538,7 +538,7 @@ test('individual contract and enquiry messages recover after transient API failu
     await page.locator('#sbar [data-f="More"]').click({ force: true, timeout: 10_000 });
     await expect(page.getByRole('heading', { name: 'All services' })).toBeVisible({ timeout: 10_000 });
     const enquiryListsBeforeOpen = enquiryListRequests;
-    await page.locator('#pg [data-pg="conversations"]').click({ force: true, timeout: 10_000 });
+    await page.locator('#pg [data-pg="conversations"]').dispatchEvent('click', undefined, { timeout: 10_000 });
     await expect.poll(() => enquiryListRequests, { timeout: 10_000 }).toBeGreaterThan(enquiryListsBeforeOpen);
     const enquiryRow = page.getByRole('button', { name: /Enquiry message retry fixture/ });
     await expect(enquiryRow).toBeVisible({ timeout: 10_000 });
