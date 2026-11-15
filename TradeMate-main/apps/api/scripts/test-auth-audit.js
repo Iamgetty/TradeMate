@@ -121,11 +121,16 @@ async function main() {
     await installReject('profile.public_details_updated');
     const publicProfileFailed = await call('PATCH', '/api/profiles/me', { bio: 'Must roll back' });
     assert.equal(publicProfileFailed.status, 500, 'audit failure must fail public profile update');
-    let publicProfile = await pool.query('SELECT bio FROM user_profiles WHERE user_id=$1', [userId]);
-    assert.equal(publicProfile.rowCount, 0, 'public profile insert must roll back when audit insert fails');
+    let publicProfile = await pool.query('SELECT bio, username FROM user_profiles WHERE user_id=$1', [userId]);
+    assert.equal(publicProfile.rowCount, 1, 'new accounts receive their default username profile at creation');
+    assert.equal(publicProfile.rows[0].bio, '', 'public profile details must roll back when audit insert fails');
+    assert.ok(publicProfile.rows[0].username, 'default username must remain present after rollback');
     await removeReject();
     const publicProfileOk = await call('PATCH', '/api/profiles/me', { bio: 'Audit success profile' });
     assert.equal(publicProfileOk.status, 200, 'public profile update must succeed when audit insert succeeds');
+    publicProfile = await pool.query('SELECT bio, username FROM user_profiles WHERE user_id=$1', [userId]);
+    assert.equal(publicProfile.rows[0].bio, 'Audit success profile');
+    assert.ok(publicProfile.rows[0].username, 'editing public profile details must not overwrite username');
 
     await installReject('profile.followed');
     const followFailed = await call('POST', '/api/profiles/' + targetId + '/follow');
