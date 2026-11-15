@@ -42,5 +42,5 @@ services:
     startCommand: npm run start
     autoDeployTrigger: checksPass
     envVars:
-      - key: NEXT_PUBLIC_API_URL
+      - key: TRADEMATE_API_ORIGIN
         value: https://trademate-api-toip.onrender.com
