@@ -2,6 +2,10 @@
 
 This roadmap records the current product direction. It is not a claim that each item is already implemented or deployed.
 
+## Production data integrity baseline — 15 November 2026
+
+A production data-integrity contract has been added at [docs/data-integrity.md](data-integrity.md). It prohibits synthetic production business records and fabricated market values, requires explicit source/provenance/freshness, isolates test fixtures from production, and treats unavailable/empty states as valid. The initial source audit identifies local-mode configuration, direct browser CoinGecko refresh, 14-day FX snapshots, 30-day non-FX market snapshots and exchange-feed reconnect/freshness verification as priority gates. These are audit findings, not claims that all production journeys have been verified.
+
 ## Current product principles
 
 - TradeMate connects counterparties; it is not a conventional exchange or product checkout.
