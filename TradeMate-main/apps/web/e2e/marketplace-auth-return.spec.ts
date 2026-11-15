@@ -113,3 +113,94 @@ test('external post-login return destinations are rejected', async ({ page }) =>
   await login(page);
   await expect.poll(() => new URL(page.url()).hostname).not.toBe('outside.example');
 });
+
+
+async function openNotifications(page: import('@playwright/test').Page, notifications: Array<Record<string, unknown>>, calls: string[]) {
+  await page.route('**/api/**', async route => {
+    const url = new URL(route.request().url());
+    const path = url.pathname;
+    const method = route.request().method();
+    if (path === '/api/auth/me') {
+      await route.fulfill({ status: 200, json: { user: { id: 'buyer-001', email: 'buyer@example.test', display_name: 'Buyer', country_code: 'NG' } } });
+      return;
+    }
+    if (path === '/api/notifications' && method === 'GET') {
+      await route.fulfill({ status: 200, json: { notifications, unread_count: notifications.length } });
+      return;
+    }
+    if (path.startsWith('/api/notifications/') && path.endsWith('/read') && method === 'PATCH') {
+      calls.push('read');
+      await route.fulfill({ status: 200, json: { success: true } });
+      return;
+    }
+    if (path === '/api/market/enquiries/mine') {
+      await route.fulfill({ status: 200, json: { data: [] } });
+      return;
+    }
+    if (path === '/api/market/enquiries/' + enquiryId + '/messages' && method === 'GET') {
+      calls.push('conversation');
+      await route.fulfill({ status: 200, json: { data: {
+        enquiry: { id: enquiryId, listing_id: listingId, listing_title: 'Bulk packaging materials', buyer_user_id: 'buyer-001', buyer_name: 'Buyer', seller_name: 'Seller', status: 'open' },
+        messages: [{ id: 'm1', sender_user_id: 'buyer-001', sender_name: 'Buyer', message: 'Initial enquiry', created_at: '2026-11-15T05:00:00.000Z', initial: true }],
+      } } });
+      return;
+    }
+    await route.fulfill({ status: 200, json: { data: [], notifications: [], preferences: {}, tickets: [], feedback: [] } });
+  });
+  await page.goto('/app');
+  await page.locator('[data-pg="notif"]:visible').first().click();
+  await expect(page.locator('.nf-card')).toHaveCount(notifications.length);
+}
+
+test('marketplace enquiry notification is marked read before its conversation opens', async ({ page }) => {
+  const calls: string[] = [];
+  await openNotifications(page, [{
+    id: '323e4567-e89b-42d3-a456-426614174000',
+    category: 'Contracts',
+    title: 'New marketplace enquiry',
+    body: 'A buyer enquired about Bulk packaging materials.',
+    icon: 'message-square',
+    created_at: '2026-11-15T05:00:00.000Z',
+    read_at: null,
+    action_url: '/messages/' + enquiryId,
+  }], calls);
+
+  await page.locator('.nf-card').click();
+  await expect(page).toHaveURL(new RegExp('/messages/' + enquiryId + '$'));
+  await expect(page.getByRole('heading', { name: 'Bulk packaging materials.' })).toBeVisible();
+  expect(calls.indexOf('read')).toBeGreaterThanOrEqual(0);
+  expect(calls.indexOf('conversation')).toBeGreaterThan(calls.indexOf('read'));
+});
+
+test('notification action links reject protocol-relative and backslash destinations', async ({ page }) => {
+  const calls: string[] = [];
+  await openNotifications(page, [
+    {
+      id: '423e4567-e89b-42d3-a456-426614174000',
+      category: 'Contracts',
+      title: 'External link must be ignored',
+      body: 'This notification has an unsafe destination.',
+      icon: 'message-square',
+      created_at: '2026-11-15T05:00:00.000Z',
+      read_at: null,
+      action_url: '//outside.example/steal-session',
+    },
+    {
+      id: '523e4567-e89b-42d3-a456-426614174000',
+      category: 'Contracts',
+      title: 'Backslash link must be ignored',
+      body: 'This notification has an unsafe destination.',
+      icon: 'message-square',
+      created_at: '2026-11-15T05:01:00.000Z',
+      read_at: null,
+      action_url: '/\\\\outside.example/steal-session',
+    },
+  ], calls);
+
+  await page.locator('.nf-card').nth(0).click();
+  await expect(page).toHaveURL(/\/app$/);
+  await page.locator('.nf-card').nth(1).click();
+  await expect(page).toHaveURL(/\/app$/);
+  expect(calls.filter(call => call === 'read')).toHaveLength(2);
+  expect(calls).not.toContain('conversation');
+});
