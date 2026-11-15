@@ -40,7 +40,7 @@ test('B2B offer creation passes the entered whole-number inventory to the API', 
     submitted = route.request().postDataJSON();
     await route.fulfill({
       status: 201,
-      json: { listing: { ...b2bOffer, quantity_available: submitted.quantityAvailable } },
+      json: { listing: { ...b2bOffer, quantity_available: submitted?.quantityAvailable } },
     });
   });
 
@@ -93,7 +93,7 @@ test('editing a B2B draft retains and submits its current inventory value', asyn
   await page.route('**/api/market/listings/' + b2bOffer.id, async route => {
     if (route.request().method() === 'PATCH') {
       savedPayload = route.request().postDataJSON();
-      await route.fulfill({ status: 200, json: { listing: { ...b2bOffer, quantity_available: savedPayload.quantityAvailable } } });
+      await route.fulfill({ status: 200, json: { listing: { ...b2bOffer, quantity_available: savedPayload?.quantityAvailable } } });
       return;
     }
     await route.continue();
