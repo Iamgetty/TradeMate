@@ -2960,9 +2960,8 @@ class CommunityFeedController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid post id.');
     const result = await databasePool.query(
-      `SELECT c.id, c.body, c.created_at, u.display_name AS author_name
-       FROM feed_comments c JOIN users u ON u.id = c.author_user_id
-       JOIN feed_posts p ON p.id = c.post_id
+      `SELECT c.id, c.author_user_id, c.body, c.created_at
+       FROM feed_comments c JOIN feed_posts p ON p.id = c.post_id
        WHERE c.post_id = $1 AND c.status = 'published' AND p.status = 'published'
        ORDER BY c.created_at ASC LIMIT 200`,
       [id],
@@ -2980,11 +2979,11 @@ class CommunityFeedController {
     const result = await databasePool!.query(
       `INSERT INTO feed_comments (post_id, author_user_id, body)
        SELECT p.id, $2, $3 FROM feed_posts p WHERE p.id = $1 AND p.status = 'published'
-       RETURNING id, post_id, body, created_at`,
+       RETURNING id, post_id, author_user_id, body, created_at`,
       [id, userId, content],
     );
     if (!result.rowCount) throw new NotFoundException('Published post not found.');
-    return { comment: { ...result.rows[0], author_name: 'You' } };
+    return { comment: result.rows[0] };
   }
 
   @Post('posts/:id/reactions')
