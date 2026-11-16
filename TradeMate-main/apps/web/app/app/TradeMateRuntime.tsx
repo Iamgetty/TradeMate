@@ -26,6 +26,8 @@ export default function TradeMateRuntime() {
     window.TM_CONFIG = { api: '/api' };
 
     let settled = false;
+    let feedReady = false;
+    let cssReady = false;
     const fail = (title: string, detail: string) => {
       if (settled) return;
       settled = true;
@@ -48,22 +50,46 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=98';
+    app.src = '/tm/app.js?v=99';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=98. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=99. Check the deployment and static asset response.');
 
     const loadApp = () => {
-      if (settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !cssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
+
+    // The first legacy runtime style is now a real blocking stylesheet.
+    // Do not start app.js until it is ready, preserving the original startup
+    // cascade and preventing the app from painting without its base rule.
+    const baseCss = document.createElement('link');
+    baseCss.rel = 'stylesheet';
+    baseCss.href = '/tm/runtime-base.css?v=1';
+    baseCss.onload = () => {
+      cssReady = true;
+      loadApp();
+    };
+    baseCss.onerror = () => {
+      // Keep startup resilient if the static CSS asset is unavailable.
+      const fallback = document.createElement('style');
+      fallback.textContent = 'input,select,textarea{font-size:16px!important}';
+      document.head.appendChild(fallback);
+      cssReady = true;
+      loadApp();
+    };
+    document.head.appendChild(baseCss);
 
     const feed = document.createElement('script');
     feed.src = '/tm/feed-client.js?v=2';
     feed.async = false;
-    feed.onload = loadApp;
+    feed.onload = () => {
+      feedReady = true;
+      loadApp();
+    };
     feed.onerror = () => {
       // The feed helper is optional for rendering the core application.
+      feedReady = true;
       loadApp();
     };
     document.body.appendChild(feed);
