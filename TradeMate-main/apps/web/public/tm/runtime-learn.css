@@ -1,0 +1,15 @@
+
+.ln-list{display:grid;grid-template-columns:1fr;gap:8px;margin-top:12px}
+.ln-card{align-items:flex-start}
+.ln-card .er-go{align-self:center}
+.ln-min{align-self:flex-start;display:inline-flex;align-items:center;gap:4px;margin:2px 0 3px;padding:2px 8px;border-radius:999px;border:1px solid color-mix(in srgb,var(--am) 55%,transparent);background:color-mix(in srgb,var(--am) 10%,transparent);color:var(--am);font:700 10px 'Hanken Grotesk',sans-serif}
+.ln-min svg{width:11px;height:11px}
+@media(min-width:900px){
+.tm-desktop .pgs[data-id=learn] .ph{display:none}
+.tm-desktop .pgs[data-id=learn] .pgw{max-width:900px}
+.ln-list{grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.ln-card{flex-direction:row;align-items:flex-start;min-height:0;padding:14px;gap:12px}
+.ln-card .er-tx{flex:1;width:auto}
+.ln-card .er-tx small{padding-right:0}
+.ln-card .er-go{position:static;align-self:center}
+}
