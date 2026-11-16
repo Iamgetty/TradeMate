@@ -1,0 +1,18 @@
+
+@media(max-width:599px){
+.pmx .pm-h h2{font-size:16px!important}
+.pmx .pm-card .pm-pill{font-size:10.5px!important;height:24px!important}
+.pmx>.pm-card:first-child .pm-ring{width:80px!important;height:80px!important}
+.pmx>.pm-card:first-child .pm-ring b{font-size:19px!important}
+.pmx>.pm-card:first-child .pm-ring small{font-size:8.5px!important;margin-top:2px}
+.pmx>.pm-card:first-child .pm-pb{gap:12px 14px!important}
+.pmx>.pm-card:first-child .pm-val small{font-size:11px!important}
+.pmx>.pm-card:first-child .pm-val b{font-size:clamp(21px,6vw,25px)!important;margin:3px 0 8px!important}
+.pmx>.pm-card:first-child .pm-val .pm-up{font-size:10.5px!important;padding:3px 8px 3px 6px!important}
+.pmx>.pm-card:first-child .pm-val .pm-lv{font-size:10px!important;padding:3px 8px;gap:5px}
+.pmx>.pm-card:first-child .pm-st{gap:8px!important}
+.pmx>.pm-card:first-child .pm-st>div:not(.pm-seg){padding:8px 6px;gap:4px;border-radius:12px}
+.pmx>.pm-card:first-child .pm-st small{font-size:10.5px!important}
+.pmx>.pm-card:first-child .pm-st small i{width:6px;height:6px;margin-right:5px!important}
+.pmx>.pm-card:first-child .pm-st b{font-size:18px!important}
+}
