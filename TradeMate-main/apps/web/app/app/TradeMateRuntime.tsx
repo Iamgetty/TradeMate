@@ -36,6 +36,7 @@ export default function TradeMateRuntime() {
     let searchCssReady = false;
     let contractfCssReady = false;
     let contractf2CssReady = false;
+    let helpCssReady = false;
     const fail = (title: string, detail: string) => {
       if (settled) return;
       settled = true;
@@ -64,7 +65,7 @@ export default function TradeMateRuntime() {
     app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=111. Check the deployment and static asset response.');
 
     const loadApp = () => {
-      if (!feedReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -207,6 +208,14 @@ export default function TradeMateRuntime() {
     };
     document.head.appendChild(contractf2Preload);
 
+
+    const helpPreload = document.createElement('link');
+    helpPreload.rel = 'preload';
+    helpPreload.as = 'style';
+    helpPreload.href = '/tm/runtime-help.css?v=1';
+    helpPreload.onload = () => { helpCssReady = true; loadApp(); };
+    helpPreload.onerror = () => { helpCssReady = true; loadApp(); };
+    document.head.appendChild(helpPreload);
     const feed = document.createElement('script');
     feed.src = '/tm/feed-client.js?v=2';
     feed.async = false;
