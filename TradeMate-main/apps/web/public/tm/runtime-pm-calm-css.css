@@ -1,0 +1,8 @@
+
+html .pmx.pmx{--pm-act:var(--am);--pm-pen:color-mix(in srgb,var(--am) 50%,var(--s3));--pm-ok:var(--mut);--pm-t1:var(--txt);--pm-t2:var(--txt);--pm-t3:var(--txt);--pm-t4:var(--txt);--pm-d1:var(--mut);--pm-d2:var(--mut);--pm-d3:var(--mut);--pm-d4:var(--mut)}
+html .pmx .pm-card{background:var(--s1)!important}
+html .pmx .pm-card:before{display:none!important}
+html .pmx .pm-h>svg,html .pmx .pm-h>svg.hd{background:var(--s2)!important;box-shadow:inset 0 0 0 1px var(--line)!important;color:var(--am)}
+html .pmx .pm-rg,html .pmx .pm-sd,html .pmx .pm-sl,html .pmx .pm-ring circle{filter:none!important}
+html .pmx>.pm-card:first-child .pm-st>div:not(.pm-seg){background:var(--s2)!important}
+html .pmx .pm-doc em{background:var(--s3)!important;color:var(--mut)!important}
