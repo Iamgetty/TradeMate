@@ -28,6 +28,7 @@ export default function TradeMateRuntime() {
     let settled = false;
     let feedReady = false;
     let cssReady = false;
+    let layoutCssReady = false;
     const fail = (title: string, detail: string) => {
       if (settled) return;
       settled = true;
@@ -50,13 +51,13 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=101';
+    app.src = '/tm/app.js?v=102';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=101. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=102. Check the deployment and static asset response.');
 
     const loadApp = () => {
-      if (!feedReady || !cssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !cssReady || !layoutCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -79,6 +80,25 @@ export default function TradeMateRuntime() {
       loadApp();
     };
     document.head.appendChild(baseCss);
+
+    // Fetch the next extracted runtime stylesheet before app.js executes.
+    // app.js inserts its stylesheet link at the former style-block position,
+    // preserving the original cascade order while avoiding a late CSS fetch.
+    const layoutPreload = document.createElement('link');
+    layoutPreload.rel = 'preload';
+    layoutPreload.as = 'style';
+    layoutPreload.href = '/tm/runtime-layout.css?v=1';
+    layoutPreload.onload = () => {
+      layoutCssReady = true;
+      loadApp();
+    };
+    layoutPreload.onerror = () => {
+      // Do not prevent the application from starting if the optional preload
+      // hint fails; app.js still inserts the stylesheet at its cascade point.
+      layoutCssReady = true;
+      loadApp();
+    };
+    document.head.appendChild(layoutPreload);
 
     const feed = document.createElement('script');
     feed.src = '/tm/feed-client.js?v=2';
@@ -104,7 +124,7 @@ export default function TradeMateRuntime() {
       if (!rendered) {
         fail(
           'TradeMate could not start',
-          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=101 returns successfully.'
+          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=102 returns successfully.'
         );
         return;
       }
