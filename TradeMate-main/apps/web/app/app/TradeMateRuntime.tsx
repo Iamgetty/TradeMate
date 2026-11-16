@@ -11,24 +11,14 @@ declare global {
 
 type BootIssue = { title: string; detail: string };
 
-function isVisible(el: Element | null): boolean {
-  if (!el) return false;
-  const rect = el.getBoundingClientRect();
-  const style = window.getComputedStyle(el);
-  return rect.width > 0 && rect.height > 0 &&
-    style.display !== 'none' && style.visibility !== 'hidden' &&
-    parseFloat(style.opacity || '1') > 0.01;
-}
-
 /**
  * Next.js runtime boundary for the legacy TradeMate app.
  * Startup diagnostics live here because /app does not load public/tm/index.html.
+ * No loading screen is shown: the page renders nothing until the legacy app
+ * paints itself, and only a real startup failure shows the error card below.
  */
 export default function TradeMateRuntime() {
   const [issue, setIssue] = useState<BootIssue | null>(null);
-  // True once the legacy app has painted something visible. The startup shell
-  // is removed at that point so it never sits behind or beside the real app.
-  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (window.__tradeMateBooted) return;
@@ -58,10 +48,10 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=85';
+    app.src = '/tm/app.js?v=86';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=85. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=86. Check the deployment and static asset response.');
 
     const loadApp = () => {
       if (settled || document.querySelector('script[data-trademate-app]')) return;
@@ -78,21 +68,6 @@ export default function TradeMateRuntime() {
     };
     document.body.appendChild(feed);
 
-    // Remove the startup shell as soon as the legacy app is visibly on screen
-    // (public landing or signed-in view). Polling is used because the legacy
-    // runtime reveals itself with style changes, which MutationObserver on
-    // childList would miss.
-    const revealTimer = window.setInterval(() => {
-      const landing = document.getElementById('land');
-      const view = document.querySelector('#app .view');
-      if (isVisible(landing) || isVisible(view)) {
-        window.clearInterval(revealTimer);
-        setReady(true);
-      }
-    }, 250);
-    // Stop polling after a minute; the watchdog below reports real failures.
-    window.setTimeout(() => window.clearInterval(revealTimer), 60000);
-
     // The Next.js /app route does not execute public/tm/index.html, so it needs
     // its own rendered-shell and landing-overlay watchdog.
     window.setTimeout(() => {
@@ -103,7 +78,7 @@ export default function TradeMateRuntime() {
       if (!rendered) {
         fail(
           'TradeMate could not start',
-          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=85 returns successfully.'
+          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=86 returns successfully.'
         );
         return;
       }
@@ -121,78 +96,36 @@ export default function TradeMateRuntime() {
     // the legacy runtime owns the DOM and its WebSocket lifecycle.
   }, []);
 
-  if (issue) {
-    return (
-      <main role="alert" style={{
-        position: 'fixed', inset: 0, zIndex: 20000, display: 'grid',
-        placeItems: 'center', padding: 20, background: '#050505',
-        color: '#f5f7fa', fontFamily: 'system-ui, sans-serif',
-      }}>
-        <section style={{
-          width: 'min(100%, 520px)', padding: 22, borderRadius: 16,
-          border: '1px solid #704b32', background: '#111820',
-          boxShadow: '0 18px 60px #0009',
-        }}>
-          <p style={{ margin: '0 0 8px', color: '#ffb02e', fontSize: 11, fontWeight: 800, letterSpacing: '.12em' }}>
-            TRADEMATE STARTUP
-          </p>
-          <h1 style={{ margin: '0 0 10px', fontSize: 22 }}>{issue.title}</h1>
-          <p style={{ margin: '0 0 18px', color: '#b8c2ce', fontSize: 13, lineHeight: 1.55 }}>
-            {issue.detail}
-          </p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            style={{
-              border: 0, borderRadius: 10, padding: '11px 16px',
-              background: '#ffb02e', color: '#17110a', fontWeight: 800,
-            }}
-          >
-            Reload app
-          </button>
-        </section>
-      </main>
-    );
-  }
-
-  // The legacy app is on screen: render nothing so the shell cannot overlap it.
-  if (ready) return null;
+  if (!issue) return null;
 
   return (
-    <main
-      id="trademate-startup"
-      aria-live="polite"
-      aria-busy="true"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 19000,
-        display: 'grid',
-        placeItems: 'center',
-        padding: 24,
-        background: '#070a0e',
-        color: '#f2f6fa',
-        fontFamily: 'system-ui, sans-serif',
-      }}
-    >
-      <section style={{ width: 'min(100%, 420px)', textAlign: 'center' }}>
-        <div
-          aria-hidden="true"
-          style={{
-            width: 34,
-            height: 34,
-            margin: '0 auto 18px',
-            border: '3px solid #26343d',
-            borderTopColor: '#9effc7',
-            borderRadius: '50%',
-            animation: 'trademate-spin .8s linear infinite',
-          }}
-        />
-        <p style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Opening TradeMate</p>
-        <p style={{ margin: '8px 0 0', color: '#8996a6', fontSize: 12 }}>
-          Connecting your workspace…
+    <main role="alert" style={{
+      position: 'fixed', inset: 0, zIndex: 20000, display: 'grid',
+      placeItems: 'center', padding: 20, background: '#050505',
+      color: '#f5f7fa', fontFamily: 'system-ui, sans-serif',
+    }}>
+      <section style={{
+        width: 'min(100%, 520px)', padding: 22, borderRadius: 16,
+        border: '1px solid #704b32', background: '#111820',
+        boxShadow: '0 18px 60px #0009',
+      }}>
+        <p style={{ margin: '0 0 8px', color: '#ffb02e', fontSize: 11, fontWeight: 800, letterSpacing: '.12em' }}>
+          TRADEMATE STARTUP
         </p>
-        <style>{'@keyframes trademate-spin{to{transform:rotate(360deg)}}'}</style>
+        <h1 style={{ margin: '0 0 10px', fontSize: 22 }}>{issue.title}</h1>
+        <p style={{ margin: '0 0 18px', color: '#b8c2ce', fontSize: 13, lineHeight: 1.55 }}>
+          {issue.detail}
+        </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          style={{
+            border: 0, borderRadius: 10, padding: '11px 16px',
+            background: '#ffb02e', color: '#17110a', fontWeight: 800,
+          }}
+        >
+          Reload app
+        </button>
       </section>
     </main>
   );
