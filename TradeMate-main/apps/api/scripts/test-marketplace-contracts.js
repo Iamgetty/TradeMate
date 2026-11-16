@@ -156,7 +156,7 @@ async function main() {
     const memberCancel = await call('member', 'PATCH', '/api/market/contracts/' + cancelledId + '/cancel');
     assert.equal(memberCancel.status, 404, 'ordinary seller members must not cancel a buyer proposal');
     const pendingAfterDeniedCancel = await call('buyer', 'GET', '/api/market/contracts/' + cancelledId);
-    assert.equal((await pendingAfterDeniedCancel.json()).data.status, 'pending',
+    assert.equal((await pendingAfterDeniedCancel.json()).data.status, 'proposed',
       'an unauthorized seller-member cancellation must leave the proposal unchanged');
     const cancelled = await call('buyer', 'PATCH', '/api/market/contracts/' + cancelledId + '/cancel');
     assert.equal(cancelled.status, 200, 'buyer must be able to cancel a pending proposal');
