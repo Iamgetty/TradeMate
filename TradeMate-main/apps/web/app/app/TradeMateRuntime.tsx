@@ -35,6 +35,7 @@ export default function TradeMateRuntime() {
     let nftCssReady = false;
     let searchCssReady = false;
     let contractfCssReady = false;
+    let contractf2CssReady = false;
     const fail = (title: string, detail: string) => {
       if (settled) return;
       settled = true;
@@ -57,13 +58,13 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=110';
+    app.src = '/tm/app.js?v=111';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=109. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=111. Check the deployment and static asset response.');
 
     const loadApp = () => {
-      if (!feedReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -191,6 +192,20 @@ export default function TradeMateRuntime() {
       loadApp();
     };
     document.head.appendChild(contractfPreload);
+
+    const contractf2Preload = document.createElement('link');
+    contractf2Preload.rel = 'preload';
+    contractf2Preload.as = 'style';
+    contractf2Preload.href = '/tm/runtime-contractf2.css?v=1';
+    contractf2Preload.onload = () => {
+      contractf2CssReady = true;
+      loadApp();
+    };
+    contractf2Preload.onerror = () => {
+      contractf2CssReady = true;
+      loadApp();
+    };
+    document.head.appendChild(contractf2Preload);
 
     const feed = document.createElement('script');
     feed.src = '/tm/feed-client.js?v=2';
