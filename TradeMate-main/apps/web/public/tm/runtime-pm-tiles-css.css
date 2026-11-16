@@ -1,0 +1,16 @@
+
+/* Wallet actions: rounded tiles with coloured icons (Deposit, Transfer, Assets) */
+.pmx .pm-card .pm-wb{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:none;gap:8px;align-items:stretch;align-content:start}
+.pmx .pm-card .pm-wb .pm-bal{grid-column:1/-1;grid-row:auto;min-height:0;padding:12px 14px;border-radius:14px;gap:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.pmx .pm-card .pm-wb .pm-bal small{font-size:11.5px;font-weight:600;color:var(--mut)}
+.pmx .pm-card .pm-wb .pm-bal b{font-size:22px;margin:0;line-height:1.1;letter-spacing:-.02em}
+.pmx .pm-card .pm-wb .pm-bal .pm-up{display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px 2px 6px;border-radius:999px;color:var(--mut)!important;background:var(--s2)!important;border:0}
+.pmx .pm-card .pm-wb .pm-bal .pm-up svg{width:11px;height:11px}
+.pmx .pm-card .pm-wb .pm-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:64px;padding:10px 4px;border-radius:14px;background:var(--s2)!important;border:1px solid var(--line)!important;box-shadow:none!important;font:700 12px/1.1 'Hanken Grotesk',sans-serif;color:var(--txt);transition:background .18s,border-color .18s}
+.pmx .pm-card .pm-wb .pm-tile:hover{background:var(--s3)!important}
+.pmx .pm-card .pm-wb .pm-tile:active{transform:scale(.97)}
+.pmx .pm-card .pm-wb .pm-tile>span{display:grid;place-items:center;width:auto;height:auto;border-radius:0;background:none!important;box-shadow:none!important;translate:none;scale:none;color:var(--txt)!important}
+.pmx .pm-card .pm-wb .pm-tile svg{width:20px;height:20px}
+.pmx .pm-card .pm-wb .pm-tile:nth-of-type(n)>span{color:var(--txt)!important}
+.pmx .pm-card .pm-wb .pm-tile svg *{stroke:currentColor}
+.pmx>.pm-card:nth-child(2) .pm-h>svg{color:var(--txt)!important;width:26px;height:26px}
