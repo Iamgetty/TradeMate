@@ -273,3 +273,15 @@ html[data-theme] .nft-toolbar-select,html[data-theme] .nft-toolbar-select select
 .tm-desktop .sp-ri{width:38px;height:38px}
 .tm-desktop .sp-row span.t{font-size:14px}
 }
+
+
+/* Desktop Profile mode-switcher page: keep scrolling native and confined to
+   its own viewport so the top and bottom remain reachable. */
+@media (min-width:900px){
+  .tm-desktop .pgs[data-id="profile"]{
+    overflow-x:hidden;
+    overflow-y:auto;
+    overscroll-behavior-y:contain;
+    scroll-behavior:auto!important;
+  }
+}
