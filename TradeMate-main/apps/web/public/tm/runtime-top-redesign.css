@@ -1,0 +1,58 @@
+
+:root{--pt-or:var(--am);--pt-or2:var(--am);--pt-ln:color-mix(in srgb,var(--am) 27%,transparent)}
+.pt-hero{position:relative;overflow-x:clip;display:flex;align-items:center;gap:14px;padding:8px 16px 14px}
+.pt-hero:after{content:"";position:absolute;right:-90px;top:-100px;width:240px;height:240px;border-radius:50%;border:2px solid color-mix(in srgb,var(--am) 22%,transparent);box-shadow:inset 0 0 0 18px color-mix(in srgb,var(--am) 5%,transparent);pointer-events:none}
+.pt-av{position:relative;z-index:1;width:64px;height:64px;flex:none;border-radius:50%;display:grid;place-items:center;overflow:hidden;background:radial-gradient(circle at 50% 40%,var(--s2),#000 72%);border:1.5px solid var(--pt-or);box-shadow:0 0 16px color-mix(in srgb,var(--am) 23%,transparent),inset 0 0 12px color-mix(in srgb,var(--am) 12%,transparent)}
+.pt-av img{width:100%;height:100%;object-fit:cover;display:block}
+.pt-ti{font:800 28px/1 'Bricolage Grotesque','Hanken Grotesk',sans-serif;font-style:italic;letter-spacing:-.05em;padding-right:3px;background:linear-gradient(135deg,var(--pt-or2),var(--co));-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+.pt-id{position:relative;z-index:1;min-width:0;flex:1}
+.pt-id h1{font:800 24px/1.1 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.02em;color:var(--txt);overflow-wrap:anywhere}
+.pt-uid{display:flex;align-items:center;gap:8px;margin:3px 0 8px;color:var(--mut);font:600 12.5px 'Hanken Grotesk',sans-serif}
+.pt-uid button{display:grid;place-items:center;color:var(--mut)}
+.pt-uid svg{width:15px;height:15px}
+.pt-pills{display:flex;flex-wrap:wrap;gap:6px}
+.pt-ok,.pt-pill{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border-radius:999px;font:700 12px 'Hanken Grotesk',sans-serif;white-space:nowrap}
+.pt-ok svg{width:13px;height:13px}.pt-pill svg{width:12px;height:12px}
+.pt-ok{color:var(--up);background:color-mix(in srgb,var(--up) 9%,transparent);border:1px solid color-mix(in srgb,var(--up) 44%,transparent)}
+.pt-pill{color:var(--txt);border:1px solid var(--line);background:color-mix(in srgb,var(--txt) 3%,transparent)}
+.pt-card{position:relative;z-index:1;margin:0 16px 14px;padding:16px 16px 14px;border-radius:18px;background:linear-gradient(180deg,var(--s1),var(--bg));border:1px solid var(--line)}
+.pt-top{display:flex;align-items:center;margin-bottom:16px}
+.pt-sh{display:grid;place-items:center;width:40px;flex:none}
+.pt-sh svg{width:34px;height:34px}
+.pt-vr{align-self:stretch;width:1px;background:var(--line);margin:0 14px 0 10px}
+.pt-tx{min-width:0;flex:1}
+.pt-tx h3{font:800 15px/1.2 'Hanken Grotesk','Bricolage Grotesque',sans-serif;letter-spacing:-.01em;color:var(--txt);margin:0 0 3px}
+.pt-tx p{margin:0;color:var(--mut);font:500 12px/1.4 'Hanken Grotesk',sans-serif}
+.pt-prog{display:flex;align-items:center;gap:12px}
+.pt-bar{flex:1;height:8px;border-radius:999px;background:var(--s3);overflow:hidden}
+.pt-bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--am),var(--am))}
+.pt-prog b{font:700 13px 'Hanken Grotesk',sans-serif;color:var(--txt);font-variant-numeric:tabular-nums}
+.pt-meta{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:10px 0 12px}
+.pt-meta small{font:500 11.5px 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.pt-meta button{white-space:nowrap;font:700 12px 'Hanken Grotesk',sans-serif;color:var(--pt-or)}
+.pt-cta{display:block;width:100%;height:42px;border-radius:999px;background:var(--co);color:var(--ongrad,#1b1006);font:800 14px 'Hanken Grotesk',sans-serif;text-align:center}
+.pt-cta:active{filter:brightness(.92)}
+.uc-hd{background:transparent!important;backdrop-filter:none!important;padding-bottom:4px}
+.uc-hd h2{font:700 16px 'Hanken Grotesk',sans-serif;color:var(--txt)}
+.uc-hd .bk2{width:36px;height:36px;display:grid;place-items:center;background:none!important;border:0!important;color:var(--txt)}
+.uc-hd .bk2 svg,.uc-hd .rt svg{width:22px;height:22px}
+.uc-hd .rts{gap:2px}
+.uc-hd .rt{background:none!important;border:0!important;box-shadow:none!important;width:38px;height:36px;color:var(--txt)}
+.uc-tabs{display:grid;grid-template-columns:repeat(3,1fr);position:relative;margin:6px 16px 12px;height:42px;border-radius:15px;border:1px solid var(--pt-ln);background:color-mix(in srgb,var(--bg) 60%,transparent)}
+.uc-tabs button{position:relative;display:grid;place-items:center;font:700 13.5px 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.uc-tabs button+button:before{content:"";position:absolute;left:0;top:30%;bottom:30%;width:1px;background:var(--line)}
+.uc-tabs button.on{color:var(--pt-or)}
+.uc-tabs button.on:after{content:"";position:absolute;left:8px;right:8px;bottom:-1px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--am),var(--am));box-shadow:0 0 8px color-mix(in srgb,var(--am) 40%,transparent)}
+.uc-card{position:relative;overflow:hidden;display:flex;align-items:center;gap:14px;margin:0 16px 14px;padding:16px;border-radius:18px;border:1px solid var(--pt-ln);background:linear-gradient(135deg,var(--s1),var(--s2) 130%)}
+.uc-card:after{content:"";position:absolute;right:-90px;top:-50px;width:210px;height:210px;border-radius:50%;border:2px solid color-mix(in srgb,var(--am) 23%,transparent);box-shadow:inset 0 0 0 20px color-mix(in srgb,var(--am) 5%,transparent);pointer-events:none}
+.uc-av{position:relative;z-index:1;width:64px;height:64px;flex:none;border-radius:50%;display:grid;place-items:center;overflow:hidden;background:#000;border:2px solid var(--pt-or)}
+.uc-av img{width:100%;height:100%;object-fit:cover;display:block}
+.uc-av svg{width:44px;height:44px;margin-top:3px}
+.uc-id{position:relative;z-index:1;min-width:0;flex:1}
+.uc-id h1{display:flex;align-items:center;gap:8px;font:800 22px/1.1 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.02em;color:var(--txt);overflow-wrap:anywhere}
+.uc-badge{flex:none;width:19px;height:19px}
+.uc-sec{display:flex;align-items:center;gap:7px;margin-top:6px;color:var(--mut);font:500 12.5px 'Hanken Grotesk',sans-serif}
+.uc-sec b{color:var(--pt-or);font-weight:700}
+.uc-sec svg{width:16px;height:16px}
+.uc-reg{display:flex;align-items:center;gap:7px;margin-top:6px;color:var(--mut);font:500 12.5px 'Hanken Grotesk',sans-serif}
+.uc-reg svg{width:15px;height:15px;color:var(--mut)}
