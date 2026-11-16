@@ -1,4 +1,4 @@
-'html{-webkit-text-size-adjust:100%;text-rendering:optimizeLegibility;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%;text-rendering:optimizeLegibility;-webkit-tap-highlight-color:transparent}
 body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;font-kerning:normal}
 svg{shape-rendering:geometricPrecision}
 .cell,.bk,.up,.dn,[class*=price],[class*=amt]{font-variant-numeric:tabular-nums}
