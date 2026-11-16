@@ -32,6 +32,7 @@ export default function TradeMateRuntime() {
     let patchesCssReady = false;
     let portfolioCssReady = false;
     let polishCssReady = false;
+    let nftCssReady = false;
     const fail = (title: string, detail: string) => {
       if (settled) return;
       settled = true;
@@ -54,13 +55,13 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=107';
+    app.src = '/tm/app.js?v=108';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=107. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=108. Check the deployment and static asset response.');
 
     const loadApp = () => {
-      if (!feedReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -145,6 +146,21 @@ export default function TradeMateRuntime() {
     };
     document.head.appendChild(polishPreload);
 
+
+    const nftPreload = document.createElement('link');
+    nftPreload.rel = 'preload';
+    nftPreload.as = 'style';
+    nftPreload.href = '/tm/runtime-nft.css?v=1';
+    nftPreload.onload = () => {
+      nftCssReady = true;
+      loadApp();
+    };
+    nftPreload.onerror = () => {
+      nftCssReady = true;
+      loadApp();
+    };
+    document.head.appendChild(nftPreload);
+
     const feed = document.createElement('script');
     feed.src = '/tm/feed-client.js?v=2';
     feed.async = false;
@@ -169,7 +185,7 @@ export default function TradeMateRuntime() {
       if (!rendered) {
         fail(
           'TradeMate could not start',
-          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=107 returns successfully.'
+          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=108 returns successfully.'
         );
         return;
       }
