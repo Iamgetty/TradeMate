@@ -773,8 +773,17 @@ test('desktop Profile content scrolls fully while its header and mode switcher s
       return { header: rect(header), footer: rect(footer), bodyTop: body.scrollTop };
     });
     expect(anchored).not.toBeNull();
-    expect(anchored!.header.top).toBeCloseTo(before!.header.top, 0);
-    expect(anchored!.footer.bottom).toBeCloseTo(before!.footer.bottom, 0);
+    // Scrolling the nested content can trigger a brief browser layout/scroll
+    // anchoring adjustment. Wait for the header and footer to settle back into
+    // their anchored positions; a persistent displacement still fails.
+    await expect.poll(
+      () => header.evaluate(element => element.getBoundingClientRect().top),
+      { timeout: 5_000, message: 'Profile header should remain anchored after content scrolling' },
+    ).toBeCloseTo(before!.header.top, 0);
+    await expect.poll(
+      () => footer.evaluate(element => element.getBoundingClientRect().bottom),
+      { timeout: 5_000, message: 'Profile mode switcher should remain anchored after content scrolling' },
+    ).toBeCloseTo(before!.footer.bottom, 0);
     expect(anchored!.bodyTop).toBeGreaterThan(0);
 
     await content.evaluate(element => { element.scrollTop = 0; });
