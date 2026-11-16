@@ -1,0 +1,132 @@
+
+.cf.cf2{padding:0 16px calc(24px + env(safe-area-inset-bottom,0px));gap:14px;max-width:none}
+.cf2 :where(h1,h2){margin:0}
+.cf2-hero{position:relative;min-height:104px;display:flex;align-items:center;margin:0 -16px;padding:6px 16px;overflow:hidden;background:radial-gradient(60% 120% at 88% 45%,color-mix(in srgb,var(--am) 24%,transparent),transparent 70%)}
+.cf2-ht{position:relative;z-index:1;max-width:62%}
+.cf2-ht h1{font:800 26px/1.05 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.03em;color:var(--txt)}
+.cf2-ht p{margin:6px 0 0;font:500 13px/1.45 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.cf2-hero .cf-art{position:absolute;right:0;top:50%;transform:translateY(-50%);width:128px;height:auto;pointer-events:none}
+.cf2-steps{list-style:none;margin:2px 0 0;padding:8px 0 0;display:grid;grid-template-columns:repeat(3,1fr)}
+.cf2-steps li{position:relative;display:grid;justify-items:center;gap:6px;font:700 12px 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.cf2-steps li+li::before{content:"";position:absolute;top:13px;right:50%;width:100%;height:2px;border-radius:2px;background:var(--line)}
+.cf2-steps li.dn+li::before,.cf2-steps li.on+li.dn::before{background:var(--am)}
+.cf2-steps i{position:relative;z-index:1;width:28px;height:28px;display:grid;place-items:center;border-radius:50%;border:1.5px solid var(--line);background:var(--s1);color:var(--mut);font:800 12.5px 'Hanken Grotesk',sans-serif;font-style:normal;transition:background .2s,border-color .2s,box-shadow .2s}
+.cf2-steps i svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.cf2-steps li.on{color:var(--am)}
+.cf2-steps li.on i{background:var(--am);border-color:var(--am);color:var(--ongrad,#1b1006);box-shadow:0 0 0 5px color-mix(in srgb,var(--am) 20%,transparent)}
+.cf2-steps li.dn{color:var(--txt)}
+.cf2-steps li.dn i{border-color:var(--am);color:var(--am);background:color-mix(in srgb,var(--am) 14%,var(--s1))}
+.cf2-offer{display:flex;align-items:center;gap:11px;width:100%;padding:9px 12px;border-radius:14px;text-align:left;color:var(--txt);border:1px solid color-mix(in srgb,var(--am) 50%,transparent);background:radial-gradient(ellipse at 0% 50%,color-mix(in srgb,var(--am) 16%,transparent),transparent 62%),var(--s1);box-shadow:0 10px 30px -18px color-mix(in srgb,var(--am) 70%,transparent)}
+button.cf2-offer{cursor:pointer;transition:border-color .2s}
+button.cf2-offer:hover{border-color:var(--am)}
+.cf2-oi{width:40px;height:40px;flex:none;display:grid;place-items:center;border-radius:12px;background:color-mix(in srgb,var(--am) 10%,var(--s2));border:1px solid color-mix(in srgb,var(--am) 20%,transparent)}
+.cf2-oi svg{width:24px;height:24px}
+.cf2-ox{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.cf2-ox small{font:800 14px/1.25 'Hanken Grotesk',sans-serif;color:var(--txt)}
+.cf2-ox strong{font:600 12.5px/1.3 'Hanken Grotesk',sans-serif;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cf2-ox em{font:500 11.5px/1.3 'Hanken Grotesk',sans-serif;font-style:normal;color:var(--mut)}
+.cf2-chg{flex:none;padding:5px 11px;border-radius:999px;font:700 12px 'Hanken Grotesk',sans-serif;color:var(--am);background:color-mix(in srgb,var(--am) 14%,transparent)}
+.cf2-oc{flex:none;display:grid;color:var(--txt);transition:transform .2s}.cf2-oc svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.cf2-offer.open .cf2-oc{transform:rotate(90deg)}
+.cf2-offers{display:grid;gap:6px;margin-top:-6px}
+.cf2-op{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;border-radius:13px;background:var(--s1);border:1px solid var(--line);text-align:left;color:var(--txt);cursor:pointer}
+.cf2-op.on{border-color:var(--am)}
+.cf2-op span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.cf2-op b{font:700 13px 'Hanken Grotesk',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cf2-op small{font:500 11.5px 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.cf2-op svg{width:17px;height:17px;color:var(--am);flex:none}
+.cf2-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+.cf2-main{display:grid;gap:14px;min-width:0}
+.cf2-side{display:contents}
+.cf2-card{display:grid;gap:16px;padding:16px;border-radius:18px;background:var(--s1);border:1px solid var(--line)}
+.cf2-card h2,.cf2-sum h2,.cf2-next h2{font:800 15px 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.01em;color:var(--txt)}
+.cf2-f{display:grid;gap:7px;min-width:0}
+.cf2-l{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font:700 13px 'Hanken Grotesk',sans-serif;color:var(--txt)}
+.cf2-l em{font:500 11.5px 'Hanken Grotesk',sans-serif;font-style:normal;color:var(--mut)}
+.cf2-in{display:flex;align-items:center;gap:10px;min-height:48px;padding:0 12px;border-radius:13px;background:var(--bg);border:1px solid var(--line);transition:border-color .15s,box-shadow .15s}
+.cf2-in:hover{border-color:color-mix(in srgb,var(--am) 35%,var(--line))}
+.cf2-in:focus-within{border-color:var(--am);box-shadow:0 0 0 3px color-mix(in srgb,var(--am) 22%,transparent)}
+.cf2-in.ar{align-items:flex-start;padding:12px}
+.cf2-in i{min-width:28px;height:28px;padding:0 6px;box-sizing:border-box;flex:none;display:grid;place-items:center;border-radius:9px;background:color-mix(in srgb,var(--am) 14%,transparent);color:var(--am);font-style:normal}
+.cf2-in i b{font:800 11px 'Hanken Grotesk',sans-serif;letter-spacing:.02em}
+.cf2-in i svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.cf2-in input,.cf2-in textarea{flex:1;min-width:0;width:100%;border:0;outline:0;background:transparent;color:var(--txt);font:500 15px 'Hanken Grotesk',sans-serif;padding:0}
+.cf2-in textarea{resize:vertical;min-height:84px;line-height:1.5}
+.cf2-in input[type=date]{min-height:46px;color-scheme:dark}
+html[data-theme="light"] .cf2-in input[type=date]{color-scheme:light}
+.cf2-in input::placeholder,.cf2-in textarea::placeholder{color:var(--mut);opacity:.8}
+.cf2-in input[type=date]::-webkit-calendar-picker-indicator{opacity:.7;cursor:pointer}
+.cf2-h{font:500 12px 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.cf2-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.cf2-card h2{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.cf2-card h2 small{font:500 12px 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.cf2-in.dt{position:relative;gap:8px;padding:0 10px}
+.cf2-in.dt i{min-width:26px;height:26px;padding:0}
+.cf2-in.dt input{font-size:14.5px}
+.cf2-ph{position:absolute;left:46px;pointer-events:none;font:500 14.5px 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.cf2-in.dt.has .cf2-ph,.cf2-in.dt:focus-within .cf2-ph{display:none}
+.cf2-in.dt:not(.has):not(:focus-within) input{color:transparent}
+.cf2-sum,.cf2-next{display:none}
+.cf2-act{position:sticky;bottom:0;z-index:5;margin:0 -16px;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:linear-gradient(to top,var(--bg) 62%,transparent)}
+.cf2-send{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;height:52px;border:0;border-radius:14px;cursor:pointer;background:var(--grad,var(--am));color:var(--ongrad,#1b1006);font:800 15.5px 'Hanken Grotesk',sans-serif;box-shadow:0 12px 28px -12px color-mix(in srgb,var(--am) 80%,transparent);transition:transform .15s,filter .15s}
+.cf2-send svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.cf2-send:hover{filter:brightness(1.06)}.cf2-send:active{transform:scale(.985);filter:brightness(.94)}
+.cf2-send:focus-visible,.cf2-offer:focus-visible,.cf2-op:focus-visible{outline:2px solid var(--txt);outline-offset:2px}
+.cf2-note{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:var(--s1);border:1px solid var(--line);font:500 12.5px/1.5 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.cf2-note svg{width:18px;height:18px;flex:none;margin-top:1px;fill:none;stroke:var(--am);stroke-width:1.8;stroke-linecap:round}
+@media(min-width:900px){
+html.tm-desktop .pgs[data-id=contractf] .ph,html.tm-desktop .pgs[data-id=pick] .ph.rw-hd{display:none}
+html.tm-desktop .pgs[data-id=contractf] .pgw,html.tm-desktop .pgs[data-id=pick] .pgw{max-width:1120px}
+.cf.cf2{padding:28px 32px 40px;gap:18px}
+.cf2-hero{min-height:150px;margin:0;padding:0 8px;border-radius:24px}
+.cf2-ht{max-width:620px}.cf2-ht h1{font-size:40px}.cf2-ht p{font-size:16px}
+.cf2-hero .cf-art{width:230px;right:24px}
+.cf2-steps{max-width:760px;width:100%;margin:2px auto 4px}
+.cf2-steps li{font-size:13px}.cf2-steps i{width:32px;height:32px;font-size:14px}.cf2-steps li+li::before{top:15px}
+.cf2-offer{padding:12px 18px;gap:14px}.cf2-oi{width:48px;height:48px;border-radius:14px}.cf2-oi svg{width:30px;height:30px}.cf2-ox small{font-size:16px}.cf2-ox strong{font-size:13.5px}.cf2-ox em{font-size:12.5px}
+.cf2-grid{grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
+.cf2-main{gap:18px}
+.cf2-card{padding:24px;gap:20px;border-radius:20px}
+.cf2-card h2{font-size:17px}
+.cf2-side{display:grid;gap:14px;position:sticky;top:20px}
+.cf2-sum,.cf2-next{display:grid;gap:12px;padding:20px;border-radius:20px;background:var(--s1);border:1px solid var(--line)}
+.cf2-sum{background:radial-gradient(120% 90% at 100% 0%,color-mix(in srgb,var(--am) 14%,transparent),transparent 60%),var(--s1);border-color:color-mix(in srgb,var(--am) 40%,var(--line))}
+.cf2-sr{display:flex;justify-content:space-between;align-items:baseline;gap:14px;font:500 13px 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.cf2-sr b{color:var(--txt);font-weight:700;text-align:right;overflow-wrap:anywhere}
+.cf2-sr.cf2-big{padding:10px 0;border-block:1px dashed var(--line)}
+.cf2-sr.cf2-big b{font:800 22px 'Bricolage Grotesque','Hanken Grotesk',sans-serif;color:var(--am)}
+.cf2-next ol{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+.cf2-next li{display:flex;gap:12px;align-items:flex-start}
+.cf2-next li i{flex:none;width:24px;height:24px;display:grid;place-items:center;border-radius:50%;background:color-mix(in srgb,var(--am) 16%,transparent);color:var(--am);font:800 11.5px 'Hanken Grotesk',sans-serif;font-style:normal}
+.cf2-next li span{display:grid;gap:2px}.cf2-next li b{font:700 13px 'Hanken Grotesk',sans-serif;color:var(--txt)}.cf2-next li small{font:500 12px/1.4 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.cf2-act{position:static;margin:0;padding:0;background:none}
+.cf2-send{height:54px}
+}
+.cf3 .cf2-hero{margin-bottom:0}
+.cf3-sh{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.cf3-sh h2{font:800 19px/1.2 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.015em;color:var(--txt)}
+.cf3-sh small{font:600 12.5px 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.cf3-card{gap:18px;padding:18px}
+.cf3-card .fs{display:grid;gap:18px}
+.cf3-card .fld{display:grid;gap:8px}
+.cf3-card .fld>span{font:700 13px 'Hanken Grotesk',sans-serif;color:var(--txt)}
+.cf3-card .fld input,.cf3-card .fld select,.cf3-card .fld textarea{height:50px;padding:0 14px;border-radius:13px;border:1px solid var(--line);background-color:var(--bg);color:var(--txt);font:500 15px 'Hanken Grotesk',sans-serif;outline:0;transition:border-color .15s,box-shadow .15s}
+.cf3-card .fld textarea{height:auto;min-height:120px;padding:13px 14px;line-height:1.5;resize:vertical}
+.cf3-card .fld select{padding-right:40px}
+.cf3-card .fld input:hover,.cf3-card .fld select:hover,.cf3-card .fld textarea:hover{border-color:color-mix(in srgb,var(--am) 35%,var(--line))}
+.cf3-card .fld input:focus,.cf3-card .fld select:focus,.cf3-card .fld textarea:focus{border-color:var(--am);box-shadow:0 0 0 3px color-mix(in srgb,var(--am) 22%,transparent)}
+.cf3-card .rv{border:1px solid var(--line);border-radius:14px;background:var(--bg);overflow:hidden}
+.cf3-card .rv div{display:flex;justify-content:space-between;gap:16px;padding:13px 14px;border-bottom:1px solid var(--line);font-size:13.5px}
+.cf3-card .rv div:last-child{border-bottom:0}
+.cf3-card .rv span{color:var(--mut)}.cf3-card .rv b{text-align:right;font-weight:700;overflow-wrap:anywhere}
+.cf3-btns{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:10px;margin-top:4px}
+.cf2-send.o{background:transparent;color:var(--am);border:1.5px solid var(--am);box-shadow:none}
+.cf3-types{display:grid;gap:10px}
+.cf3 .ctype{display:flex;align-items:center;gap:14px;width:100%;margin:0;padding:14px 16px;border-radius:16px;text-align:left;background:var(--s1);border:1px solid var(--line);color:var(--txt);cursor:pointer;transition:border-color .15s}
+.cf3 .ctype:hover{border-color:var(--am)}
+.cf3 .ctype>span:nth-child(2){flex:1;min-width:0;display:grid;gap:2px}
+.cf3 .ctype b{font:800 15px 'Hanken Grotesk',sans-serif}.cf3 .ctype small{font:500 12.5px/1.4 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.cf3 .ctype .tile{width:46px;height:46px;min-width:46px;border-radius:13px}.cf3 .ctype .tile svg{width:22px;height:22px}
+.cf3-go{flex:none;display:grid;color:var(--txt);font-style:normal}.cf3-go svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+@media(min-width:900px){.cf3-card{padding:26px;gap:22px}.cf3-sh h2{font-size:22px}.cf3-types{grid-template-columns:1fr 1fr;gap:14px}.cf3 .ctype{padding:18px 20px}.cf3-btns{max-width:460px;margin-left:auto;width:100%}}
+@media(prefers-reduced-motion:reduce){.cf2 *{transition:none!important}}

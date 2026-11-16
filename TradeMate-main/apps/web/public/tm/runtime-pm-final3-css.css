@@ -1,0 +1,9 @@
+
+html.tm-mw .grid .opt,html.tm-desktop .grid .opt{height:50px!important;padding:0 12px!important;gap:10px!important;font-size:13.5px!important;overflow:visible!important}
+html.tm-mw .grid .opt .tile,html.tm-desktop .grid .opt .tile{width:32px!important;height:32px!important;border-radius:10px!important}
+html.tm-mw .grid .opt .tile svg,html.tm-desktop .grid .opt .tile svg{width:17px!important;height:17px!important}
+html.tm-mw .grid .opt .tag,html.tm-desktop .grid .opt .tag{top:-8px!important;z-index:3}
+.view>.dk-head+.mk-livebar{top:-24px}
+@media(min-width:900px){html.tm-desktop .view>.dk-head+.mk-livebar{top:-20px}}
+.view>.dk-head+.mk-livebar.tl{top:-28px}
+@media(min-width:900px){html.tm-desktop .view>.dk-head+.mk-livebar.tl{top:-34.5px}}

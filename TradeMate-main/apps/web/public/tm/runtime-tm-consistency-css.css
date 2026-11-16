@@ -1,0 +1,11 @@
+
+html .mk-sec h2,html .nft-section-head h2,html .nft-hub .nft-section-head h2,html .pmx .pm-h h2,html .tl-sec{font:800 18px/1.15 'Bricolage Grotesque','Hanken Grotesk',sans-serif!important;letter-spacing:-.02em!important;color:var(--txt)}
+html .tl-sec small{font:600 11px 'Hanken Grotesk',sans-serif!important;letter-spacing:0!important}
+html .pmx .pm-h h2{font-size:18px!important}
+html[data-theme]:not([data-theme~=dark]) [style*="background:#14251f"]{background:color-mix(in srgb,var(--up) 12%,var(--s1))!important;border-color:color-mix(in srgb,var(--up) 45%,var(--line))!important}
+html[data-theme="purple"] [style*="--h:#ffb02e"]{--h:var(--am)!important}
+html[data-theme="purple"] [style*="color:#ff9f2e"]{color:var(--am)!important}
+html[data-theme="purple"] [style*="linear-gradient(135deg,#ffc24d,#ff6a4d)"]{background:var(--grad)!important}
+html[data-theme="purple"] [style*="color:#d9d9dd"]{color:var(--mut)!important}
+html[data-theme="purple"] [style*="background:#17232d"],html[data-theme="purple"] [style*="background:#16222a"]{background:var(--s2)!important}
+html[data-theme="purple"] [style*="background:#0d1319;overflow:"],html[data-theme="purple"] [style*="background:#0d1319;border:1.5px solid var(--line)"]{background:var(--s1)!important}

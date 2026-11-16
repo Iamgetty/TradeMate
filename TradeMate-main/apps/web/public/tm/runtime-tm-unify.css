@@ -1,0 +1,12 @@
+
+/* ===== tm-unify: one look across light / purple / dark, on app / mobile web / desktop ===== */
+html[data-theme]:not([data-theme~=dark]) .grid .opt .tile,html[data-theme]:not([data-theme~=dark]) .grid .opt .tile.hl{background:var(--s2)!important;color:var(--txt)!important;box-shadow:none!important;border:0!important}
+html[data-theme]:not([data-theme~=dark]) .grid .opt .tile svg,html[data-theme]:not([data-theme~=dark]) .grid .opt .tile svg *{stroke:var(--txt)!important;color:var(--txt)!important}
+html[data-theme]:not([data-theme~=dark]) .grid .opt .tag{background:var(--s3)!important;color:var(--txt)!important}
+html[data-theme]:not([data-theme~=dark]) .lr .lic,html[data-theme]:not([data-theme~=dark]) .ncard .lic,html[data-theme]:not([data-theme~=dark]) .pgs .lr .lic{background:var(--s2)!important;color:var(--txt)!important;box-shadow:none!important}
+html[data-theme]:not([data-theme~=dark]) .lr .lic svg,html[data-theme]:not([data-theme~=dark]) .ncard .lic svg,html[data-theme]:not([data-theme~=dark]) .lr .lic svg *{stroke:var(--txt)!important;color:var(--txt)!important}
+html[data-theme]:not([data-theme~=dark]) .tfx-opt.hot{background:var(--s1)!important;color:var(--txt)!important}
+html[data-theme]:not([data-theme~=dark]) .tfx-opt.hot small{color:var(--mut)!important}
+html[data-theme="light"] .cw{background:var(--s1)!important;border:1px solid var(--line)!important}
+html[data-theme]:not([data-theme~=dark]) .cx-chips button.on{background:var(--am)!important;color:var(--ongrad,#1b1006)!important}
+html[data-theme]:not([data-theme~=dark]) .pt-ok{color:var(--up)!important}

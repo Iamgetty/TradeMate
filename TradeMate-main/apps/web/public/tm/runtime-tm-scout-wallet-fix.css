@@ -1,0 +1,6 @@
+
+html[data-theme="light"] .sc-lc{--tmsw:conic-gradient(from 0deg,transparent 0 55%,rgba(96,165,250,.6))}
+html[data-theme="light"] .sc-radar{--tmsw:conic-gradient(from 0deg,transparent 0 55%,rgba(96,165,250,.7))}
+html[data-theme="light"] .sc-gl .sc-lc .w:not(#tm-x){clip-path:none!important;background-image:var(--tmsw)!important;background-color:transparent!important}
+html[data-theme="light"] .sc-w .sc-rc .sc-radar:not(#tm-x):before{clip-path:none!important;background-image:var(--tmsw)!important;background-color:transparent!important}
+html.tm-desktop .pm-bal img.w{display:none!important}

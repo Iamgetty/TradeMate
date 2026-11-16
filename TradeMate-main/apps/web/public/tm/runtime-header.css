@@ -1,0 +1,11 @@
+
+html .ph .bk2,html .uc-hd .bk2{width:32px;height:32px;border-radius:10px;flex:none}
+html .ph .bk2 svg,html .uc-hd .bk2 svg{width:17px;height:17px}
+html .ph .rt[data-closeall],html .uc-hd .rt[data-closeall],html .rt[data-closeall]{visibility:hidden!important;pointer-events:none!important;width:32px!important;height:32px!important;min-width:0;flex:none;padding:0}
+html:not(.tm-desktop) .ph{padding:6px 14px 8px}
+html:not(.tm-desktop) .ph.rw-hd{padding-bottom:12px}
+
+html .nft-topline>b,html .ph h2,html .uc-hd h2,html .rw-head h1,html .hc-hd h1,html .fh-ht h1,html .cf-ht h1,html .cf2-ht h1,html .mk-hero-tx h1,html .mk-head h1,html .tfx-hero h1,html .cx-t h1{font:500 11px 'DM Mono',monospace!important;letter-spacing:.2em!important;text-transform:uppercase!important;color:var(--am)!important;line-height:1.3!important;margin:0 0 4px!important;text-align:left!important;-webkit-text-fill-color:var(--am)!important;background:none!important}
+html .ph h2,html .uc-hd h2{margin:0!important}
+html .hc-hd h1::after{display:none!important}
+html .dk-head h1,html .dk-head p,html .rw-head p,html .hc-hd p,html .fh-ht p,html .cf-ht p,html .cf2-ht p,html .mk-hero-tx p,html .mk-head p,html .tfx-hero p,html .cx-t p{display:none!important}

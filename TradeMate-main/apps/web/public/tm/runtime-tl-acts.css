@@ -1,0 +1,7 @@
+
+.tl-acts{gap:10px!important;margin:14px 18px 4px!important}
+.tl-acts .tl-b{flex:1 1 0!important;min-width:0;height:38px!important;min-height:0!important;padding:0 14px!important;border-radius:999px!important;font-size:13px!important;font-weight:700!important;letter-spacing:.01em;gap:7px!important;line-height:1;transition:transform .15s,box-shadow .2s,background .2s}
+.tl-acts .tl-b svg{width:15px!important;height:15px!important;flex:none}
+.tl-acts .tl-b:not(.p){background:transparent!important;border:1px solid color-mix(in srgb,var(--txt) 22%,var(--line))!important;box-shadow:none!important}
+.tl-acts .tl-b.p{box-shadow:0 4px 14px color-mix(in srgb,var(--am) 30%,transparent)!important}
+.tl-acts .tl-b:active{transform:scale(.97)}

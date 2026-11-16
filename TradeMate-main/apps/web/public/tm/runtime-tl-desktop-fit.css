@@ -1,0 +1,12 @@
+
+html.tm-desktop #tlView{width:auto!important;right:0!important}
+html.tm-desktop #tlView .tl-in{max-width:none!important;width:100%;margin:0!important;padding-left:0;padding-right:0}
+html.tm-desktop #tlView .tl-cover{margin:0!important;border-radius:0!important;height:200px!important}
+html.tm-desktop #tlView .tl-av{margin-left:28px!important}
+html.tm-desktop #tlView .tl-h,html.tm-desktop #tlView .tl-acts,html.tm-desktop #tlView .tl-soc{margin-left:28px!important;margin-right:28px!important}
+html.tm-desktop #tlView .tl-h{margin-top:0}
+html.tm-desktop #tlView .tl-stats{margin-left:28px!important;margin-right:28px!important;max-width:none!important}
+html.tm-desktop #tlView .tl-sec,html.tm-desktop #tlView .tl-tabs,html.tm-desktop #tlView .tl-empty,html.tm-desktop #tlView .tl-card,html.tm-desktop #tlView .tl-prev{margin-left:28px!important;margin-right:28px!important}
+html.tm-desktop #tlView .tl-hls{padding-left:28px!important;padding-right:28px!important}
+html.tm-desktop #tlView .tl-bio{max-width:none!important;margin-left:0!important;margin-right:0!important}
+html.tm-desktop #tlView .tl-h{padding-left:0!important;padding-right:0!important}

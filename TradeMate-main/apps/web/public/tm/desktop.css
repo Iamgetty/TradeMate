@@ -275,34 +275,40 @@ html[data-theme] .nft-toolbar-select,html[data-theme] .nft-toolbar-select select
 }
 
 
-/* Desktop Profile: header and footer stay anchored and .pbody is the only
-   vertical scroll container.
-   app.js injects <style id="pfDeskFix"> that makes the whole .pgs scroll and
-   forces .pbody to overflow:visible with !important. The extra `body` in these
-   selectors outranks that block regardless of stylesheet order. */
+/* Desktop Profile: the page shell fills the viewport; only .pbody scrolls. */
 @media (min-width:900px){
+  /* The base .pgs entrance animation translates the shell while .pbody scrolls.
+     Desktop Profile is a fixed frame, so it must not animate its geometry. */
+  html.tm-desktop body .pgs[data-id="profile"]{animation:none!important;transform:none!important;}
   html.tm-desktop body .pgs[data-id="profile"]{
+    display:flex!important;
+    flex-direction:column!important;
     overflow:hidden!important;
   }
-  html.tm-desktop body .pgs[data-id="profile"] .pgw{
-    height:100%!important;
+  html.tm-desktop body .pgs[data-id="profile"] > .pgw{
+    flex:1 1 auto!important;
+    width:100%;
+    height:auto!important;
     min-height:0!important;
-    display:flex;
-    flex-direction:column;
+    display:flex!important;
+    flex-direction:column!important;
+    overflow:hidden!important;
+    padding-bottom:0!important;
   }
   html.tm-desktop body .pgs[data-id="profile"] .ph,
   html.tm-desktop body .pgs[data-id="profile"] .pfoot{
-    flex:none;
+    flex:0 0 auto!important;
   }
   html.tm-desktop body .pgs[data-id="profile"] .pfoot{
-    margin-top:0;
+    margin-top:0!important;
   }
   html.tm-desktop body .pgs[data-id="profile"] .pbody{
-    flex:1 1 auto!important;
+    flex:1 1 0!important;
     min-height:0!important;
-    overflow-x:hidden;
+    max-height:100%;
+    overflow-x:hidden!important;
     overflow-y:auto!important;
-    overscroll-behavior-y:contain;
+    overscroll-behavior:contain;
     scroll-behavior:auto!important;
     -webkit-overflow-scrolling:touch;
   }

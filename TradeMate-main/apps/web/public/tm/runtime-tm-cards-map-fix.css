@@ -1,0 +1,16 @@
+
+@media(max-width:640px){
+html:not(.tm-desktop) .mk-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important;padding:0 16px 10px!important;justify-content:stretch!important}
+html:not(.tm-desktop) .mk-grid .mk-card{display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:8px!important;text-align:center!important;width:100%!important;height:auto!important;min-height:92px!important;aspect-ratio:auto!important;padding:12px 2px 10px!important;border-radius:18px!important}
+html:not(.tm-desktop) .mk-grid .mk-ico{display:grid!important;place-items:center!important;flex:none!important;width:38px!important;height:38px!important;margin:0!important;border-radius:12px!important;background:var(--s2)!important}
+html:not(.tm-desktop) .mk-grid .mk-ico svg{width:20px!important;height:20px!important}
+html:not(.tm-desktop) .mk-grid .mk-name{display:block!important;width:100%!important;margin:0!important;padding:0 2px!important;text-align:center!important;font:700 11px/1.15 'Bricolage Grotesque',sans-serif!important;letter-spacing:0!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+}
+@media(max-width:360px){html:not(.tm-desktop) .mk-grid .mk-name{font-size:10px!important}}
+html[data-theme="purple"] .sc-map:not(#tm-x),html[data-theme="purple"] .sc-hero:not(#tm-x){background:#2B1A72!important}
+html[data-theme="purple"] .sc-gl:not(#tm-x){background-color:#2B1A72!important;background-blend-mode:screen}
+html[data-theme="purple"] .sc-map.m:not(#tm-x):after{background:none!important}
+html[data-theme="purple"] .sc-gl .sc-lc .g:not(#tm-x){background:rgba(167,139,250,.2)!important}
+html[data-theme="purple"] .sc-gl .sc-lc .w:not(#tm-x){background-image:conic-gradient(from 0deg,transparent 0 55%,rgba(196,181,253,.55))!important;background-color:transparent!important;clip-path:none!important}
+html[data-theme="purple"] .sc-gl .sc-lc .p:not(#tm-x){border-color:rgba(196,181,253,.85)!important}
+html[data-theme="purple"] .sc-gl .sc-lc .r:not(#tm-x){border-color:rgba(196,181,253,.7)!important}

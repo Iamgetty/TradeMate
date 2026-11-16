@@ -1,0 +1,15 @@
+
+html.tm-desktop body{caret-color:transparent}
+html.tm-desktop input,html.tm-desktop textarea,html.tm-desktop [contenteditable="true"]{caret-color:var(--am)}
+html.tm-desktop .ph,html.tm-desktop .dk-head,html.tm-desktop .sbar,html.tm-desktop button,html.tm-desktop .nft-topline{-webkit-user-select:none;user-select:none}
+@media(min-width:900px){html.tm-desktop .pgs .ph .bk2{display:none!important}}
+@media(min-width:900px){
+/* compact service / category / marketplace tiles (same look as mobile) */
+html.tm-desktop .view>.grid,html.tm-desktop .mk-grid{grid-template-columns:repeat(auto-fill,minmax(112px,128px))!important;gap:10px!important;justify-content:start;padding:0 16px 16px!important}
+html.tm-desktop .view>.grid .opt,html.tm-desktop .mk-card{display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:8px!important;text-align:center!important;height:auto!important;aspect-ratio:1/1!important;min-height:0!important;padding:8px 4px!important;border-radius:18px!important}
+html.tm-desktop .view>.grid .opt,html.tm-desktop .view>.grid .opt:last-child:nth-child(odd){grid-column:auto!important}
+html.tm-desktop .view>.grid .opt .tile,html.tm-desktop .mk-ico{width:34px!important;height:34px!important;border-radius:11px!important;margin:0!important}
+html.tm-desktop .view>.grid .opt .tile svg,html.tm-desktop .mk-ico svg{width:19px!important;height:19px!important}
+html.tm-desktop .view>.grid .opt .opt-label,html.tm-desktop .mk-name{flex:none!important;max-width:100%;padding:0 4px;font:700 12.5px/1.15 'Bricolage Grotesque','Hanken Grotesk',system-ui,sans-serif!important;letter-spacing:0!important;text-align:center!important;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+html.tm-desktop .mk-sec h2{font-size:20px}
+}

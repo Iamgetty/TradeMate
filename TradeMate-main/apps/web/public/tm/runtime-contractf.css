@@ -1,0 +1,123 @@
+
+.cf{padding:0 14px 20px;display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.cf-head{position:relative;min-height:84px;display:flex;align-items:center}
+.cf-ht{position:relative;z-index:1;max-width:68%}
+.cf-ht h1{font:800 21px/1.1 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.025em;color:var(--txt);margin:0}
+.cf-ht p{margin:4px 0 0;font:500 11.5px/1.4 'Hanken Grotesk',sans-serif;color:var(--txt)}
+.cf-art{position:absolute;right:-6px;top:50%;transform:translateY(-50%);width:104px;height:auto;pointer-events:none}
+.cf-steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,1fr)}
+.cf-steps li{position:relative;display:grid;justify-items:center;gap:4px;font:700 11.5px 'Hanken Grotesk',sans-serif;color:var(--txt)}
+.cf-steps i{position:relative;z-index:1;width:24px;height:24px;display:grid;place-items:center;border-radius:50%;border:1.5px solid var(--line);background:var(--s1);color:var(--txt);font:800 12px 'Hanken Grotesk',sans-serif;font-style:normal}
+.cf-steps li+li::before{content:"";position:absolute;top:11px;right:50%;width:100%;height:2px;background:var(--line)}
+.cf-steps li.on+li::before{background:var(--am)}
+.cf-steps li.on i{background:var(--am);border-color:var(--am);color:var(--ongrad,#1b1006);box-shadow:0 0 0 4px color-mix(in srgb,var(--am) 22%,transparent)}
+.cf-steps li.on{color:var(--am)}
+.cf-steps li:not(.on){color:var(--mut)}
+.cf-offer{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:14px;text-align:left;border:1px solid color-mix(in srgb,var(--am) 45%,transparent);background:radial-gradient(ellipse at 0% 50%,color-mix(in srgb,var(--am) 14%,transparent),transparent 60%),var(--s1);color:var(--txt)}
+.cf-oi{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:11px;background:linear-gradient(135deg,color-mix(in srgb,var(--am) 30%,transparent),color-mix(in srgb,var(--am) 10%,transparent));color:var(--am)}
+.cf-oi svg{width:20px;height:20px}
+.cf-ox{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.cf-ox b{font:800 13.5px/1.25 'Hanken Grotesk',sans-serif;color:var(--txt)}
+.cf-ox strong{font:700 12px/1.3 'Hanken Grotesk',sans-serif;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cf-ox small{font:500 11px/1.3 'Hanken Grotesk',sans-serif;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cf-ox small{white-space:normal}
+.cf-oc{flex:none;color:var(--txt)}.cf-oc svg{width:18px;height:18px}
+.cf-form{display:grid;gap:10px;padding:12px;border-radius:14px;background:var(--s1);border:1px solid var(--line)}
+.cf-f{display:grid;gap:6px;min-width:0}
+.cf-l{font:700 12px 'Hanken Grotesk',sans-serif;color:var(--txt)}
+.cf-in{display:flex;align-items:center;gap:8px;min-height:40px;padding:0 8px;border-radius:11px;background:var(--bg);border:1px solid var(--line)}
+.cf-in:focus-within{border-color:var(--am)}
+.cf-in.ar{align-items:flex-start;padding-top:8px;padding-bottom:8px}
+.cf-in i{width:26px;height:26px;flex:none;display:grid;place-items:center;border-radius:8px;background:color-mix(in srgb,var(--am) 14%,transparent);color:var(--am)}
+.cf-in i svg{width:15px;height:15px}
+.cf-in input,.cf-in textarea{flex:1;min-width:0;width:100%;border:0;outline:0;background:transparent;color:var(--txt);font:500 13px 'Hanken Grotesk',sans-serif;padding:0}
+.cf-in textarea{resize:vertical;min-height:46px;line-height:1.4;padding-top:4px}
+.cf-in input::placeholder,.cf-in textarea::placeholder{color:var(--mut)}
+.cf-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cf-send{height:42px;border-radius:12px;background:var(--grad,var(--am));color:var(--ongrad,#1b1006);font:800 14px 'Hanken Grotesk',sans-serif}
+.cf-send:active{filter:brightness(.92)}
+.cf-note{margin-top:0;align-items:flex-start;font-size:11px;padding:9px 12px}
+.cf-note svg{margin-top:1px}
+.cf-steps li:first-child::before{content:"";position:absolute;top:11px;right:50%;width:34px;height:2px;background:var(--am)}
+.cf-in.sm{align-items:center;padding-top:0;padding-bottom:0}
+.cf-in.sm textarea{min-height:0;height:44px;padding-top:6px;resize:none}
+.cf-offer.open .cf-oc{transform:rotate(90deg)}
+.cf-offers{display:grid;gap:6px;margin-top:-4px}
+.cf-op{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-radius:12px;background:var(--s1);border:1px solid var(--line);text-align:left;color:var(--txt)}
+.cf-op.on{border-color:var(--am)}
+.cf-op span{display:flex;flex-direction:column;gap:1px;min-width:0}
+.cf-op b{font:700 12.5px 'Hanken Grotesk',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cf-op small{font:500 11px 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.cf-op svg{width:16px;height:16px;color:var(--am);flex:none}
+.cf-link{justify-self:center;padding:6px 10px;font:700 12.5px 'Hanken Grotesk',sans-serif;color:var(--am);white-space:normal;text-align:center}
+.cf-steps li.dn i{background:linear-gradient(color-mix(in srgb,var(--am) 18%,transparent),color-mix(in srgb,var(--am) 18%,transparent)),var(--s1);border-color:var(--am);color:var(--am)}
+.cf-steps li.dn+li::before{background:var(--am)}
+.cf-steps li.dn{color:var(--txt)}
+.cf-steps i svg{width:13px;height:13px;stroke-width:3}
+.cf-steps li span{text-align:center;line-height:1.2}
+.cf-intro{display:flex;flex-wrap:wrap;gap:6px}
+.cf-intro span{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:var(--s1);border:1px solid var(--line);font:600 11px 'Hanken Grotesk',sans-serif;color:var(--txt)}
+.cf-intro svg{width:13px;height:13px;color:var(--am)}
+.cf-sh{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.cf-sh b{font:800 15px 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.01em;color:var(--txt)}
+.cf-sh small{font:700 10.5px 'Hanken Grotesk',sans-serif;letter-spacing:.05em;color:var(--am);text-transform:uppercase}
+.cf-btns{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:8px;margin-top:4px}
+.cf-send.o{background:transparent;border:1.5px solid var(--am);color:var(--am)}
+.cf-list{display:grid;gap:8px}
+.cf .ctype{width:100%;margin:0;padding:10px 12px;gap:10px;border-radius:14px;border-width:1px}
+.cf .ctype:hover{transform:none}
+.cf .ctype .tile{width:38px;height:38px;min-width:38px;border-radius:11px}
+.cf .ctype .tile svg{width:19px;height:19px}
+.cf .ctype b{font-size:13.5px}.cf .ctype small{font-size:11px}
+.cf .ctype em{font-size:18px}
+.cf-form .fld{display:grid;gap:6px;padding:0;border:0;border-radius:0;background:none;box-shadow:none}
+.cf-form .fld:focus-within{box-shadow:none;border:0}
+.cf-form .fld>span{position:static;font:700 12px 'Hanken Grotesk',sans-serif;color:var(--txt)}
+.cf-form .fld>span b{color:var(--am)}
+.cf-form .fld input,.cf-form .fld select,.cf-form .fld textarea{height:40px;padding:0 12px;border-radius:11px;background-color:var(--bg);border:1px solid var(--line);font:500 13px 'Hanken Grotesk',sans-serif;color:var(--txt)}
+.cf-form .fld textarea{height:78px;padding:10px 12px;resize:none;line-height:1.4}
+.cf-form .fld input:focus,.cf-form .fld select:focus,.cf-form .fld textarea:focus{border-color:var(--am)}
+.cf-form .fld input::placeholder,.cf-form .fld textarea::placeholder{color:var(--mut)}
+.cf-form .fld select{padding-right:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' fill='none' stroke='%238b95a1' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;background-size:12px}
+.cf-form .fld.sl:after{display:none}
+.cf-form .fld .oth{margin-top:0;padding:0 12px;border-top:1px solid var(--line)}
+.cf-form .fld.pr2{grid-template-columns:90px 1fr;gap:6px 8px}
+.cf-form .fld.pr2>span{grid-column:1/-1}
+.cf-form .fld.pr2 select{border-right:1px solid var(--line)}
+.cf-form .fld[style*="dashed"]{border:1px dashed var(--line);border-radius:11px;background:var(--bg)}
+.cf-form .sec{padding:0 0 6px!important;font:700 12px 'Hanken Grotesk',sans-serif!important;letter-spacing:0!important;text-transform:none!important;color:var(--txt)!important}
+.cf-form .chk{padding:7px 12px;border-width:1px;border-radius:999px;background:var(--bg);font-weight:600}
+.cf-form .rv{border-width:1px;border-radius:12px;background:var(--bg)}
+.cf-form .rv div{padding:10px 12px;font-size:12.5px}
+.cf-form .fine{margin:0}
+@media(min-width:900px){
+.tm-desktop .pgs[data-id=contractf] .ph{display:none}
+.tm-desktop .pgs[data-id=contractf] .pgw{max-width:900px}
+.cf{padding:22px 16px 28px;gap:12px}
+.cf-head{min-height:112px}
+.cf-ht{max-width:560px}
+.cf-ht h1{font-size:28px}.cf-ht p{font-size:13px}
+.cf-art{width:170px;right:20px}
+.cf-steps li{font-size:12.5px}
+.cf-steps i{width:26px;height:26px;font-size:13px}
+.cf-steps li+li::before{top:12px}
+.cf-offer{padding:12px 16px;gap:14px}
+.cf-oi{width:46px;height:46px}.cf-oi svg{width:24px;height:24px}
+.cf-ox b{font-size:15px}.cf-ox strong{font-size:13.5px}.cf-ox small{font-size:12px}
+.cf-form{padding:16px;gap:12px}
+.cf-l{font-size:12.5px}
+.cf-in{min-height:42px}
+.cf-in input,.cf-in textarea{font-size:13px}
+.cf-send{height:44px;font-size:14.5px}
+.cf-note{font-size:12px}
+.cf-in.sm textarea{height:42px;padding-top:11px}
+.cf-steps li:first-child::before{top:12px;width:44px}
+.tm-desktop .pgs[data-id=pick] .ph.rw-hd,.tm-desktop .pgs[data-id=listpick] .ph.rw-hd,.tm-desktop .pgs[data-id=wiz] .ph.rw-hd{display:none}
+.tm-desktop .pgs[data-id=pick] .pgw,.tm-desktop .pgs[data-id=listpick] .pgw,.tm-desktop .pgs[data-id=wiz] .pgw{max-width:900px}
+.cf-list{grid-template-columns:1fr 1fr;gap:10px}
+.cf .ctype{padding:12px 16px;gap:14px}
+.cf .ctype .tile{width:46px;height:46px;min-width:46px}
+.cf .ctype b{font-size:15px}.cf .ctype small{font-size:12px}
+.cf-sh b{font-size:17px}
+.cf-btns{max-width:520px;margin-left:auto;width:100%}
+}

@@ -1,0 +1,5 @@
+
+.pm-rt{stroke-width:12;stroke:color-mix(in srgb,var(--txt) 8%,transparent)}
+.pm-card:first-child .pm-ring{align-self:start;margin-top:2px}
+.pm-card:first-child .pm-st>div.pm-seg{display:none!important}.pmx>.pm-card:first-child .pm-st>div:not(.pm-seg){justify-self:start}
+.pm-card:first-child .pm-st b{padding-left:9px;text-align:center}

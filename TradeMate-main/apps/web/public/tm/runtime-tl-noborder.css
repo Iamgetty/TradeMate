@@ -1,0 +1,5 @@
+
+#tlView .tl-stats div{border:0!important}
+#tlView .tl-acts .tl-b:not(.p){border:0!important;background:var(--s2)!important}
+#tlView .tl-tabs{border-bottom:0!important}
+#tlView .tl-empty{border:0!important;background:var(--s1)}

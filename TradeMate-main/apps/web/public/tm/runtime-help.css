@@ -1,0 +1,50 @@
+
+.hc{padding:0 14px calc(18px + env(safe-area-inset-bottom,0px));display:grid;gap:9px;align-content:start}
+.hc :where(h1,h2,h3,p){margin:0}
+.hc-hd h1{font:800 20px/1.1 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.03em;color:var(--txt)}
+.hc-hd p{margin-top:2px;font:500 12px/1.4 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.hc-s{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:10px;background:var(--s1);border:1px solid var(--line);transition:border-color .15s,box-shadow .15s}
+.hc-s:focus-within{border-color:var(--am);box-shadow:0 0 0 3px color-mix(in srgb,var(--am) 20%,transparent)}
+.hc-s svg{flex:none;width:15px;height:15px;fill:none;stroke:var(--mut);stroke-width:2;stroke-linecap:round}
+.hc-s input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--txt);font:500 13px 'Hanken Grotesk',sans-serif;-webkit-appearance:none;appearance:none}
+.hc-s input::placeholder{color:var(--mut)}
+.hc-grid{display:grid;gap:10px}
+.hc-main h2{margin:2px 0 7px;font:800 14.5px 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.01em;color:var(--txt)}
+.hc-list{display:grid;gap:5px}
+.hc-q{border-radius:10px;background:var(--s1);border:1px solid var(--line);overflow:hidden;transition:border-color .15s}
+.hc-q.on{border-color:color-mix(in srgb,var(--am) 45%,var(--line))}
+.hc-q button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:36px;padding:8px 12px;text-align:left;color:var(--txt);font:700 12.5px 'Hanken Grotesk',sans-serif;cursor:pointer}
+.hc-q button svg{flex:none;width:13px;height:13px;fill:none;stroke:var(--txt);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transition:transform .15s}
+.hc-q.on button svg{stroke:var(--am);transform:rotate(-90deg)}
+.hc-q p{padding:0 12px 10px;font:500 12px/1.45 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.hc-empty{padding:16px 12px;border-radius:10px;border:1px dashed var(--line);text-align:center;font:500 12px/1.5 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.hc-empty b{display:block;margin-bottom:2px;font:700 13px 'Hanken Grotesk',sans-serif;color:var(--txt)}
+.hc-help{display:grid;grid-template-columns:auto 1fr;grid-template-areas:"art txt" "btn btn";gap:8px 10px;align-items:center;padding:10px 12px;border-radius:12px;background:var(--s1);border:1px solid var(--line)}
+.hc-art{grid-area:art;width:34px;height:34px}
+.hc-ht{grid-area:txt;min-width:0}
+.hc-ht h3{font:800 13.5px 'Hanken Grotesk',sans-serif;color:var(--txt)}
+.hc-ht p{margin-top:1px;font:500 11px/1.35 'Hanken Grotesk',sans-serif;color:var(--mut)}
+.hc-btn{grid-area:btn;height:36px;border:0;border-radius:999px;background:var(--grad,var(--am));color:var(--ongrad,#1b1006);font:800 12.5px 'Hanken Grotesk',sans-serif;cursor:pointer;transition:filter .15s,transform .15s}
+.hc-btn:hover{filter:brightness(1.06)}.hc-btn:active{transform:scale(.98)}
+.hc-q button:focus-visible,.hc-btn:focus-visible{outline:2px solid var(--txt);outline-offset:2px}
+.tm-desktop .pgs:has(.hc) .ph{display:none}
+.tm-desktop .pgs:has(.hc) .pgw{max-width:1180px}
+.tm-desktop .hc{padding:16px 24px 20px;gap:10px}
+.tm-desktop .hc-hd h1{font-size:25px}.tm-desktop .hc-hd p{font-size:13px}
+.tm-desktop .hc-s{height:38px;border-radius:12px}
+.tm-desktop .hc-grid{grid-template-columns:minmax(0,1fr) 230px;gap:16px;align-items:start;margin-top:2px}
+.tm-desktop .hc-main h2{font-size:16px}
+.tm-desktop .hc-q button{min-height:40px;padding:9px 14px;font-size:13px}
+.tm-desktop .hc-q p{padding:0 14px 12px;font-size:12.5px}
+.tm-desktop .hc-help{position:sticky;top:16px;grid-template-columns:1fr;grid-template-areas:"art" "txt" "btn";justify-items:center;text-align:center;gap:6px;padding:16px 14px;border-radius:14px}
+.tm-desktop .hc-art{width:64px;height:64px}
+.tm-desktop .hc-ht h3{font-size:15px}.tm-desktop .hc-ht p{font-size:12px;margin-top:2px}
+.tm-desktop .hc-btn{width:100%;height:38px;margin-top:4px}
+.hc-btn{display:flex;align-items:center;justify-content:center;text-align:center;padding:0 16px;box-shadow:0 6px 16px -8px var(--am)}
+.hc-art{border:0!important;outline:0!important;border-radius:0!important;background:none!important;box-shadow:none!important;padding:0!important}
+.hc-hd h1::after{content:"";display:block;width:26px;height:3px;border-radius:3px;margin-top:7px;background:var(--grad,var(--am))}
+.hc-q button span::before{content:"";display:inline-block;width:6px;height:6px;margin-right:9px;border-radius:50%;background:var(--am);opacity:.65;vertical-align:middle}
+.hc-q.on button span::before{opacity:1}
+.hc-q:hover{border-color:color-mix(in srgb,var(--am) 30%,var(--line))}
+.hc-help{background:linear-gradient(160deg,color-mix(in srgb,var(--am) 10%,var(--s1)),var(--s1) 65%);border-color:color-mix(in srgb,var(--am) 22%,var(--line))}
+@media(prefers-reduced-motion:reduce){.hc *{transition:none!important}}

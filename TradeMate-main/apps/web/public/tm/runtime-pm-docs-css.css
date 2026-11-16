@@ -1,0 +1,8 @@
+
+html .pmx.pmx{--pm-d1:var(--am);--pm-d2:var(--am);--pm-d3:var(--am);--pm-d4:var(--am)}
+html .pmx .pm-doc .f{box-sizing:content-box;width:20px;height:25px;padding:8px 10px;border-radius:12px;background:color-mix(in srgb,var(--am) 13%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--am) 26%,transparent)}
+html .pmx .pm-doc{border-radius:16px;padding:10px 12px}
+html .pmx .pm-doc em{background:color-mix(in srgb,var(--up) 15%,transparent)!important;color:var(--up)!important;font-weight:800}
+html .pmx .pm-doc:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--am) 55%,var(--line))}
+html .pmx .pm-dl{background:color-mix(in srgb,var(--am) 14%,transparent)!important;color:var(--am)!important}
+html .pmx .pm-dl:hover{background:var(--am)!important;color:var(--ongrad,#1b1006)!important}

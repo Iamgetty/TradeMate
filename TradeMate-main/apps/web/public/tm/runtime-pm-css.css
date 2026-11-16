@@ -1,0 +1,109 @@
+/* ===== TradeMate — Portfolio page (theme-driven; scoped to .pmx so nothing else in the app is affected) ===== */
+.pmx{--pm-act:var(--in);--pm-pen:var(--am);--pm-ok:var(--up);--pm-t1:var(--am);--pm-t2:var(--in);--pm-t3:var(--dn);--pm-t4:var(--up);--pm-d1:var(--dn);--pm-d2:var(--in);--pm-d3:var(--co);--pm-d4:var(--up);
+ max-width:1010px;margin:0 auto;padding:6px 16px 28px;color:var(--txt);font-family:'Hanken Grotesk',system-ui,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+html[data-theme="purple"] .pmx{--pm-pen:var(--ro);--pm-t2:var(--ro);--pm-d3:var(--ro)}
+.pmx *{box-sizing:border-box}
+.pmx button{color:inherit;font:inherit;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pmx svg{display:block}
+.pmx :focus-visible{outline:2px solid var(--am);outline-offset:2px}
+
+/* ---- card: soft accent wash + gradient hairline ---- */
+.pm-card{position:relative;container-type:inline-size;margin:0 0 14px;padding:16px;border-radius:22px;background:radial-gradient(120% 90% at 0% 0%,color-mix(in srgb,var(--am) 8%,transparent),transparent 55%),var(--s1);box-shadow:inset 0 0 0 1px var(--line),var(--shadow,none)}
+.pm-card:before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;background:linear-gradient(140deg,color-mix(in srgb,var(--am) 60%,transparent),transparent 34%,transparent 72%,color-mix(in srgb,var(--am) 22%,transparent));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0)}
+.pm-h{display:flex;align-items:center;gap:11px;margin-bottom:14px}
+.pm-h>svg{width:36px;height:36px;padding:8px;flex:none;border-radius:12px;color:var(--am);background:color-mix(in srgb,var(--am) 14%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--am) 24%,transparent)}
+.pm-h>svg.hd{width:36px;height:36px;padding:7px 9px;background:color-mix(in srgb,var(--in) 14%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--in) 26%,transparent)}
+.pm-h h2{flex:1;min-width:0;margin:0;font:800 18px/1.1 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.025em;color:var(--txt)}
+/* "View all" / "Manage wallet": quiet accent link with a nudging arrow */
+.pm-pill{display:inline-flex;align-items:center;gap:2px;height:auto;padding:6px 0 6px 8px;border:0!important;background:none;color:var(--am);font:800 12.5px 'Hanken Grotesk',sans-serif;letter-spacing:.01em;white-space:nowrap}
+.pm-pill svg{width:15px;height:15px;color:var(--am);transition:translate .18s}
+.pm-pill:hover svg{translate:3px 0}.pm-pill:active{opacity:.7}
+.pm-lg{display:none}
+
+/* ---- portfolio summary ---- */
+.pm-pb{display:grid;grid-template-columns:84px minmax(0,1fr);grid-template-areas:"r v" "s s" "p p";gap:14px 16px;align-items:center}
+.pm-ring{grid-area:r;position:relative;width:84px;height:84px}
+.pm-ring>svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.pm-rt{stroke:var(--s3)}
+.pm-rg{stroke:var(--am);filter:drop-shadow(0 0 5px color-mix(in srgb,var(--am) 60%,transparent))}
+.pm-ring>div{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.pm-ring b{font:800 21px/1 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.02em;color:var(--txt)}
+.pm-ring small{margin-top:2px;color:var(--mut);font:600 9.5px/1.15 'Hanken Grotesk',sans-serif}
+.pm-val{grid-area:v;min-width:0}
+.pm-val small,.pm-bal small{display:flex;align-items:center;gap:4px;color:var(--mut);font:600 12.5px 'Hanken Grotesk',sans-serif}
+.pm-val small button,.pm-bal small button{display:grid;place-items:center;width:24px;height:24px;margin:-4px 0;border-radius:8px;color:inherit;opacity:.8}
+.pm-val small button:hover,.pm-bal small button:hover{opacity:1}
+.pm-val small svg,.pm-bal small svg{width:16px;height:16px}
+.pm-val b{display:block;margin:3px 0 5px;font:800 clamp(24px,7vw,30px)/1.05 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.03em;color:var(--txt)}
+.pm-up{display:inline-flex;align-items:center;gap:3px;padding:2px 8px 2px 6px;border-radius:999px;background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up);font:800 12px 'Hanken Grotesk',sans-serif}.pm-up svg{width:12px;height:12px}
+.pm-st{grid-area:s;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding-top:2px}
+.pm-seg{grid-column:1/-1;display:flex;gap:3px;height:6px;margin-bottom:6px}
+.pm-seg i{display:block;min-width:8px;border-radius:3px}
+.pm-st small{display:block;color:var(--mut);font:600 11.5px/1.3 'Hanken Grotesk',sans-serif}
+.pm-st i{display:inline-block;width:7px;height:7px;margin-right:5px;border-radius:50%;vertical-align:1px}
+.pm-seg i{margin:0;width:auto;height:auto;vertical-align:baseline}
+.pm-st b{display:block;margin-top:3px;font:800 18px/1 'Bricolage Grotesque','Hanken Grotesk',sans-serif;color:var(--txt)}
+.pm-sp{grid-area:p;width:100%;height:46px;overflow:visible}
+.pm-sl{fill:none;stroke:var(--am);stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
+.pm-sd{fill:none;stroke:var(--am);stroke-width:7;stroke-linecap:round}
+.pm-sd:last-child{stroke-width:10}
+
+/* ---- wallet: solid accent balance panel + round action buttons ---- */
+.pm-wb{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 8px}
+.pm-bal{grid-column:1/-1;position:relative;overflow:hidden;min-height:92px;padding:14px 16px;border-radius:18px;color:var(--ongrad,#1b1006);background:radial-gradient(90% 130% at 0% 0%,rgba(255,255,255,.26),transparent 55%),linear-gradient(135deg,var(--am),color-mix(in srgb,var(--am) 80%,#000));box-shadow:0 12px 26px -12px color-mix(in srgb,var(--am) 75%,transparent)}
+html[data-theme]:not([data-theme~=dark]) .pmx.pmx.pmx .pm-bal.pm-bal small,html[data-theme]:not([data-theme~=dark]) .pmx.pmx.pmx .pm-bal.pm-bal small button{color:color-mix(in srgb,var(--ongrad,#1b1006) 78%,transparent)!important}
+.pmx .pm-bal b{display:block;margin:3px 0 6px;font:800 27px/1.05 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.03em;color:var(--ongrad,#1b1006)}
+.pm-bal .pm-up{background:color-mix(in srgb,var(--ongrad,#1b1006) 16%,transparent);color:var(--ongrad,#1b1006)}
+.pm-bal img.w{position:absolute;right:10px;top:50%;width:68px;height:auto;transform:translateY(-50%) rotate(6deg);filter:drop-shadow(0 8px 10px rgba(0,0,0,.35));pointer-events:none}
+.pm-tile{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:7px;min-height:0;padding:2px 0;background:none!important;border:0!important;color:var(--txt);font:700 12px 'Hanken Grotesk',sans-serif}
+.pm-tile>span{display:grid;place-items:center;width:50px;height:50px;border-radius:50%;background:color-mix(in srgb,currentColor 12%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 26%,transparent);transition:background .18s,translate .18s,box-shadow .18s}
+.pm-tile svg{width:22px;height:22px}
+.pm-tile:hover>span{background:color-mix(in srgb,currentColor 22%,transparent);translate:0 -2px}
+.pm-tile:active>span{scale:.94}
+
+/* ---- documents ---- */
+.pm-dt{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+.pm-ds{display:flex;align-items:center;gap:8px;height:40px;padding:0 14px;border-radius:999px;background:var(--s2);box-shadow:inset 0 0 0 1px var(--line);color:var(--mut);transition:box-shadow .15s}
+.pm-ds:focus-within{box-shadow:inset 0 0 0 1.5px var(--am),0 0 0 4px color-mix(in srgb,var(--am) 14%,transparent)}
+.pm-ds svg{width:17px;height:17px;flex:none}
+.pmx .pm-ds input{flex:1;min-width:0;height:auto;padding:0!important;margin:0;background:transparent!important;border:0!important;border-radius:0;box-shadow:none!important;outline:0!important;color:var(--txt);font:500 13.5px 'Hanken Grotesk',sans-serif}
+.pm-ds input::placeholder{color:var(--mut)}
+.pm-ch{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -2px;padding:0 2px}.pm-ch::-webkit-scrollbar{display:none}
+.pm-ch button{flex:none;height:30px;padding:0 14px;border-radius:999px;background:none;box-shadow:inset 0 0 0 1px var(--line);color:var(--mut);font:700 12.5px 'Hanken Grotesk',sans-serif;white-space:nowrap;transition:color .15s,background .15s,box-shadow .15s}
+.pm-ch button:hover{color:var(--txt)}
+.pm-ch button.on{background:var(--am);box-shadow:none;color:var(--ongrad,#1b1006)}
+.pm-dg{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.pm-none{grid-column:1/-1;margin:6px 0;color:var(--mut);font:600 13px 'Hanken Grotesk',sans-serif}
+/* document row: icon | title + date | badge + download */
+.pm-doc{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:12px;row-gap:2px;align-items:center;padding:11px 12px;border-radius:16px;background:var(--s2);box-shadow:inset 0 0 0 1px var(--line);transition:box-shadow .18s,translate .18s}
+.pm-doc:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--am) 45%,var(--line));translate:0 -1px}
+.pm-doc>div{display:contents}
+.pm-doc .f{grid-column:1;grid-row:1/3;width:26px;height:33px}
+.pm-doc b{grid-column:2;grid-row:1;align-self:end;color:var(--txt);font:700 13px/1.25 'Hanken Grotesk',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pm-doc>div>svg{display:none}
+.pm-doc>div span{grid-column:2;grid-row:2;align-self:start;color:var(--mut);font:600 11.5px 'Hanken Grotesk',sans-serif}
+.pm-doc em{grid-column:3;grid-row:1;justify-self:end;padding:2px 8px;border-radius:999px;background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up);font:800 10px/1.3 'Hanken Grotesk',sans-serif;font-style:normal;letter-spacing:.02em}
+.pm-dl{grid-column:3;grid-row:2;justify-self:end;width:28px;height:28px;border-radius:50%;background:var(--s3)!important;display:grid;place-items:center;color:var(--txt);transition:background .15s,color .15s}
+.pm-doc:not(:has(em)) .pm-dl{grid-row:1/3}
+.pm-dl svg{width:14px;height:14px}
+.pm-dl:hover{background:var(--am)!important;color:var(--ongrad,#1b1006)}
+
+/* ---- wider cards: layout follows the card's own width (right beside the desktop sidebar too) ---- */
+@container (min-width:480px){
+ .pm-pb{grid-template-columns:104px minmax(0,1fr) minmax(0,1.1fr);grid-template-areas:"r v s" "r p p";gap:12px 20px}
+ .pm-ring{width:104px;height:104px}.pm-ring b{font-size:26px}.pm-ring small{font-size:10.5px}
+ .pm-val{padding-left:20px;border-left:1px solid var(--line)}
+ .pm-val b{font-size:32px}
+ .pm-st{padding:0 0 0 20px;border-left:1px solid var(--line);align-self:center}
+ .pm-sp{height:50px}
+ .pm-wb{grid-template-columns:minmax(0,2.5fr) repeat(4,minmax(0,1fr));align-items:center}
+ .pm-bal{grid-column:auto;min-height:104px}
+ .pm-bal img.w{width:78px}
+ .pm-lg{display:inline}
+ .pm-dt{flex-direction:row;align-items:center;gap:12px}
+ .pm-ds{flex:1}
+ .pm-ch{margin:0;padding:0}
+ .pm-dg{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(min-width:900px){.pmx{padding:6px 16px 40px;margin:0}.pm-card{padding:18px 20px}.pm-h h2{font-size:20px}}
+@media(prefers-reduced-motion:reduce){.pmx *{transition:none!important}}

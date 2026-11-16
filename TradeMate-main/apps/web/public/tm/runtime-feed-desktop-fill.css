@@ -1,0 +1,5 @@
+
+html.tm-desktop .view:has([data-feed-type]){max-width:none!important;margin-left:0!important;margin-right:0!important;padding-left:28px!important;padding-right:28px!important}
+html.tm-desktop .view:has([data-feed-type]) .feed-post{margin-left:0!important;margin-right:0!important;max-width:none!important}
+html.tm-desktop .view:has([data-feed-type])>.sub{padding-left:0!important;padding-right:0!important}
+html.tm-desktop .view:has([data-feed-type])>.empty,html.tm-desktop .view:has([data-feed-type])>.fine{margin-left:0!important;margin-right:0!important}

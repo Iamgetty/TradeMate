@@ -1,0 +1,3 @@
+
+html.tm-app .view>.grid{grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:12px 0!important;padding-left:6px!important;padding-right:6px!important}
+html.tm-app .view>.grid .opt{font-size:10px!important;line-height:1.15;text-align:center;max-width:100%;overflow-wrap:anywhere}

@@ -1,0 +1,12 @@
+
+html.tm-app .view>.grid{gap:12px 2px!important}
+html.tm-app .view>.grid .opt{gap:5px!important;font-size:10.5px!important}
+html.tm-app .view>.grid .opt .tile{width:40px!important;height:40px!important}
+html.tm-app .view>.grid .opt .tile svg{width:19px!important;height:19px!important}
+html.tm-mw .view>.grid,html.tm-desktop .view>.grid{gap:8px!important}
+html.tm-mw .view>.grid .opt,html.tm-desktop .view>.grid .opt{height:42px!important;padding:0 10px!important;gap:8px!important;border-radius:12px!important}
+html.tm-mw .view>.grid .opt .tile,html.tm-desktop .view>.grid .opt .tile{width:28px!important;height:28px!important;border-radius:9px!important}
+html.tm-mw .view>.grid .opt .tile svg,html.tm-desktop .view>.grid .opt .tile svg{width:15px!important;height:15px!important}
+html.tm-mw .view>.grid .opt .opt-label{font-size:12.5px!important}
+html.tm-desktop .view>.grid .opt .opt-label{font-size:13px!important}
+html.tm-desktop .view>.grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))!important}
