@@ -21,14 +21,13 @@ const source = fs.readFileSync(runtimePath, "utf8");
 function find(needle, from) {
   const start = from || 0;
   if (typeof needle === "string") return source.indexOf(needle, start);
-  const re = new RegExp(needle.source, needle.flags.replace("g", ""));
-  const m = re.exec(source.slice(start));
-  return m ? start + m.index : -1;
+  const index = source.slice(start).search(needle);
+  return index === -1 ? -1 : start + index;
 }
 
 // Number of times a pattern occurs in a piece of text.
 function count(text, re) {
-  return (text.match(new RegExp(re.source, "g")) || []).length;
+  return text.split(re).length - 1;
 }
 
 // Slice of the source between a start marker and the next end marker.
