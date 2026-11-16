@@ -1,4 +1,4 @@
-!function(){var t=document.querySelector("meta[name=viewport]");t||((t=document.createElement("meta")).name="viewport",document.head.appendChild(t)),t.setAttribute("content","width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover");var e=document.createElement("style");e.textContent="input,select,textarea{font-size:16px!important}",document.head.appendChild(e)}(),
+
 /*!
  * TradeMate — live app (app.js)
  * One self-contained file: injects fonts, styles and markup, then runs the app.
@@ -170,3 +170,4 @@ html.tm-desktop #tlView .tl-col .tl-grid{margin:2px 0 0!important}
 var NM={scSpin:1,scRot:1};function sync(){try{document.getAnimations().forEach(function(a){if(NM[a.animationName]&&a.startTime!==0)a.startTime=0})}catch(e){}}
 function has(n){return n.nodeType===1&&(n.matches&&n.matches(".sc-gl,.sc-radar,.sc-lc")||n.querySelector&&n.querySelector(".sc-gl,.sc-radar,.sc-lc"))}
 new MutationObserver(function(m){for(var i=0;i<m.length;i++)for(var j=0;j<m[i].addedNodes.length;j++)if(has(m[i].addedNodes[j]))return void sync()}).observe(document.documentElement,{childList:!0,subtree:!0});setTimeout(sync,300)}();
+!function(){var t=document.querySelector("meta[name=viewport]");t||((t=document.createElement("meta")).name="viewport",document.head.appendChild(t)),t.setAttribute("content","width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover")}(),
