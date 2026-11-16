@@ -700,7 +700,7 @@ test('notification action marks the item read and opens its internal conversatio
 test('desktop Profile content scrolls fully while its header and mode switcher stay anchored', async ({ browser }) => {
   test.setTimeout(45_000);
   let authenticated = false;
-  const context = await browser.newContext({ viewport: { width: 1280, height: 700 } });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 480 } });
   const page = await context.newPage();
 
   await page.route('**/api/**', async route => {
