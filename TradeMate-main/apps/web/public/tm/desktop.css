@@ -275,32 +275,33 @@ html[data-theme] .nft-toolbar-select,html[data-theme] .nft-toolbar-select select
 }
 
 
-/* Desktop Profile: preserve its fixed header/footer and use the
-   dedicated content pane as the only vertical scroll container.
-   Every ancestor between the page frame and .pbody must be a bounded flex
-   column, otherwise .pbody grows to its content and has no scroll range. */
+/* Desktop Profile: header and footer stay anchored and .pbody is the only
+   vertical scroll container.
+   app.js injects <style id="pfDeskFix"> that makes the whole .pgs scroll and
+   forces .pbody to overflow:visible with !important. The extra `body` in these
+   selectors outranks that block regardless of stylesheet order. */
 @media (min-width:900px){
-  html.tm-desktop .pgs[data-id="profile"]{
-    overflow:hidden;
+  html.tm-desktop body .pgs[data-id="profile"]{
+    overflow:hidden!important;
+  }
+  html.tm-desktop body .pgs[data-id="profile"] .pgw{
+    height:100%!important;
+    min-height:0!important;
     display:flex;
     flex-direction:column;
   }
-  html.tm-desktop .pgs[data-id="profile"] .pgw{
-    display:flex;
-    flex-direction:column;
-    flex:1 1 auto;
-    min-height:0;
-    width:100%;
-  }
-  html.tm-desktop .pgs[data-id="profile"] .ph,
-  html.tm-desktop .pgs[data-id="profile"] .pfoot{
+  html.tm-desktop body .pgs[data-id="profile"] .ph,
+  html.tm-desktop body .pgs[data-id="profile"] .pfoot{
     flex:none;
   }
-  html.tm-desktop .pgs[data-id="profile"] .pbody{
-    flex:1 1 auto;
-    min-height:0;
+  html.tm-desktop body .pgs[data-id="profile"] .pfoot{
+    margin-top:0;
+  }
+  html.tm-desktop body .pgs[data-id="profile"] .pbody{
+    flex:1 1 auto!important;
+    min-height:0!important;
     overflow-x:hidden;
-    overflow-y:auto;
+    overflow-y:auto!important;
     overscroll-behavior-y:contain;
     scroll-behavior:auto!important;
     -webkit-overflow-scrolling:touch;
