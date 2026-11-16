@@ -1,0 +1,34 @@
+'html{-webkit-text-size-adjust:100%;text-rendering:optimizeLegibility;-webkit-tap-highlight-color:transparent}
+body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;font-kerning:normal}
+svg{shape-rendering:geometricPrecision}
+.cell,.bk,.up,.dn,[class*=price],[class*=amt]{font-variant-numeric:tabular-nums}
+::selection{background:color-mix(in srgb,var(--am) 32%,transparent)}
+input,textarea,select{caret-color:var(--am)}
+button:active,.btn:active,.pill:active,.ib:active{scale:.97}
+:focus-visible{outline:2px solid var(--am);outline-offset:3px}
+.bk .h{gap:8px;align-items:end}.bk .h span{min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.25}.bk .h.r span:first-child{padding-left:6px}
+html[data-theme="light"] small:not(.up):not(.dn):not(.pos):not(.neg){color:#64748B!important}
+/* Markets > Trending now: name + 24h only */
+.mk-trend .thead,.mk-trend .row{grid-template-columns:minmax(0,1fr) 92px}.mk-trend .row>.p{display:none}.mk-trend .nm small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Edit profile: compact, centered card. Fields scroll in their own area; Save/Cancel stay in a separate footer */
+#tlEdit.tl-scrim{align-items:center;padding:16px;padding-top:max(16px,env(safe-area-inset-top,0px));padding-bottom:max(16px,env(safe-area-inset-bottom,0px))}
+#tlEdit .tl-sheet{display:flex;flex-direction:column;overflow:hidden;max-width:400px;max-height:calc(100dvh - 32px);padding:16px 16px 14px;border:1px solid var(--line);border-radius:26px;box-shadow:0 24px 60px #0007;animation:tlpop .28s cubic-bezier(.2,.8,.2,1) both}
+@keyframes tlpop{from{opacity:0;transform:translateY(10px) scale(.97)}}
+#tlEdit .tl-grab{display:none}
+#tlEdit h3{margin:0 0 10px!important;flex:none}
+#tlEdit .tl-sc{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;margin:0 -6px;padding:0 6px}
+#tlEdit .tl-ed{height:84px;margin-bottom:40px;border-radius:16px}
+#tlEdit .tl-ed .a{width:64px;height:64px;border-radius:22px;bottom:-32px;font-size:24px}
+#tlEdit .tl-ed button{padding:6px 10px;font-size:11.5px}#tlEdit .tl-ed button.v{left:60px;bottom:-26px}
+#tlEdit .tl-fld{margin-bottom:8px}#tlEdit .tl-fld>span{font-size:12px;margin-bottom:4px}
+#tlEdit .tl-fld input,#tlEdit .tl-fld textarea{padding:9px 13px;font-size:15px;border-radius:14px}
+#tlEdit .tl-fld input{height:42px}#tlEdit .tl-fld textarea{height:68px;min-height:0;resize:none}
+#tlEdit .tl-acts{flex:none;margin:10px 0 0!important;padding-top:12px;border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+#tlEdit .tl-b{padding-top:11px;padding-bottom:11px}
+/* Profile page footer: two separate, compact buttons */
+.pfoot{gap:10px;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));align-items:center;border-top:1px solid var(--line);background:var(--bg)}
+.pfoot>span[style*="width:1px"]{display:none}
+.pfoot .lr{flex:1;min-height:0!important;height:36px;padding:0 12px!important;font-size:13px!important;font-weight:600;letter-spacing:.01em;gap:7px;border-radius:12px!important;border:1px solid var(--line)!important;background:var(--s2);color:var(--txt)}
+.pfoot .lr svg{width:14px!important;height:14px!important;color:var(--mut)}.pfoot .lr:first-child svg{color:var(--am)}
+.pfoot .lr:active{scale:.97}
+@media(max-width:899px){*{scrollbar-width:none}*::-webkit-scrollbar{display:none}}
