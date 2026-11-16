@@ -275,10 +275,10 @@ html[data-theme] .nft-toolbar-select,html[data-theme] .nft-toolbar-select select
 }
 
 
-/* Desktop Profile: the page shell stays clipped; only the content pane scrolls. */
+/* Desktop Profile: keep one page-level scroll container and let its header
+   participate in the same scroll flow as the profile content. */
 @media (min-width:900px){
-  .tm-desktop .pgs[data-id="profile"] .pbody{
-    min-height:0;
+  html.tm-desktop .pgs[data-id="profile"]{
     overflow-x:hidden;
     overflow-y:auto;
     overscroll-behavior-y:contain;
