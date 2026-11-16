@@ -16,3 +16,16 @@ html[data-theme="light"] .sc-gl .sc-lc .w:not(#tm-x){clip-path:none!important;ba
 html[data-theme="light"] .sc-w .sc-rc .sc-radar:not(#tm-x):before{clip-path:none!important;background-image:var(--tmsw)!important;background-color:transparent!important}
 html.tm-desktop .pm-bal img.w{display:none!important}
 `;document.head.appendChild(e)})();
+
+/* ---- Mobile category cards: centred icon + label; purple map background ---- */
+(function(){var e=document.createElement("style");e.id="tm-cards-map-fix";e.textContent=`
+@media(max-width:640px){
+html:not(.tm-desktop) .mk-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important;padding:0 16px 10px!important;justify-content:stretch!important}
+html:not(.tm-desktop) .mk-grid .mk-card{display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:8px!important;text-align:center!important;width:100%!important;height:auto!important;min-height:92px!important;aspect-ratio:auto!important;padding:12px 2px 10px!important;border-radius:18px!important}
+html:not(.tm-desktop) .mk-grid .mk-ico{display:grid!important;place-items:center!important;flex:none!important;width:38px!important;height:38px!important;margin:0!important;border-radius:12px!important;background:var(--s2)!important}
+html:not(.tm-desktop) .mk-grid .mk-ico svg{width:20px!important;height:20px!important}
+html:not(.tm-desktop) .mk-grid .mk-name{display:block!important;width:100%!important;margin:0!important;padding:0 2px!important;text-align:center!important;font:700 11px/1.15 'Bricolage Grotesque',sans-serif!important;letter-spacing:0!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+}
+@media(max-width:360px){html:not(.tm-desktop) .mk-grid .mk-name{font-size:10px!important}}
+html[data-theme="purple"] .sc-map{background:radial-gradient(ellipse 80% 70% at 48% 45%,rgba(124,92,255,.55),rgba(76,45,170,.38) 45%,transparent 75%),linear-gradient(180deg,#1b1240,#120b2e 60%,var(--bg))!important}
+`;document.head.appendChild(e)})();
