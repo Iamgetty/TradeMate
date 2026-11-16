@@ -1,6 +1,6 @@
 # TradeMate by Metadusk
 
-TradeMate is a global, contract-first business platform. Its core purpose is to connect counterparties to discover opportunities, negotiate terms and establish business agreements—not to operate as a conventional shopping marketplace or crypto exchange.
+TradeMate is a global, contract-first business platform. Its core purpose is to connect counterparties to discover opportunities, negotiate terms and establish business agreements not to operate as a conventional shopping marketplace or crypto exchange.
 
 **Trade Smart. Trade Direct.**
 
