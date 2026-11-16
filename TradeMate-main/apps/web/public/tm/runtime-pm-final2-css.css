@@ -1,0 +1,11 @@
+
+.pmx .pm-card .pm-pill,.pmd-sh .pmd-x{display:inline-flex;align-items:center;justify-content:center;flex:none;gap:1px;height:26px;padding:0 6px 0 11px;border:0;border-radius:999px;background:var(--s2);box-shadow:inset 0 0 0 1px var(--line);color:var(--txt);font:700 11px/1 'Hanken Grotesk',sans-serif;letter-spacing:0;white-space:nowrap;cursor:pointer}
+.pmd-sh .pmd-x{padding:0 12px}
+.pmx .pm-card .pm-pill svg{width:13px;height:13px;color:var(--txt)}
+.pmd-all{max-height:82vh;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:12px}
+.pm-bal{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.pm-bal small{justify-content:center}
+.pm-bal .pm-up{align-self:center}
+@container (min-width:480px){.pm-bal{padding-right:100px}}
+html,body,.app,.pgs{overscroll-behavior:none!important}
+html.tm-mw .app,html.tm-desktop .app{padding-bottom:calc(var(--navh,58px) + 14px)}
