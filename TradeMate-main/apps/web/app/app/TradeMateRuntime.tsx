@@ -60,10 +60,10 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=111';
+    app.src = '/tm/app.js?v=112';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=111. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=112. Check the deployment and static asset response.');
 
     const loadApp = () => {
       if (!feedReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
@@ -221,7 +221,7 @@ export default function TradeMateRuntime() {
     const headerPreload = document.createElement('link');
     headerPreload.rel = 'preload';
     headerPreload.as = 'style';
-    headerPreload.href = '/tm/runtime-header.css?v=1';
+    headerPreload.href = '/tm/runtime-header.css?v=2';
     headerPreload.onload = () => { headerCssReady = true; loadApp(); };
     headerPreload.onerror = () => { headerCssReady = true; loadApp(); };
     document.head.appendChild(headerPreload);
