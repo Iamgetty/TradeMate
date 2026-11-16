@@ -276,10 +276,25 @@ html[data-theme] .nft-toolbar-select,html[data-theme] .nft-toolbar-select select
 
 
 /* Desktop Profile: preserve its fixed header/footer and use the
-   dedicated content pane as the only vertical scroll container. */
+   dedicated content pane as the only vertical scroll container.
+   Every ancestor between the page frame and .pbody must be a bounded flex
+   column, otherwise .pbody grows to its content and has no scroll range. */
 @media (min-width:900px){
   html.tm-desktop .pgs[data-id="profile"]{
     overflow:hidden;
+    display:flex;
+    flex-direction:column;
+  }
+  html.tm-desktop .pgs[data-id="profile"] .pgw{
+    display:flex;
+    flex-direction:column;
+    flex:1 1 auto;
+    min-height:0;
+    width:100%;
+  }
+  html.tm-desktop .pgs[data-id="profile"] .ph,
+  html.tm-desktop .pgs[data-id="profile"] .pfoot{
+    flex:none;
   }
   html.tm-desktop .pgs[data-id="profile"] .pbody{
     flex:1 1 auto;
