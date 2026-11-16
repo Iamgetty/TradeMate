@@ -27,34 +27,7 @@ document.addEventListener("click",function(t){var e,a=t.target;if(a.closest){if(
 (function(){var e=e=document.createElement("link");e.id="tm-feed-x-layout";e.rel="stylesheet";e.href="/tm/runtime-tm-feed-x-layout.css";document.head.appendChild(e)})();
 
 /* ---- Post media, X-style: rounded grids, tap-to-view lightbox ---- */
-(function(){var e=document.createElement("style");e.id="tm-feed-media";e.textContent=`
-.fd-media{display:grid;gap:2px;margin:10px 0 6px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--s2)}
-.fd-media.m1{display:block}
-.fd-media .fd-mi{position:relative;display:block;width:100%;padding:0;margin:0;border:0;background:none;overflow:hidden;cursor:zoom-in;min-height:0}
-.fd-media .fd-mi img{display:block;width:100%;height:auto;max-height:510px;object-fit:cover;border-radius:0!important;margin:0!important;transition:filter .2s}
-.fd-media .fd-mi:hover img{filter:brightness(.92)}
-.fd-media.m2,.fd-media.m3,.fd-media.m4{aspect-ratio:16/9;grid-template-columns:1fr 1fr}
-.fd-media.m3,.fd-media.m4{grid-template-rows:1fr 1fr}
-.fd-media.m3 .fd-mi:first-child{grid-row:1/span 2}
-.fd-media.m2 .fd-mi img,.fd-media.m3 .fd-mi img,.fd-media.m4 .fd-mi img{position:absolute;inset:0;height:100%;max-height:none}
-.fd-vid{display:block;width:100%;max-height:510px;background:#000}
-.fd-aud{margin:10px 0 6px;padding:10px 12px;border:1px solid var(--line);border-radius:16px;background:var(--s2)}
-.fd-aud audio{display:block;width:100%}
-.fd-aud small{display:block;margin-top:4px;color:var(--mut);font-size:12px}
-.fd-file{display:flex;align-items:center;gap:12px;margin:10px 0 6px;padding:12px 14px;border:1px solid var(--line);border-radius:16px;background:var(--s2);color:var(--txt);text-decoration:none}
-.fd-file:hover{background:var(--s3)}
-.fd-fi{flex:none;min-width:44px;height:44px;padding:0 6px;border-radius:12px;display:grid;place-items:center;background:var(--s3);font:800 12px 'Bricolage Grotesque',sans-serif;letter-spacing:.02em}
-.fd-fn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;font-size:14px}
-#fd-lb{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.92);padding:24px}
-#fd-lb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
-#fd-lb button{position:absolute;display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;cursor:pointer}
-#fd-lb button:hover{background:rgba(255,255,255,.26)}
-#fd-lb .x{top:16px;left:16px}
-#fd-lb .p{left:16px;top:50%;transform:translateY(-50%)}
-#fd-lb .n{right:16px;top:50%;transform:translateY(-50%)}
-#fd-lb .c{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);color:#fff;font:600 13px 'Hanken Grotesk',sans-serif;opacity:.8}
-@media(max-width:640px){.fd-media{border-radius:14px}#fd-lb{padding:0}#fd-lb .p,#fd-lb .n{display:none}}
-`;document.head.appendChild(e);
+(function(){var e=e=document.createElement("link");e.id="tm-feed-media";e.rel="stylesheet";e.href="/tm/runtime-tm-feed-media.css";document.head.appendChild(e);
 var ic=function(d){return'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+d+'"/></svg>'};
 function openLb(list,start){var cur=start,lb=document.createElement("div");lb.id="fd-lb";lb.setAttribute("role","dialog");lb.setAttribute("aria-modal","true");lb.setAttribute("aria-label","Image viewer");
 lb.innerHTML='<button type="button" class="x" aria-label="Close">'+ic("M6 6l12 12M18 6L6 18")+"</button>"+(list.length>1?'<button type="button" class="p" aria-label="Previous image">'+ic("M15 6l-6 6 6 6")+'</button><button type="button" class="n" aria-label="Next image">'+ic("M9 6l6 6-6 6")+'</button><span class="c"></span>':"")+'<img alt="">';
@@ -68,40 +41,7 @@ document.addEventListener("click",function(ev){var b=ev.target.closest&&ev.targe
 })();
 
 /* ---- Profile, X-style on desktop: centred column + right sidebar ---- */
-(function(){var e=document.createElement("style");e.id="tm-profile-x-layout";e.textContent=`
-#tlView .fd-side{display:none}
-@media(min-width:900px){
-html.tm-desktop #tlView .tl-in{display:grid!important;grid-template-columns:minmax(0,640px) 340px;column-gap:28px;justify-content:center;align-items:start;padding-bottom:80px}
-html.tm-desktop #tlView .tl-col{position:relative;min-width:0;min-height:100dvh;border-left:1px solid var(--line);border-right:1px solid var(--line)}
-html.tm-desktop #tlView .fd-side{display:block;position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow-y:auto;scrollbar-width:none;padding-top:0}
-html.tm-desktop #tlView .fd-side::-webkit-scrollbar{display:none}
-html.tm-desktop #tlView .tl-col .tl-cover{height:200px!important}
-html.tm-desktop #tlView .tl-col .tl-cover:after{display:none}
-html.tm-desktop #tlView .tl-col .tl-av{width:120px;height:120px;margin:-60px 0 0 16px!important;padding:4px;border-radius:50%;background:var(--bg)}
-html.tm-desktop #tlView .tl-col .tl-av>.big,html.tm-desktop #tlView .tl-col .tl-av>.ini{border-radius:50%!important;border:0!important;font-size:44px}
-html.tm-desktop #tlView .tl-col .tl-av>.big img{border-radius:50%}
-html.tm-desktop #tlView .tl-col .tl-h{margin:10px 16px 0!important;padding:0!important}
-html.tm-desktop #tlView .tl-col .tl-h h2{font-size:22px}
-html.tm-desktop #tlView .tl-col .tl-h .sub2{font-size:14px}
-html.tm-desktop #tlView .tl-col .tl-acts{position:absolute;top:212px;right:16px;margin:0!important;padding:0!important;border:0!important;width:auto;display:flex;gap:8px!important}
-html.tm-desktop #tlView .tl-col .tl-acts .tl-b{flex:none!important;height:36px!important;padding:0 16px!important}
-html.tm-desktop #tlView .tl-col .tl-acts .tl-b:not(.p){background:transparent!important;border:1px solid color-mix(in srgb,var(--txt) 22%,var(--line))!important}
-html.tm-desktop #tlView .tl-col .tl-stats{display:flex;flex-wrap:wrap;gap:4px 18px;margin:12px 16px 0!important}
-html.tm-desktop #tlView .tl-col .tl-stats div{flex:none!important;display:flex;gap:5px;align-items:baseline;padding:0!important;background:none!important;border:0!important;text-align:left}
-html.tm-desktop #tlView .tl-col .tl-stats b{display:inline;font:800 15px 'Bricolage Grotesque',sans-serif}
-html.tm-desktop #tlView .tl-col .tl-stats span{font-size:14px}
-html.tm-desktop #tlView .tl-col .tl-stats div:nth-child(3){order:1}
-html.tm-desktop #tlView .tl-col .tl-stats div:nth-child(2){order:2}
-html.tm-desktop #tlView .tl-col .tl-stats div:nth-child(1){order:3}
-html.tm-desktop #tlView .tl-col .tl-soc,html.tm-desktop #tlView .tl-col .tl-prev,html.tm-desktop #tlView .tl-col .tl-sec{margin-left:16px!important;margin-right:16px!important}
-html.tm-desktop #tlView .tl-col .tl-hls{padding-left:16px!important;padding-right:16px!important}
-html.tm-desktop #tlView .tl-col .tl-tabs{margin:14px 0 0!important;border-bottom:1px solid var(--line)!important}
-html.tm-desktop #tlView .tl-col .tl-tabs button{padding:14px 12px}
-html.tm-desktop #tlView .tl-col .tl-card{margin:0!important;padding:14px 16px;border:0!important;border-bottom:1px solid var(--line)!important;border-radius:0!important;background:none!important}
-html.tm-desktop #tlView .tl-col .tl-empty{margin:16px!important}
-html.tm-desktop #tlView .tl-col .tl-grid{margin:2px 0 0!important}
-}
-`;document.head.appendChild(e)})();
+(function(){var e=e=document.createElement("link");e.id="tm-profile-x-layout";e.rel="stylesheet";e.href="/tm/runtime-tm-profile-x-layout.css";document.head.appendChild(e)})();
 
 /* Contract Scout: logo is part of scout-map.jpg; keep the scanning rings/sweep turning smoothly */
 !function(){if(document.getElementById("scSpinFix"))return;var s=document.createElement("style");s.id="scSpinFix";s.textContent=".sc-gl .sc-lc .r,.sc-gl .sc-lc .w{will-change:transform;-webkit-backface-visibility:hidden;backface-visibility:hidden}@media(prefers-reduced-motion:reduce){.sc-gl .sc-lc .r{animation:scRot 26s linear infinite!important}.sc-gl .sc-lc .w{animation:scRot 5s linear infinite!important}}";document.head.appendChild(s)}();

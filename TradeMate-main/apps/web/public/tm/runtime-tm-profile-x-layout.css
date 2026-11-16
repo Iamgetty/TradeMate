@@ -1,0 +1,33 @@
+
+#tlView .fd-side{display:none}
+@media(min-width:900px){
+html.tm-desktop #tlView .tl-in{display:grid!important;grid-template-columns:minmax(0,640px) 340px;column-gap:28px;justify-content:center;align-items:start;padding-bottom:80px}
+html.tm-desktop #tlView .tl-col{position:relative;min-width:0;min-height:100dvh;border-left:1px solid var(--line);border-right:1px solid var(--line)}
+html.tm-desktop #tlView .fd-side{display:block;position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow-y:auto;scrollbar-width:none;padding-top:0}
+html.tm-desktop #tlView .fd-side::-webkit-scrollbar{display:none}
+html.tm-desktop #tlView .tl-col .tl-cover{height:200px!important}
+html.tm-desktop #tlView .tl-col .tl-cover:after{display:none}
+html.tm-desktop #tlView .tl-col .tl-av{width:120px;height:120px;margin:-60px 0 0 16px!important;padding:4px;border-radius:50%;background:var(--bg)}
+html.tm-desktop #tlView .tl-col .tl-av>.big,html.tm-desktop #tlView .tl-col .tl-av>.ini{border-radius:50%!important;border:0!important;font-size:44px}
+html.tm-desktop #tlView .tl-col .tl-av>.big img{border-radius:50%}
+html.tm-desktop #tlView .tl-col .tl-h{margin:10px 16px 0!important;padding:0!important}
+html.tm-desktop #tlView .tl-col .tl-h h2{font-size:22px}
+html.tm-desktop #tlView .tl-col .tl-h .sub2{font-size:14px}
+html.tm-desktop #tlView .tl-col .tl-acts{position:absolute;top:212px;right:16px;margin:0!important;padding:0!important;border:0!important;width:auto;display:flex;gap:8px!important}
+html.tm-desktop #tlView .tl-col .tl-acts .tl-b{flex:none!important;height:36px!important;padding:0 16px!important}
+html.tm-desktop #tlView .tl-col .tl-acts .tl-b:not(.p){background:transparent!important;border:1px solid color-mix(in srgb,var(--txt) 22%,var(--line))!important}
+html.tm-desktop #tlView .tl-col .tl-stats{display:flex;flex-wrap:wrap;gap:4px 18px;margin:12px 16px 0!important}
+html.tm-desktop #tlView .tl-col .tl-stats div{flex:none!important;display:flex;gap:5px;align-items:baseline;padding:0!important;background:none!important;border:0!important;text-align:left}
+html.tm-desktop #tlView .tl-col .tl-stats b{display:inline;font:800 15px 'Bricolage Grotesque',sans-serif}
+html.tm-desktop #tlView .tl-col .tl-stats span{font-size:14px}
+html.tm-desktop #tlView .tl-col .tl-stats div:nth-child(3){order:1}
+html.tm-desktop #tlView .tl-col .tl-stats div:nth-child(2){order:2}
+html.tm-desktop #tlView .tl-col .tl-stats div:nth-child(1){order:3}
+html.tm-desktop #tlView .tl-col .tl-soc,html.tm-desktop #tlView .tl-col .tl-prev,html.tm-desktop #tlView .tl-col .tl-sec{margin-left:16px!important;margin-right:16px!important}
+html.tm-desktop #tlView .tl-col .tl-hls{padding-left:16px!important;padding-right:16px!important}
+html.tm-desktop #tlView .tl-col .tl-tabs{margin:14px 0 0!important;border-bottom:1px solid var(--line)!important}
+html.tm-desktop #tlView .tl-col .tl-tabs button{padding:14px 12px}
+html.tm-desktop #tlView .tl-col .tl-card{margin:0!important;padding:14px 16px;border:0!important;border-bottom:1px solid var(--line)!important;border-radius:0!important;background:none!important}
+html.tm-desktop #tlView .tl-col .tl-empty{margin:16px!important}
+html.tm-desktop #tlView .tl-col .tl-grid{margin:2px 0 0!important}
+}
