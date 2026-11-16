@@ -38,6 +38,7 @@ export default function TradeMateRuntime() {
     let contractf2CssReady = false;
     let helpCssReady = false;
     let headerCssReady = false;
+    let feedbackCssReady = false;
     const fail = (title: string, detail: string) => {
       if (settled) return;
       settled = true;
@@ -60,13 +61,13 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=112';
+    app.src = '/tm/app.js?v=113';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=112. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=113. Check the deployment and static asset response.');
 
     const loadApp = () => {
-      if (!feedReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -225,6 +226,14 @@ export default function TradeMateRuntime() {
     headerPreload.onload = () => { headerCssReady = true; loadApp(); };
     headerPreload.onerror = () => { headerCssReady = true; loadApp(); };
     document.head.appendChild(headerPreload);
+    const feedbackPreload = document.createElement('link');
+    feedbackPreload.rel = 'preload';
+    feedbackPreload.as = 'style';
+    feedbackPreload.href = '/tm/runtime-feedback.css?v=1';
+    feedbackPreload.onload = () => { feedbackCssReady = true; loadApp(); };
+    feedbackPreload.onerror = () => { feedbackCssReady = true; loadApp(); };
+    document.head.appendChild(feedbackPreload);
+
     const feed = document.createElement('script');
     feed.src = '/tm/feed-client.js?v=2';
     feed.async = false;
