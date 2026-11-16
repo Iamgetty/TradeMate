@@ -604,7 +604,7 @@ test('community Feed recovers after a transient API failure and fits mobile scre
 
     await page.getByRole('button', { name: 'Try again', exact: true }).click();
     await expect(page.getByText('Feed retry acceptance post', { exact: true })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('Feed QA Member', { exact: true })).toBeVisible();
+    await expect(page.getByRole('article').getByRole('button', { name: 'Feed QA Member', exact: true })).toBeVisible();
     expect(feedRequests).toBe(2);
 
     await page.setViewportSize({ width: 390, height: 844 });
@@ -694,4 +694,93 @@ test('notification action marks the item read and opens its internal conversatio
   await expect(page).toHaveURL(url => url.pathname === '/messages/' + enquiryId);
   await expect(page.getByRole('heading', { name: 'Notification navigation fixture.' })).toBeVisible();
   expect(notificationRead).toBe(true);
+});
+
+
+test('desktop Profile content scrolls fully while its header and mode switcher stay anchored', async ({ browser }) => {
+  test.setTimeout(45_000);
+  let authenticated = false;
+  const context = await browser.newContext({ viewport: { width: 1280, height: 480 } });
+  const page = await context.newPage();
+
+  await page.route('**/api/**', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname.startsWith('/api') ? url.pathname.slice(4) : url.pathname;
+    if (path === '/auth/me' && request.method() === 'GET') {
+      await route.fulfill(authenticated
+        ? { status: 200, json: { user: { id: 'profile-scroll-user', email: 'profile-scroll@example.test', display_name: 'Profile Scroll User', country_code: 'NG' } } }
+        : { status: 401, json: { message: 'No active session' } });
+      return;
+    }
+    if (path === '/auth/login' && request.method() === 'POST') {
+      authenticated = true;
+      await route.fulfill({ status: 200, json: { user: { id: 'profile-scroll-user', email: 'profile-scroll@example.test', display_name: 'Profile Scroll User', country_code: 'NG' } } });
+      return;
+    }
+    await route.fulfill({ status: 200, json: {} });
+  });
+
+  try {
+    await login(page, 'profile-scroll@example.test');
+    await page.locator('#app .top button[data-pg="profile"]').click();
+    const profile = page.locator('#pg .pgs[data-id="profile"]');
+    const content = profile.locator('.pbody');
+    const header = profile.locator('.ph');
+    const footer = profile.locator('.pfoot');
+    await expect(content).toBeVisible();
+    await expect(footer.locator('[data-act="mode"]')).toBeVisible();
+
+    const before = await page.evaluate(() => {
+      const root = document.querySelector('#pg .pgs[data-id="profile"]');
+      const body = root?.querySelector('.pbody');
+      const header = root?.querySelector('.ph');
+      const footer = root?.querySelector('.pfoot');
+      if (!(root instanceof HTMLElement) || !(body instanceof HTMLElement) ||
+          !(header instanceof HTMLElement) || !(footer instanceof HTMLElement)) return null;
+      const rect = (element: HTMLElement) => {
+        const box = element.getBoundingClientRect();
+        return { top: box.top, bottom: box.bottom };
+      };
+      return {
+        maxScroll: body.scrollHeight - body.clientHeight,
+        header: rect(header),
+        footer: rect(footer),
+        pageScrollHeight: document.documentElement.scrollHeight,
+        viewportHeight: document.documentElement.clientHeight,
+      };
+    });
+    expect(before).not.toBeNull();
+    expect(before!.maxScroll, 'Profile content must have its own vertical scroll range').toBeGreaterThan(0);
+
+    const bottom = await content.evaluate(element => {
+      element.scrollTop = element.scrollHeight;
+      return { top: element.scrollTop, max: element.scrollHeight - element.clientHeight };
+    });
+    expect(bottom.top).toBeGreaterThan(0);
+    expect(bottom.top).toBeGreaterThanOrEqual(bottom.max - 2);
+
+    const anchored = await page.evaluate(() => {
+      const root = document.querySelector('#pg .pgs[data-id="profile"]');
+      const body = root?.querySelector('.pbody');
+      const header = root?.querySelector('.ph');
+      const footer = root?.querySelector('.pfoot');
+      if (!(body instanceof HTMLElement) || !(header instanceof HTMLElement) || !(footer instanceof HTMLElement)) return null;
+      const rect = (element: HTMLElement) => {
+        const box = element.getBoundingClientRect();
+        return { top: box.top, bottom: box.bottom };
+      };
+      return { header: rect(header), footer: rect(footer), bodyTop: body.scrollTop };
+    });
+    expect(anchored).not.toBeNull();
+    expect(anchored!.header.top).toBeCloseTo(before!.header.top, 0);
+    expect(anchored!.footer.bottom).toBeCloseTo(before!.footer.bottom, 0);
+    expect(anchored!.bodyTop).toBeGreaterThan(0);
+
+    await content.evaluate(element => { element.scrollTop = 0; });
+    await expect.poll(() => content.evaluate(element => element.scrollTop)).toBe(0);
+    await expect(footer.locator('[data-act="mode"]')).toBeVisible();
+  } finally {
+    await context.close().catch(() => undefined);
+  }
 });

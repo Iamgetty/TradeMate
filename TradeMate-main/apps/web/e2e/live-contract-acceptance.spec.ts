@@ -51,6 +51,23 @@ async function openContract(page: Page, title: string) {
   await contractPage.locator('.cx-row').filter({ hasText: title }).click();
 }
 
+async function getWithTransientRetry(page: Page, url: string) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await page.request.get(url, { timeout: 15_000 });
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/ECONNRESET|ECONNREFUSED|socket hang up|network/i.test(message) || attempt === 2) {
+        throw error;
+      }
+      await page.waitForTimeout(300 * (attempt + 1));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
 async function expectNoHorizontalOverflow(page: Page, surface: string) {
   const dimensions = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
@@ -117,14 +134,14 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
     await expect(buyer.getByText('Completed', { exact: true }).first()).toBeVisible();
     await expectNoHorizontalOverflow(buyer, 'Clients completed contract');
 
-    const durableContract = await buyer.request.get('/api/market/contracts/' + fixture.contractId);
+    const durableContract = await getWithTransientRetry(buyer, '/api/market/contracts/' + fixture.contractId);
     expect(durableContract.status()).toBe(200);
     const result = await durableContract.json();
     expect(result.data.status).toBe('completed');
     expect(result.data.buyer_confirmed_at).toBeTruthy();
     expect(result.data.seller_confirmed_at).toBeTruthy();
 
-    const sellerReload = await seller.request.get('/api/market/contracts/' + fixture.contractId);
+    const sellerReload = await getWithTransientRetry(seller, '/api/market/contracts/' + fixture.contractId);
     expect(sellerReload.status()).toBe(200);
     expect((await sellerReload.json()).data.status).toBe('completed');
   } finally {
