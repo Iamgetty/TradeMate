@@ -30,6 +30,7 @@ export default function TradeMateRuntime() {
     let cssReady = false;
     let layoutCssReady = false;
     let patchesCssReady = false;
+    let portfolioCssReady = false;
     const fail = (title: string, detail: string) => {
       if (settled) return;
       settled = true;
@@ -52,13 +53,13 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=104';
+    app.src = '/tm/app.js?v=105';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=104. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=105. Check the deployment and static asset response.');
 
     const loadApp = () => {
-      if (!feedReady || !cssReady || !layoutCssReady || !patchesCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -115,6 +116,20 @@ export default function TradeMateRuntime() {
     };
     document.head.appendChild(patchesPreload);
 
+    const portfolioPreload = document.createElement('link');
+    portfolioPreload.rel = 'preload';
+    portfolioPreload.as = 'style';
+    portfolioPreload.href = '/tm/runtime-portfolio.css?v=1';
+    portfolioPreload.onload = () => {
+      portfolioCssReady = true;
+      loadApp();
+    };
+    portfolioPreload.onerror = () => {
+      portfolioCssReady = true;
+      loadApp();
+    };
+    document.head.appendChild(portfolioPreload);
+
     const feed = document.createElement('script');
     feed.src = '/tm/feed-client.js?v=2';
     feed.async = false;
@@ -139,7 +154,7 @@ export default function TradeMateRuntime() {
       if (!rendered) {
         fail(
           'TradeMate could not start',
-          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=104 returns successfully.'
+          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=105 returns successfully.'
         );
         return;
       }
