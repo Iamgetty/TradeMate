@@ -604,7 +604,7 @@ test('community Feed recovers after a transient API failure and fits mobile scre
 
     await page.getByRole('button', { name: 'Try again', exact: true }).click();
     await expect(page.getByText('Feed retry acceptance post', { exact: true })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('Feed QA Member', { exact: true })).toBeVisible();
+    await expect(page.getByRole('article').getByRole('button', { name: 'Feed QA Member', exact: true })).toBeVisible();
     expect(feedRequests).toBe(2);
 
     await page.setViewportSize({ width: 390, height: 844 });
