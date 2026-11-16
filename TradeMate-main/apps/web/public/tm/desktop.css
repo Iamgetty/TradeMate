@@ -163,7 +163,7 @@ html[data-theme] .nft-toolbar-select,html[data-theme] .nft-toolbar-select select
 .tm-desktop .ph h2{flex:1;margin:0;text-align:left;font:800 34px/1.05 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.03em;color:var(--txt)}
 .tm-desktop .ph .rt[data-closeall],.tm-desktop .ph [data-closeall]{display:none!important}
 .tm-desktop .pgs:not([data-deep]) .ph .bk2{display:none!important}
-.tm-desktop .pgs[data-id="profile"] .ph{padding:18px 16px 8px;position:absolute;left:0;right:0;z-index:3;background:none}
+.tm-desktop .pgs[data-id="profile"] .ph{padding:18px 16px 8px;position:relative;left:auto;right:auto;z-index:3;background:none}
 .tm-desktop .pgs[data-id="profile"] .ph .rts{margin-left:auto}
 .tm-desktop .ph>.srch{max-width:640px}
 
@@ -275,10 +275,10 @@ html[data-theme] .nft-toolbar-select,html[data-theme] .nft-toolbar-select select
 }
 
 
-/* Desktop Profile mode-switcher page: keep scrolling native and confined to
-   its own viewport so the top and bottom remain reachable. */
+/* Desktop Profile: the page shell stays clipped; only the content pane scrolls. */
 @media (min-width:900px){
-  .tm-desktop .pgs[data-id="profile"]{
+  .tm-desktop .pgs[data-id="profile"] .pbody{
+    min-height:0;
     overflow-x:hidden;
     overflow-y:auto;
     overscroll-behavior-y:contain;
