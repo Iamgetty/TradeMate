@@ -1,0 +1,17 @@
+
+html[data-theme="light"] .sc-map:not(#tm-x),html[data-theme="light"] .sc-hero:not(#tm-x){background-color:#0B1F5C!important}
+html[data-theme="light"] .sc-gl:not(#tm-x){background-color:#0B1F5C!important;background-blend-mode:screen}
+html[data-theme="light"] .sc-gl .sc-lc .g:not(#tm-x){background:rgba(96,165,250,.18)!important}
+html[data-theme="light"] .sc-gl .sc-lc .w:not(#tm-x){background:rgba(147,197,253,.5)!important;clip-path:polygon(50% 50%,50% 0,100% 0,100% 55%)}
+html[data-theme="light"] .sc-gl .sc-lc .p:not(#tm-x){border-color:rgba(147,197,253,.85)!important}
+html[data-theme="light"] .sc-gl .sc-lc .r:not(#tm-x){border-color:rgba(147,197,253,.7)!important}
+html[data-theme="light"] .sc-gl .sc-twk i:not(#tm-x){background:#FFE9B8!important;width:6px!important;height:6px!important;margin:-3px 0 0 -3px!important;box-shadow:0 0 6px 1px rgba(255,190,70,.8)!important}
+html[data-theme="light"] .sc-rc:not(#tm-x){background:#0B1F5C!important;border-color:#1E3A8A!important}
+html[data-theme="light"] .sc-chk:not(#tm-x){border-left-color:rgba(255,255,255,.22)!important}
+html[data-theme="light"] .sc-chk li:not(.on):not(#tm-x){color:#BFDBFE!important}
+html[data-theme="light"] .sc-chk li.on:not(#tm-x){color:#fff!important}
+html[data-theme="light"] .sc-chk li b:not(#tm-x){border-color:rgba(255,255,255,.4)!important}
+html[data-theme="light"] .sc-chk li.on b:not(#tm-x){background:#3B82F6!important;border-color:#3B82F6!important;color:#fff!important}
+html[data-theme="light"] .sc-w .sc-rc .sc-radar:not(#tm-x){background-image:none!important;background-color:#0B1F5C!important;box-shadow:inset 0 0 0 1.5px #60A5FA,inset 0 0 0 15px #0B1F5C,inset 0 0 0 16.5px rgba(96,165,250,.6),inset 0 0 0 30px #0B1F5C,inset 0 0 0 31.5px rgba(96,165,250,.45)!important}
+html[data-theme="light"] .sc-w .sc-rc .sc-radar:not(#tm-x):before{background:rgba(96,165,250,.4)!important;clip-path:polygon(50% 50%,50% 0,0 0,0 41%)}
+html[data-theme="light"] .sc-w .sc-rc .sc-radar:not(#tm-x):after{background:#93C5FD!important;box-shadow:none!important}
