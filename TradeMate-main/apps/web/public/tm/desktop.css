@@ -277,6 +277,9 @@ html[data-theme] .nft-toolbar-select,html[data-theme] .nft-toolbar-select select
 
 /* Desktop Profile: the page shell fills the viewport; only .pbody scrolls. */
 @media (min-width:900px){
+  /* The base .pgs entrance animation translates the shell while .pbody scrolls.
+     Desktop Profile is a fixed frame, so it must not animate its geometry. */
+  html.tm-desktop body .pgs[data-id="profile"]{animation:none!important;transform:none!important;}
   html.tm-desktop body .pgs[data-id="profile"]{
     display:flex!important;
     flex-direction:column!important;
