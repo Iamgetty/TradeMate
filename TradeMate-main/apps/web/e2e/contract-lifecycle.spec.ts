@@ -706,7 +706,7 @@ test('desktop Profile content scrolls fully while its header and mode switcher s
   await page.route('**/api/**', async route => {
     const request = route.request();
     const url = new URL(request.url());
-    const path = url.pathname.replace(/^\\/api/, '');
+    const path = url.pathname.startsWith('/api') ? url.pathname.slice(4) : url.pathname;
     if (path === '/auth/me' && request.method() === 'GET') {
       await route.fulfill(authenticated
         ? { status: 200, json: { user: { id: 'profile-scroll-user', email: 'profile-scroll@example.test', display_name: 'Profile Scroll User', country_code: 'NG' } } }
