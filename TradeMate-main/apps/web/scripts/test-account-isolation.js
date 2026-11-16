@@ -27,7 +27,7 @@ function find(needle, from) {
 
 // Number of times a pattern occurs in a piece of text.
 function count(text, re) {
-  return text.split(re).length - 1;
+  return (text.match(re) || []).length;
 }
 
 // Slice of the source between a start marker and the next end marker.
@@ -103,7 +103,7 @@ function section(startMark, endMark) {
     "authenticated requests must capture their account identity and generation");
   assert.match(apiBlock, /accountRequestControllers\.push\([\w$]+\)/,
     "authenticated requests must be cancellable on account changes");
-  assert.ok(count(apiBlock, /if\([\w$]+&&!isCurrentAccountRequest\([\w$]+\)\)/) >= 3,
+  assert.ok(count(apiBlock, /if\([\w$]+&&!isCurrentAccountRequest\([\w$]+\)\)/g) >= 3,
     "responses and network errors must all be rejected when the account generation changes");
   assert.match(apiBlock, /\.finally\(function\(\)\{if\([\w$]+\)\{var [\w$]+=accountRequestControllers\.indexOf\(/,
     "request cancellation handles must be cleaned up");
@@ -120,7 +120,7 @@ function section(startMark, endMark) {
     "account changes must discard pending authenticator setup secrets");
   assert.match(source, /tlClose\("tlView"\)/,
     "account changes must close the previous account's timeline overlay");
-  assert.ok(count(source, /keepTp\(function\(\)\{for\(var ([\w$]+)=items\.length-1;\1>=0;\1--\)items\[\1\]\.own&&items\.splice\(\1,1\)\}\),ads=ads\.filter\(function\(([\w$]+)\)\{return!\2\.own\}\)/) >= 2,
+  assert.ok(count(source, /keepTp\(function\(\)\{for\(var ([\w$]+)=items\.length-1;\1>=0;\1--\)items\[\1\]\.own&&items\.splice\(\1,1\)\}\),ads=ads\.filter\(function\(([\w$]+)\)\{return!\2\.own\}\)/g) >= 2,
     "account switches and logout must both remove prior account-owned listings and ads");
   assert.match(source, /accountSessionGeneration\+\+,abortAccountRequests\(\)/,
     "logout must invalidate the old session generation and abort its requests");
