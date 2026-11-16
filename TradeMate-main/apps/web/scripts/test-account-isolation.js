@@ -16,23 +16,23 @@ function section(startText, endText) {
 }
 
 (function connectedStorageIsAccountIsolated() {
-  assert.match(source, /var DEVICE_SAVED=\["mode","hide","lang"\]/,
+  assert.match(source, /(?:var SAVED=\[[^;]*,)?DEVICE_SAVED=\["mode","hide","lang"\]/,
     "connected mode must allowlist only non-sensitive device settings");
 
   const saveBlock = section("function save(){", "\nfunction keepTp");
-  assert.match(saveBlock, /var o=CONNECTED\?\{\}:\{mine:items\.filter\(function\(i\)\{return i\.own\}\),ads:ads\.filter\(function\(a\)\{return a\.own\}\)\}/,
+  assert.match(saveBlock, /var t=CONNECTED\?\{\}:\{mine:items\.filter\(function\(t\)\{return t\.own\}\),ads:ads\.filter\(function\(t\)\{return t\.own\}\)\}/,
     "connected save must not serialize owned listings or P2P ads");
   assert.match(saveBlock, /\(CONNECTED\?DEVICE_SAVED:SAVED\)\.forEach/,
     "connected save must use the device-only allowlist");
 
   const loadBlock = section("function load(){", "\nload();if(!CONNECTED");
-  assert.match(loadBlock, /var keys=CONNECTED\?DEVICE_SAVED:SAVED/,
+  assert.match(loadBlock, /CONNECTED\?DEVICE_SAVED:SAVED\)\.forEach/,
     "connected load must use the device-only allowlist");
-  const privateRestore = loadBlock.indexOf("(s.mine||[]).forEach(addItem)");
-  const connectedReturn = loadBlock.indexOf("if(CONNECTED){var safe={}");
+  const privateRestore = loadBlock.indexOf("(t.mine||[]).forEach(addItem)");
+  const connectedReturn = loadBlock.indexOf("if(CONNECTED){var e={}");
   assert.ok(connectedReturn !== -1 && privateRestore > connectedReturn,
     "connected startup must return before restoring private listing and ad caches");
-  assert.match(loadBlock, /localStorage\.setItem\(KEY,JSON\.stringify\(safe\)\);return/,
+  assert.match(loadBlock, /localStorage\.setItem\(KEY,JSON\.stringify\(e\)\)/,
     "legacy shared-device cache must be rewritten without private account fields");
 
   assert.match(loadBlock, /if\(CONNECTED\)localStorage\.removeItem\(KEY\)/,
