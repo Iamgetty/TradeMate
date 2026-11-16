@@ -1,0 +1,6 @@
+
+html .ph .bk2,html .uc-hd .bk2{width:32px;height:32px;border-radius:10px;flex:none}
+html .ph .bk2 svg,html .uc-hd .bk2 svg{width:17px;height:17px}
+html .ph .rt[data-closeall],html .uc-hd .rt[data-closeall],html .rt[data-closeall]{visibility:hidden!important;pointer-events:none!important;width:32px!important;height:32px!important;min-width:0;flex:none;padding:0}
+html:not(.tm-desktop) .ph{padding:6px 14px 8px}
+html:not(.tm-desktop) .ph.rw-hd{padding-bottom:12px}
