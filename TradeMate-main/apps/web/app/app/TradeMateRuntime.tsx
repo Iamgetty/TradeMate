@@ -40,6 +40,7 @@ export default function TradeMateRuntime() {
     let headerCssReady = false;
     let feedbackCssReady = false;
     let learnCssReady = false;
+    let earnCssReady = false;
     const fail = (title: string, detail: string) => {
       if (settled) return;
       settled = true;
@@ -62,13 +63,13 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=115';
+    app.src = '/tm/app.js?v=116';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=115. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=116. Check the deployment and static asset response.');
 
     const loadApp = () => {
-      if (!feedReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -243,6 +244,14 @@ export default function TradeMateRuntime() {
     learnPreload.onerror = () => { learnCssReady = true; loadApp(); };
     document.head.appendChild(learnPreload);
 
+    const earnPreload = document.createElement('link');
+    earnPreload.rel = 'preload';
+    earnPreload.as = 'style';
+    earnPreload.href = '/tm/runtime-earn.css?v=1';
+    earnPreload.onload = () => { earnCssReady = true; loadApp(); };
+    earnPreload.onerror = () => { earnCssReady = true; loadApp(); };
+    document.head.appendChild(earnPreload);
+
     const feed = document.createElement('script');
     feed.src = '/tm/feed-client.js?v=2';
     feed.async = false;
@@ -267,7 +276,7 @@ export default function TradeMateRuntime() {
       if (!rendered) {
         fail(
           'TradeMate could not start',
-          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=115 returns successfully.'
+          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=116 returns successfully.'
         );
         return;
       }
