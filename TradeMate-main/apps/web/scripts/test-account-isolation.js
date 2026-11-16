@@ -19,13 +19,13 @@ function section(startText, endText) {
   assert.match(source, /(?:var SAVED=\[[^;]*,)?DEVICE_SAVED=\["mode","hide","lang"\]/,
     "connected mode must allowlist only non-sensitive device settings");
 
-  const saveBlock = section("function save(){", "\nfunction keepTp");
+  const saveBlock = section("function save(){", "function keepTp(");
   assert.match(saveBlock, /var t=CONNECTED\?\{\}:\{mine:items\.filter\(function\(t\)\{return t\.own\}\),ads:ads\.filter\(function\(t\)\{return t\.own\}\)\}/,
     "connected save must not serialize owned listings or P2P ads");
   assert.match(saveBlock, /\(CONNECTED\?DEVICE_SAVED:SAVED\)\.forEach/,
     "connected save must use the device-only allowlist");
 
-  const loadBlock = section("function load(){", "\nload();if(!CONNECTED");
+  const loadBlock = section("function load(){", "}load(),CONNECTED");
   assert.match(loadBlock, /CONNECTED\?DEVICE_SAVED:SAVED\)\.forEach/,
     "connected load must use the device-only allowlist");
   const privateRestore = loadBlock.indexOf("(t.mine||[]).forEach(addItem)");
