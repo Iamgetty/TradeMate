@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, randomInt, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { Pool } from 'pg';
 import { createRlsAwarePool } from './database-context';
+import { configuredIdentityProvider } from './sports-transfer/identity-provider';
 import { decimalToUnits, fiatCentsToQuantityUnits, productToFiatCents, unitsToDecimal } from './p2p-decimal';
 import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema, sportsOrganizationCreateBodySchema, sportsOrganizationMembershipInviteBodySchema, sportsRepresentativeMandateCreateBodySchema, sportsRepresentativeMandateResponseBodySchema, sportsTransferOpportunityCreateBodySchema, sportsTransferDataSourceCreateBodySchema, sportsTransferDataSourceReviewBodySchema, sportsTransferExternalPlayerIngestBodySchema, sportsTransferExternalPlayerReviewBodySchema, sportsTransferExternalPlayerClaimCreateBodySchema, sportsTransferExternalPlayerClaimReviewBodySchema, sportsTransferVerificationCaseCreateBodySchema, sportsTransferVerificationReviewBodySchema, sportsTransferVerificationProviderEventBodySchema } from './validation';
 
@@ -4767,8 +4768,7 @@ class SportsTransferVerificationCasesController {
     const userId = await this.currentUser(request);
     // The sandbox is an explicit non-production adapter. Real vendors remain disabled
     // until a reviewed adapter, country policy and managed credentials are configured.
-    if (process.env.SPORTS_TRANSFER_IDENTITY_PROVIDER !== 'sandbox'
-      || process.env.SPORTS_TRANSFER_SANDBOX_ENABLED !== 'true') {
+    if (configuredIdentityProvider() !== 'sandbox') {
       throw new HttpException('Identity verification sessions are not configured for this environment.', HttpStatus.SERVICE_UNAVAILABLE);
     }
     const client = await databasePool!.connect();
