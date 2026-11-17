@@ -130,6 +130,58 @@ async function main() {
     const sessionPrivacy = await userRequest('POST', '/api/sports-transfer/verification-cases/' + caseRecord.id + '/session');
     assert.equal(sessionPrivacy.status, 400, 'sporting identity evidence cannot be sent through the legal KYC session');
 
+    // Exercise the real Sumsub API adapter without external network access.
+    const nativeFetch = global.fetch;
+    process.env.SPORTS_TRANSFER_IDENTITY_PROVIDER = 'sumsub';
+    process.env.SUMSUB_APP_TOKEN = 'sumsub-test-app-token';
+    process.env.SUMSUB_SECRET_KEY = 'sumsub-test-secret-key';
+    process.env.SUMSUB_KYC_LEVEL_NAME = 'trademate-sandbox-kyc';
+    process.env.SUMSUB_WEBHOOK_SECRET = 'sumsub-test-webhook-secret';
+    let sumsubAccessTokenCalls = 0;
+    global.fetch = async (url, options) => {
+      if (String(url).startsWith(base)) return nativeFetch(url, options);
+      const bodyText = options?.body || '';
+      const timestamp = options?.headers?.['X-App-Access-Ts'];
+      const expectedSignature = createHmac('sha256', process.env.SUMSUB_SECRET_KEY)
+        .update(String(timestamp) + String(options.method).toUpperCase() + new URL(url).pathname + bodyText)
+        .digest('hex');
+      assert.equal(options.headers['X-App-Token'], process.env.SUMSUB_APP_TOKEN);
+      assert.equal(options.headers['X-App-Access-Sig'], expectedSignature,
+        'Sumsub API requests must use the documented HMAC request signature');
+      if (String(url).includes('/resources/accessTokens/sdk')) {
+        sumsubAccessTokenCalls += 1;
+        const sent = JSON.parse(bodyText);
+        assert.equal(sent.userId, legalCase.id);
+        assert.equal(sent.levelName, process.env.SUMSUB_KYC_LEVEL_NAME);
+        return new Response(JSON.stringify({ token: 'short-lived-sumsub-sdk-token', userId: sent.userId }), {
+          status: 200, headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (String(url).includes('/resources/applicants/-;externalUserId=')) {
+        return new Response(JSON.stringify({
+          review: { reviewStatus: 'completed', reviewResult: { reviewAnswer: 'GREEN' } },
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      throw new Error('Unexpected Sumsub test URL.');
+    };
+    const sumsubSessionResponse = await userRequest('POST', '/api/sports-transfer/verification-cases/' + legalCase.id + '/session');
+    assert.equal(sumsubSessionResponse.status, 201);
+    const sumsubSession = await sumsubSessionResponse.json();
+    assert.equal(sumsubSession.session.provider_key, 'sumsub');
+    assert.equal(sumsubSession.sdkAccessToken, 'short-lived-sumsub-sdk-token');
+    assert.ok(sumsubSession.sdkTokenExpiresAt);
+    assert.equal(sumsubAccessTokenCalls, 1);
+    const sumsubStatusResponse = await userRequest('GET', '/api/sports-transfer/verification-cases/' + legalCase.id + '/session');
+    assert.equal(sumsubStatusResponse.status, 200);
+    const sumsubStatus = await sumsubStatusResponse.json();
+    assert.equal(sumsubStatus.providerPollingAvailable, true);
+    assert.equal(sumsubStatus.providerOutcome, 'succeeded');
+    const sumsubCaseStatus = await pool.query('SELECT status FROM sports_transfer_verification_cases WHERE id = $1', [legalCase.id]);
+    assert.equal(sumsubCaseStatus.rows[0].status, 'needs_review',
+      'a Sumsub GREEN result must still require independent TradeMate human review');
+    global.fetch = nativeFetch;
+    process.env.SPORTS_TRANSFER_IDENTITY_PROVIDER = 'sandbox';
+
     await pool.query(
       "UPDATE sports_transfer_verification_cases SET provider_key = 'sandbox', provider_subject_reference = '' WHERE id = $1",
       [legalCase.id],
@@ -226,6 +278,42 @@ async function main() {
       body: providerEvent,
     });
     assert.equal(missingTimestampWebhook.status, 401, 'sandbox webhook timestamp is mandatory');
+    // Sumsub webhooks use their documented raw-body HMAC digest headers.
+    const sumsubWebhookBody = JSON.stringify({
+      applicantId: 'sumsub-applicant-test',
+      externalUserId: legalCase.id,
+      correlationId: 'sumsub-correlation-' + suffix,
+      type: 'applicantReviewed',
+      reviewStatus: 'completed',
+      reviewResult: { reviewAnswer: 'GREEN' },
+      createdAtMs: '2026-11-17 12:30:00.000',
+    });
+    const sumsubDigest = createHmac('sha256', process.env.SUMSUB_WEBHOOK_SECRET)
+      .update(Buffer.from(sumsubWebhookBody)).digest('hex');
+    const sumsubWebhookHeaders = {
+      'content-type': 'application/json',
+      'x-payload-digest-alg': 'HMAC_SHA256_HEX',
+      'x-payload-digest': sumsubDigest,
+    };
+    const sumsubWebhook = await nativeFetch(base + '/api/webhooks/sports-transfer/identity/sumsub', {
+      method: 'POST', headers: sumsubWebhookHeaders, body: sumsubWebhookBody,
+    });
+    assert.equal(sumsubWebhook.status, 200);
+    assert.equal((await sumsubWebhook.json()).humanReviewRequired, true);
+    const duplicateSumsubWebhook = await nativeFetch(base + '/api/webhooks/sports-transfer/identity/sumsub', {
+      method: 'POST', headers: sumsubWebhookHeaders, body: sumsubWebhookBody,
+    });
+    assert.equal(duplicateSumsubWebhook.status, 200);
+    assert.equal((await duplicateSumsubWebhook.json()).duplicate, true,
+      'Sumsub webhook retries must be idempotent');
+    const invalidSumsubWebhook = await nativeFetch(base + '/api/webhooks/sports-transfer/identity/sumsub', {
+      method: 'POST',
+      headers: { ...sumsubWebhookHeaders, 'x-payload-digest': '0'.repeat(64) },
+      body: sumsubWebhookBody,
+    });
+    assert.equal(invalidSumsubWebhook.status, 401,
+      'invalid Sumsub webhook digest must be rejected');
+
     const duplicate = await userRequest('POST', '/api/sports-transfer/verification-cases', body);
     assert.equal(duplicate.status, 409, 'duplicate open sporting identity cases are blocked');
 
