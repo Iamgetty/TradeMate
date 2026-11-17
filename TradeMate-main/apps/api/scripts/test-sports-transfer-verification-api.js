@@ -71,6 +71,15 @@ async function main() {
     assert.equal(caseRecord.case_type, 'sporting_identity');
     assert.equal(caseRecord.status, 'submitted');
 
+    const legalBody = {
+      caseType: 'legal_identity',
+      countryCode: 'NG',
+      claimStatement: 'I request legal identity assurance for my TradeMate account. Identity documents will be handled only by an approved verification workflow.',
+    };
+    const legalCreated = await userRequest('POST', '/api/sports-transfer/verification-cases', legalBody);
+    assert.equal(legalCreated.status, 201);
+    const legalCase = (await legalCreated.json()).verificationCase;
+
     await pool.query(
       "UPDATE sports_transfer_verification_cases SET provider_key = 'sandbox', provider_subject_reference = '' WHERE id = $1",
       [legalCase.id],
@@ -143,14 +152,6 @@ async function main() {
     const duplicate = await userRequest('POST', '/api/sports-transfer/verification-cases', body);
     assert.equal(duplicate.status, 409, 'duplicate open sporting identity cases are blocked');
 
-    const legalBody = {
-      caseType: 'legal_identity',
-      countryCode: 'NG',
-      claimStatement: 'I request legal identity assurance for my TradeMate account. Identity documents will be handled only by an approved verification workflow.',
-    };
-    const legalCreated = await userRequest('POST', '/api/sports-transfer/verification-cases', legalBody);
-    assert.equal(legalCreated.status, 201);
-    const legalCase = (await legalCreated.json()).verificationCase;
     process.env.SPORTS_TRANSFER_SANDBOX_ENABLED = 'false';
     const disabledSession = await userRequest('POST', '/api/sports-transfer/verification-cases/' + legalCase.id + '/session');
     assert.equal(disabledSession.status, 503, 'provider sessions stay disabled unless sandbox mode is explicitly enabled');
