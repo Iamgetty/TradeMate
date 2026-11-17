@@ -87,7 +87,7 @@ async function main() {
     );
 
     const mandate = (await client.query(
-      "INSERT INTO sports_representative_mandates (player_profile_id, representative_user_id, mandate_type, permitted_actions, status, verified_by_user_id, verified_at, starts_at, expires_at) VALUES ($1, $2, 'agent', ARRAY['view_profile','negotiate'], 'active', $3, now(), now(), now() + interval '30 days') RETURNING id, status",
+      "INSERT INTO sports_representative_mandates (player_profile_id, representative_user_id, mandate_type, permitted_actions, status, representative_response, responded_by_user_id, responded_at, verified_by_user_id, verified_at, starts_at, expires_at) VALUES ($1, $2, 'agent', ARRAY['view_profile','negotiate'], 'active', 'accepted', $2, now(), $3, now(), now(), now() + interval '30 days') RETURNING id, status",
       [profile.id, representative, reviewer],
     )).rows[0];
     assert.equal(mandate.status, 'active', 'a mandate can be stored with an explicit verification record');
