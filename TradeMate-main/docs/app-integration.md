@@ -57,8 +57,8 @@ The Forex market groups include ten stock indices, ten commodities, ten individu
 
 ## Scope and verification limits
 
-- The persistent listing model currently accepts Services and B2B offer types. Product listings and cart checkout are not part of the current app. A Product marketplace is only a future consideration and must not silently reappear.
-- Real Estate, Software and NFT market surfaces are not yet connected to the same durable Services/B2B contract workflow.
+- The persistent listing model stores the commercial listing behaviour (`service` or `b2b`) separately from the Explore `division`.
+- All ten Contract Categories can create durable listing drafts and submit them to the shared TradeMate moderation queue. Approved listings enter public discovery and can receive contract proposals. Product listings and cart checkout remain out of scope; P2P, NFTs, Forex and Crypto remain separate marketplace surfaces.
 - P2P-related code and routes exist, but the P2P roadmap stage remains gated on completion of the pre-P2P audit and the product owner's remaining instructions.
 - Contract and Feed code paths have build/migration coverage; live end-to-end testing, mobile-device testing, production authorization review and deployment verification remain outstanding.
 - No payment processing, escrow, custody or wallet connection should be implied as available.
