@@ -4939,6 +4939,7 @@ class SportsTransferVerificationModerationController {
     return { verificationCases: result.rows };
   }
 
+  @HttpCode(HttpStatus.OK)
   @Post('provider-events/:provider/:eventId/reconcile')
   async reconcileUnmatchedProviderEvent(
     @Param('provider') provider: string,
