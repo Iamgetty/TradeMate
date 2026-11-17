@@ -82,6 +82,11 @@ async function main() {
     const membership = (await invite.json()).membership;
     assert.equal(membership.status, 'invited');
     assert.equal(membership.permission_scope, 'recruitment');
+    const inviteNotification = await rawPool.query(
+      "SELECT id FROM user_notifications WHERE user_id = $1 AND title = 'Sporting organization invitation'",
+      [actors.member.userId],
+    );
+    assert.equal(inviteNotification.rowCount, 1, 'the invitee receives an in-app invitation notification');
     const duplicateInvite = await call('owner', 'POST', '/api/sports-transfer/organizations/' + organizationId + '/memberships', inviteBody);
     assert.equal(duplicateInvite.status, 409, 'an unexpired invitation must not be duplicated');
 
@@ -96,6 +101,11 @@ async function main() {
     const accepted = await call('member', 'POST', '/api/sports-transfer/memberships/' + membership.id + '/accept');
     assert.equal(accepted.status, 201);
     assert.equal((await accepted.json()).membership.status, 'active');
+    const ownerNotification = await rawPool.query(
+      "SELECT id FROM user_notifications WHERE user_id = $1 AND title = 'New sporting organization member'",
+      [actors.owner.userId],
+    );
+    assert.equal(ownerNotification.rowCount, 1, 'organization owners are notified when an invite is accepted');
     const repeatedAccept = await call('member', 'POST', '/api/sports-transfer/memberships/' + membership.id + '/accept');
     assert.equal(repeatedAccept.status, 404);
 
@@ -141,6 +151,11 @@ async function main() {
     const ownerRevoke = await call('owner', 'POST', '/api/sports-transfer/memberships/' + membership.id + '/revoke');
     assert.equal(ownerRevoke.status, 201);
     assert.equal((await ownerRevoke.json()).membership.status, 'revoked');
+    const revokeNotification = await rawPool.query(
+      "SELECT id FROM user_notifications WHERE user_id = $1 AND title = 'Sporting organization access updated'",
+      [actors.member.userId],
+    );
+    assert.equal(revokeNotification.rowCount, 1, 'a removed member is notified about access revocation');
 
     const revokedMemberList = await call('member', 'GET', '/api/sports-transfer/organizations/' + organizationId + '/members');
     assert.equal(revokedMemberList.status, 403);
