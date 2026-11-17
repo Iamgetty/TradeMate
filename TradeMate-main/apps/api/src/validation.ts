@@ -348,6 +348,30 @@ export const sportsOrganizationMembershipInviteBodySchema = z.object({
   expiresAt: z.string().datetime({ offset: true }),
 }).strict();
 
+
+export const sportsRepresentativeMandateCreateBodySchema = z.object({
+  representativeUserId: z.string().uuid().optional(),
+  representativeOrganizationId: z.string().uuid().optional(),
+  mandateType: z.enum(['agent', 'intermediary', 'legal_adviser']),
+  permittedActions: z.array(z.enum(['view_profile', 'contact_clubs', 'create_opportunities', 'negotiate', 'share_documents', 'receive_offers'])).min(1).max(6),
+  territoryCodes: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/)).max(30).optional(),
+  competitionIds: z.array(z.string().uuid()).max(30).optional(),
+  startsAt: z.string().datetime({ offset: true }).optional(),
+  expiresAt: z.string().datetime({ offset: true }),
+}).strict().refine((value) => Boolean(value.representativeUserId) !== Boolean(value.representativeOrganizationId), {
+  message: 'A mandate must identify exactly one representative person or sporting organization.',
+}).refine((value) => new Set(value.permittedActions).size === value.permittedActions.length, {
+  message: 'Mandate actions must not contain duplicates.',
+}).refine((value) => new Set(value.territoryCodes || []).size === (value.territoryCodes || []).length, {
+  message: 'Territory codes must not contain duplicates.',
+}).refine((value) => new Set(value.competitionIds || []).size === (value.competitionIds || []).length, {
+  message: 'Competition identifiers must not contain duplicates.',
+});
+
+export const sportsRepresentativeMandateResponseBodySchema = z.object({
+  note: z.string().trim().max(500).optional(),
+}).strict();
+
 export const sportsConsentGrantBodySchema = z.object({
   targetUserId: z.string().uuid().optional(),
   targetOrganizationId: z.string().uuid().optional(),
