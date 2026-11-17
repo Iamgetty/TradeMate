@@ -4,7 +4,7 @@ import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, 
 import { Pool } from 'pg';
 import { createRlsAwarePool } from './database-context';
 import { decimalToUnits, fiatCentsToQuantityUnits, productToFiatCents, unitsToDecimal } from './p2p-decimal';
-import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema, sportsOrganizationCreateBodySchema, sportsOrganizationMembershipInviteBodySchema, sportsRepresentativeMandateCreateBodySchema, sportsRepresentativeMandateResponseBodySchema } from './validation';
+import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema, sportsOrganizationCreateBodySchema, sportsOrganizationMembershipInviteBodySchema, sportsRepresentativeMandateCreateBodySchema, sportsRepresentativeMandateResponseBodySchema, sportsTransferOpportunityCreateBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -4116,7 +4116,117 @@ class PublicMarketQuotesController {
   }
 }
 
-@Module({ controllers: [SportsTransferMandatesController, SportsTransferOrganizationsController, SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController] })
+
+@Controller('sports-transfer')
+class SportsTransferOpportunitiesController {
+  private async currentUser(request: Request) {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to continue.');
+    const result = await databasePool.query(
+      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+      [tokenDigest(token)],
+    );
+    if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    return result.rows[0].id as string;
+  }
+
+  @Get('opportunities/mine')
+  async mine(@Req() request: Request) {
+    const userId = await this.currentUser(request);
+    const result = await databasePool!.query(
+      `SELECT o.id, o.sport, o.movement_type, o.player_profile_id,
+              p.display_name AS player_name, o.sporting_organization_id,
+              so.display_name AS organization_name, o.created_by_user_id,
+              o.title, o.description, o.position_or_role, o.country_code,
+              o.competition_name, o.season_label, o.opportunity_direction,
+              o.financial_terms, o.visibility, o.status, o.created_at, o.updated_at
+       FROM sports_transfer_opportunities o
+       LEFT JOIN sports_profiles p ON p.id = o.player_profile_id
+       LEFT JOIN sports_organizations so ON so.id = o.sporting_organization_id
+       WHERE p.user_id = $1
+          OR EXISTS (
+            SELECT 1 FROM sports_org_memberships m
+            WHERE m.sports_organization_id = o.sporting_organization_id
+              AND m.user_id = $1 AND m.status = 'active'
+              AND m.role IN ('owner','admin','sporting_director','general_manager','recruiter')
+              AND m.permission_scope IN ('workspace','recruitment')
+              AND (m.starts_at IS NULL OR m.starts_at <= now())
+              AND (m.expires_at IS NULL OR m.expires_at > now())
+          )
+       ORDER BY o.updated_at DESC LIMIT 100`,
+      [userId],
+    );
+    return { opportunities: result.rows };
+  }
+
+  @Post('opportunities')
+  async create(@Req() request: Request, @Body() body: any) {
+    const input = parseBody(sportsTransferOpportunityCreateBodySchema, body);
+    const userId = await this.currentUser(request);
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      if (input.playerProfileId) {
+        const profile = await client.query(
+          'SELECT id, sport FROM sports_profiles WHERE id = $1 AND user_id = $2 FOR UPDATE',
+          [input.playerProfileId, userId],
+        );
+        if (!profile.rowCount) throw new NotFoundException('Sports Transfer player profile not found.');
+        if (profile.rows[0].sport !== input.sport) {
+          throw new BadRequestException('The opportunity sport must match the player profile.');
+        }
+      } else {
+        const organization = await client.query(
+          'SELECT id FROM sports_organizations WHERE id = $1 FOR UPDATE',
+          [input.sportingOrganizationId],
+        );
+        if (!organization.rowCount) throw new NotFoundException('Sporting organization not found.');
+        const membership = await client.query(
+          `SELECT role, permission_scope FROM sports_org_memberships
+           WHERE sports_organization_id = $1 AND user_id = $2 AND status = 'active'
+             AND role IN ('owner','admin','sporting_director','general_manager','recruiter')
+             AND permission_scope IN ('workspace','recruitment')
+             AND (starts_at IS NULL OR starts_at <= now())
+             AND (expires_at IS NULL OR expires_at > now())
+           FOR UPDATE`,
+          [input.sportingOrganizationId, userId],
+        );
+        if (!membership.rowCount) throw new ForbiddenException('An active recruitment-scoped organization membership is required.');
+      }
+      const financialTerms = input.financialTerms || { type: 'undisclosed' };
+      const created = await client.query(
+        `INSERT INTO sports_transfer_opportunities
+          (sport, movement_type, player_profile_id, sporting_organization_id,
+           created_by_user_id, title, description, position_or_role, country_code,
+           competition_name, season_label, opportunity_direction, financial_terms, visibility, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,'draft')
+         RETURNING id, sport, movement_type, player_profile_id, sporting_organization_id,
+                   created_by_user_id, title, description, position_or_role, country_code,
+                   competition_name, season_label, opportunity_direction, financial_terms,
+                   visibility, status, created_at, updated_at`,
+        [input.sport, input.movementType, input.playerProfileId || null,
+         input.sportingOrganizationId || null, userId, input.title, input.description || '',
+         input.positionOrRole || '', input.countryCode || null, input.competitionName || '',
+         input.seasonLabel || '', input.opportunityDirection, JSON.stringify(financialTerms),
+         input.visibility],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.opportunity.draft_created', 'sports_transfer_opportunity', $2, $3::jsonb)",
+        [userId, created.rows[0].id, JSON.stringify({ sport: input.sport, movement_type: input.movementType, owner_type: input.playerProfileId ? 'player' : 'organization', visibility: input.visibility })],
+      );
+      await client.query('COMMIT');
+      return { opportunity: created.rows[0], message: 'Private opportunity draft created. It is not published or discoverable.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+}
+
+@Module({ controllers: [SportsTransferOpportunitiesController, SportsTransferMandatesController, SportsTransferOrganizationsController, SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController] })
 export class AppModule implements OnModuleDestroy {
   async onModuleDestroy() {
     if (databasePool) await databasePool.end();

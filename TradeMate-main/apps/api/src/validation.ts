@@ -385,3 +385,48 @@ export const sportsConsentGrantBodySchema = z.object({
 }).strict().refine((value) => Boolean(value.targetUserId) !== Boolean(value.targetOrganizationId), {
   message: 'Consent must target exactly one person or sporting organization.',
 });
+
+
+export const sportsTransferOpportunityCreateBodySchema = z.object({
+  sport: z.enum(['football', 'basketball']),
+  movementType: z.enum([
+    'permanent_transfer','loan','loan_with_option','loan_with_obligation','loan_extension',
+    'loan_recall','free_agent','pre_contract','player_swap','trial','scouting_invitation',
+    'contract_renewal','contract_release','contract_termination','academy_pathway',
+    'free_agent_signing','free_agent_resigning','restricted_free_agent','unrestricted_free_agent',
+    'player_trade','multi_team_trade','draft_rights','draft_declaration','waiver_claim',
+    'contract_assignment','buyout','contract_renewal','contract_release','contract_termination','international_clearance','temporary_assignment',
+    'two_way_contract','tryout',
+  ]),
+  playerProfileId: z.string().uuid().optional(),
+  sportingOrganizationId: z.string().uuid().optional(),
+  title: z.string().trim().min(5).max(140),
+  description: z.string().trim().max(5000).optional(),
+  positionOrRole: z.string().trim().max(100).optional(),
+  countryCode: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/).optional(),
+  competitionName: z.string().trim().max(160).optional(),
+  seasonLabel: z.string().trim().max(40).optional(),
+  opportunityDirection: z.enum(['available','seeking']),
+  financialTerms: z.object({
+    type: z.enum(['undisclosed','negotiable','structured','not_applicable']),
+    currencyCode: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/).optional(),
+    guaranteedAmount: z.string().regex(/^\d{1,14}(?:\.\d{1,2})?$/).optional(),
+    variableAmount: z.string().regex(/^\d{1,14}(?:\.\d{1,2})?$/).optional(),
+    notes: z.string().trim().max(500).optional(),
+  }).strict().optional(),
+  visibility: z.enum(['private','invitation_only']).default('private'),
+}).strict().refine((value) => Boolean(value.playerProfileId) !== Boolean(value.sportingOrganizationId), {
+  message: 'An opportunity must belong to exactly one player profile or sporting organization.',
+}).refine((value) => {
+  const football = ['permanent_transfer','loan','loan_with_option','loan_with_obligation','loan_extension','loan_recall','free_agent','pre_contract','player_swap','trial','scouting_invitation','contract_renewal','contract_release','contract_termination','academy_pathway'];
+  const basketball = ['free_agent_signing','free_agent_resigning','restricted_free_agent','unrestricted_free_agent','player_trade','multi_team_trade','draft_rights','draft_declaration','waiver_claim','contract_assignment','buyout','contract_renewal','contract_release','contract_termination','international_clearance','temporary_assignment','two_way_contract','tryout'];
+  return value.sport === 'football' ? football.includes(value.movementType) : basketball.includes(value.movementType);
+}, {
+  message: 'Choose a movement type supported by the selected sport.',
+}).refine((value) => {
+  const terms = value.financialTerms;
+  if (!terms || terms.type !== 'structured') return true;
+  return Boolean(terms.currencyCode) && Boolean(terms.guaranteedAmount || terms.variableAmount || terms.notes);
+}, {
+  message: 'Structured financial terms require a currency and at least one term.',
+});
