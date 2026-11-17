@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS sports_transfer_opportunities (
   season_label TEXT NOT NULL DEFAULT '' CHECK (char_length(season_label) <= 40),
   opportunity_direction TEXT NOT NULL CHECK (opportunity_direction IN ('available','seeking')),
   financial_terms JSONB NOT NULL DEFAULT '{"type":"undisclosed"}'::jsonb
-    CHECK (jsonb_typeof(financial_terms) = 'object')
+    CHECK (jsonb_typeof(financial_terms) = 'object' AND financial_terms ? 'type')
     CHECK (financial_terms->>'type' IN ('undisclosed','negotiable','structured','not_applicable')),
   visibility TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','invitation_only')),
   status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','submitted','published','paused','closed','rejected','expired')),
