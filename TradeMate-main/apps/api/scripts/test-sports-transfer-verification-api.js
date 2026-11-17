@@ -72,10 +72,34 @@ async function main() {
     assert.equal(caseRecord.status, 'submitted');
 
     await pool.query(
-      "UPDATE sports_transfer_verification_cases SET provider_key = 'sandbox', provider_subject_reference = 'provider-case-' || id::text WHERE id = $1",
+      "UPDATE sports_transfer_verification_cases SET provider_key = 'sandbox', provider_subject_reference = '' WHERE id = $1",
       [caseRecord.id],
     );
-    const providerCase = 'provider-case-' + caseRecord.id;
+    const providerCase = 'future-provider-case-' + caseRecord.id;
+    const unmatchedEvent = JSON.stringify({
+      eventId: 'unmatched-event-' + suffix,
+      caseReference: providerCase,
+      outcome: 'succeeded',
+    });
+    const unmatchedSignature = 'sha256=' + createHmac('sha256', process.env.SPORTS_TRANSFER_SANDBOX_WEBHOOK_SECRET).update(Buffer.from(unmatchedEvent)).digest('hex');
+    const unmatchedWebhook = await fetch(base + '/api/webhooks/sports-transfer/identity/sandbox', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-trademate-signature': unmatchedSignature },
+      body: unmatchedEvent,
+    });
+    assert.equal(unmatchedWebhook.status, 200);
+    assert.equal((await unmatchedWebhook.json()).matched, false);
+    const pendingReconcile = await reviewRequest('POST', '/api/moderation/sports-transfer/verification-cases/provider-events/sandbox/unmatched-event-' + suffix + '/reconcile');
+    assert.equal(pendingReconcile.status, 200);
+    assert.equal((await pendingReconcile.json()).matched, false);
+    await pool.query(
+      'UPDATE sports_transfer_verification_cases SET provider_subject_reference = $1 WHERE id = $2',
+      [providerCase, caseRecord.id],
+    );
+    const reconciledEvent = await reviewRequest('POST', '/api/moderation/sports-transfer/verification-cases/provider-events/sandbox/unmatched-event-' + suffix + '/reconcile');
+    assert.equal(reconciledEvent.status, 200);
+    assert.equal((await reconciledEvent.json()).reconciled, true,
+      'late case mapping reconciles the retained unmatched provider event');
     const providerEvent = JSON.stringify({
       eventId: 'event-' + suffix,
       caseReference: providerCase,
