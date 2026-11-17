@@ -4,7 +4,7 @@ import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, 
 import { Pool } from 'pg';
 import { createRlsAwarePool } from './database-context';
 import { decimalToUnits, fiatCentsToQuantityUnits, productToFiatCents, unitsToDecimal } from './p2p-decimal';
-import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema, sportsOrganizationCreateBodySchema, sportsOrganizationMembershipInviteBodySchema, sportsRepresentativeMandateCreateBodySchema, sportsRepresentativeMandateResponseBodySchema, sportsTransferOpportunityCreateBodySchema, sportsTransferDataSourceCreateBodySchema, sportsTransferDataSourceReviewBodySchema, sportsTransferExternalPlayerIngestBodySchema, sportsTransferExternalPlayerReviewBodySchema, sportsTransferExternalPlayerClaimCreateBodySchema, sportsTransferExternalPlayerClaimReviewBodySchema } from './validation';
+import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema, sportsOrganizationCreateBodySchema, sportsOrganizationMembershipInviteBodySchema, sportsRepresentativeMandateCreateBodySchema, sportsRepresentativeMandateResponseBodySchema, sportsTransferOpportunityCreateBodySchema, sportsTransferDataSourceCreateBodySchema, sportsTransferDataSourceReviewBodySchema, sportsTransferExternalPlayerIngestBodySchema, sportsTransferExternalPlayerReviewBodySchema, sportsTransferExternalPlayerClaimCreateBodySchema, sportsTransferExternalPlayerClaimReviewBodySchema, sportsTransferVerificationCaseCreateBodySchema, sportsTransferVerificationReviewBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -4707,7 +4707,162 @@ class SportsTransferOpportunitiesController {
   }
 }
 
-@Module({ controllers: [SportsTransferExternalPlayerClaimsController, SportsTransferExternalPlayerClaimsModerationController, SportsTransferDiscoveryModerationController, SportsTransferOpportunitiesController, SportsTransferMandatesController, SportsTransferOrganizationsController, SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController] })
+
+@Controller('sports-transfer')
+class SportsTransferVerificationCasesController {
+  private async currentUser(request: Request) {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to continue.');
+    const result = await databasePool.query(
+      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+      [tokenDigest(token)],
+    );
+    if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    return result.rows[0].id as string;
+  }
+
+  @Post('verification-cases')
+  async createCase(@Req() request: Request, @Body() body: any) {
+    const input = parseBody(sportsTransferVerificationCaseCreateBodySchema, body);
+    const userId = await this.currentUser(request);
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      if (input.caseType === 'sporting_identity') {
+        const profile = await client.query(
+          'SELECT id, user_id, sport FROM sports_profiles WHERE id = $1 FOR UPDATE',
+          [input.profileId],
+        );
+        if (!profile.rowCount || profile.rows[0].user_id !== userId) {
+          throw new NotFoundException('Sports Transfer profile not found.');
+        }
+      }
+      const created = await client.query(
+        `INSERT INTO sports_transfer_verification_cases
+          (subject_user_id, player_profile_id, case_type, country_code, claim_statement, evidence_url)
+         VALUES ($1,$2,$3,$4,$5,$6)
+         RETURNING id, case_type, player_profile_id, status, country_code, policy_version, created_at`,
+        [userId, input.profileId || null, input.caseType, input.countryCode || null,
+         input.claimStatement, input.evidenceUrl || ''],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.identity.verification_submitted', 'sports_transfer_verification_case', $2, $3::jsonb)",
+        [userId, created.rows[0].id, JSON.stringify({ case_type: input.caseType, profile_id: input.profileId || null })],
+      );
+      await client.query('COMMIT');
+      return { verificationCase: created.rows[0], message: 'Verification case submitted for review. No identity has been verified yet.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      if ((error as { code?: string })?.code === '23505') {
+        throw new ConflictException('An open verification case already exists for this account or profile.');
+      }
+      throw error;
+    } finally { client.release(); }
+  }
+
+  @Get('verification-cases/mine')
+  async mine(@Req() request: Request) {
+    const userId = await this.currentUser(request);
+    const result = await databasePool!.query(
+      `SELECT id, case_type, player_profile_id, status, country_code, policy_version,
+              reason_code, review_note, reviewed_at, created_at, updated_at
+       FROM sports_transfer_verification_cases
+       WHERE subject_user_id = $1 ORDER BY created_at DESC LIMIT 100`,
+      [userId],
+    );
+    return { verificationCases: result.rows };
+  }
+}
+
+@Controller('moderation/sports-transfer/verification-cases')
+class SportsTransferVerificationModerationController {
+  private authorize(request: Request) {
+    const expected = process.env.TRADEMATE_REVIEW_API_KEY || '';
+    const supplied = request.header('x-review-key') || '';
+    const a = Buffer.from(expected), b = Buffer.from(supplied);
+    if (!expected || a.length !== b.length || !timingSafeEqual(a, b)) {
+      throw new UnauthorizedException('Sports Transfer verification moderation access is not authorized.');
+    }
+    return reviewerKeyId(expected);
+  }
+
+  @Get()
+  async queue(@Req() request: Request, @Query('status') status?: string) {
+    this.authorize(request);
+    if (status && !['submitted','processing','needs_review','verified','rejected','expired','cancelled','disputed'].includes(status)) {
+      throw new BadRequestException('Unsupported verification case status.');
+    }
+    const result = await databasePool!.query(
+      `SELECT c.id, c.subject_user_id, c.player_profile_id, c.case_type, c.status,
+              c.country_code, c.claim_statement, c.evidence_url, c.reason_code,
+              c.created_at, p.display_name AS profile_display_name, p.sport
+       FROM sports_transfer_verification_cases c
+       LEFT JOIN sports_profiles p ON p.id = c.player_profile_id
+       WHERE ($1::text IS NULL OR c.status = $1)
+       ORDER BY c.created_at ASC LIMIT 200`,
+      [status || null],
+    );
+    return { verificationCases: result.rows };
+  }
+
+  @Patch(':id/review')
+  async review(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+    parseUuidParam(id);
+    const reviewerId = this.authorize(request);
+    const input = parseBody(sportsTransferVerificationReviewBodySchema, body);
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const found = await client.query(
+        'SELECT * FROM sports_transfer_verification_cases WHERE id = $1 FOR UPDATE',
+        [id],
+      );
+      if (!found.rowCount) throw new NotFoundException('Verification case not found.');
+      const verificationCase = found.rows[0];
+      if (!['submitted','processing','needs_review','disputed'].includes(verificationCase.status)) {
+        throw new ConflictException('This verification case has already reached a final decision.');
+      }
+      if (input.decision === 'verified' && verificationCase.case_type === 'sporting_identity') {
+        const profile = await client.query(
+          'SELECT id, user_id FROM sports_profiles WHERE id = $1 FOR UPDATE',
+          [verificationCase.player_profile_id],
+        );
+        if (!profile.rowCount || profile.rows[0].user_id !== verificationCase.subject_user_id) {
+          throw new ConflictException('The player profile ownership changed; this case cannot be approved.');
+        }
+        await client.query(
+          "UPDATE sports_profiles SET verification_status = 'verified', updated_at = now() WHERE id = $1",
+          [verificationCase.player_profile_id],
+        );
+      } else if (input.decision === 'rejected' && verificationCase.case_type === 'sporting_identity') {
+        await client.query(
+          "UPDATE sports_profiles SET verification_status = 'rejected', updated_at = now() WHERE id = $1 AND user_id = $2",
+          [verificationCase.player_profile_id, verificationCase.subject_user_id],
+        );
+      }
+      const updated = await client.query(
+        `UPDATE sports_transfer_verification_cases
+         SET status = $1, reason_code = $2, review_note = $3,
+             reviewer_key_id = $4, reviewed_at = now(), updated_at = now()
+         WHERE id = $5
+         RETURNING id, case_type, player_profile_id, status, reason_code, reviewed_at`,
+        [input.decision, input.reasonCode, input.note || '', reviewerId, id],
+      );
+      await client.query(
+        "INSERT INTO audit_events (event_type, entity_type, entity_id, metadata) VALUES ('sports.identity.verification_reviewed', 'sports_transfer_verification_case', $1, $2::jsonb)",
+        [id, JSON.stringify({ case_type: verificationCase.case_type, decision: input.decision, reason_code: input.reasonCode })],
+      );
+      await client.query('COMMIT');
+      return { verificationCase: updated.rows[0] };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
+  }
+}
+
+@Module({ controllers: [SportsTransferVerificationCasesController, SportsTransferVerificationModerationController, SportsTransferExternalPlayerClaimsController, SportsTransferExternalPlayerClaimsModerationController, SportsTransferDiscoveryModerationController, SportsTransferOpportunitiesController, SportsTransferMandatesController, SportsTransferOrganizationsController, SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController] })
 export class AppModule implements OnModuleDestroy {
   async onModuleDestroy() {
     if (databasePool) await databasePool.end();
