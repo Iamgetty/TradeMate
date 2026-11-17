@@ -16,6 +16,7 @@ on:
       - feat/sports-transfer-external-player-discovery-foundation
       - feat/sports-transfer-discovery-ingestion-moderation
       - feat/sports-transfer-external-player-claims
+      - feat/sports-transfer-identity-verification-safeguarding
   pull_request:
     branches:
       - main
@@ -100,6 +101,11 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: node scripts/test-sports-transfer-claims-api.js
+      - name: Verify Sports Transfer legal and sporting identity verification case separation
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-sports-transfer-verification-api.js
       - name: Verify organization document permissions and rollback through HTTP endpoints
         working-directory: TradeMate-main/apps/api
         env:
