@@ -1,4 +1,9 @@
 -- Provider webhook inbox: persist only event identifiers and payload hashes, never raw identity payloads.
+ALTER TABLE sports_transfer_verification_cases
+  DROP CONSTRAINT IF EXISTS sports_transfer_verification_cases_provider_key_check;
+ALTER TABLE sports_transfer_verification_cases
+  ADD CONSTRAINT sports_transfer_verification_cases_provider_key_check
+  CHECK (provider_key IN ('manual','sandbox','sumsub','veriff','trulioo'));
 CREATE TABLE IF NOT EXISTS sports_transfer_verification_provider_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   provider_key TEXT NOT NULL CHECK (provider_key IN ('sumsub','veriff','trulioo','sandbox')),
