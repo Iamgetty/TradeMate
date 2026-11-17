@@ -4823,6 +4823,38 @@ class SportsTransferVerificationCasesController {
     } finally { client.release(); }
   }
 
+  @Get('verification-cases/:id/session')
+  async getProviderSessionStatus(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
+    const userId = await this.currentUser(request);
+    const ownedCase = await databasePool!.query(
+      "SELECT id, case_type FROM sports_transfer_verification_cases WHERE id = $1 AND subject_user_id = $2",
+      [id, userId],
+    );
+    if (!ownedCase.rowCount) throw new NotFoundException('Verification case not found.');
+    if (ownedCase.rows[0].case_type !== 'legal_identity') {
+      throw new BadRequestException('Provider sessions are only available for legal identity cases.');
+    }
+
+    // This endpoint reports TradeMate's persisted session state. It deliberately
+    // does not claim to poll a vendor: live adapters are not registered yet.
+    await databasePool!.query(
+      "UPDATE sports_transfer_verification_sessions SET status = 'expired', updated_at = now() WHERE verification_case_id = $1 AND status IN ('created','submitted') AND expires_at <= now()",
+      [id],
+    );
+    const result = await databasePool!.query(
+      "SELECT id, provider_key, status, expires_at, created_at, updated_at FROM sports_transfer_verification_sessions WHERE verification_case_id = $1 ORDER BY created_at DESC LIMIT 1",
+      [id],
+    );
+    return {
+      session: result.rows[0] || null,
+      providerPollingAvailable: false,
+      message: result.rowCount
+        ? 'Showing the last status recorded by TradeMate. Provider status polling is not yet configured.'
+        : 'No provider session has been created for this verification case.',
+    };
+  }
+
   @Get('verification-cases/mine')
   async mine(@Req() request: Request) {
     const userId = await this.currentUser(request);
