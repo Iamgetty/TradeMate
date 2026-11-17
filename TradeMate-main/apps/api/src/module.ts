@@ -4792,8 +4792,8 @@ class SportsTransferVerificationCasesController {
         [id],
       );
       const active = await client.query(
-        "SELECT id, provider_key, provider_session_reference, status, expires_at FROM sports_transfer_verification_sessions WHERE verification_case_id = $1 AND status IN ('created','submitted') AND expires_at > now() ORDER BY created_at DESC LIMIT 1",
-        [id],
+        "SELECT id, provider_key, provider_session_reference, status, expires_at FROM sports_transfer_verification_sessions WHERE verification_case_id = $1 AND provider_key = $2 AND status IN ('created','submitted') AND expires_at > now() ORDER BY created_at DESC LIMIT 1",
+        [id, providerKey],
       );
       if (active.rowCount) {
         const sdk = providerKey === 'sumsub' ? await createSumsubWebSdkSession(id) : null;
