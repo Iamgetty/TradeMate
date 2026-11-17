@@ -1953,7 +1953,7 @@ class MarketplaceContractsController {
   private async authorizedContract(id: string, userId: string) {
     this.validateContractId(id);
     const result = await databasePool!.query(
-      `SELECT c.*, l.title AS listing_title, l.listing_type, o.name AS seller_name,
+      `SELECT c.*, l.title AS listing_title, l.listing_type, l.division, o.name AS seller_name,
               buyer.display_name AS buyer_name,
               (c.buyer_user_id = $2) AS is_buyer,
               EXISTS (
@@ -2080,7 +2080,7 @@ class MarketplaceContractsController {
               c.requested_start_date, c.requested_completion_date, c.status,
               c.accepted_at, c.buyer_confirmed_at, c.seller_confirmed_at, c.completed_at,
               c.created_at, c.updated_at, l.listing_type, o.name AS seller_name,
-              buyer.display_name AS buyer_name,
+              buyer.display_name AS buyer_name, l.division,
               (SELECT om.member_role FROM organization_members om WHERE om.organization_id = c.seller_organization_id AND om.user_id = $1 LIMIT 1) AS seller_member_role,
               CASE WHEN c.buyer_user_id = $1 THEN 'sent' ELSE 'received' END AS direction
        FROM marketplace_contracts c
