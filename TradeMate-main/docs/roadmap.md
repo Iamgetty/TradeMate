@@ -6,7 +6,7 @@ This roadmap records the current product direction. It is not a claim that each 
 
 - TradeMate connects counterparties; it is not a conventional exchange or product checkout.
 - The core outcome is a mutually agreed business contract.
-- Current marketplace categories include Services and B2B, alongside Real Estate, Software, NFTs and market-information sections.
+- Explore separates ten Contract Categories (Services, Real Estate, Software, B2B, Industrial & Trade, Agriculture, Finance & Investment, Institution & Infrastructure, Sports and Entertainment) from the four Marketplaces (P2P, NFTs, Forex and Crypto). All ten Contract Categories share the persistent review-submission workflow; P2P remains separate.
 - Product listings and product-cart commerce are out of scope for the current build. A dedicated product marketplace may be reconsidered in a future version, subject to a deliberate product decision. It must not silently reappear in the current app.
 - Keep P2P separate from the current marketplace contract workflow.
 
