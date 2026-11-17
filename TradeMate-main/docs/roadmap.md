@@ -6,7 +6,7 @@ This roadmap records the current product direction. It is not a claim that each 
 
 - TradeMate connects counterparties; it is not a conventional exchange or product checkout.
 - The core outcome is a mutually agreed business contract.
-- Explore separates ten Contract Categories (Services, Real Estate, Software, B2B, Industrial & Trade, Agriculture, Finance & Investment, Institution & Infrastructure, Sports and Entertainment) from the four Marketplaces (P2P, NFTs, Forex and Crypto). All ten Contract Categories share the persistent review-submission workflow; P2P remains separate.
+- Explore separates ten Contract Categories (Services, Real Estate, Software, B2B, Industrial & Trade, Agriculture, Finance & Investment, Institution & Infrastructure, Sports Transfer and Entertainment) from the four Marketplaces (P2P, NFTs, Forex and Crypto). All ten Contract Categories share the persistent review-submission workflow; P2P remains separate.
 - Product listings and product-cart commerce are out of scope for the current build. A dedicated product marketplace may be reconsidered in a future version, subject to a deliberate product decision. It must not silently reappear in the current app.
 - Keep P2P separate from the current marketplace contract workflow.
 
@@ -455,9 +455,9 @@ This section records the five engineering observations raised during the ongoing
 The canonical inventory of current, planned, candidate, alternative, placeholder and unselected external providers is maintained in [`third-party-integrations.md`](third-party-integrations.md). Check it before every build session and update it in the same PR whenever an integration decision or dependency changes. Do not treat listed candidates or cloud targets as selected or deployed.
 
 
-## Sports transfer marketplace — football and basketball first
+## Sports Transfer — football and basketball first
 
-**Product decision confirmed 17 November 2026:** the first supported sports are **football (soccer) and basketball**. Design the Sports capability as one shared transfer/recruitment marketplace with sport-specific transaction models and rules. Keep the data model extensible so additional sports can be added later without rebuilding the platform. This is a roadmap decision, not an implementation or launch claim.
+**Product decision confirmed 17 November 2026:** the first supported sports are **football (soccer) and basketball**. Design Sports Transfer as one shared transfer/recruitment marketplace with sport-specific transaction models and rules. Keep the data model extensible so additional sports can be added later without rebuilding the platform. This is a roadmap decision, not an implementation or launch claim.
 
 ### Shared platform capabilities
 - Verified club/team and organization profiles; player/athlete profiles; authorized agents/representatives; scouts and recruitment staff with role-limited permissions.
