@@ -4941,7 +4941,16 @@ class SportsTransferVerificationProviderWebhookController {
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       if ((error as { code?: string })?.code === '23505') {
-        return { received: true, duplicate: true };
+        // A provider event ID is immutable. Treat an exact retry as idempotent,
+        // but reject an ID reused with different signed content.
+        const prior = await databasePool!.query(
+          'SELECT payload_sha256 FROM sports_transfer_verification_provider_events WHERE provider_key = $1 AND provider_event_id = $2',
+          [provider, input.eventId],
+        );
+        if (prior.rowCount && prior.rows[0].payload_sha256 === payloadHash) {
+          return { received: true, duplicate: true };
+        }
+        throw new ConflictException('Provider event ID was already used with different content.');
       }
       throw error;
     } finally { client.release(); }
