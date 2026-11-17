@@ -310,6 +310,24 @@ async function main() {
     });
     assert.equal(invalidSumsubWebhook.status, 401,
       'invalid Sumsub webhook digest must be rejected');
+    const unsupportedSumsubBody = JSON.stringify({
+      applicantId: 'sumsub-applicant-test',
+      externalUserId: legalCase.id,
+      correlationId: 'sumsub-unrelated-' + suffix,
+      type: 'applicantCreated',
+      reviewStatus: 'completed',
+      reviewResult: { reviewAnswer: 'GREEN' },
+      createdAtMs: '2026-11-17 12:30:00.000',
+    });
+    const unsupportedSumsubDigest = createHmac('sha256', process.env.SUMSUB_WEBHOOK_SECRET)
+      .update(Buffer.from(unsupportedSumsubBody)).digest('hex');
+    const unsupportedSumsubWebhook = await nativeFetch(base + '/api/webhooks/sports-transfer/identity/sumsub', {
+      method: 'POST',
+      headers: { ...sumsubWebhookHeaders, 'x-payload-digest': unsupportedSumsubDigest },
+      body: unsupportedSumsubBody,
+    });
+    assert.equal(unsupportedSumsubWebhook.status, 401,
+      'signed Sumsub events other than applicantReviewed must not enter identity review');
     const conflictingSumsubBody = JSON.stringify({
       applicantId: 'sumsub-applicant-test',
       externalUserId: legalCase.id,
