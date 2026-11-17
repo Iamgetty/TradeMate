@@ -4,7 +4,7 @@
 
 This is a source-level audit of the current application baseline, not a claim that every workflow has been accepted in production. It reviews the main web runtime (`apps/web/public/tm/app.js`), API controllers in `apps/api/src/module.ts`, and the existing marketplace integration/CI evidence. The API module contains 91 decorated HTTP endpoints across the controllers listed below. A screen or button is not treated as implemented unless its action reaches a real service or persistent API.
 
-The audit snapshot is based on main after PR #155 (merge commit `3a293d06ccf942c9373336d9215f4a589c92da25`). PR #156 separately corrects the profile verification progress indicator and is subject to its own CI.
+The audit snapshot is based on main after PR #155 (merge commit `3a293d06ccf942c9373336d9215f4a589c92da25`). PR #156 subsequently corrected the profile verification progress indicator to reflect the actual three-step flow; it was merged as `ef8b3939dc1acdb2cdc96e1a743a5e61cfa320ac` after all eight CI jobs passed.
 
 ## Implemented server-backed workflows
 
