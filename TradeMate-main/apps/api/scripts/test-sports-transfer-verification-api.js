@@ -7,6 +7,12 @@ const { AppModule } = require('../dist/module');
 const { databaseRequestContextMiddleware } = require('../dist/database-context');
 
 const tokenHash = token => createHash('sha256').update(token).digest('hex');
+const sandboxSignature = (rawBody, timestamp = Math.floor(Date.now() / 1000)) => ({
+  timestamp: String(timestamp),
+  signature: 'sha256=' + createHmac('sha256', process.env.SPORTS_TRANSFER_SANDBOX_WEBHOOK_SECRET)
+    .update(Buffer.concat([Buffer.from(String(timestamp) + '.'), Buffer.from(rawBody)]))
+    .digest('hex'),
+});
 
 async function main() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required.');
@@ -107,10 +113,10 @@ async function main() {
       caseReference: providerCase,
       outcome: 'succeeded',
     });
-    const unmatchedSignature = 'sha256=' + createHmac('sha256', process.env.SPORTS_TRANSFER_SANDBOX_WEBHOOK_SECRET).update(Buffer.from(unmatchedEvent)).digest('hex');
+    const unmatchedAuth = sandboxSignature(unmatchedEvent);
     const unmatchedWebhook = await fetch(base + '/api/webhooks/sports-transfer/identity/sandbox', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-trademate-signature': unmatchedSignature },
+      headers: { 'content-type': 'application/json', 'x-trademate-timestamp': unmatchedAuth.timestamp, 'x-trademate-signature': unmatchedAuth.signature },
       body: unmatchedEvent,
     });
     assert.equal(unmatchedWebhook.status, 200);
@@ -139,10 +145,10 @@ async function main() {
     });
     assert.equal(unimplementedVendorWebhook.status, 503,
       'vendor webhooks must fail closed until provider-specific adapters exist');
-    const providerSignature = 'sha256=' + createHmac('sha256', process.env.SPORTS_TRANSFER_SANDBOX_WEBHOOK_SECRET).update(Buffer.from(providerEvent)).digest('hex');
+    const providerAuth = sandboxSignature(providerEvent);
     const webhook = await fetch(base + '/api/webhooks/sports-transfer/identity/sandbox', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-trademate-signature': providerSignature },
+      headers: { 'content-type': 'application/json', 'x-trademate-timestamp': providerAuth.timestamp, 'x-trademate-signature': providerAuth.signature },
       body: providerEvent,
     });
     assert.equal(webhook.status, 200, 'valid signed provider webhook is accepted');
@@ -154,7 +160,7 @@ async function main() {
 
     const duplicateWebhook = await fetch(base + '/api/webhooks/sports-transfer/identity/sandbox', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-trademate-signature': providerSignature },
+      headers: { 'content-type': 'application/json', 'x-trademate-timestamp': providerAuth.timestamp, 'x-trademate-signature': providerAuth.signature },
       body: providerEvent,
     });
     assert.equal(duplicateWebhook.status, 200);
@@ -162,10 +168,23 @@ async function main() {
 
     const invalidWebhook = await fetch(base + '/api/webhooks/sports-transfer/identity/sandbox', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-trademate-signature': 'sha256=' + '0'.repeat(64) },
+      headers: { 'content-type': 'application/json', 'x-trademate-timestamp': providerAuth.timestamp, 'x-trademate-signature': 'sha256=' + '0'.repeat(64) },
       body: providerEvent,
     });
     assert.equal(invalidWebhook.status, 401, 'invalid provider webhook signature is rejected');
+    const staleAuth = sandboxSignature(providerEvent, Math.floor(Date.now() / 1000) - 301);
+    const staleWebhook = await fetch(base + '/api/webhooks/sports-transfer/identity/sandbox', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-trademate-timestamp': staleAuth.timestamp, 'x-trademate-signature': staleAuth.signature },
+      body: providerEvent,
+    });
+    assert.equal(staleWebhook.status, 401, 'correctly signed stale webhook timestamps are rejected');
+    const missingTimestampWebhook = await fetch(base + '/api/webhooks/sports-transfer/identity/sandbox', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-trademate-signature': providerAuth.signature },
+      body: providerEvent,
+    });
+    assert.equal(missingTimestampWebhook.status, 401, 'sandbox webhook timestamp is mandatory');
     const duplicate = await userRequest('POST', '/api/sports-transfer/verification-cases', body);
     assert.equal(duplicate.status, 409, 'duplicate open sporting identity cases are blocked');
 
