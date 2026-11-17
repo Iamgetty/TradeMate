@@ -918,7 +918,7 @@ class PreferencesController {
         if (typeof value !== 'string' || !['NGN', 'USD', 'EUR', 'GBP', 'GHS', 'KES'].includes(value)) throw new BadRequestException('Choose a supported display currency.');
         update[key] = value;
       } else if (key === 'market') {
-        if (typeof value !== 'string' || !['Services', 'B2B', 'Real Estate', 'Software', 'NFTs', 'Forex', 'Crypto', 'P2P'].includes(value)) throw new BadRequestException('Choose a supported default market.');
+        if (typeof value !== 'string' || !['Services', 'Real Estate', 'Software', 'B2B', 'Industrial & Trade', 'Agriculture', 'Finance & Investment', 'Institution & Infrastructure', 'Sports', 'Entertainment', 'P2P', 'NFTs', 'Forex', 'Crypto'].includes(value)) throw new BadRequestException('Choose a supported default market.');
         update[key] = value;
       } else if (key === 'language') {
         if (typeof value !== 'string' || !['English', 'Français', 'Hausa', 'Yorùbá', 'Igbo', 'Kiswahili', 'Português', 'العربية'].includes(value)) throw new BadRequestException('Choose a supported language.');
@@ -1344,7 +1344,7 @@ class PublicListingsController {
   @Post()
   async createDraft(
     @Req() request: Request,
-    @Body() body: { title?: string; description?: string; listingType?: string; price?: string | number; quantityAvailable?: string | number | null },
+    @Body() body: { title?: string; description?: string; listingType?: string; division?: string; price?: string | number; quantityAvailable?: string | number | null },
   ) {
     parseBody(listingBodySchema, body);
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
@@ -1359,12 +1359,15 @@ class PublicListingsController {
     const title = typeof body?.title === 'string' ? body.title.trim() : '';
     const description = typeof body?.description === 'string' ? body.description.trim() : '';
     const listingType = body?.listingType;
+    const division = body?.division || (listingType === 'b2b' ? 'b2b' : 'services');
     const priceText = String(body?.price ?? '').trim();
     const quantityText = body?.quantityAvailable === null || body?.quantityAvailable === undefined || String(body.quantityAvailable).trim() === ''
       ? null : String(body.quantityAvailable).trim();
     if (title.length < 3 || title.length > 140) throw new BadRequestException('Offer title must be between 3 and 140 characters.');
     if (description.length > 5000) throw new BadRequestException('Description must be 5,000 characters or fewer.');
-    if (!['b2b', 'service'].includes(listingType || '')) throw new BadRequestException('Choose a Services or B2B offer type.');
+    if (!['b2b', 'service'].includes(listingType || '')) throw new BadRequestException('Choose a valid listing type.');
+    if (!['services', 'real_estate', 'software', 'b2b', 'industrial_trade', 'agriculture', 'finance_investment', 'institution_infrastructure', 'sports', 'entertainment'].includes(division)) throw new BadRequestException('Choose one of the ten contract categories.');
+    if ((division === 'b2b') !== (listingType === 'b2b')) throw new BadRequestException('B2B listings must use the B2B listing type; other categories use the service listing type.');
     if (!/^\d{1,12}(\.\d{1,2})?$/.test(priceText)) throw new BadRequestException('Enter a valid price with up to two decimal places.');
     const priceMinorUnits = Math.round(Number(priceText) * 100);
     if (!Number.isSafeInteger(priceMinorUnits) || priceMinorUnits < 0) throw new BadRequestException('Enter a valid non-negative price.');
@@ -1384,12 +1387,12 @@ class PublicListingsController {
     try {
       await client.query('BEGIN');
       const created = await client.query(
-        "INSERT INTO listings (seller_organization_id, title, description, listing_type, price_minor_units, currency_code, country_code, quantity_available, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'draft') RETURNING id, title, description, listing_type, price_minor_units::text AS price_minor_units, currency_code, country_code, quantity_available, status, created_at",
-        [organization.id, title, description, listingType, priceMinorUnits, organization.default_currency, organization.country_code, quantity],
+        "INSERT INTO listings (seller_organization_id, title, description, listing_type, division, price_minor_units, currency_code, country_code, quantity_available, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'draft') RETURNING id, title, description, listing_type, division, price_minor_units::text AS price_minor_units, currency_code, country_code, quantity_available, status, created_at",
+        [organization.id, title, description, listingType, division, priceMinorUnits, organization.default_currency, organization.country_code, quantity],
       );
       await client.query(
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'listing.draft_created','listing',$3,$4::jsonb)",
-        [userId, organization.id, created.rows[0].id, JSON.stringify({ listing_type: listingType, business_status: organization.status })],
+        [userId, organization.id, created.rows[0].id, JSON.stringify({ listing_type: listingType, division, business_status: organization.status })],
       );
       await client.query('COMMIT');
       return { listing: created.rows[0], message: 'Offer saved as a draft. It is not publicly visible yet.' };
@@ -1412,7 +1415,7 @@ class PublicListingsController {
     );
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const result = await databasePool.query(
-      `SELECT l.id, l.title, l.description, l.listing_type, l.price_minor_units::text AS price_minor_units,
+      `SELECT l.id, l.title, l.description, l.listing_type, l.division, l.price_minor_units::text AS price_minor_units,
               l.currency_code, l.country_code, l.quantity_available, l.status, l.created_at, l.updated_at,
               o.name AS seller_name
        FROM listings l
@@ -1480,7 +1483,7 @@ class PublicListingsController {
   async updateDraft(
     @Param('id') id: string,
     @Req() request: Request,
-    @Body() body: { title?: string; description?: string; listingType?: string; price?: string | number; quantityAvailable?: string | number | null },
+    @Body() body: { title?: string; description?: string; listingType?: string; division?: string; price?: string | number; quantityAvailable?: string | number | null },
   ) {
     parseUuidParam(id);
     parseBody(listingBodySchema, body);
@@ -1499,12 +1502,15 @@ class PublicListingsController {
     const title = typeof body?.title === 'string' ? body.title.trim() : '';
     const description = typeof body?.description === 'string' ? body.description.trim() : '';
     const listingType = body?.listingType;
+    const division = body?.division || (listingType === 'b2b' ? 'b2b' : 'services');
     const priceText = String(body?.price ?? '').trim();
     const quantityText = body?.quantityAvailable === null || body?.quantityAvailable === undefined || String(body.quantityAvailable).trim() === ''
       ? null : String(body.quantityAvailable).trim();
     if (title.length < 3 || title.length > 140) throw new BadRequestException('Offer title must be between 3 and 140 characters.');
     if (description.length > 5000) throw new BadRequestException('Description must be 5,000 characters or fewer.');
-    if (!['b2b', 'service'].includes(listingType || '')) throw new BadRequestException('Choose a Services or B2B offer type.');
+    if (!['b2b', 'service'].includes(listingType || '')) throw new BadRequestException('Choose a valid listing type.');
+    if (!['services', 'real_estate', 'software', 'b2b', 'industrial_trade', 'agriculture', 'finance_investment', 'institution_infrastructure', 'sports', 'entertainment'].includes(division)) throw new BadRequestException('Choose one of the ten contract categories.');
+    if ((division === 'b2b') !== (listingType === 'b2b')) throw new BadRequestException('B2B listings must use the B2B listing type; other categories use the service listing type.');
     if (!/^\d{1,12}(\.\d{1,2})?$/.test(priceText)) throw new BadRequestException('Enter a valid price with up to two decimal places.');
     const priceMinorUnits = Math.round(Number(priceText) * 100);
     if (!Number.isSafeInteger(priceMinorUnits) || priceMinorUnits < 0) throw new BadRequestException('Enter a valid non-negative price.');
@@ -1519,15 +1525,15 @@ class PublicListingsController {
       await client.query('BEGIN');
       const updated = await client.query(
         `UPDATE listings l
-         SET title = $1, description = $2, listing_type = $3, price_minor_units = $4, quantity_available = $5, updated_at = now()
-         WHERE l.id = $6 AND l.status = 'draft'
+         SET title = $1, description = $2, listing_type = $3, division = $4, price_minor_units = $5, quantity_available = $6, updated_at = now()
+         WHERE l.id = $7 AND l.status = 'draft'
            AND EXISTS (
              SELECT 1 FROM organization_members om
-             WHERE om.organization_id = l.seller_organization_id AND om.user_id = $7
+             WHERE om.organization_id = l.seller_organization_id AND om.user_id = $8
            )
-         RETURNING l.id, l.title, l.description, l.listing_type, l.price_minor_units::text AS price_minor_units,
+         RETURNING l.id, l.title, l.description, l.listing_type, l.division, l.price_minor_units::text AS price_minor_units,
                    l.currency_code, l.country_code, l.quantity_available, l.status, l.created_at, l.updated_at`,
-        [title, description, listingType, priceMinorUnits, quantity, id, userId],
+        [title, description, listingType, division, priceMinorUnits, quantity, id, userId],
       );
       if (!updated.rowCount) {
         const exists = await client.query('SELECT status FROM listings WHERE id = $1', [id]);
@@ -1537,7 +1543,7 @@ class PublicListingsController {
       }
       await client.query(
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, (SELECT seller_organization_id FROM listings WHERE id = $3), 'listing.draft_updated', 'listing', $3, $2::jsonb)",
-        [userId, JSON.stringify({ listing_type: listingType }), id],
+        [userId, JSON.stringify({ listing_type: listingType, division }), id],
       );
       await client.query('COMMIT');
       return { listing: updated.rows[0], message: 'Draft offer updated.' };
@@ -1608,7 +1614,7 @@ class PublicListingsController {
     }
 
     const result = await databasePool.query(
-      `SELECT l.id, l.title, l.description, l.listing_type, l.price_minor_units::text AS price_minor_units,
+      `SELECT l.id, l.title, l.description, l.listing_type, l.division, l.price_minor_units::text AS price_minor_units,
               l.currency_code, l.country_code, l.quantity_available, l.created_at, l.updated_at,
               o.name AS seller_name, o.country_code AS seller_country_code,
               c.name AS category_name,
@@ -1630,11 +1636,12 @@ class PublicListingsController {
     @Query('q') search?: string,
     @Query('country') country?: string,
     @Query('type') type?: string,
+    @Query('division') division?: string,
     @Query('category') category?: string,
     @Query('page') pageValue?: string,
     @Query('limit') limitValue?: string,
   ) {
-    parseBody(marketplaceBrowseQuerySchema, { search, country, type, category, page: pageValue, limit: limitValue });
+    parseBody(marketplaceBrowseQuerySchema, { search, country, type, division, category, page: pageValue, limit: limitValue });
     if (!databasePool) {
       return { data: [], pagination: { page: 1, limit: 20, total: 0 }, message: 'Marketplace database is not configured.' };
     }
@@ -1647,6 +1654,7 @@ class PublicListingsController {
     if (type && !['b2b', 'service'].includes(type)) {
       throw new BadRequestException('type must be service or b2b.');
     }
+    if (division && !['services', 'real_estate', 'software', 'b2b', 'industrial_trade', 'agriculture', 'finance_investment', 'institution_infrastructure', 'sports', 'entertainment'].includes(division)) throw new BadRequestException('division must be one of the ten contract categories.');
     if (country && !/^[A-Za-z]{2}$/.test(country)) {
       throw new BadRequestException('country must be a two-letter country code.');
     }
@@ -1654,7 +1662,7 @@ class PublicListingsController {
       throw new BadRequestException('category must be a valid category UUID.');
     }
 
-    const conditions = ["l.status = 'published'", "o.status = 'active'", "l.listing_type IN ('service', 'b2b')"];
+    const conditions = ["l.status = 'published'", "o.status = 'active'"];
     const values: unknown[] = [];
     const add = (clause: string, value: unknown) => {
       values.push(value);
@@ -1668,6 +1676,7 @@ class PublicListingsController {
     }
     if (country) add('l.country_code = ?', country.toUpperCase());
     if (type) add('l.listing_type = ?', type);
+    if (division) add('l.division = ?', division);
     if (category) add('l.category_id = ?', category);
 
     const where = conditions.join(' AND ');
@@ -1679,7 +1688,7 @@ class PublicListingsController {
     const offset = (page - 1) * limit;
     const resultValues = [...values, limit, offset];
     const listingsResult = await databasePool.query(
-      `SELECT l.id, l.title, l.description, l.listing_type, l.price_minor_units::text AS price_minor_units,
+      `SELECT l.id, l.title, l.description, l.listing_type, l.division, l.price_minor_units::text AS price_minor_units,
               l.currency_code, l.country_code, l.quantity_available, l.created_at,
               o.name AS seller_name, c.name AS category_name,
               (SELECT lm.media_url FROM listing_media lm WHERE lm.listing_id = l.id ORDER BY lm.sort_order, lm.created_at LIMIT 1) AS cover_image
@@ -1944,7 +1953,7 @@ class MarketplaceContractsController {
   private async authorizedContract(id: string, userId: string) {
     this.validateContractId(id);
     const result = await databasePool!.query(
-      `SELECT c.*, l.title AS listing_title, l.listing_type, o.name AS seller_name,
+      `SELECT c.*, l.title AS listing_title, l.listing_type, l.division, o.name AS seller_name,
               buyer.display_name AS buyer_name,
               (c.buyer_user_id = $2) AS is_buyer,
               EXISTS (
@@ -2021,12 +2030,11 @@ class MarketplaceContractsController {
          FROM listings l
          JOIN organizations o ON o.id = l.seller_organization_id
          WHERE l.id = $1 AND l.status = 'published' AND o.status = 'active'
-           AND l.listing_type IN ('service', 'b2b')
          LIMIT 1
          FOR SHARE OF l, o`,
         [listingId],
       );
-      if (!listing.rowCount) throw new NotFoundException('This published Services or B2B offer is not available for a contract.');
+      if (!listing.rowCount) throw new NotFoundException('This published contract-category offer is not available for a contract.');
       const offer = listing.rows[0];
       const sellerMembership = await client.query(
         'SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1',
@@ -2072,7 +2080,7 @@ class MarketplaceContractsController {
               c.requested_start_date, c.requested_completion_date, c.status,
               c.accepted_at, c.buyer_confirmed_at, c.seller_confirmed_at, c.completed_at,
               c.created_at, c.updated_at, l.listing_type, o.name AS seller_name,
-              buyer.display_name AS buyer_name,
+              buyer.display_name AS buyer_name, l.division,
               (SELECT om.member_role FROM organization_members om WHERE om.organization_id = c.seller_organization_id AND om.user_id = $1 LIMIT 1) AS seller_member_role,
               CASE WHEN c.buyer_user_id = $1 THEN 'sent' ELSE 'received' END AS direction
        FROM marketplace_contracts c
@@ -3200,7 +3208,7 @@ class ModerationController {
     this.authorize(request);
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const result = await databasePool.query(
-      `SELECT l.id, l.title, l.description, l.listing_type, l.price_minor_units::text AS price_minor_units,
+      `SELECT l.id, l.title, l.description, l.listing_type, l.division, l.price_minor_units::text AS price_minor_units,
               l.currency_code, l.country_code, l.quantity_available, l.review_submitted_at,
               o.id AS organization_id, o.name AS seller_name, o.status AS organization_status
        FROM listings l JOIN organizations o ON o.id = l.seller_organization_id

@@ -1,8 +1,8 @@
 # TradeMate marketplace taxonomy
 
-**Status:** Approved target product architecture; implementation is staged and is not implied by this document.
+**Status:** Approved product architecture. All ten top-level Contract Categories are connected to the shared persistent listing draft and moderation workflow; division-specific attributes, safeguards and specialised workflows remain staged.
 
-This document defines the target taxonomy for TradeMate's hybrid marketplace. It is a product and domain model, not a statement that every division, listing type, regulated activity, payment rail or contract workflow is currently available.
+This document defines the taxonomy for TradeMate's hybrid marketplace. Every top-level Contract Category can be submitted by a signed-in user with a business space and is held for TradeMate review before public discovery. Category submission does not imply that every regulated activity, payment rail or specialised transaction workflow is available.
 
 ## 1. Marketplace model
 
@@ -217,8 +217,9 @@ Crypto and Forex market information is informational data, not an offer to execu
 
 ## 6. Implementation and release rules
 
-- The approved target contains ten divisions; it does not mean ten production-ready marketplaces exist.
-- The currently established persistent marketplace contract paths are Services and B2B. Other divisions and specialist transaction flows must be implemented and tested incrementally.
+- The approved target contains ten divisions; it does not mean ten production-ready specialist marketplaces exist.
+- All ten Contract Categories now share the persistent listing draft, review submission, moderation, approval and public-discovery path. P2P remains separate.
+- Division-specific evidence, safeguards, legal checks and specialist transaction workflows must still be implemented and tested incrementally.
 - Do not mark a division complete based on navigation, labels, a listing form or an API route alone.
 - Completion requires frontend-to-backend-to-database wiring, authorization and organization-boundary tests, audit coverage, failure/retry handling, responsive QA, and end-to-end acceptance for the relevant workflow.
 - Regulated workflows remain gated until legal/compliance review, jurisdiction mapping, provider approval, threat modelling and security testing are complete.

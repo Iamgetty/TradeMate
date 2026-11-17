@@ -58,7 +58,7 @@ async function main() {
     await app.listen(0, '127.0.0.1');
     const address = app.getHttpServer().address();
     const baseUrl = 'http://127.0.0.1:' + address.port;
-    const createDraft = (role, title, quantityAvailable = null, listingType = 'service') => fetch(baseUrl + '/api/market/listings', {
+    const createDraft = (role, title, quantityAvailable = null, listingType = 'service', division = listingType === 'b2b' ? 'b2b' : 'services') => fetch(baseUrl + '/api/market/listings', {
       method: 'POST',
       headers: {
         cookie: 'trademate_session=' + encodeURIComponent(actors[role].token),
@@ -68,6 +68,7 @@ async function main() {
         title,
         description: 'Integration-test Services offer',
         listingType,
+        division,
         price: '100.00',
         quantityAvailable,
       }),
@@ -158,6 +159,35 @@ async function main() {
     const publicB2bPayload = await publicB2b.json();
     assert.ok(publicB2bPayload.data.some((offer) => offer.id === b2bDraft.id),
       'an approved B2B offer must appear in public discovery');
+
+    // Every contract division must use the same durable draft -> review -> publish workflow.
+    const divisions = ['services','real_estate','software','b2b','industrial_trade','agriculture','finance_investment','institution_infrastructure','sports','entertainment'];
+    for (const role of ['owner', 'admin', 'member']) {
+      for (const division of divisions) {
+        const listingType = division === 'b2b' ? 'b2b' : 'service';
+        const title = 'Division ' + division + ' ' + role + ' ' + suffix;
+        const createdResponse = await createDraft(role, title, division === 'b2b' ? 12 : null, listingType, division);
+        assert.equal(createdResponse.status, 201, role + ' must be able to create a ' + division + ' draft');
+        const createdListing = (await createdResponse.json()).listing;
+        assert.equal(createdListing.division, division, 'the selected division must persist');
+        const submitted = await fetch(baseUrl + '/api/market/listings/' + createdListing.id + '/submit', { method: 'POST', headers: { cookie: 'trademate_session=' + encodeURIComponent(actors[role].token) } });
+        assert.equal(submitted.status, 201, role + ' must be able to submit ' + division + ' for review');
+        assert.equal((await submitted.json()).listing.status, 'pending_review');
+        const hidden = await fetch(baseUrl + '/api/market/listings?division=' + division + '&q=' + encodeURIComponent(title));
+        assert.equal(hidden.status, 200);
+        assert.ok(!(await hidden.json()).data.some((offer) => offer.id === createdListing.id), division + ' must remain private while pending review');
+        const reviewQueue = await reviewCall('GET', '/api/moderation/listings');
+        assert.equal(reviewQueue.status, 200);
+        assert.ok((await reviewQueue.json()).data.some((offer) => offer.id === createdListing.id && offer.division === division), division + ' must appear in the moderation queue with its category');
+        const approved = await reviewCall('POST', '/api/moderation/listings/' + createdListing.id + '/review', { decision: 'approved', note: 'Division integration approval.' });
+        assert.equal(approved.status, 201, 'moderator must be able to approve ' + division);
+        const visible = await fetch(baseUrl + '/api/market/listings?division=' + division + '&q=' + encodeURIComponent(title));
+        assert.equal(visible.status, 200);
+        assert.ok((await visible.json()).data.some((offer) => offer.id === createdListing.id && offer.division === division), division + ' must be publicly discoverable after approval');
+        const proposal = await fetch(baseUrl + '/api/market/contracts', { method: 'POST', headers: { cookie: 'trademate_session=' + encodeURIComponent(actors.outsider.token), 'content-type': 'application/json' }, body: JSON.stringify({ listingId: createdListing.id, amount: '100.00', scope: 'Complete the agreed ' + division + ' opportunity scope and deliverables.', terms: 'Both parties will confirm the agreed milestones and completion terms.' }) });
+        assert.equal(proposal.status, 201, 'a published ' + division + ' offer must accept contract proposals');
+      }
+    }
     const b2bDetail = await fetch(baseUrl + '/api/market/listings/' + b2bDraft.id);
     assert.equal(b2bDetail.status, 200, 'an approved B2B offer must have a public detail view');
 

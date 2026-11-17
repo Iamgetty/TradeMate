@@ -44,7 +44,7 @@ Important principles:
 
 The detailed approved taxonomy, division-specific attributes, safeguards, shared capabilities and change-governance rules are documented in [docs/marketplace-taxonomy.md](docs/marketplace-taxonomy.md).
 
-**Implementation boundary:** this is the approved target architecture, not a claim that all ten divisions or transaction workflows are implemented or production-ready. The currently established persistent marketplace contract paths remain Services and B2B. Specialist divisions must be connected and tested in stages. The implementation status and release sequence remain governed by [docs/roadmap.md](docs/roadmap.md).
+**Implementation boundary:** all ten Contract Categories in Explore can use the shared persistent listing draft and TradeMate review workflow. A category submission is not public until approved by moderation. The listing `division` is stored separately from the Services/B2B commercial listing type, and P2P remains a separate flow. Division-specific evidence, safeguards and specialised workflows still require staged implementation and testing. The implementation status and release sequence remain governed by [docs/roadmap.md](docs/roadmap.md).
 
 
 ## Metadusk ecosystem

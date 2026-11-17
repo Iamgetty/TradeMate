@@ -73,7 +73,7 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: node scripts/test-auth-audit.js
-      - name: Verify Services and B2B draft authorization and audit rollback
+      - name: Verify all ten contract divisions across member roles, moderation and audit rollback
         working-directory: TradeMate-main/apps/api
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
