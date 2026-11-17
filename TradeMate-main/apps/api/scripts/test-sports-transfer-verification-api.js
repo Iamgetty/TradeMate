@@ -211,71 +211,6 @@ async function main() {
     assert.equal(reconciledEvent.status, 200);
     assert.equal((await reconciledEvent.json()).reconciled, true,
       'late case mapping reconciles the retained unmatched provider event');
-    // Exercise the real Sumsub webhook adapter with a provider-shaped,
-    // HMAC-signed callback. The case is rebound from sandbox to Sumsub so the
-    // callback correlation check exercises the actual configured provider.
-    await pool.query(
-      "UPDATE sports_transfer_verification_cases SET provider_key = 'sumsub', provider_subject_reference = $1 WHERE id = $2",
-      [legalCase.id, legalCase.id],
-    );
-    const sumsubEventTime = new Date().toISOString().replace('T', ' ').replace('Z', '+0000');
-    const sumsubWebhookPayload = JSON.stringify({
-      applicantId: 'sumsub-applicant-' + suffix,
-      externalUserId: legalCase.id,
-      type: 'applicantReviewed',
-      createdAtMs: sumsubEventTime,
-      reviewStatus: 'completed',
-      reviewResult: { reviewAnswer: 'GREEN' },
-    });
-    const sumsubWebhookDigest = createHmac('sha256', process.env.SUMSUB_WEBHOOK_SECRET)
-      .update(Buffer.from(sumsubWebhookPayload))
-      .digest('hex');
-    const sumsubWebhookHeaders = {
-      'content-type': 'application/json',
-      'x-payload-digest-alg': 'HMAC_SHA256_HEX',
-      'x-payload-digest': sumsubWebhookDigest,
-    };
-    const sumsubWebhook = await fetch(base + '/api/webhooks/sports-transfer/identity/sumsub', {
-      method: 'POST',
-      headers: sumsubWebhookHeaders,
-      body: sumsubWebhookPayload,
-    });
-    assert.equal(sumsubWebhook.status, 200, 'valid signed Sumsub webhook is accepted');
-    assert.equal((await sumsubWebhook.json()).humanReviewRequired, true,
-      'Sumsub webhook outcomes must enter independent human review');
-
-    const duplicateSumsubWebhook = await fetch(base + '/api/webhooks/sports-transfer/identity/sumsub', {
-      method: 'POST',
-      headers: sumsubWebhookHeaders,
-      body: sumsubWebhookPayload,
-    });
-    assert.equal(duplicateSumsubWebhook.status, 200);
-    assert.equal((await duplicateSumsubWebhook.json()).duplicate, true,
-      'exact Sumsub webhook retries are idempotent');
-
-    const changedSumsubPayload = JSON.stringify({
-      applicantId: 'sumsub-applicant-' + suffix,
-      externalUserId: legalCase.id,
-      type: 'applicantReviewed',
-      createdAtMs: sumsubEventTime,
-      reviewStatus: 'completed',
-      reviewResult: { reviewAnswer: 'RED' },
-    });
-    const changedSumsubDigest = createHmac('sha256', process.env.SUMSUB_WEBHOOK_SECRET)
-      .update(Buffer.from(changedSumsubPayload))
-      .digest('hex');
-    const changedSumsubWebhook = await fetch(base + '/api/webhooks/sports-transfer/identity/sumsub', {
-      method: 'POST',
-      headers: { ...sumsubWebhookHeaders, 'x-payload-digest': changedSumsubDigest },
-      body: changedSumsubPayload,
-    });
-    assert.equal(changedSumsubWebhook.status, 409,
-      'Sumsub event identity reused with different signed content must be rejected');
-
-    await pool.query(
-      "UPDATE sports_transfer_verification_cases SET provider_key = 'sandbox', provider_subject_reference = $1 WHERE id = $2",
-      [providerCase, legalCase.id],
-    );
     const providerEvent = JSON.stringify({
       eventId: 'event-' + suffix,
       caseReference: providerCase,
@@ -335,6 +270,11 @@ async function main() {
       body: providerEvent,
     });
     assert.equal(missingTimestampWebhook.status, 401, 'sandbox webhook timestamp is mandatory');
+    // Bind the case to Sumsub while exercising its signed webhook adapter.
+    await pool.query(
+      "UPDATE sports_transfer_verification_cases SET provider_key = 'sumsub', provider_subject_reference = $1 WHERE id = $2",
+      [legalCase.id, legalCase.id],
+    );
     // Sumsub webhooks use their documented raw-body HMAC digest headers.
     const sumsubWebhookBody = JSON.stringify({
       applicantId: 'sumsub-applicant-test',
@@ -370,6 +310,28 @@ async function main() {
     });
     assert.equal(invalidSumsubWebhook.status, 401,
       'invalid Sumsub webhook digest must be rejected');
+    const conflictingSumsubBody = JSON.stringify({
+      applicantId: 'sumsub-applicant-test',
+      externalUserId: legalCase.id,
+      correlationId: 'sumsub-correlation-' + suffix,
+      type: 'applicantReviewed',
+      reviewStatus: 'completed',
+      reviewResult: { reviewAnswer: 'RED' },
+      createdAtMs: '2026-11-17 12:30:00.000',
+    });
+    const conflictingSumsubDigest = createHmac('sha256', process.env.SUMSUB_WEBHOOK_SECRET)
+      .update(Buffer.from(conflictingSumsubBody)).digest('hex');
+    const conflictingSumsubWebhook = await nativeFetch(base + '/api/webhooks/sports-transfer/identity/sumsub', {
+      method: 'POST',
+      headers: { ...sumsubWebhookHeaders, 'x-payload-digest': conflictingSumsubDigest },
+      body: conflictingSumsubBody,
+    });
+    assert.equal(conflictingSumsubWebhook.status, 409,
+      'Sumsub event identity reused with different signed content must be rejected');
+    await pool.query(
+      "UPDATE sports_transfer_verification_cases SET provider_key = 'sandbox', provider_subject_reference = $1 WHERE id = $2",
+      [providerCase, legalCase.id],
+    );
 
     const duplicate = await userRequest('POST', '/api/sports-transfer/verification-cases', body);
     assert.equal(duplicate.status, 409, 'duplicate open sporting identity cases are blocked');
