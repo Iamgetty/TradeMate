@@ -4855,11 +4855,19 @@ class SportsTransferVerificationProviderWebhookController {
       throw new BadRequestException('The signed raw webhook body is unavailable.');
     }
     const secret = process.env[`SPORTS_TRANSFER_${provider.toUpperCase()}_WEBHOOK_SECRET`] || '';
+    const timestampHeader = request.header('x-trademate-timestamp') || '';
     const signature = request.header('x-trademate-signature') || '';
-    if (!secret || !/^sha256=[a-f0-9]{64}$/i.test(signature)) {
+    // Sandbox signatures bind the raw body to a short-lived Unix timestamp.
+    // Vendor adapters must implement each provider's own freshness contract.
+    if (!secret || !/^\\d{10}$/.test(timestampHeader) || !/^sha256=[a-f0-9]{64}$/i.test(signature)) {
       throw new UnauthorizedException('Verification provider webhook signature is invalid.');
     }
-    const expected = createHmac('sha256', secret).update(rawBody).digest();
+    const timestamp = Number(timestampHeader);
+    if (!Number.isSafeInteger(timestamp) || Math.abs(Math.floor(Date.now() / 1000) - timestamp) > 300) {
+      throw new UnauthorizedException('Verification provider webhook timestamp is outside the accepted window.');
+    }
+    const signedPayload = Buffer.concat([Buffer.from(timestampHeader + '.'), rawBody]);
+    const expected = createHmac('sha256', secret).update(signedPayload).digest();
     const supplied = Buffer.from(signature.slice(7), 'hex');
     if (supplied.length !== expected.length || !timingSafeEqual(expected, supplied)) {
       throw new UnauthorizedException('Verification provider webhook signature is invalid.');
