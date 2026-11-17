@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { randomUUID, createHash } = require('node:crypto');
+const { randomUUID, createHash, createHmac } = require('node:crypto');
 const { Pool } = require('pg');
 const { NestFactory } = require('@nestjs/core');
 const { json } = require('express');
@@ -11,6 +11,7 @@ const tokenHash = token => createHash('sha256').update(token).digest('hex');
 async function main() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required.');
   process.env.TRADEMATE_REVIEW_API_KEY = 'sports-verification-test-review-key';
+  process.env.SPORTS_TRANSFER_SANDBOX_WEBHOOK_SECRET = 'sports-verification-webhook-test-secret';
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
   let app;
   try {
@@ -32,7 +33,7 @@ async function main() {
     const profileId = profileResult.rows[0].id;
 
     app = await NestFactory.create(AppModule, { logger: false, bodyParser: false });
-    app.use(json({ limit: '28mb' }));
+    app.use(json({ limit: '28mb', verify: (request, _response, buffer) => { request.rawBody = Buffer.from(buffer); } }));
     app.use(databaseRequestContextMiddleware);
     app.setGlobalPrefix('api');
     await app.listen(0, '127.0.0.1');
@@ -67,6 +68,44 @@ async function main() {
     const caseRecord = (await created.json()).verificationCase;
     assert.equal(caseRecord.case_type, 'sporting_identity');
     assert.equal(caseRecord.status, 'submitted');
+
+    await pool.query(
+      "UPDATE sports_transfer_verification_cases SET provider_key = 'sandbox', provider_subject_reference = 'provider-case-' || id::text WHERE id = $1",
+      [caseRecord.id],
+    );
+    const providerCase = 'provider-case-' + caseRecord.id;
+    const providerEvent = JSON.stringify({
+      eventId: 'event-' + suffix,
+      caseReference: providerCase,
+      outcome: 'succeeded',
+    });
+    const providerSignature = 'sha256=' + createHmac('sha256', process.env.SPORTS_TRANSFER_SANDBOX_WEBHOOK_SECRET).update(Buffer.from(providerEvent)).digest('hex');
+    const webhook = await fetch(base + '/api/webhooks/sports-transfer/identity/sandbox', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-trademate-signature': providerSignature },
+      body: providerEvent,
+    });
+    assert.equal(webhook.status, 200, 'valid signed provider webhook is accepted');
+    const webhookResult = await webhook.json();
+    assert.equal(webhookResult.humanReviewRequired, true);
+    const webhookCase = await pool.query('SELECT status FROM sports_transfer_verification_cases WHERE id = $1', [caseRecord.id]);
+    assert.equal(webhookCase.rows[0].status, 'needs_review',
+      'provider success must never directly approve an identity');
+
+    const duplicateWebhook = await fetch(base + '/api/webhooks/sports-transfer/identity/sandbox', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-trademate-signature': providerSignature },
+      body: providerEvent,
+    });
+    assert.equal(duplicateWebhook.status, 200);
+    assert.equal((await duplicateWebhook.json()).duplicate, true, 'provider event replay is idempotent');
+
+    const invalidWebhook = await fetch(base + '/api/webhooks/sports-transfer/identity/sandbox', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-trademate-signature': 'sha256=' + '0'.repeat(64) },
+      body: providerEvent,
+    });
+    assert.equal(invalidWebhook.status, 401, 'invalid provider webhook signature is rejected');
     const duplicate = await userRequest('POST', '/api/sports-transfer/verification-cases', body);
     assert.equal(duplicate.status, 409, 'duplicate open sporting identity cases are blocked');
 
