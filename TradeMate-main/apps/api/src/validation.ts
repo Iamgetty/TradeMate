@@ -512,3 +512,9 @@ export const sportsTransferVerificationReviewBodySchema = z.object({
   reasonCode: z.string().trim().min(2).max(80),
   note: z.string().trim().max(2000).optional(),
 }).strict();
+
+export const sportsTransferVerificationProviderEventBodySchema = z.object({
+  eventId: z.string().trim().min(1).max(200),
+  caseReference: z.string().trim().min(1).max(200),
+  outcome: z.enum(['succeeded','failed','review_required']),
+}).strict();
