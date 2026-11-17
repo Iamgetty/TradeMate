@@ -4859,7 +4859,7 @@ class SportsTransferVerificationProviderWebhookController {
     const signature = request.header('x-trademate-signature') || '';
     // Sandbox signatures bind the raw body to a short-lived Unix timestamp.
     // Vendor adapters must implement each provider's own freshness contract.
-    if (!secret || !/^\\d{10}$/.test(timestampHeader) || !/^sha256=[a-f0-9]{64}$/i.test(signature)) {
+    if (!secret || !/^\d{10}$/.test(timestampHeader) || !/^sha256=[a-f0-9]{64}$/i.test(signature)) {
       throw new UnauthorizedException('Verification provider webhook signature is invalid.');
     }
     const timestamp = Number(timestampHeader);
