@@ -42,6 +42,7 @@ export default function AccountPage(){
     <h1>Good to have you<br/><span>{user.display_name.split(' ')[0]}.</span></h1>
     <p className="account-lead">Your TradeMate account and Alpha workspace are managed here.</p>
     <div className="account-card"><div className="account-avatar">{user.display_name.trim().charAt(0).toUpperCase()}</div><div><strong>{user.display_name}</strong><span>{user.email}</span><small>TRADEMATE MEMBER</small></div><i>●</i></div>
+    <Link className="account-secondary-link" href="/sports-transfer/verification">Sports Transfer identity verification →</Link>
     {organization?
      <div className="account-next">
       <div className="section-kicker"><span/> BUSINESS SPACE CREATED</div>
