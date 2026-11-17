@@ -4144,8 +4144,7 @@ class SportsTransferOpportunitiesController {
        FROM sports_transfer_opportunities o
        LEFT JOIN sports_profiles p ON p.id = o.player_profile_id
        LEFT JOIN sports_organizations so ON so.id = o.sporting_organization_id
-       WHERE o.created_by_user_id = $1
-          OR (p.user_id = $1)
+       WHERE p.user_id = $1
           OR EXISTS (
             SELECT 1 FROM sports_org_memberships m
             WHERE m.sports_organization_id = o.sporting_organization_id
