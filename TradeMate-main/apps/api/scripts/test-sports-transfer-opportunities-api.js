@@ -36,6 +36,10 @@ async function main() {
       "INSERT INTO sports_profiles (user_id, sport, display_name) VALUES ($1, 'football', 'Opportunity test player') RETURNING id",
       [actors.player.userId],
     );
+    const basketballProfile = await pool.query(
+      "INSERT INTO sports_profiles (user_id, sport, display_name) VALUES ($1, 'basketball', 'Opportunity test basketball player') RETURNING id",
+      [actors.player.userId],
+    );
     const org = await pool.query(
       "INSERT INTO sports_organizations (entity_type, legal_name, display_name, country_code, created_by_user_id) VALUES ('club', $1, 'Opportunity Test Club', 'NG', $2) RETURNING id",
       ['Opportunity Test Club ' + suffix, actors.player.userId],
@@ -70,6 +74,13 @@ async function main() {
     const playerResult = (await playerDraft.json()).opportunity;
     assert.equal(playerResult.status,'draft');
     assert.equal(playerResult.financial_terms.type,'negotiable');
+
+    const basketballDraft = await call('player','POST','/api/sports-transfer/opportunities',{
+      sport:'basketball', movementType:'contract_renewal', playerProfileId:basketballProfile.rows[0].id,
+      title:'Basketball contract renewal', opportunityDirection:'available',
+      financialTerms:{type:'not_applicable'},
+    });
+    assert.equal(basketballDraft.status,201, 'basketball contract renewal is a supported basketball movement');
 
     const invalidSportMovement = await call('player','POST','/api/sports-transfer/opportunities',{
       sport:'football', movementType:'player_trade', playerProfileId:profile.rows[0].id,
