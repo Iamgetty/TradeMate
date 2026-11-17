@@ -68,7 +68,7 @@ export const deletionCancelBodySchema = z.object({
 
 export const preferencesBodySchema = z.object({
   cur: z.enum(['NGN', 'USD', 'EUR', 'GBP', 'GHS', 'KES']).optional(),
-  market: z.enum(['Services', 'B2B', 'Real Estate', 'Software', 'NFTs', 'Forex', 'Crypto', 'P2P']).optional(),
+  market: z.enum(['Services', 'Real Estate', 'Software', 'B2B', 'Industrial & Trade', 'Agriculture', 'Finance & Investment', 'Institution & Infrastructure', 'Sports', 'Entertainment', 'P2P', 'NFTs', 'Forex', 'Crypto']).optional(),
   orders: z.boolean().optional(),
   p2p: z.boolean().optional(),
   promos: z.boolean().optional(),
