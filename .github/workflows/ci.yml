@@ -11,6 +11,7 @@ on:
       - main
       - feat/sports-transfer-private-profile-api
       - feat/sports-transfer-organization-memberships
+      - feat/sports-transfer-representative-mandates
   pull_request:
     branches:
       - main
@@ -65,6 +66,11 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: node scripts/test-sports-transfer-private-api.js
+      - name: Verify Sports Transfer representative mandate HTTP authorization
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-sports-transfer-mandates-api.js
       - name: Verify Sports Transfer organization membership HTTP authorization
         working-directory: TradeMate-main/apps/api
         env:
