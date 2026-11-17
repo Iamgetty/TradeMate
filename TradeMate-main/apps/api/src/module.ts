@@ -4283,7 +4283,7 @@ class SportsTransferDiscoveryModerationController {
       }
       const updated = await client.query(
         `UPDATE sports_transfer_external_player_records
-         SET review_status=$1, reviewed_at=now(), reviewed_by_user_id=NULL,
+         SET review_status=$1, reviewed_at=now(), reviewed_by_user_id=NULL, reviewer_key_id=$4,
              review_note=$2, last_verified_at=CASE WHEN $1='approved' THEN now() ELSE last_verified_at END,
              updated_at=now()
          WHERE id=$3
