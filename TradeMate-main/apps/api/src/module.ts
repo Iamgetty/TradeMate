@@ -4,7 +4,7 @@ import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, 
 import { Pool } from 'pg';
 import { createRlsAwarePool } from './database-context';
 import { decimalToUnits, fiatCentsToQuantityUnits, productToFiatCents, unitsToDecimal } from './p2p-decimal';
-import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema } from './validation';
+import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -3267,6 +3267,192 @@ class ModerationController {
 }
 
 
+
+
+@Controller('sports-transfer')
+class SportsTransferIdentityController {
+  private async currentUser(request: Request) {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to continue.');
+    const result = await databasePool.query(
+      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+      [tokenDigest(token)],
+    );
+    if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    return result.rows[0].id as string;
+  }
+
+  @Get('profiles/mine')
+  async myProfiles(@Req() request: Request) {
+    const userId = await this.currentUser(request);
+    const result = await databasePool!.query(
+      `SELECT id, sport, display_name, biography, primary_position, country_code,
+              visibility, verification_status, created_at, updated_at
+       FROM sports_profiles WHERE user_id = $1 ORDER BY sport ASC`,
+      [userId],
+    );
+    return { profiles: result.rows };
+  }
+
+  @Post('profiles')
+  async createProfile(@Req() request: Request, @Body() body: any) {
+    const input = parseBody(sportsProfileCreateBodySchema, body);
+    const userId = await this.currentUser(request);
+    try {
+      const client = await databasePool!.connect();
+      try {
+        await client.query('BEGIN');
+        const result = await client.query(
+          `INSERT INTO sports_profiles (user_id, sport, display_name, biography, primary_position, country_code)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           RETURNING id, sport, display_name, biography, primary_position, country_code,
+                     visibility, verification_status, created_at, updated_at`,
+          [userId, input.sport, input.displayName, input.biography || '', input.primaryPosition || '', input.countryCode || null],
+        );
+        await client.query(
+          "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.profile.created', 'sports_profile', $2, $3::jsonb)",
+          [userId, result.rows[0].id, JSON.stringify({ sport: input.sport })],
+        );
+        await client.query('COMMIT');
+        return { profile: result.rows[0], message: 'Your private Sports Transfer profile has been created.' };
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        if ((error as { code?: string })?.code === '23505') throw new ConflictException('You already have a profile for this sport.');
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  @Patch('profiles/:id')
+  async updateProfile(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+    parseUuidParam(id);
+    const input = parseBody(sportsProfileUpdateBodySchema, body);
+    const userId = await this.currentUser(request);
+    const result = await databasePool!.query(
+      `UPDATE sports_profiles
+       SET display_name = COALESCE($1, display_name),
+           biography = COALESCE($2, biography),
+           primary_position = COALESCE($3, primary_position),
+           country_code = CASE WHEN $4::boolean THEN $5::char(2) ELSE country_code END,
+           updated_at = now()
+       WHERE id = $6 AND user_id = $7
+       RETURNING id, sport, display_name, biography, primary_position, country_code,
+                 visibility, verification_status, created_at, updated_at`,
+      [input.displayName ?? null, input.biography ?? null, input.primaryPosition ?? null,
+       Object.prototype.hasOwnProperty.call(input, 'countryCode'), input.countryCode ?? null, id, userId],
+    );
+    if (!result.rowCount) throw new NotFoundException('Sports Transfer profile not found.');
+    await databasePool!.query(
+      "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.profile.updated', 'sports_profile', $2, $3::jsonb)",
+      [userId, id, JSON.stringify({ fields: Object.keys(input) })],
+    );
+    return { profile: result.rows[0] };
+  }
+
+  @Get('profiles/:id/consents')
+  async listProfileConsents(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
+    const userId = await this.currentUser(request);
+    const owner = await databasePool!.query('SELECT id FROM sports_profiles WHERE id = $1 AND user_id = $2', [id, userId]);
+    if (!owner.rowCount) throw new NotFoundException('Sports Transfer profile not found.');
+    const result = await databasePool!.query(
+      `SELECT c.id, c.granted_to_user_id, c.granted_to_organization_id, c.purpose,
+              c.scope, c.status, c.granted_at, c.expires_at, c.revoked_at
+       FROM sports_player_consents c
+       WHERE c.player_profile_id = $1
+       ORDER BY c.created_at DESC LIMIT 100`,
+      [id],
+    );
+    return { consents: result.rows };
+  }
+
+  @Post('profiles/:id/consents')
+  async grantProfileConsent(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+    parseUuidParam(id);
+    const input = parseBody(sportsConsentGrantBodySchema, body);
+    const userId = await this.currentUser(request);
+    const expiresAt = new Date(input.expiresAt);
+    const now = Date.now();
+    if (!Number.isFinite(expiresAt.getTime()) || expiresAt.getTime() <= now || expiresAt.getTime() > now + 366 * 24 * 60 * 60 * 1000) {
+      throw new BadRequestException('Consent must expire within the next 12 months.');
+    }
+    if (input.targetUserId === userId) throw new BadRequestException('Consent cannot be granted to your own account.');
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const profile = await client.query(
+        'SELECT id, sport FROM sports_profiles WHERE id = $1 AND user_id = $2 FOR UPDATE',
+        [id, userId],
+      );
+      if (!profile.rowCount) throw new NotFoundException('Sports Transfer profile not found.');
+      if (input.targetUserId) {
+        const target = await client.query("SELECT id FROM users WHERE id = $1 AND status = 'active'", [input.targetUserId]);
+        if (!target.rowCount) throw new NotFoundException('The consent recipient was not found.');
+      } else if (input.targetOrganizationId) {
+        const target = await client.query('SELECT id FROM sports_organizations WHERE id = $1', [input.targetOrganizationId]);
+        if (!target.rowCount) throw new NotFoundException('The sporting organization was not found.');
+      }
+      const result = await client.query(
+        `INSERT INTO sports_player_consents
+           (player_profile_id, granted_by_user_id, granted_to_user_id, granted_to_organization_id,
+            purpose, scope, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+         RETURNING id, granted_to_user_id, granted_to_organization_id, purpose, scope,
+                   status, granted_at, expires_at`,
+        [id, userId, input.targetUserId || null, input.targetOrganizationId || null,
+         input.purpose, JSON.stringify(input.scope || {}), expiresAt.toISOString()],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.consent.granted', 'sports_player_consent', $2, $3::jsonb)",
+        [userId, result.rows[0].id, JSON.stringify({ profile_id: id, purpose: input.purpose, recipient_type: input.targetUserId ? 'user' : 'organization', expires_at: expiresAt.toISOString() })],
+      );
+      await client.query('COMMIT');
+      return { consent: result.rows[0], message: 'Your time-limited consent has been recorded.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  @Post('consents/:id/revoke')
+  async revokeConsent(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
+    const userId = await this.currentUser(request);
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        `UPDATE sports_player_consents c
+         SET status = 'revoked', revoked_at = now()
+         FROM sports_profiles p
+         WHERE c.id = $1 AND c.player_profile_id = p.id AND p.user_id = $2
+           AND c.status = 'granted' AND c.revoked_at IS NULL
+         RETURNING c.id, c.player_profile_id, c.purpose, c.status, c.revoked_at`,
+        [id, userId],
+      );
+      if (!result.rowCount) throw new NotFoundException('Active consent not found.');
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.consent.revoked', 'sports_player_consent', $2, $3::jsonb)",
+        [userId, id, JSON.stringify({ profile_id: result.rows[0].player_profile_id, purpose: result.rows[0].purpose })],
+      );
+      await client.query('COMMIT');
+      return { consent: result.rows[0], message: 'Consent has been revoked.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+}
+
 const MARKET_SYMBOLS = new Set([
   '^GSPC','^DJI','^IXIC','^FTSE','^GDAXI','^FCHI','^N225','^HSI','^STOXX50E','^NSEI',
   'GC=F','SI=F','CL=F','BZ=F','NG=F','HG=F','ZW=F','ZC=F','ZS=F','KC=F',
@@ -3322,7 +3508,7 @@ class PublicMarketQuotesController {
   }
 }
 
-@Module({ controllers: [PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController] })
+@Module({ controllers: [SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController] })
 export class AppModule implements OnModuleDestroy {
   async onModuleDestroy() {
     if (databasePool) await databasePool.end();
