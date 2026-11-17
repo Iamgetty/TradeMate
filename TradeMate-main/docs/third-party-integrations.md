@@ -112,6 +112,34 @@ All names below are procurement/evaluation candidates unless separately evidence
 - **Electronic signatures:** no e-signature vendor selected; contract agreement workflow must not be described as legally e-signed.
 - **SMS / voice OTP:** no provider selected; assess only if a product requirement calls for it.
 
+
+## Sports marketplace — football and basketball (first-release scope)
+
+The product decision is to launch the Sports transfer/recruitment capability with football and basketball first, while keeping the domain model extensible to other sports. The entries below are **authoritative reference sources or evaluation candidates**, not confirmed commercial integrations or permissions.
+
+| Provider / source | Sports capability | Register status | Acceptance / access gate |
+|---|---|---|---|
+| FIFA Transfer Matching System (TMS) | Official international football transfer administration | **Authoritative external process — access restricted; no integration assumed** | Do not assume a public API or TradeMate access. Confirm eligibility, authorization, permitted use and technical access directly with FIFA before any integration proposal. |
+| FIFA member-association registration-period information | Football registration-window rules and dates | **Authoritative reference source — evaluate data access** | Build country/association/competition-specific calendars; confirm source freshness, gender/category distinctions, reuse rights and update process. |
+| FIFA Regulations on the Status and Transfer of Players (RSTP) | Football transfer, registration, training compensation and solidarity framework | **Authoritative regulatory reference** | Version and jurisdiction/date control; obtain legal review before translating rules into automated eligibility or financial calculations. |
+| FIFA Football Agent regulatory/licensing information | Football agent status and regulatory requirements | **Authoritative reference — verify current rules** | Agent verification must reflect current regulations and any suspensions/amendments; do not hardcode provisions without current legal review. |
+| FIFA Clearing House | Training rewards settlement framework | **Official external process — no integration assumed** | TradeMate may track potential training compensation/solidarity items but must not claim to replace FIFA Clearing House or imply access to its systems. |
+| Sportradar | Sports data, fixtures, statistics and related feeds | **Evaluate — commercial data candidate** | Confirm football and basketball coverage by competition/territory, player identifiers, historical depth, latency, licensing/display rights, pricing and API terms. |
+| Stats Perform / Opta | Football and basketball statistics, performance and data feeds | **Evaluate — commercial data candidate** | Validate competition coverage, athlete identity matching, data definitions, redistribution rights, video/data rights, service levels and cost. |
+| Basketball governing bodies and league rulebooks (including FIBA and relevant national leagues) | Basketball player movement, eligibility, transfer/clearance and competition rules | **Authoritative references — jurisdiction/competition specific** | Maintain versioned rule profiles; do not treat NBA, WNBA, FIBA or one national league's rules as universal. |
+| NBA / WNBA and other league transaction/roster sources | Basketball contracts, trades, waivers, roster and transaction status | **Authoritative league sources — evaluate permitted data access** | Confirm public-data reuse/API terms, territory, update frequency and whether the source is authoritative for each competition. |
+| Football league and federation registration sources | Domestic football registration and clearance status | **Authoritative references — country/competition specific** | Identify official source per association/competition; confirm access, update frequency and legal reuse. |
+| Electronic-signature provider | Execution of employment/representation/transfer-related documents | **Not selected — capability gap** | Evaluate legal validity by jurisdiction, identity assurance, signer authority, evidence package, audit trail, data residency and retention. |
+| Secure document verification / signing provider | Verification and secure exchange of player, club and agent documents | **Not selected — capability gap** | Assess authenticity checks, fraud controls, privacy, access controls and manual-review fallback; do not expose medical documents publicly. |
+| Licensed sports data / video providers | Player performance, scouting and video evidence | **Not selected — capability gap** | Obtain explicit data/video licensing and redistribution rights; avoid scraping or unlicensed highlight distribution. |
+
+**Implementation guardrails**
+- Separate football transfer/registration concepts from basketball trades, free agency, waivers, draft rights and league approval. Use sport- and competition-specific state machines.
+- Treat governing-body and league sources as rule authorities; treat commercial data vendors as data suppliers, not sources of legal authority.
+- Confirm every vendor's competition coverage, territory, athlete identity resolution, freshness, licensing, privacy, retention, pricing and API terms before procurement.
+- Do not mark an athlete movement officially complete until the relevant league/federation/registration clearance state is evidenced. TradeMate's agreement status and official registration status must remain distinct.
+- Maintain human/legal review for edge cases, minors, agent licensing, international clearance, salary-cap/CBA rules and regulatory changes.
+
 ## Mandatory build-time control: no integration gets skipped
 
 Before resuming feature implementation, and whenever a new feature is planned:
