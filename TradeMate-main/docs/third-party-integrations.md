@@ -113,7 +113,7 @@ All names below are procurement/evaluation candidates unless separately evidence
 - **SMS / voice OTP:** no provider selected; assess only if a product requirement calls for it.
 
 
-## Sports marketplace — football and basketball (first-release scope)
+## Sports Transfer — football and basketball (first-release scope)
 
 The product decision is to launch the Sports transfer/recruitment capability with football and basketball first, while keeping the domain model extensible to other sports. The entries below are **authoritative reference sources or evaluation candidates**, not confirmed commercial integrations or permissions.
 
