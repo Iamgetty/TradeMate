@@ -4879,9 +4879,9 @@ class SportsTransferVerificationProviderWebhookController {
       const mappedOutcome = caseId ? input.outcome : 'unmatched';
       await client.query(
         `INSERT INTO sports_transfer_verification_provider_events
-          (provider_key, provider_event_id, verification_case_id, payload_sha256, mapped_outcome)
-         VALUES ($1,$2,$3,$4,$5)`,
-        [provider, input.eventId, caseId, payloadHash, mappedOutcome],
+           (provider_key, provider_event_id, verification_case_id, provider_subject_reference, payload_sha256, mapped_outcome)
+          VALUES ($1,$2,$3,$4,$5,$6)`,
+         [provider, input.eventId, caseId, input.caseReference, payloadHash, mappedOutcome],
       );
       if (caseId && ['submitted','processing'].includes(found.rows[0].status)) {
         // Provider outcomes never approve or reject a TradeMate identity.
@@ -4936,6 +4936,67 @@ class SportsTransferVerificationModerationController {
       [status || null],
     );
     return { verificationCases: result.rows };
+  }
+
+  @Post('provider-events/:provider/:eventId/reconcile')
+  async reconcileUnmatchedProviderEvent(
+    @Param('provider') provider: string,
+    @Param('eventId') eventId: string,
+    @Req() request: Request,
+  ) {
+    const reviewerId = this.authorize(request);
+    if (!['sandbox','sumsub','veriff','trulioo'].includes(provider) || !eventId || eventId.length > 200) {
+      throw new BadRequestException('Provider event reference is invalid.');
+    }
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const event = await client.query(
+        `SELECT id, provider_subject_reference, mapped_outcome
+         FROM sports_transfer_verification_provider_events
+         WHERE provider_key = $1 AND provider_event_id = $2 AND verification_case_id IS NULL
+         FOR UPDATE`,
+        [provider, eventId],
+      );
+      if (!event.rowCount) throw new NotFoundException('Unmatched provider event not found.');
+      const matches = await client.query(
+        `SELECT id, status FROM sports_transfer_verification_cases
+         WHERE provider_key = $1 AND provider_subject_reference = $2
+         ORDER BY created_at DESC LIMIT 2 FOR UPDATE`,
+        [provider, event.rows[0].provider_subject_reference],
+      );
+      if (matches.rowCount === 0) {
+        await client.query('COMMIT');
+        return { reconciled: false, matched: false };
+      }
+      if (matches.rowCount !== 1) {
+        throw new ConflictException('Provider reference maps to multiple verification cases; manual investigation is required.');
+      }
+      const matchedCase = matches.rows[0];
+      const outcome = event.rows[0].mapped_outcome === 'unmatched' ? 'review_required' : event.rows[0].mapped_outcome;
+      await client.query(
+        `UPDATE sports_transfer_verification_provider_events
+         SET verification_case_id = $1, mapped_outcome = $2
+         WHERE id = $3 AND verification_case_id IS NULL`,
+        [matchedCase.id, outcome, event.rows[0].id],
+      );
+      const requiresReview = ['submitted','processing'].includes(matchedCase.status);
+      if (requiresReview) {
+        await client.query(
+          "UPDATE sports_transfer_verification_cases SET status = 'needs_review', updated_at = now() WHERE id = $1",
+          [matchedCase.id],
+        );
+      }
+      await client.query(
+        "INSERT INTO audit_events (event_type, entity_type, entity_id, metadata) VALUES ('sports.identity.provider_event_reconciled', 'sports_transfer_verification_case', $1, $2::jsonb)",
+        [matchedCase.id, JSON.stringify({ provider, event_id: eventId, reviewer_key_id: reviewerId, outcome })],
+      );
+      await client.query('COMMIT');
+      return { reconciled: true, matched: true, humanReviewRequired: requiresReview };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
   }
 
   @Patch(':id/review')
