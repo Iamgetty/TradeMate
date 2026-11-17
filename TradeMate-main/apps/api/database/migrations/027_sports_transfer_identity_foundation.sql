@@ -58,6 +58,7 @@ CREATE INDEX IF NOT EXISTS sports_org_memberships_user_idx
 CREATE TABLE IF NOT EXISTS sports_player_consents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   player_profile_id UUID NOT NULL REFERENCES sports_profiles(id) ON DELETE RESTRICT,
+  granted_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   granted_to_user_id UUID REFERENCES users(id) ON DELETE RESTRICT,
   granted_to_organization_id UUID REFERENCES sports_organizations(id) ON DELETE RESTRICT,
   purpose TEXT NOT NULL CHECK (purpose IN ('profile_discovery', 'direct_contact', 'opportunity_publication', 'negotiation', 'document_sharing', 'representative_access')),
@@ -69,7 +70,8 @@ CREATE TABLE IF NOT EXISTS sports_player_consents (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CHECK ((granted_to_user_id IS NOT NULL)::int + (granted_to_organization_id IS NOT NULL)::int = 1),
   CHECK (expires_at IS NULL OR expires_at > granted_at),
-  CHECK (revoked_at IS NULL OR revoked_at >= granted_at)
+  CHECK (revoked_at IS NULL OR revoked_at >= granted_at),
+  CHECK ((status = 'revoked') = (revoked_at IS NOT NULL))
 );
 CREATE INDEX IF NOT EXISTS sports_player_consents_active_idx
   ON sports_player_consents (player_profile_id, purpose, expires_at)
@@ -95,7 +97,8 @@ CREATE TABLE IF NOT EXISTS sports_representative_mandates (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CHECK ((representative_user_id IS NOT NULL)::int + (representative_organization_id IS NOT NULL)::int = 1),
   CHECK (expires_at > COALESCE(starts_at, created_at)),
-  CHECK (revoked_at IS NULL OR revoked_at >= created_at)
+  CHECK (revoked_at IS NULL OR revoked_at >= created_at),
+  CHECK ((status = 'revoked') = (revoked_at IS NOT NULL))
 );
 CREATE INDEX IF NOT EXISTS sports_mandates_player_active_idx
   ON sports_representative_mandates (player_profile_id, status, expires_at);
@@ -120,7 +123,8 @@ CREATE TABLE IF NOT EXISTS sports_guardian_relationships (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (player_profile_id, guardian_user_id),
-  CHECK (expires_at IS NULL OR expires_at > COALESCE(starts_at, created_at))
+  CHECK (expires_at IS NULL OR expires_at > COALESCE(starts_at, created_at)),
+  CHECK (verified_at IS NULL OR checked_by_user_id IS NOT NULL)
 );
 CREATE INDEX IF NOT EXISTS sports_guardian_player_status_idx
   ON sports_guardian_relationships (player_profile_id, verification_status);
