@@ -75,8 +75,8 @@ async function main() {
     assert.ok(membership.rows[0].id, 'scoped sporting-organization membership should be stored');
 
     const consent = (await client.query(
-      "INSERT INTO sports_player_consents (player_profile_id, granted_to_user_id, purpose, scope, expires_at) VALUES ($1, $2, 'negotiation', '{\"competition\":\"test\"}'::jsonb, now() + interval '7 days') RETURNING id, status",
-      [profile.id, representative],
+      "INSERT INTO sports_player_consents (player_profile_id, granted_by_user_id, granted_to_user_id, purpose, scope, expires_at) VALUES ($1, $2, $3, 'negotiation', '{\"competition\":\"test\"}'::jsonb, now() + interval '7 days') RETURNING id, status",
+      [profile.id, player, representative],
     )).rows[0];
     assert.equal(consent.status, 'granted', 'consent state must be explicit');
     await expectConstraintFailure(
