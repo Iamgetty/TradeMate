@@ -160,6 +160,7 @@ export const listingBodySchema = z.object({
   title: z.string().trim().min(3).max(140),
   description: z.string().trim().max(5000).optional(),
   listingType: z.enum(['b2b', 'service']),
+  division: z.enum(['services', 'real_estate', 'software', 'b2b', 'industrial_trade', 'agriculture', 'finance_investment', 'institution_infrastructure', 'sports', 'entertainment']).optional(),
   price: priceInputSchema,
   quantityAvailable: quantityInputSchema,
 }).strict();
@@ -279,6 +280,7 @@ export const marketplaceBrowseQuerySchema = z.object({
   search: z.string().max(200).optional(),
   country: z.string().regex(/^[A-Za-z]{2}$/).optional(),
   type: z.enum(['b2b', 'service']).optional(),
+  division: z.enum(['services', 'real_estate', 'software', 'b2b', 'industrial_trade', 'agriculture', 'finance_investment', 'institution_infrastructure', 'sports', 'entertainment']).optional(),
   category: z.string().uuid().optional(),
   page: positiveIntegerQuery,
   limit: boundedIntegerQuery(50),
