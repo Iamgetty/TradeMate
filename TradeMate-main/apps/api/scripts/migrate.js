@@ -37,6 +37,7 @@ const MIGRATIONS = [
   '030_sports_transfer_external_player_discovery.sql',
   '031_sports_transfer_discovery_reviewer_keys.sql',
   '032_sports_transfer_external_player_claims.sql',
+  '033_sports_transfer_verification_cases.sql',
 ];
 
 async function main() {
