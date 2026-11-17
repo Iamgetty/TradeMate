@@ -80,6 +80,23 @@ async function main() {
     assert.equal(legalCreated.status, 201);
     const legalCase = (await legalCreated.json()).verificationCase;
 
+    process.env.SPORTS_TRANSFER_SANDBOX_ENABLED = 'false';
+    const disabledSession = await userRequest('POST', '/api/sports-transfer/verification-cases/' + legalCase.id + '/session');
+    assert.equal(disabledSession.status, 503, 'provider sessions stay disabled unless sandbox mode is explicitly enabled');
+    process.env.SPORTS_TRANSFER_SANDBOX_ENABLED = 'true';
+    const sessionResponse = await userRequest('POST', '/api/sports-transfer/verification-cases/' + legalCase.id + '/session');
+    assert.equal(sessionResponse.status, 201);
+    const sessionResult = await sessionResponse.json();
+    assert.equal(sessionResult.session.provider_key, 'sandbox');
+    assert.equal(sessionResult.session.status, 'created');
+    assert.equal(sessionResult.hostedUrl, null, 'sandbox must not pretend to provide a hosted identity flow');
+    assert.equal(sessionResult.reused, false);
+    const reusedSession = await userRequest('POST', '/api/sports-transfer/verification-cases/' + legalCase.id + '/session');
+    assert.equal(reusedSession.status, 201);
+    assert.equal((await reusedSession.json()).reused, true, 'active provider sessions are reused rather than duplicated');
+    const sessionPrivacy = await userRequest('POST', '/api/sports-transfer/verification-cases/' + caseRecord.id + '/session');
+    assert.equal(sessionPrivacy.status, 400, 'sporting identity evidence cannot be sent through the legal KYC session');
+
     await pool.query(
       "UPDATE sports_transfer_verification_cases SET provider_key = 'sandbox', provider_subject_reference = '' WHERE id = $1",
       [legalCase.id],
@@ -152,22 +169,6 @@ async function main() {
     const duplicate = await userRequest('POST', '/api/sports-transfer/verification-cases', body);
     assert.equal(duplicate.status, 409, 'duplicate open sporting identity cases are blocked');
 
-    process.env.SPORTS_TRANSFER_SANDBOX_ENABLED = 'false';
-    const disabledSession = await userRequest('POST', '/api/sports-transfer/verification-cases/' + legalCase.id + '/session');
-    assert.equal(disabledSession.status, 503, 'provider sessions stay disabled unless sandbox mode is explicitly enabled');
-    process.env.SPORTS_TRANSFER_SANDBOX_ENABLED = 'true';
-    const sessionResponse = await userRequest('POST', '/api/sports-transfer/verification-cases/' + legalCase.id + '/session');
-    assert.equal(sessionResponse.status, 201);
-    const sessionResult = await sessionResponse.json();
-    assert.equal(sessionResult.session.provider_key, 'sandbox');
-    assert.equal(sessionResult.session.status, 'created');
-    assert.equal(sessionResult.hostedUrl, null, 'sandbox must not pretend to provide a hosted identity flow');
-    assert.equal(sessionResult.reused, false);
-    const reusedSession = await userRequest('POST', '/api/sports-transfer/verification-cases/' + legalCase.id + '/session');
-    assert.equal(reusedSession.status, 201);
-    assert.equal((await reusedSession.json()).reused, true, 'active provider sessions are reused rather than duplicated');
-    const sessionPrivacy = await userRequest('POST', '/api/sports-transfer/verification-cases/' + caseRecord.id + '/session');
-    assert.equal(sessionPrivacy.status, 400, 'sporting identity evidence cannot be sent through the legal KYC session');
     const noKey = await reviewRequest('PATCH', '/api/moderation/sports-transfer/verification-cases/' + caseRecord.id + '/review', {
       decision: 'verified', reasonCode: 'official_roster_match',
     }, false);
