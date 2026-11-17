@@ -9,13 +9,13 @@ CREATE TABLE IF NOT EXISTS sports_transfer_opportunities (
       'permanent_transfer','loan','loan_with_option','loan_with_obligation',
       'loan_extension','loan_recall','free_agent','pre_contract',
       'player_swap','trial','scouting_invitation','contract_renewal',
-      'contract_release','academy_pathway'
+      'contract_release','contract_termination','academy_pathway'
     )) OR
     (sport = 'basketball' AND movement_type IN (
       'free_agent_signing','free_agent_resigning','restricted_free_agent',
       'unrestricted_free_agent','player_trade','multi_team_trade',
       'draft_rights','draft_declaration','waiver_claim','contract_assignment',
-      'buyout','contract_release','international_clearance',
+      'buyout','contract_renewal','contract_release','contract_termination','international_clearance',
       'temporary_assignment','two_way_contract','tryout'
     ))
   ),
