@@ -1526,10 +1526,10 @@ class PublicListingsController {
       const updated = await client.query(
         `UPDATE listings l
          SET title = $1, description = $2, listing_type = $3, division = $4, price_minor_units = $5, quantity_available = $6, updated_at = now()
-         WHERE l.id = $6 AND l.status = 'draft'
+         WHERE l.id = $7 AND l.status = 'draft'
            AND EXISTS (
              SELECT 1 FROM organization_members om
-             WHERE om.organization_id = l.seller_organization_id AND om.user_id = $7
+             WHERE om.organization_id = l.seller_organization_id AND om.user_id = $8
            )
          RETURNING l.id, l.title, l.description, l.listing_type, l.division, l.price_minor_units::text AS price_minor_units,
                    l.currency_code, l.country_code, l.quantity_available, l.status, l.created_at, l.updated_at`,
