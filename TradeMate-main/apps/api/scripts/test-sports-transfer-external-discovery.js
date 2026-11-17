@@ -9,10 +9,6 @@ async function main() {
   try {
     await client.query('BEGIN');
     const suffix = randomUUID();
-    const user = await client.query(
-      "INSERT INTO users (email, display_name, status) VALUES ($1, 'Discovery schema reviewer', 'active') RETURNING id",
-      ['discovery-review-' + suffix + '@example.invalid'],
-    );
     const candidate = await client.query(
       "INSERT INTO sports_transfer_data_sources (source_key, display_name, source_type) VALUES ($1, 'Candidate sports source', 'licensed_sports_data') RETURNING id, rights_status, contact_data_permission",
       ['candidate-' + suffix],
@@ -30,6 +26,10 @@ async function main() {
     );
     await client.query('ROLLBACK');
     await client.query('BEGIN');
+    const user = await client.query(
+      "INSERT INTO users (email, display_name, status) VALUES ($1, 'Discovery schema reviewer', 'active') RETURNING id",
+      ['discovery-review-' + suffix + '@example.invalid'],
+    );
 
     const approved = await client.query(
       `INSERT INTO sports_transfer_data_sources
