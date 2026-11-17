@@ -4131,11 +4131,11 @@ class SportsTransferDiscoveryModerationController {
         `UPDATE sports_transfer_data_sources
          SET rights_status = $1, rights_basis = $2, terms_reference = $3,
              permitted_data_categories = $4, permitted_purposes = $5,
-             reviewed_by_user_id = NULL, reviewed_at = now(), review_note = $6, updated_at = now()
+             reviewed_by_user_id = NULL, reviewer_key_id = $8, reviewed_at = now(), review_note = $6, updated_at = now()
          WHERE id = $7
          RETURNING id, source_key, display_name, rights_status, permitted_data_categories,
                    permitted_purposes, contact_data_permission, reviewed_at, review_note`,
-        [input.decision, basis, terms, categories, purposes, input.note || '', id],
+        [input.decision, basis, terms, categories, purposes, input.note || '', id, reviewerId],
       );
       // The reviewer key is not a user account; reviewer identity is recorded in audit metadata.
       await client.query(
@@ -4289,7 +4289,7 @@ class SportsTransferDiscoveryModerationController {
          WHERE id=$3
          RETURNING id, sport, display_name, availability_status, review_status,
                    observed_at, last_verified_at, expires_at, review_note`,
-        [input.decision, input.note || '', id],
+        [input.decision, input.note || '', id, reviewerId],
       );
       await client.query(
         `INSERT INTO sports_transfer_external_player_history
