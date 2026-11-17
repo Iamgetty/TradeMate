@@ -12,6 +12,8 @@ async function main() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required.');
   process.env.TRADEMATE_REVIEW_API_KEY = 'sports-verification-test-review-key';
   process.env.SPORTS_TRANSFER_SANDBOX_WEBHOOK_SECRET = 'sports-verification-webhook-test-secret';
+  process.env.SPORTS_TRANSFER_IDENTITY_PROVIDER = 'sandbox';
+  process.env.SPORTS_TRANSFER_SANDBOX_ENABLED = 'true';
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
   let app;
   try {
@@ -117,6 +119,22 @@ async function main() {
     const legalCreated = await userRequest('POST', '/api/sports-transfer/verification-cases', legalBody);
     assert.equal(legalCreated.status, 201);
     const legalCase = (await legalCreated.json()).verificationCase;
+    process.env.SPORTS_TRANSFER_SANDBOX_ENABLED = 'false';
+    const disabledSession = await userRequest('POST', '/api/sports-transfer/verification-cases/' + legalCase.id + '/session');
+    assert.equal(disabledSession.status, 503, 'provider sessions stay disabled unless sandbox mode is explicitly enabled');
+    process.env.SPORTS_TRANSFER_SANDBOX_ENABLED = 'true';
+    const sessionResponse = await userRequest('POST', '/api/sports-transfer/verification-cases/' + legalCase.id + '/session');
+    assert.equal(sessionResponse.status, 201);
+    const sessionResult = await sessionResponse.json();
+    assert.equal(sessionResult.session.provider_key, 'sandbox');
+    assert.equal(sessionResult.session.status, 'created');
+    assert.equal(sessionResult.hostedUrl, null, 'sandbox must not pretend to provide a hosted identity flow');
+    assert.equal(sessionResult.reused, false);
+    const reusedSession = await userRequest('POST', '/api/sports-transfer/verification-cases/' + legalCase.id + '/session');
+    assert.equal(reusedSession.status, 201);
+    assert.equal((await reusedSession.json()).reused, true, 'active provider sessions are reused rather than duplicated');
+    const sessionPrivacy = await userRequest('POST', '/api/sports-transfer/verification-cases/' + caseRecord.id + '/session');
+    assert.equal(sessionPrivacy.status, 400, 'sporting identity evidence cannot be sent through the legal KYC session');
     const noKey = await reviewRequest('PATCH', '/api/moderation/sports-transfer/verification-cases/' + caseRecord.id + '/review', {
       decision: 'verified', reasonCode: 'official_roster_match',
     }, false);
