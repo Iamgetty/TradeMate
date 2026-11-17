@@ -1392,7 +1392,7 @@ class PublicListingsController {
       );
       await client.query(
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'listing.draft_created','listing',$3,$4::jsonb)",
-        [userId, organization.id, created.rows[0].id, JSON.stringify({ listing_type: listingType, business_status: organization.status })],
+        [userId, organization.id, created.rows[0].id, JSON.stringify({ listing_type: listingType, division, business_status: organization.status })],
       );
       await client.query('COMMIT');
       return { listing: created.rows[0], message: 'Offer saved as a draft. It is not publicly visible yet.' };
@@ -1543,7 +1543,7 @@ class PublicListingsController {
       }
       await client.query(
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, (SELECT seller_organization_id FROM listings WHERE id = $3), 'listing.draft_updated', 'listing', $3, $2::jsonb)",
-        [userId, JSON.stringify({ listing_type: listingType }), id],
+        [userId, JSON.stringify({ listing_type: listingType, division }), id],
       );
       await client.query('COMMIT');
       return { listing: updated.rows[0], message: 'Draft offer updated.' };
