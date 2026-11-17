@@ -4,7 +4,7 @@ import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, 
 import { Pool } from 'pg';
 import { createRlsAwarePool } from './database-context';
 import { decimalToUnits, fiatCentsToQuantityUnits, productToFiatCents, unitsToDecimal } from './p2p-decimal';
-import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema, sportsOrganizationCreateBodySchema, sportsOrganizationMembershipInviteBodySchema, sportsRepresentativeMandateCreateBodySchema, sportsRepresentativeMandateResponseBodySchema, sportsTransferOpportunityCreateBodySchema, sportsTransferDataSourceCreateBodySchema, sportsTransferDataSourceReviewBodySchema, sportsTransferExternalPlayerIngestBodySchema, sportsTransferExternalPlayerReviewBodySchema } from './validation';
+import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema, sportsOrganizationCreateBodySchema, sportsOrganizationMembershipInviteBodySchema, sportsRepresentativeMandateCreateBodySchema, sportsRepresentativeMandateResponseBodySchema, sportsTransferOpportunityCreateBodySchema, sportsTransferDataSourceCreateBodySchema, sportsTransferDataSourceReviewBodySchema, sportsTransferExternalPlayerIngestBodySchema, sportsTransferExternalPlayerReviewBodySchema, sportsTransferExternalPlayerClaimCreateBodySchema, sportsTransferExternalPlayerClaimReviewBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -4062,6 +4062,238 @@ class SportsTransferMandatesController {
 }
 
 
+
+@Controller('sports-transfer')
+class SportsTransferExternalPlayerClaimsController {
+  private async currentUser(request: Request) {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to continue.');
+    const result = await databasePool.query(
+      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+      [tokenDigest(token)],
+    );
+    if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    return result.rows[0].id as string;
+  }
+
+  @Post('external-records/:id/claims')
+  async createClaim(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+    parseUuidParam(id);
+    const input = parseBody(sportsTransferExternalPlayerClaimCreateBodySchema, body);
+    const userId = await this.currentUser(request);
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const recordResult = await client.query(
+        `SELECT r.*, s.rights_status, s.permitted_data_categories, s.permitted_purposes
+         FROM sports_transfer_external_player_records r
+         JOIN sports_transfer_data_sources s ON s.id = r.data_source_id
+         WHERE r.id = $1 FOR UPDATE OF r, s`,
+        [id],
+      );
+      if (!recordResult.rowCount) throw new NotFoundException('External player record not found.');
+      const record = recordResult.rows[0];
+      if (record.review_status !== 'approved' || record.rights_status !== 'approved'
+        || (record.expires_at && new Date(record.expires_at).getTime() <= Date.now())) {
+        throw new ConflictException('Only fresh, approved source records can be claimed.');
+      }
+      if (!(record.permitted_data_categories || []).includes('player_identity')
+        || !(record.permitted_purposes || []).includes('player_discovery')) {
+        throw new ForbiddenException('The source rights do not permit player identity matching for discovery.');
+      }
+      const profileResult = await client.query(
+        'SELECT id, user_id, sport, verification_status FROM sports_profiles WHERE id = $1 FOR UPDATE',
+        [input.profileId],
+      );
+      if (!profileResult.rowCount || profileResult.rows[0].user_id !== userId) {
+        throw new NotFoundException('Sports Transfer profile not found.');
+      }
+      const profile = profileResult.rows[0];
+      if (profile.sport !== record.sport) throw new BadRequestException('The player profile sport does not match the external record.');
+      if (profile.verification_status !== 'verified') {
+        throw new ForbiddenException('Verify your sporting identity before claiming an external player record.');
+      }
+      if (record.claim_status === 'verified' || record.claimed_profile_id) {
+        throw new ConflictException('This external record has already been linked to a verified player profile.');
+      }
+      const created = await client.query(
+        `INSERT INTO sports_transfer_external_player_claims
+           (external_player_record_id, player_profile_id, claimant_user_id, claim_statement, evidence_url)
+         VALUES ($1,$2,$3,$4,$5)
+         RETURNING id, external_player_record_id, player_profile_id, status, created_at`,
+        [id, profile.id, userId, input.claimStatement, input.evidenceUrl || ''],
+      );
+      await client.query(
+        "UPDATE sports_transfer_external_player_records SET claim_status = 'pending', updated_at = now() WHERE id = $1",
+        [id],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.discovery.claim_requested', 'sports_transfer_external_player_claim', $2, $3::jsonb)",
+        [userId, created.rows[0].id, JSON.stringify({ external_record_id: id, profile_id: profile.id })],
+      );
+      await client.query('COMMIT');
+      return { claim: created.rows[0], message: 'Identity claim submitted for independent human review. The external record has not been merged or linked to your profile.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      if ((error as { code?: string })?.code === '23505') {
+        throw new ConflictException('A claim for this external record is already under review or has already been approved.');
+      }
+      throw error;
+    } finally { client.release(); }
+  }
+
+  @Get('claims/mine')
+  async myClaims(@Req() request: Request) {
+    const userId = await this.currentUser(request);
+    const result = await databasePool!.query(
+      `SELECT c.id, c.external_player_record_id, c.player_profile_id,
+              c.claim_statement, c.evidence_url, c.status, c.review_note,
+              c.reviewed_at, c.created_at, c.updated_at,
+              r.sport, r.display_name AS external_display_name,
+              r.availability_status, p.display_name AS profile_display_name
+       FROM sports_transfer_external_player_claims c
+       JOIN sports_transfer_external_player_records r ON r.id = c.external_player_record_id
+       JOIN sports_profiles p ON p.id = c.player_profile_id
+       WHERE c.claimant_user_id = $1
+       ORDER BY c.created_at DESC LIMIT 100`,
+      [userId],
+    );
+    return { claims: result.rows };
+  }
+}
+
+@Controller('moderation/sports-transfer')
+class SportsTransferExternalPlayerClaimsModerationController {
+  private authorize(request: Request) {
+    const expected = process.env.TRADEMATE_REVIEW_API_KEY || '';
+    const supplied = request.header('x-review-key') || '';
+    const a = Buffer.from(expected), b = Buffer.from(supplied);
+    if (!expected || a.length !== b.length || !timingSafeEqual(a, b)) {
+      throw new UnauthorizedException('Sports Transfer claim moderation access is not authorized.');
+    }
+    return reviewerKeyId(expected);
+  }
+
+  @Get('claims')
+  async queue(@Req() request: Request, @Query('status') status?: string) {
+    this.authorize(request);
+    if (status && !['pending_review','approved','rejected','withdrawn'].includes(status)) {
+      throw new BadRequestException('Unsupported identity claim status.');
+    }
+    const result = await databasePool!.query(
+      `SELECT c.id, c.external_player_record_id, c.player_profile_id, c.claimant_user_id,
+              c.claim_statement, c.evidence_url, c.status, c.created_at,
+              r.sport, r.display_name AS external_display_name, r.current_team_name,
+              r.competition_name, r.country_code, r.source_record_url, r.review_status AS record_review_status,
+              s.display_name AS source_name,
+              p.display_name AS profile_display_name, p.verification_status AS profile_verification_status,
+              u.display_name AS claimant_display_name
+       FROM sports_transfer_external_player_claims c
+       JOIN sports_transfer_external_player_records r ON r.id = c.external_player_record_id
+       JOIN sports_transfer_data_sources s ON s.id = r.data_source_id
+       JOIN sports_profiles p ON p.id = c.player_profile_id
+       JOIN users u ON u.id = c.claimant_user_id
+       WHERE ($1::text IS NULL OR c.status = $1)
+       ORDER BY c.created_at ASC LIMIT 200`,
+      [status || null],
+    );
+    return { claims: result.rows };
+  }
+
+  @Patch('claims/:id/review')
+  async review(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+    parseUuidParam(id);
+    const reviewerId = this.authorize(request);
+    const input = parseBody(sportsTransferExternalPlayerClaimReviewBodySchema, body);
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const found = await client.query(
+        `SELECT c.*, r.sport, r.review_status AS record_review_status,
+                r.expires_at AS record_expires_at, r.claim_status AS record_claim_status,
+                r.claimed_profile_id, r.data_source_id, s.rights_status,
+                s.permitted_data_categories, s.permitted_purposes,
+                p.user_id AS profile_owner_user_id, p.sport AS profile_sport,
+                p.verification_status AS profile_verification_status
+         FROM sports_transfer_external_player_claims c
+         JOIN sports_transfer_external_player_records r ON r.id = c.external_player_record_id
+         JOIN sports_transfer_data_sources s ON s.id = r.data_source_id
+         JOIN sports_profiles p ON p.id = c.player_profile_id
+         WHERE c.id = $1 FOR UPDATE OF c, r, s, p`,
+        [id],
+      );
+      if (!found.rowCount) throw new NotFoundException('Player identity claim not found.');
+      const claim = found.rows[0];
+      if (claim.status !== 'pending_review') throw new ConflictException('Only pending identity claims can be reviewed.');
+      if (input.decision === 'approved') {
+        if (claim.profile_owner_user_id !== claim.claimant_user_id
+          || claim.profile_verification_status !== 'verified'
+          || claim.profile_sport !== claim.sport) {
+          throw new ConflictException('The claimant must still own a verified player profile for the same sport.');
+        }
+        if (claim.record_review_status !== 'approved' || claim.rights_status !== 'approved'
+          || (claim.record_expires_at && new Date(claim.record_expires_at).getTime() <= Date.now())
+          || !(claim.permitted_data_categories || []).includes('player_identity')
+          || !(claim.permitted_purposes || []).includes('player_discovery')) {
+          throw new ConflictException('The source and external sporting record must remain approved, permitted and fresh.');
+        }
+        if (claim.claimed_profile_id || claim.record_claim_status === 'verified') {
+          throw new ConflictException('This external record has already been linked to another verified profile.');
+        }
+      }
+      const updated = await client.query(
+        `UPDATE sports_transfer_external_player_claims
+         SET status = $1, reviewer_key_id = $2, reviewed_by_user_id = NULL,
+             reviewed_at = now(), review_note = $3, updated_at = now()
+         WHERE id = $4
+         RETURNING id, external_player_record_id, player_profile_id, claimant_user_id,
+                   status, reviewed_at, review_note`,
+        [input.decision, reviewerId, input.note || '', id],
+      );
+      if (input.decision === 'approved') {
+        await client.query(
+          `UPDATE sports_transfer_external_player_records
+           SET claim_status = 'verified', claimed_profile_id = $2, updated_at = now()
+           WHERE id = $1 AND claimed_profile_id IS NULL AND claim_status IN ('pending','rejected')`,
+          [claim.external_player_record_id, claim.player_profile_id],
+        );
+        await client.query(
+          `INSERT INTO sports_transfer_external_player_history
+           (external_player_record_id, data_source_id, change_type, previous_snapshot, current_snapshot, actor_user_id)
+           VALUES ($1,$2,'claimed',$3::jsonb,$4::jsonb,NULL)`,
+          [claim.external_player_record_id, claim.data_source_id,
+           JSON.stringify({ claim_status: claim.record_claim_status, claimed_profile_id: null }),
+           JSON.stringify({ claim_status: 'verified', claimed_profile_id: claim.player_profile_id, claim_id: id })],
+        );
+      } else {
+        await client.query(
+          "UPDATE sports_transfer_external_player_records SET claim_status = 'rejected', updated_at = now() WHERE id = $1 AND claimed_profile_id IS NULL",
+          [claim.external_player_record_id],
+        );
+      }
+      await client.query(
+        "INSERT INTO audit_events (event_type, entity_type, entity_id, metadata) VALUES ('sports.discovery.claim_reviewed', 'sports_transfer_external_player_claim', $1, $2::jsonb)",
+        [id, JSON.stringify({ decision: input.decision, reviewer_key_id: reviewerId, note: input.note || '', external_record_id: claim.external_player_record_id, profile_id: claim.player_profile_id })],
+      );
+      await client.query(
+        "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'System', $2, $3, $4)",
+        [claim.claimant_user_id,
+         input.decision === 'approved' ? 'Sports Transfer identity claim approved' : 'Sports Transfer identity claim declined',
+         input.decision === 'approved'
+           ? 'Your sporting identity claim was reviewed and the external record has been linked to your verified Sports Transfer profile.'
+           : 'Your sporting identity claim was not approved. Review the decision note in Sports Transfer.',
+         input.decision === 'approved' ? 'shield-check' : 'shield-alert'],
+      );
+      await client.query('COMMIT');
+      return { claim: updated.rows[0], message: input.decision === 'approved' ? 'Claim approved after human review. The source record is now linked to the verified profile; no source data was copied into the profile.' : 'Claim rejected. The external record remains separate and unlinked.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
+  }
+}
+
 @Controller('moderation/sports-transfer')
 class SportsTransferDiscoveryModerationController {
   private authorize(request: Request) {
@@ -4475,7 +4707,7 @@ class SportsTransferOpportunitiesController {
   }
 }
 
-@Module({ controllers: [SportsTransferDiscoveryModerationController, SportsTransferOpportunitiesController, SportsTransferMandatesController, SportsTransferOrganizationsController, SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController] })
+@Module({ controllers: [SportsTransferExternalPlayerClaimsController, SportsTransferExternalPlayerClaimsModerationController, SportsTransferDiscoveryModerationController, SportsTransferOpportunitiesController, SportsTransferMandatesController, SportsTransferOrganizationsController, SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController] })
 export class AppModule implements OnModuleDestroy {
   async onModuleDestroy() {
     if (databasePool) await databasePool.end();
