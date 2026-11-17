@@ -218,11 +218,12 @@ async function main() {
       "UPDATE sports_transfer_verification_cases SET provider_key = 'sumsub', provider_subject_reference = $1 WHERE id = $2",
       [legalCase.id, legalCase.id],
     );
+    const sumsubEventTime = new Date().toISOString().replace('T', ' ').replace('Z', '+0000');
     const sumsubWebhookPayload = JSON.stringify({
       applicantId: 'sumsub-applicant-' + suffix,
       externalUserId: legalCase.id,
       type: 'applicantReviewed',
-      createdAtMs: new Date().toISOString(),
+      createdAtMs: sumsubEventTime,
       reviewStatus: 'completed',
       reviewResult: { reviewAnswer: 'GREEN' },
     });
@@ -256,7 +257,7 @@ async function main() {
       applicantId: 'sumsub-applicant-' + suffix,
       externalUserId: legalCase.id,
       type: 'applicantReviewed',
-      createdAtMs: new Date().toISOString(),
+      createdAtMs: sumsubEventTime,
       reviewStatus: 'completed',
       reviewResult: { reviewAnswer: 'RED' },
     });
