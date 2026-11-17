@@ -449,3 +449,7 @@ This section records the five engineering observations raised during the ongoing
 - Preserve unsent marketplace enquiries and conversation replies in tab-scoped session storage when a request returns 401; restore the draft on return and clear it after a successful send.
 - Reject external, protocol-relative and backslash-containing return destinations to prevent open redirects.
 - Add browser coverage for login return, marketplace enquiry draft restoration and expired-session conversation reply recovery.
+
+## Third-party integration register — mandatory build reference
+
+The canonical inventory of current, planned, candidate, alternative, placeholder and unselected external providers is maintained in [`third-party-integrations.md`](third-party-integrations.md). Check it before every build session and update it in the same PR whenever an integration decision or dependency changes. Do not treat listed candidates or cloud targets as selected or deployed.
