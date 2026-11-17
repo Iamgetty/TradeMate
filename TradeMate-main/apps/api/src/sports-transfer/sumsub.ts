@@ -140,7 +140,7 @@ export const verifySumsubWebhook = (
   const outcome = reviewStatus !== 'completed' ? 'review_required'
     : answer === 'GREEN' ? 'succeeded'
     : answer === 'RED' ? 'failed' : 'review_required';
-  const occurredAt = Date.parse(payload.createdAtMs.replace(' ', 'T') + (/[+-]\\d{4}$/.test(payload.createdAtMs) ? '' : 'Z'));
+  const occurredAt = Date.parse(payload.createdAtMs.replace(' ', 'T') + (/[+-]\d{4}$/.test(payload.createdAtMs) ? '' : 'Z'));
   const payloadSha256 = createHash('sha256').update(rawBody).digest('hex');
   // Sumsub's documented applicant webhook has no universal event ID. Derive a
   // stable inbox key from its event identity fields; exact retries stay idempotent.
