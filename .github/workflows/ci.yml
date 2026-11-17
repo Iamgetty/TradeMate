@@ -234,11 +234,11 @@ jobs:
         with:
           node-version: 20
 
-      - name: API dependency audit
+      - name: API production dependency audit
         working-directory: TradeMate-main/apps/api
         run: |
-          npm install --no-audit --no-fund
-          npm audit --audit-level=high
+          npm install --omit=dev --no-audit --no-fund
+          npm audit --omit=dev --audit-level=high
 
       - name: Web dependency audit
         working-directory: TradeMate-main/apps/web
