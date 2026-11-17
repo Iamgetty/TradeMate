@@ -81,8 +81,8 @@ async function main() {
     assert.equal(consent.status, 'granted', 'consent state must be explicit');
     await expectConstraintFailure(
       client,
-      "INSERT INTO sports_player_consents (player_profile_id, purpose, granted_to_user_id, granted_to_organization_id) VALUES ($1, 'direct_contact', $2, $3)",
-      [profile.id, representative, sportsOrg.id],
+      "INSERT INTO sports_player_consents (player_profile_id, granted_by_user_id, purpose, granted_to_user_id, granted_to_organization_id) VALUES ($1, $2, 'direct_contact', $3, $4)",
+      [profile.id, player, representative, sportsOrg.id],
       'a consent grant must target exactly one person or organization',
     );
 
