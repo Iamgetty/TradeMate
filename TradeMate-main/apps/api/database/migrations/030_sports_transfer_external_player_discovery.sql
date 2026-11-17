@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS sports_transfer_data_sources (
   rights_basis TEXT NOT NULL DEFAULT '' CHECK (char_length(rights_basis) <= 2000),
   terms_reference TEXT NOT NULL DEFAULT '' CHECK (char_length(terms_reference) <= 2048),
   permitted_data_categories TEXT[] NOT NULL DEFAULT '{}'
-    CHECK (permitted_data_categories <@ ARRAY['player_identity','sporting_profile','roster','transfer_activity','availability_status','competition_data']::TEXT[]),
+    CHECK (permitted_data_categories <@ ARRAY['player_identity','sporting_profile','roster','transfer_activity','availability_status','competition_data','contact_data']::TEXT[]),
   permitted_purposes TEXT[] NOT NULL DEFAULT '{}'
     CHECK (permitted_purposes <@ ARRAY['internal_research','player_discovery','public_sporting_profile','availability_monitoring']::TEXT[]),
   contact_data_permission TEXT NOT NULL DEFAULT 'not_approved'
@@ -81,7 +81,8 @@ CREATE TABLE IF NOT EXISTS sports_transfer_external_player_records (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (data_source_id, sport, external_player_key),
   CHECK (expires_at IS NULL OR expires_at > observed_at),
-  CHECK ((review_status = 'approved') = (reviewed_at IS NOT NULL AND reviewed_by_user_id IS NOT NULL)),
+  CHECK ((reviewed_at IS NULL) = (reviewed_by_user_id IS NULL)),
+  CHECK (review_status <> 'approved' OR (reviewed_at IS NOT NULL AND reviewed_by_user_id IS NOT NULL)),
   CHECK ((claim_status = 'verified') = (claimed_profile_id IS NOT NULL))
 );
 
