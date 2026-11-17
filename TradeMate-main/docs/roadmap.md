@@ -453,3 +453,47 @@ This section records the five engineering observations raised during the ongoing
 ## Third-party integration register — mandatory build reference
 
 The canonical inventory of current, planned, candidate, alternative, placeholder and unselected external providers is maintained in [`third-party-integrations.md`](third-party-integrations.md). Check it before every build session and update it in the same PR whenever an integration decision or dependency changes. Do not treat listed candidates or cloud targets as selected or deployed.
+
+
+## Sports transfer marketplace — football and basketball first
+
+**Product decision confirmed 17 November 2026:** the first supported sports are **football (soccer) and basketball**. Design the Sports capability as one shared transfer/recruitment marketplace with sport-specific transaction models and rules. Keep the data model extensible so additional sports can be added later without rebuilding the platform. This is a roadmap decision, not an implementation or launch claim.
+
+### Shared platform capabilities
+- Verified club/team and organization profiles; player/athlete profiles; authorized agents/representatives; scouts and recruitment staff with role-limited permissions.
+- Player availability and recruitment-need listings, position/role filters, age/eligibility, competition, location, contract status/expiry and profile evidence.
+- Private and public listing visibility, verified interest, watchlists, shortlist management, offer/counteroffer negotiation rooms, audit history and notifications.
+- Secure document exchange, consent and authority records, contract/registration status tracking, dispute/escalation workflows and deadline alerts.
+- Clearly distinguish reported, proposed, agreed-in-principle, pending-clearance and officially completed transactions. User agreement alone must not mark a transfer/trade as officially registered or completed.
+
+### Football-specific workflows
+- Permanent transfers, loans, loans with option/obligation to buy, free-agent moves, pre-contract opportunities where permitted, swaps and add-ons.
+- Negotiation terms can include transfer fee, instalments, sell-on clauses, performance bonuses, loan fee, salary allocation, recall/extension and option deadlines.
+- Registration-window calendar by member association, competition, gender and player category; support separate men's, women's and amateur windows where applicable.
+- Model the transaction as a change in registration/employment arrangements subject to player consent and applicable rules; never describe a player as property owned by a club.
+- Track potential training compensation and solidarity contribution obligations/entitlements without representing TradeMate as a substitute for official FIFA Clearing House processes.
+
+### Basketball-specific workflows
+- Player recruitment and availability; free agency and contract signing; team-to-team trades; waivers and claim processes; draft-related rights/opportunities where applicable; and international moves/clearances.
+- Support multi-player and multi-team trades, draft-pick or other permitted consideration, salary matching/cap implications as informational rule checks, trade exceptions where competition rules provide them, and league approval/clearance.
+- Model league, competition, season, collective bargaining agreement (where applicable), roster, contract and eligibility rules as configurable rule sets. Do not assume NBA rules apply to FIBA, WNBA, national leagues or other competitions.
+- Loans or temporary assignments only where the relevant league, federation and contract rules permit them; do not force football loan semantics onto basketball.
+
+### Legal, trust and safeguarding gates
+- Verify clubs/teams, representatives and agent authority; verify player identity and obtain explicit player consent for representation and listing.
+- Agent/intermediary permissions must be jurisdiction- and sport-aware. Do not hardcode FIFA agent provisions that are subject to current legal/regulatory changes; verify applicable rules at transaction time.
+- Minors require enhanced safeguards, guardian consent and compliance with applicable federation, league and national rules; restrict contact and visibility appropriately.
+- Medical information is highly sensitive: separate access controls, explicit purpose/consent, retention limits and audit trails; never expose private medical records in public listings.
+- Require documentary/manual review paths where official registry or provider coverage is unavailable; record source, reviewer and decision.
+- Club/player agreement, employment-contract execution, federation/league approval, international clearance and official registration are distinct states.
+
+### Delivery sequence
+1. **Domain and rules foundation:** shared sport/team/player/agent/competition model, role permissions, verification, consent, audit, private documents and configurable rule engine.
+2. **Football MVP:** player availability, club recruitment needs, authorized representation, permanent/loan/free-agent listing types, offers and negotiation, window calendar and registration-status workflow.
+3. **Basketball MVP:** free agency, contracts, multi-party trades, waiver/claim and draft-rights workflows, configurable league/competition rules and approval states.
+4. **Transfer centre:** verified transactions, attributed reports/rumours clearly separated from confirmed activity, deadline-day activity, history and permitted fee/contract disclosures.
+5. **Data and integrations:** evaluate official and licensed sources only after access rights, coverage, licensing, data protection and API availability are confirmed. FIFA TMS access is restricted and must not be assumed to be a public marketplace API.
+6. **Expansion:** add other sports only after their governing-body rules, transaction types, rights model and safeguarding requirements are separately mapped.
+
+### Sports-specific third-party dependencies
+See the Sports section in [third-party-integrations.md](third-party-integrations.md). All named bodies, data vendors and service providers are candidates or authoritative reference sources only; none is represented as selected, contracted, API-integrated or approved for production.
