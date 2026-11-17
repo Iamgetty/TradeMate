@@ -145,7 +145,7 @@ CREATE TABLE IF NOT EXISTS sports_authority_checks (
   notes TEXT NOT NULL DEFAULT '' CHECK (char_length(notes) <= 2000),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CHECK (sports_organization_id IS NOT NULL OR subject_user_id IS NOT NULL),
-  CHECK (verified_at IS NULL OR checked_by_user_id IS NOT NULL),
+  CHECK (checked_at IS NULL OR checked_by_user_id IS NOT NULL),
   CHECK (status NOT IN ('verified', 'rejected', 'expired') OR checked_at IS NOT NULL)
 );
 CREATE INDEX IF NOT EXISTS sports_authority_checks_org_idx
