@@ -131,9 +131,9 @@ export const verifySumsubWebhook = (
   let payload: any;
   try { payload = JSON.parse(rawBody.toString('utf8')); }
   catch { throw new Error('Sumsub webhook payload is invalid JSON.'); }
-  if (!payload || typeof payload !== 'object' || typeof payload.externalUserId !== 'string'
-    || typeof payload.type !== 'string' || typeof payload.createdAtMs !== 'string') {
-    throw new Error('Sumsub webhook payload is missing required correlation fields.');
+  if (!payload || typeof payload !== 'object' || payload.type !== 'applicantReviewed'
+    || typeof payload.externalUserId !== 'string' || typeof payload.createdAtMs !== 'string') {
+    throw new Error('Sumsub webhook must be an applicantReviewed event with valid correlation fields.');
   }
   const reviewStatus = String(payload.reviewStatus || '');
   const answer = String(payload.reviewResult?.reviewAnswer || '');
