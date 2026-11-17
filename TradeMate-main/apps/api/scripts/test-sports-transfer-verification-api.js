@@ -81,6 +81,14 @@ async function main() {
       caseReference: providerCase,
       outcome: 'succeeded',
     });
+    process.env.SPORTS_TRANSFER_SUMSUB_WEBHOOK_SECRET = 'placeholder-not-a-real-adapter-secret';
+    const unimplementedVendorWebhook = await fetch(base + '/api/webhooks/sports-transfer/identity/sumsub', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: providerEvent,
+    });
+    assert.equal(unimplementedVendorWebhook.status, 503,
+      'vendor webhooks must fail closed until provider-specific adapters exist');
     const providerSignature = 'sha256=' + createHmac('sha256', process.env.SPORTS_TRANSFER_SANDBOX_WEBHOOK_SECRET).update(Buffer.from(providerEvent)).digest('hex');
     const webhook = await fetch(base + '/api/webhooks/sports-transfer/identity/sandbox', {
       method: 'POST',
