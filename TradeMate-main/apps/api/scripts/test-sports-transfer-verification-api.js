@@ -111,6 +111,22 @@ async function main() {
     const reusedSession = await userRequest('POST', '/api/sports-transfer/verification-cases/' + legalCase.id + '/session');
     assert.equal(reusedSession.status, 201);
     assert.equal((await reusedSession.json()).reused, true, 'active provider sessions are reused rather than duplicated');
+
+    await pool.query(
+      "UPDATE sports_transfer_verification_sessions SET expires_at = now() - interval '1 minute' WHERE verification_case_id = $1 AND status = 'created'",
+      [legalCase.id],
+    );
+    const expiredSessionStatus = await userRequest('GET', '/api/sports-transfer/verification-cases/' + legalCase.id + '/session');
+    assert.equal(expiredSessionStatus.status, 200);
+    assert.equal((await expiredSessionStatus.json()).session.status, 'expired',
+      'locally expired sessions must be reflected in the owner status endpoint');
+    const replacementSession = await userRequest('POST', '/api/sports-transfer/verification-cases/' + legalCase.id + '/session');
+    assert.equal(replacementSession.status, 201);
+    const replacementSessionResult = await replacementSession.json();
+    assert.equal(replacementSessionResult.reused, false,
+      'an expired session must not be reused');
+    assert.notEqual(replacementSessionResult.session.id, sessionResult.session.id,
+      'an expired session is replaced with a new opaque session reference');
     const sessionPrivacy = await userRequest('POST', '/api/sports-transfer/verification-cases/' + caseRecord.id + '/session');
     assert.equal(sessionPrivacy.status, 400, 'sporting identity evidence cannot be sent through the legal KYC session');
 
