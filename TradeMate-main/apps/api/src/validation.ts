@@ -392,10 +392,10 @@ export const sportsTransferOpportunityCreateBodySchema = z.object({
   movementType: z.enum([
     'permanent_transfer','loan','loan_with_option','loan_with_obligation','loan_extension',
     'loan_recall','free_agent','pre_contract','player_swap','trial','scouting_invitation',
-    'contract_renewal','contract_release','academy_pathway',
+    'contract_renewal','contract_release','contract_termination','academy_pathway',
     'free_agent_signing','free_agent_resigning','restricted_free_agent','unrestricted_free_agent',
     'player_trade','multi_team_trade','draft_rights','draft_declaration','waiver_claim',
-    'contract_assignment','buyout','international_clearance','temporary_assignment',
+    'contract_assignment','buyout','contract_renewal','contract_release','contract_termination','international_clearance','temporary_assignment',
     'two_way_contract','tryout',
   ]),
   playerProfileId: z.string().uuid().optional(),
@@ -418,8 +418,9 @@ export const sportsTransferOpportunityCreateBodySchema = z.object({
 }).strict().refine((value) => Boolean(value.playerProfileId) !== Boolean(value.sportingOrganizationId), {
   message: 'An opportunity must belong to exactly one player profile or sporting organization.',
 }).refine((value) => {
-  const football = ['permanent_transfer','loan','loan_with_option','loan_with_obligation','loan_extension','loan_recall','free_agent','pre_contract','player_swap','trial','scouting_invitation','contract_renewal','contract_release','academy_pathway'];
-  return value.sport === 'football' ? football.includes(value.movementType) : !football.includes(value.movementType);
+  const football = ['permanent_transfer','loan','loan_with_option','loan_with_obligation','loan_extension','loan_recall','free_agent','pre_contract','player_swap','trial','scouting_invitation','contract_renewal','contract_release','contract_termination','academy_pathway'];
+  const basketball = ['free_agent_signing','free_agent_resigning','restricted_free_agent','unrestricted_free_agent','player_trade','multi_team_trade','draft_rights','draft_declaration','waiver_claim','contract_assignment','buyout','contract_renewal','contract_release','contract_termination','international_clearance','temporary_assignment','two_way_contract','tryout'];
+  return value.sport === 'football' ? football.includes(value.movementType) : basketball.includes(value.movementType);
 }, {
   message: 'Choose a movement type supported by the selected sport.',
 }).refine((value) => {
