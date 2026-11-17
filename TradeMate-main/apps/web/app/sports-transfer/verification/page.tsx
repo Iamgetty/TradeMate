@@ -135,6 +135,8 @@ export default function SportsTransferVerificationPage() {
       const result = await requestJson(API + '/' + caseRecord.id + '/session');
       if (result.session?.status) setStatus(String(result.session.status).replaceAll('_', ' '));
       if (result.providerOutcome) {
+        setCaseRecord(current => current ? { ...current, status: 'needs_review' } : current);
+        setStatus('needs review');
         setMessage('Sumsub has returned a result. TradeMate review is still required before your identity is marked verified.');
       } else {
         setMessage(result.message || 'Status refreshed.');
@@ -169,13 +171,13 @@ export default function SportsTransferVerificationPage() {
             <input id="verification-country" value={countryCode} maxLength={2} autoComplete="country" placeholder="e.g. NG"
               onChange={event => setCountryCode(event.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2))}
               className="verification-country" />
-            <button className="cta-primary detail-back" disabled={starting || !sdkReady || !/^[A-Z]{2}$/.test(countryCode)} onClick={startVerification}>
-              {starting ? 'Preparing secure session…' : caseRecord ? 'Continue verification ↗' : 'Start identity verification ↗'}
+            <button className="cta-primary detail-back" disabled={starting || !sdkReady || !/^[A-Z]{2}$/.test(countryCode) || caseRecord?.status === 'needs_review' || caseRecord?.status === 'disputed'} onClick={startVerification}>
+              {starting ? 'Preparing secure session…' : caseRecord?.status === 'needs_review' || caseRecord?.status === 'disputed' ? 'Awaiting TradeMate review' : caseRecord ? 'Continue verification ↗' : 'Start identity verification ↗'}
             </button>
-            {caseRecord && <button className="account-secondary-link" onClick={refreshStatus}>Refresh verification status →</button>}
             <p className="account-lead">You will complete document capture and any required liveness steps inside Sumsub's secure interface. A provider result does not automatically approve your TradeMate identity.</p>
           </div>}
           <div id="sumsub-websdk-container" className="sumsub-sdk-container" />
+          {caseRecord && <button className="account-secondary-link" onClick={refreshStatus}>Refresh verification status →</button>}
           {message && <p role="status" className="verification-message">{message}</p>}
           {error && <p role="alert" className="verification-error">{error}</p>}
         </>}
