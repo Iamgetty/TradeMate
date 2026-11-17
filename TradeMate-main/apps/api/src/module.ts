@@ -3608,6 +3608,10 @@ class SportsTransferOrganizationsController {
         "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.organization.member_invited', 'sports_org_membership', $2, $3::jsonb)",
         [userId, result.rows[0].id, JSON.stringify({ sports_organization_id: id, invited_user_id: input.userId, role: input.role, permission_scope: input.permissionScope, expires_at: expiresAt.toISOString() })],
       );
+      await client.query(
+        "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'Sports Transfer', 'Sporting organization invitation', $2, 'users')",
+        [input.userId, 'You have been invited to join a sporting organization as ' + input.role.replace(/_/g, ' ') + '.'],
+      );
       await client.query('COMMIT');
       return { membership: result.rows[0], message: 'Membership invitation created.' };
     } catch (error) {
@@ -3638,6 +3642,15 @@ class SportsTransferOrganizationsController {
       await client.query(
         "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.organization.invitation_accepted', 'sports_org_membership', $2, $3::jsonb)",
         [userId, id, JSON.stringify({ sports_organization_id: result.rows[0].sports_organization_id })],
+      );
+      await client.query(
+        `INSERT INTO user_notifications (user_id, category, title, body, icon)
+         SELECT user_id, 'Sports Transfer', 'New sporting organization member',
+                'A new member has accepted an invitation to your sporting organization.', 'users'
+         FROM sports_org_memberships
+         WHERE sports_organization_id = $1 AND role IN ('owner', 'admin')
+           AND status = 'active' AND user_id <> $2`,
+        [result.rows[0].sports_organization_id, userId],
       );
       await client.query('COMMIT');
       return { membership: result.rows[0], message: 'You have joined the sporting organization.' };
@@ -3682,6 +3695,12 @@ class SportsTransferOrganizationsController {
         "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.organization.membership_revoked', 'sports_org_membership', $2, $3::jsonb)",
         [userId, id, JSON.stringify({ sports_organization_id: row.sports_organization_id, revoked_user_id: row.user_id, role: row.role })],
       );
+      if (row.user_id !== userId) {
+        await client.query(
+          "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'Sports Transfer', 'Sporting organization access updated', 'Your membership in a sporting organization has been revoked.', 'users')",
+          [row.user_id],
+        );
+      }
       await client.query('COMMIT');
       return { membership: revoked.rows[0], message: 'Membership has been revoked.' };
     } catch (error) {
