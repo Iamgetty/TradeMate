@@ -491,3 +491,24 @@ export const sportsTransferExternalPlayerClaimReviewBodySchema = z.object({
 }).strict();
 
 
+
+export const sportsTransferVerificationCaseCreateBodySchema = z.object({
+  caseType: z.enum(['legal_identity','sporting_identity']),
+  profileId: z.string().uuid().optional(),
+  countryCode: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/).optional(),
+  claimStatement: z.string().trim().min(20).max(2000),
+  evidenceUrl: z.string().trim().url().max(2048).refine(value => value.startsWith('https://'), 'Evidence links must use HTTPS.').optional(),
+}).strict().superRefine((value, context) => {
+  if (value.caseType === 'sporting_identity' && !value.profileId) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'A player profile is required for sporting identity verification.', path: ['profileId'] });
+  }
+  if (value.caseType === 'legal_identity' && value.profileId) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'Legal identity cases must not be attached to a sporting profile.', path: ['profileId'] });
+  }
+});
+
+export const sportsTransferVerificationReviewBodySchema = z.object({
+  decision: z.enum(['verified','rejected','needs_review']),
+  reasonCode: z.string().trim().min(2).max(80),
+  note: z.string().trim().max(2000).optional(),
+}).strict();
