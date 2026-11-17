@@ -193,6 +193,20 @@ async function main() {
     assert.equal(duplicateWebhook.status, 200);
     assert.equal((await duplicateWebhook.json()).duplicate, true, 'provider event replay is idempotent');
 
+    const conflictingReplayBody = JSON.stringify({
+      eventId: 'event-' + suffix,
+      caseReference: providerCase,
+      outcome: 'failed',
+    });
+    const conflictingReplayAuth = sandboxSignature(conflictingReplayBody);
+    const conflictingReplay = await fetch(base + '/api/webhooks/sports-transfer/identity/sandbox', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-trademate-timestamp': conflictingReplayAuth.timestamp, 'x-trademate-signature': conflictingReplayAuth.signature },
+      body: conflictingReplayBody,
+    });
+    assert.equal(conflictingReplay.status, 409,
+      'a provider event ID reused with different signed content must be rejected');
+
     const invalidWebhook = await fetch(base + '/api/webhooks/sports-transfer/identity/sandbox', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-trademate-timestamp': providerAuth.timestamp, 'x-trademate-signature': 'sha256=' + '0'.repeat(64) },
