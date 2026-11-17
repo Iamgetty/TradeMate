@@ -64,6 +64,11 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: node scripts/test-sports-transfer-private-api.js
+      - name: Verify Sports Transfer organization membership HTTP authorization
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-sports-transfer-organization-api.js
       - name: Verify organization document permissions and rollback through HTTP endpoints
         working-directory: TradeMate-main/apps/api
         env:

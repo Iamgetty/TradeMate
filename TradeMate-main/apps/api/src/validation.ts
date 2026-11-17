@@ -332,6 +332,22 @@ export const sportsProfileUpdateBodySchema = z.object({
   message: 'Supply at least one supported player-profile field.',
 });
 
+
+export const sportsOrganizationCreateBodySchema = z.object({
+  entityType: z.enum(['club', 'team', 'academy', 'league', 'federation', 'association', 'agency', 'school', 'university']),
+  legalName: z.string().trim().min(2).max(180),
+  displayName: z.string().trim().min(2).max(120),
+  countryCode: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/),
+  governingBody: z.string().trim().max(160).optional(),
+}).strict();
+
+export const sportsOrganizationMembershipInviteBodySchema = z.object({
+  userId: z.string().uuid(),
+  role: z.enum(['admin', 'sporting_director', 'general_manager', 'recruiter', 'coach', 'legal_adviser', 'scout', 'member']),
+  permissionScope: z.enum(['workspace', 'recruitment', 'negotiation', 'documents', 'signing', 'read_only']),
+  expiresAt: z.string().datetime({ offset: true }),
+}).strict();
+
 export const sportsConsentGrantBodySchema = z.object({
   targetUserId: z.string().uuid().optional(),
   targetOrganizationId: z.string().uuid().optional(),

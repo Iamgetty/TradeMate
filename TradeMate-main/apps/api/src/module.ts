@@ -4,7 +4,7 @@ import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, 
 import { Pool } from 'pg';
 import { createRlsAwarePool } from './database-context';
 import { decimalToUnits, fiatCentsToQuantityUnits, productToFiatCents, unitsToDecimal } from './p2p-decimal';
-import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema } from './validation';
+import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema, sportsOrganizationCreateBodySchema, sportsOrganizationMembershipInviteBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -3453,6 +3453,224 @@ class SportsTransferIdentityController {
   }
 }
 
+
+@Controller('sports-transfer')
+class SportsTransferOrganizationsController {
+  private async currentUser(request: Request) {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to continue.');
+    const result = await databasePool.query(
+      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+      [tokenDigest(token)],
+    );
+    if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    return result.rows[0].id as string;
+  }
+
+  private async managerRole(client: any, organizationId: string, userId: string) {
+    const result = await client.query(
+      `SELECT role FROM sports_org_memberships
+       WHERE sports_organization_id = $1 AND user_id = $2 AND status = 'active'
+         AND (starts_at IS NULL OR starts_at <= now())
+         AND (expires_at IS NULL OR expires_at > now())`,
+      [organizationId, userId],
+    );
+    if (!result.rowCount || !['owner', 'admin'].includes(result.rows[0].role)) {
+      throw new ForbiddenException('Only active sporting-organization owners and admins can manage memberships.');
+    }
+    return result.rows[0].role as string;
+  }
+
+  @Get('organizations/mine')
+  async mine(@Req() request: Request) {
+    const userId = await this.currentUser(request);
+    const result = await databasePool!.query(
+      `SELECT o.id, o.entity_type, o.legal_name, o.display_name, o.country_code,
+              o.governing_body, o.verification_status, m.role AS member_role,
+              m.permission_scope, m.status AS membership_status, m.expires_at,
+              o.created_at
+       FROM sports_org_memberships m
+       JOIN sports_organizations o ON o.id = m.sports_organization_id
+       WHERE m.user_id = $1
+       ORDER BY o.created_at DESC`,
+      [userId],
+    );
+    return { organizations: result.rows };
+  }
+
+  @Post('organizations')
+  async createOrganization(@Req() request: Request, @Body() body: any) {
+    const input = parseBody(sportsOrganizationCreateBodySchema, body);
+    const userId = await this.currentUser(request);
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const created = await client.query(
+        `INSERT INTO sports_organizations
+           (entity_type, legal_name, display_name, country_code, governing_body, created_by_user_id)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, entity_type, legal_name, display_name, country_code, governing_body,
+                   verification_status, created_at`,
+        [input.entityType, input.legalName, input.displayName, input.countryCode,
+         input.governingBody || '', userId],
+      );
+      const organization = created.rows[0];
+      const membership = await client.query(
+        `INSERT INTO sports_org_memberships
+           (sports_organization_id, user_id, role, permission_scope, status, invited_by_user_id, starts_at)
+         VALUES ($1, $2, 'owner', 'workspace', 'active', $2, now())
+         RETURNING id, role, permission_scope, status`,
+        [organization.id, userId],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.organization.created', 'sports_organization', $2, $3::jsonb)",
+        [userId, organization.id, JSON.stringify({ entity_type: input.entityType, country_code: input.countryCode })],
+      );
+      await client.query('COMMIT');
+      return { organization: { ...organization, membership: membership.rows[0] }, message: 'Your sporting organization has been created and is awaiting verification.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  @Get('organizations/:id/members')
+  async listMembers(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
+    const userId = await this.currentUser(request);
+    await this.managerRole(databasePool!, id, userId);
+    const result = await databasePool!.query(
+      `SELECT m.id, m.user_id, u.display_name, m.role, m.permission_scope,
+              m.status, m.starts_at, m.expires_at, m.created_at
+       FROM sports_org_memberships m
+       JOIN users u ON u.id = m.user_id
+       WHERE m.sports_organization_id = $1
+       ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, m.created_at ASC`,
+      [id],
+    );
+    return { members: result.rows };
+  }
+
+  @Post('organizations/:id/memberships')
+  async inviteMember(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+    parseUuidParam(id);
+    const input = parseBody(sportsOrganizationMembershipInviteBodySchema, body);
+    const userId = await this.currentUser(request);
+    const expiresAt = new Date(input.expiresAt);
+    const now = Date.now();
+    if (!Number.isFinite(expiresAt.getTime()) || expiresAt.getTime() <= now || expiresAt.getTime() > now + 30 * 24 * 60 * 60 * 1000) {
+      throw new BadRequestException('Membership invitations must expire within 30 days.');
+    }
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const organization = await client.query('SELECT id FROM sports_organizations WHERE id = $1 FOR UPDATE', [id]);
+      if (!organization.rowCount) throw new NotFoundException('Sporting organization not found.');
+      const actorRole = await this.managerRole(client, id, userId);
+      if (actorRole === 'admin' && input.role === 'admin') {
+        throw new ForbiddenException('Only an organization owner can invite another admin.');
+      }
+      const target = await client.query("SELECT id FROM users WHERE id = $1 AND status = 'active'", [input.userId]);
+      if (!target.rowCount) throw new NotFoundException('The invited account was not found.');
+      const result = await client.query(
+        `INSERT INTO sports_org_memberships
+           (sports_organization_id, user_id, role, permission_scope, status, invited_by_user_id, expires_at)
+         VALUES ($1, $2, $3, $4, 'invited', $5, $6)
+         RETURNING id, user_id, role, permission_scope, status, expires_at, created_at`,
+        [id, input.userId, input.role, input.permissionScope, userId, expiresAt.toISOString()],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.organization.member_invited', 'sports_org_membership', $2, $3::jsonb)",
+        [userId, result.rows[0].id, JSON.stringify({ sports_organization_id: id, invited_user_id: input.userId, role: input.role, permission_scope: input.permissionScope, expires_at: expiresAt.toISOString() })],
+      );
+      await client.query('COMMIT');
+      return { membership: result.rows[0], message: 'Membership invitation created.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      if ((error as { code?: string })?.code === '23505') throw new ConflictException('This account already has a membership or invitation for the organization.');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  @Post('memberships/:id/accept')
+  async acceptInvitation(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
+    const userId = await this.currentUser(request);
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        `UPDATE sports_org_memberships
+         SET status = 'active', starts_at = now(), updated_at = now()
+         WHERE id = $1 AND user_id = $2 AND status = 'invited'
+           AND (expires_at IS NULL OR expires_at > now())
+         RETURNING id, sports_organization_id, role, permission_scope, status, starts_at, expires_at`,
+        [id, userId],
+      );
+      if (!result.rowCount) throw new NotFoundException('Active membership invitation not found.');
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.organization.invitation_accepted', 'sports_org_membership', $2, $3::jsonb)",
+        [userId, id, JSON.stringify({ sports_organization_id: result.rows[0].sports_organization_id })],
+      );
+      await client.query('COMMIT');
+      return { membership: result.rows[0], message: 'You have joined the sporting organization.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  @Post('memberships/:id/revoke')
+  async revokeMembership(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
+    const userId = await this.currentUser(request);
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const target = await client.query(
+        `SELECT id, sports_organization_id, user_id, role, status
+         FROM sports_org_memberships WHERE id = $1 FOR UPDATE`,
+        [id],
+      );
+      if (!target.rowCount || target.rows[0].status === 'revoked') {
+        throw new NotFoundException('Active sporting-organization membership not found.');
+      }
+      const row = target.rows[0];
+      const actorRole = await this.managerRole(client, row.sports_organization_id, userId);
+      if (row.role === 'owner') throw new ForbiddenException('The organization owner cannot be removed through membership management.');
+      if (actorRole === 'admin' && row.role === 'admin' && row.user_id !== userId) {
+        throw new ForbiddenException('Admins cannot revoke another admin membership.');
+      }
+      if (row.status !== 'active' && row.status !== 'invited') {
+        throw new NotFoundException('Active sporting-organization membership not found.');
+      }
+      const revoked = await client.query(
+        `UPDATE sports_org_memberships SET status = 'revoked', updated_at = now()
+         WHERE id = $1 RETURNING id, sports_organization_id, user_id, role, status`,
+        [id],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.organization.membership_revoked', 'sports_org_membership', $2, $3::jsonb)",
+        [userId, id, JSON.stringify({ sports_organization_id: row.sports_organization_id, revoked_user_id: row.user_id, role: row.role })],
+      );
+      await client.query('COMMIT');
+      return { membership: revoked.rows[0], message: 'Membership has been revoked.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+}
+
 const MARKET_SYMBOLS = new Set([
   '^GSPC','^DJI','^IXIC','^FTSE','^GDAXI','^FCHI','^N225','^HSI','^STOXX50E','^NSEI',
   'GC=F','SI=F','CL=F','BZ=F','NG=F','HG=F','ZW=F','ZC=F','ZS=F','KC=F',
@@ -3508,7 +3726,7 @@ class PublicMarketQuotesController {
   }
 }
 
-@Module({ controllers: [SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController] })
+@Module({ controllers: [SportsTransferOrganizationsController, SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController] })
 export class AppModule implements OnModuleDestroy {
   async onModuleDestroy() {
     if (databasePool) await databasePool.end();
