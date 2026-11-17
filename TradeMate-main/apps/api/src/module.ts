@@ -4944,7 +4944,7 @@ class SportsTransferVerificationProviderWebhookController {
       const secret = process.env.SPORTS_TRANSFER_SANDBOX_WEBHOOK_SECRET || '';
       const timestampHeader = request.header('x-trademate-timestamp') || '';
       const signature = request.header('x-trademate-signature') || '';
-      if (!secret || !/^\\d{10}$/.test(timestampHeader) || !/^sha256=[a-f0-9]{64}$/i.test(signature)) {
+      if (!secret || !/^\d{10}$/.test(timestampHeader) || !/^sha256=[a-f0-9]{64}$/i.test(signature)) {
         throw new UnauthorizedException('Verification provider webhook signature is invalid.');
       }
       const timestamp = Number(timestampHeader);
