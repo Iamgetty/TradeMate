@@ -313,3 +313,35 @@ export const feedPostsQuerySchema = z.object({
 export const marketQuotesQuerySchema = z.object({
   symbols: z.string().trim().min(1).max(120),
 }).strict();
+
+
+export const sportsProfileCreateBodySchema = z.object({
+  sport: z.enum(['football', 'basketball']),
+  displayName: z.string().trim().min(2).max(100),
+  biography: z.string().trim().max(1600).optional(),
+  primaryPosition: z.string().trim().max(80).optional(),
+  countryCode: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/).optional(),
+}).strict();
+
+export const sportsProfileUpdateBodySchema = z.object({
+  displayName: z.string().trim().min(2).max(100).optional(),
+  biography: z.string().trim().max(1600).optional(),
+  primaryPosition: z.string().trim().max(80).optional(),
+  countryCode: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/).nullable().optional(),
+}).strict().refine((value) => Object.keys(value).length > 0, {
+  message: 'Supply at least one supported player-profile field.',
+});
+
+export const sportsConsentGrantBodySchema = z.object({
+  targetUserId: z.string().uuid().optional(),
+  targetOrganizationId: z.string().uuid().optional(),
+  purpose: z.enum(['profile_discovery', 'direct_contact', 'opportunity_publication', 'negotiation', 'document_sharing', 'representative_access']),
+  scope: z.object({
+    territoryCodes: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/)).max(30).optional(),
+    competitionIds: z.array(z.string().uuid()).max(30).optional(),
+    note: z.string().trim().max(300).optional(),
+  }).strict().optional(),
+  expiresAt: z.string().datetime({ offset: true }),
+}).strict().refine((value) => Boolean(value.targetUserId) !== Boolean(value.targetOrganizationId), {
+  message: 'Consent must target exactly one person or sporting organization.',
+});
