@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Script from 'next/script';
 import Link from 'next/link';
 
@@ -37,14 +37,15 @@ export default function SportsTransferVerificationPage() {
   const [error, setError] = useState('');
   const [countryCode, setCountryCode] = useState('NG');
   const [sdkMounted, setSdkMounted] = useState(false);
-  const mountedRef = useRef(false);
 
   const requestJson = useCallback(async (url: string, init?: RequestInit) => {
+    const headers = new Headers(init?.headers);
+    if (init?.body) headers.set('content-type', 'application/json');
     const response = await fetch(url, {
       ...init,
       credentials: 'include',
       cache: 'no-store',
-      headers: { ...(init?.headers || {}), ...(init?.body ? { 'content-type': 'application/json' } : {}) },
+      headers,
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.message || 'TradeMate could not complete this request.');
@@ -64,19 +65,10 @@ export default function SportsTransferVerificationPage() {
   }, [requestJson]);
 
   useEffect(() => {
-    mountedRef.current = true;
     loadCases()
       .catch(() => setError('Sign in to TradeMate to start legal identity verification.'))
       .finally(() => setLoading(false));
-    return () => { mountedRef.current = false; };
   }, [loadCases]);
-
-  const refreshSdkToken = useCallback(async () => {
-    if (!caseRecord?.id) throw new Error('A verification case is required.');
-    const result = await requestJson(API + '/' + caseRecord.id + '/session', { method: 'POST' });
-    if (!result.sdkAccessToken) throw new Error('A live Sumsub WebSDK token is not available.');
-    return result.sdkAccessToken as string;
-  }, [caseRecord, requestJson]);
 
   const launchSdk = useCallback((token: string, getFreshToken: () => Promise<string>) => {
     if (!window.snsWebSdk) throw new Error('The Sumsub verification interface has not loaded yet.');
@@ -113,7 +105,8 @@ export default function SportsTransferVerificationPage() {
         current = created.verificationCase;
         setCaseRecord(current);
       }
-      const session = await requestJson(API + '/' + current.id + '/session', { method: 'POST' });
+      const caseId = current.id;
+      const session = await requestJson(API + '/' + caseId + '/session', { method: 'POST' });
       setStatus('processing');
       if (!session.sdkAccessToken) {
         setMessage(session.message || 'The configured environment does not currently provide live document capture.');
@@ -123,7 +116,7 @@ export default function SportsTransferVerificationPage() {
         throw new Error('The Sumsub WebSDK is still loading. Please try again in a moment.');
       }
       launchSdk(session.sdkAccessToken, async () => {
-        const fresh = await requestJson(API + '/' + current!.id + '/session', { method: 'POST' });
+        const fresh = await requestJson(API + '/' + caseId + '/session', { method: 'POST' });
         if (!fresh.sdkAccessToken) throw new Error('A refreshed Sumsub access token is unavailable.');
         return fresh.sdkAccessToken;
       });
@@ -171,19 +164,11 @@ export default function SportsTransferVerificationPage() {
             <div><strong>Legal identity verification</strong><span>Provider: Sumsub · Individual KYC</span><small>CASE STATUS · {status.toUpperCase()}</small></div>
           </div>
           {!sdkMounted && <div className="account-next">
-            <label htmlFor="verification-country">Country of residence</label>
-            <select id="verification-country" value={countryCode} onChange={event => setCountryCode(event.target.value)} className="verification-country">
-              <option value="NG">Nigeria</option>
-              <option value="GH">Ghana</option>
-              <option value="KE">Kenya</option>
-              <option value="ZA">South Africa</option>
-              <option value="GB">United Kingdom</option>
-              <option value="US">United States</option>
-              <option value="CA">Canada</option>
-              <option value="AE">United Arab Emirates</option>
-              <option value="OTHER">Other / confirm with provider</option>
-            </select>
-            <button className="cta-primary detail-back" disabled={starting || !sdkReady} onClick={startVerification}>
+            <label htmlFor="verification-country">Country of residence (ISO two-letter code)</label>
+            <input id="verification-country" value={countryCode} maxLength={2} autoComplete="country" placeholder="e.g. NG"
+              onChange={event => setCountryCode(event.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2))}
+              className="verification-country" />
+            <button className="cta-primary detail-back" disabled={starting || !sdkReady || !/^[A-Z]{2}$/.test(countryCode)} onClick={startVerification}>
               {starting ? 'Preparing secure session…' : caseRecord ? 'Continue verification ↗' : 'Start identity verification ↗'}
             </button>
             {caseRecord && <button className="account-secondary-link" onClick={refreshStatus}>Refresh verification status →</button>}
