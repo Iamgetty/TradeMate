@@ -1,419 +1,112 @@
-name: TradeMate CI
+-- Source-governed external player discovery foundation.
+-- Stores sourced sporting facts only. Contact details, private identifiers, medical data
+-- and confidential contract documents must never be stored in these discovery tables.
 
-# Keep only the newest validation run for a given pull request or branch.
-concurrency:
-  group: trademate-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+CREATE TABLE IF NOT EXISTS sports_transfer_data_sources (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_key TEXT NOT NULL UNIQUE CHECK (char_length(source_key) BETWEEN 2 AND 100),
+  display_name TEXT NOT NULL CHECK (char_length(display_name) BETWEEN 2 AND 180),
+  source_type TEXT NOT NULL CHECK (source_type IN (
+    'official_federation','official_league','official_club','official_agent_register',
+    'licensed_sports_data','licensed_professional_directory','public_announcement','verified_referral'
+  )),
+  website_url TEXT NOT NULL DEFAULT '' CHECK (char_length(website_url) <= 2048),
+  access_method TEXT NOT NULL DEFAULT 'manual_review' CHECK (access_method IN ('manual_review','licensed_api','licensed_bulk','partner_feed')),
+  rights_status TEXT NOT NULL DEFAULT 'candidate' CHECK (rights_status IN ('candidate','under_review','approved','suspended','revoked')),
+  rights_basis TEXT NOT NULL DEFAULT '' CHECK (char_length(rights_basis) <= 2000),
+  terms_reference TEXT NOT NULL DEFAULT '' CHECK (char_length(terms_reference) <= 2048),
+  permitted_data_categories TEXT[] NOT NULL DEFAULT '{}'
+    CHECK (permitted_data_categories <@ ARRAY['player_identity','sporting_profile','roster','transfer_activity','availability_status','competition_data']::TEXT[]),
+  permitted_purposes TEXT[] NOT NULL DEFAULT '{}'
+    CHECK (permitted_purposes <@ ARRAY['internal_research','player_discovery','public_sporting_profile','availability_monitoring']::TEXT[]),
+  contact_data_permission TEXT NOT NULL DEFAULT 'not_approved'
+    CHECK (contact_data_permission IN ('not_approved','under_review','approved','revoked')),
+  coverage_sports TEXT[] NOT NULL DEFAULT '{}'
+    CHECK (coverage_sports <@ ARRAY['football','basketball']::TEXT[]),
+  coverage_country_codes CHAR(2)[] NOT NULL DEFAULT '{}',
+  reviewed_by_user_id UUID REFERENCES users(id) ON DELETE RESTRICT,
+  reviewed_at TIMESTAMPTZ,
+  review_note TEXT NOT NULL DEFAULT '' CHECK (char_length(review_note) <= 2000),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (
+    rights_status <> 'approved'
+    OR (reviewed_by_user_id IS NOT NULL AND reviewed_at IS NOT NULL
+        AND char_length(rights_basis) >= 10 AND char_length(terms_reference) >= 3
+        AND cardinality(permitted_data_categories) > 0
+        AND cardinality(permitted_purposes) > 0)
+  ),
+  CHECK (
+    contact_data_permission <> 'approved'
+    OR (rights_status = 'approved' AND 'contact_data' = ANY(permitted_data_categories))
+  )
+);
 
-on:
-  push:
-    branches:
-      - main
-      - feat/sports-transfer-private-profile-api
-      - feat/sports-transfer-organization-memberships
-      - feat/sports-transfer-representative-mandates
-      - feat/sports-transfer-opportunity-drafts
-      - feat/sports-transfer-external-player-discovery-foundation
-  pull_request:
-    branches:
-      - main
+CREATE TABLE IF NOT EXISTS sports_transfer_external_player_records (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  data_source_id UUID NOT NULL REFERENCES sports_transfer_data_sources(id) ON DELETE RESTRICT,
+  sport TEXT NOT NULL CHECK (sport IN ('football','basketball')),
+  external_player_key TEXT NOT NULL CHECK (char_length(external_player_key) BETWEEN 1 AND 180),
+  display_name TEXT NOT NULL CHECK (char_length(display_name) BETWEEN 2 AND 160),
+  position_or_role TEXT NOT NULL DEFAULT '' CHECK (char_length(position_or_role) <= 100),
+  current_team_name TEXT NOT NULL DEFAULT '' CHECK (char_length(current_team_name) <= 180),
+  competition_name TEXT NOT NULL DEFAULT '' CHECK (char_length(competition_name) <= 180),
+  country_code CHAR(2),
+  availability_status TEXT NOT NULL DEFAULT 'unknown' CHECK (
+    (sport = 'football' AND availability_status IN (
+      'unknown','transfer_listed_reported','loan_listed_reported','out_of_contract_reported',
+      'free_agent_reported','free_agent_confirmed','available_for_trial_reported',
+      'signed','unavailable','other'
+    )) OR
+    (sport = 'basketball' AND availability_status IN (
+      'unknown','restricted_free_agent_reported','unrestricted_free_agent_reported',
+      'waivers_reported','trade_available_reported','draft_eligible_reported',
+      'draft_rights_available_reported','free_agent_confirmed','signed','unavailable','other'
+    ))
+  ),
+  source_record_url TEXT NOT NULL DEFAULT '' CHECK (char_length(source_record_url) <= 2048),
+  source_published_at TIMESTAMPTZ,
+  observed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  effective_at TIMESTAMPTZ,
+  last_verified_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ,
+  confidence_score NUMERIC(5,4) CHECK (confidence_score IS NULL OR confidence_score BETWEEN 0 AND 1),
+  review_status TEXT NOT NULL DEFAULT 'pending_review' CHECK (review_status IN ('pending_review','approved','rejected','stale','withdrawn')),
+  reviewed_by_user_id UUID REFERENCES users(id) ON DELETE RESTRICT,
+  reviewed_at TIMESTAMPTZ,
+  review_note TEXT NOT NULL DEFAULT '' CHECK (char_length(review_note) <= 2000),
+  claimed_profile_id UUID REFERENCES sports_profiles(id) ON DELETE RESTRICT,
+  claim_status TEXT NOT NULL DEFAULT 'unclaimed' CHECK (claim_status IN ('unclaimed','pending','verified','rejected')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (data_source_id, sport, external_player_key),
+  CHECK (expires_at IS NULL OR expires_at > observed_at),
+  CHECK ((review_status = 'approved') = (reviewed_at IS NOT NULL AND reviewed_by_user_id IS NOT NULL)),
+  CHECK ((claim_status = 'verified') = (claimed_profile_id IS NOT NULL))
+);
 
-permissions:
-  contents: read
+CREATE INDEX IF NOT EXISTS sports_transfer_external_player_discovery_idx
+  ON sports_transfer_external_player_records (sport, availability_status, review_status, observed_at DESC);
+CREATE INDEX IF NOT EXISTS sports_transfer_external_player_source_idx
+  ON sports_transfer_external_player_records (data_source_id, review_status, observed_at DESC);
+CREATE INDEX IF NOT EXISTS sports_transfer_external_player_claim_idx
+  ON sports_transfer_external_player_records (claimed_profile_id)
+  WHERE claimed_profile_id IS NOT NULL;
 
-jobs:
+CREATE TABLE IF NOT EXISTS sports_transfer_external_player_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  external_player_record_id UUID NOT NULL REFERENCES sports_transfer_external_player_records(id) ON DELETE RESTRICT,
+  data_source_id UUID NOT NULL REFERENCES sports_transfer_data_sources(id) ON DELETE RESTRICT,
+  change_type TEXT NOT NULL CHECK (change_type IN ('created','source_refresh','availability_changed','corrected','reviewed','staled','withdrawn','claimed')),
+  previous_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(previous_snapshot) = 'object'),
+  current_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(current_snapshot) = 'object'),
+  source_observed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  recorded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  actor_user_id UUID REFERENCES users(id) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS sports_transfer_external_player_history_idx
+  ON sports_transfer_external_player_history (external_player_record_id, recorded_at DESC);
 
-  database:
-    name: Database migration integration
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: trademate_test
-          POSTGRES_DB: trademate_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d trademate_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 20
-      - name: Install API dependencies
-        working-directory: TradeMate-main/apps/api
-        run: npm install --no-audit --no-fund
-      - name: Build API for database context integration tests
-        working-directory: TradeMate-main/apps/api
-        run: npm run build
-      - name: Apply all database migrations to a clean PostgreSQL database
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: npm run db:migrate
-      - name: Verify Sports Transfer identity, consent, mandate and guardian constraints
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-sports-transfer-identity.js
-      - name: Verify Sports Transfer private profile and consent HTTP authorization
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-sports-transfer-private-api.js
-      - name: Verify Sports Transfer representative mandate HTTP authorization
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-sports-transfer-mandates-api.js
-      - name: Verify Sports Transfer organization membership HTTP authorization
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-sports-transfer-organization-api.js
-      - name: Verify private Sports Transfer opportunity draft API authorization
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-sports-transfer-opportunities-api.js
-      - name: Verify organization document permissions and rollback through HTTP endpoints
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-organization-documents.js
-      - name: Verify two-party marketplace contract lifecycle and concurrency
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-marketplace-contracts.js
-      - name: Verify two-party P2P lifecycle, privacy and concurrency
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-p2p-lifecycle.js
-      - name: Verify authentication audit atomicity and rollback
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-auth-audit.js
-      - name: Verify all ten contract divisions across member roles, moderation and audit rollback
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-marketplace-listings.js
-      - name: Verify least-privilege PostgreSQL roles and grants
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-db-roles.js
-      - name: Verify RLS owner isolation and FORCE RLS behaviour
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-rls-pilot.js
-      - name: Verify immutable audit-event history
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-audit-immutability.js
-      - name: Verify transaction-local user identity and connection-pool isolation
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-database-context.js
-
-  web:
-    name: Web build and runtime syntax
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 20
-      - name: Validate TradeMate runtime JavaScript
-        run: node --check TradeMate-main/apps/web/public/tm/app.js
-      - name: Verify connected account cache isolation
-        run: node TradeMate-main/apps/web/scripts/test-account-isolation.js
-      - name: Install web dependencies
-        working-directory: TradeMate-main/apps/web
-        run: npm install --no-audit --no-fund
-      - name: Build web application
-        working-directory: TradeMate-main/apps/web
-        run: npm run build
-
-
-  exchange-feed:
-    name: Exchange feed and MT5 tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 20
-      - name: Install exchange-feed dependencies
-        working-directory: TradeMate-main/exchange-feed
-        run: npm install --no-audit --no-fund
-      - name: Run exchange-feed and MT5 quote tests
-        working-directory: TradeMate-main/exchange-feed
-        run: npm test
-
-  api:
-    name: API TypeScript build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 20
-      - name: Install API dependencies
-        working-directory: TradeMate-main/apps/api
-        run: npm install --no-audit --no-fund
-      - name: Build API
-        working-directory: TradeMate-main/apps/api
-        run: npm run build
-      - name: Run API security validation tests
-        working-directory: TradeMate-main/apps/api
-        run: npm run test:security
-
-
-  container-images:
-    name: AWS API and exchange-feed container builds
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Build API runtime image
-        run: docker build --pull -f TradeMate-main/apps/api/Dockerfile -t trademate-api:ci .
-      - name: Verify API image runs as non-root and includes migration assets
-        run: |
-          test "$(docker image inspect trademate-api:ci --format '{{.Config.User}}')" = "node"
-          docker run --rm --entrypoint node trademate-api:ci -e "const fs=require('fs'); if(!fs.existsSync('scripts/migrate.js') || !fs.existsSync('database/migrations/001_initial_marketplace.sql')) process.exit(1)"
-      - name: Build exchange-feed runtime image
-        run: docker build --pull -f TradeMate-main/exchange-feed/Dockerfile -t trademate-exchange-feed:ci .
-      - name: Verify exchange-feed image runs as non-root
-        run: test "$(docker image inspect trademate-exchange-feed:ci --format '{{.Config.User}}')" = "node"
-
-  security:
-    name: Security scanning (SAST, SCA and secrets)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-    steps:
-      - name: Check out full repository history
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 20
-
-      - name: API dependency audit
-        working-directory: TradeMate-main/apps/api
-        run: |
-          npm install --no-audit --no-fund
-          npm audit --audit-level=high
-
-      - name: Web dependency audit
-        working-directory: TradeMate-main/apps/web
-        run: |
-          npm install --no-audit --no-fund
-          npm audit --audit-level=high
-
-      - name: Exchange feed dependency audit
-        working-directory: TradeMate-main/exchange-feed
-        run: |
-          npm install --no-audit --no-fund
-          npm audit --audit-level=high
-
-      - name: Install Semgrep
-        run: python -m pip install --disable-pip-version-check semgrep==1.183.0
-
-      - name: Static application security testing
-        run: semgrep scan --config p/default --error --timeout 15 --timeout-threshold 10 TradeMate-main/apps/api/src TradeMate-main/apps/api/scripts TradeMate-main/apps/api/database/security TradeMate-main/apps/web
-
-      - name: Fetch pull request base branch for secret scanning
-        if: github.event_name == 'pull_request'
-        run: git fetch origin "${{ github.base_ref }}:${{ github.base_ref }}" || true
-
-      - name: Secret scanning
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  browser-e2e:
-    name: Browser app-shell and live API acceptance tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: trademate_test
-          POSTGRES_DB: trademate_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d trademate_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 20
-      - name: Install API dependencies
-        working-directory: TradeMate-main/apps/api
-        run: npm install --no-audit --no-fund
-      - name: Build API for live browser acceptance
-        working-directory: TradeMate-main/apps/api
-        run: npm run build
-      - name: Apply migrations to disposable browser-test database
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: npm run db:migrate
-      - name: Seed independent browser accounts and a proposed contract
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/create-live-browser-contract-fixture.js "$RUNNER_TEMP/trademate-e2e-fixture.json"
-      - name: Start API against disposable PostgreSQL
-        working-directory: TradeMate-main/apps/api
-        env:
-          NODE_ENV: test
-          PORT: 4000
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: |
-          export TOTP_ENCRYPTION_KEY="$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))")"
-          nohup npm run start:prod > "$RUNNER_TEMP/trademate-api.log" 2>&1 &
-          for attempt in $(seq 1 40); do
-            if curl --silent --fail http://127.0.0.1:4000/api/health >/dev/null; then
-              echo "Disposable API is ready."
-              exit 0
-            fi
-            sleep 2
-          done
-          cat "$RUNNER_TEMP/trademate-api.log"
-          exit 1
-      - name: Install web and browser-test dependencies
-        working-directory: TradeMate-main/apps/web
-        run: npm install --no-audit --no-fund
-      - name: Install Chromium and system dependencies
-        working-directory: TradeMate-main/apps/web
-        run: npx playwright install --with-deps chromium
-      - name: Run mocked smoke tests and live two-account browser acceptance
-        working-directory: TradeMate-main/apps/web
-        env:
-          CI: true
-          TRADEMATE_API_ORIGIN: http://127.0.0.1:4000
-          TRADEMATE_E2E_FIXTURE: ${{ runner.temp }}/trademate-e2e-fixture.json
-        run: |
-          npm run test:e2e || {
-            echo '--- Disposable API log tail ---'
-            tail -n 120 "$RUNNER_TEMP/trademate-api.log"
-            exit 1
-          }
-
-  cloudflare-workers:
-    name: Isolated Cloudflare Workers frontend build and runtime
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 22
-      - name: Create disposable frontend copy
-        run: |
-          mkdir -p "$RUNNER_TEMP/trademate-web"
-          cp -a TradeMate-main/apps/web/. "$RUNNER_TEMP/trademate-web/"
-      - name: Initialize Cloudflare Workers adapter in disposable copy
-        working-directory: ${{ runner.temp }}/trademate-web
-        run: |
-          npx --yes vinext@1.4.0 init --platform=cloudflare \
-            --cdn-cache=none \
-            --data-cache=none \
-            --image-optimization=none \
-            --no-prerender
-      # The source app's standalone output is for the Node.js deployment target.
-      # vinext/Workers writes its own .cloudflare output; leaving Next's standalone
-      # setting enabled makes vinext's finalizer incorrectly look for ./dist.
-      # Remove it only from the disposable CI copy, never from the tracked app.
-      - name: Disable Node standalone output in disposable adapter copy
-        working-directory: ${{ runner.temp }}/trademate-web
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path("next.config.mjs")
-          source = path.read_text()
-          setting = "  output: 'standalone',\n"
-          if source.count(setting) != 1:
-              raise SystemExit("Expected exactly one standalone output setting in next.config.mjs")
-          path.write_text(source.replace(setting, ""))
-          PY
-      - name: Install isolated adapter dependencies
-        working-directory: ${{ runner.temp }}/trademate-web
-        run: npm install --no-audit --no-fund
-      - name: Build Cloudflare Workers output
-        working-directory: ${{ runner.temp }}/trademate-web
-        run: npm run build:vinext
-      - name: Smoke-test local Workers runtime and API proxy guard
-        working-directory: ${{ runner.temp }}/trademate-web
-        run: |
-          set -euo pipefail
-          # Exercise the built Worker preview, not Vite's development server.
-          npm run start:vinext -- --host 127.0.0.1 --port 4173 > "$RUNNER_TEMP/vinext-runtime.log" 2>&1 &
-          server_pid=$!
-          cleanup() {
-            kill "$server_pid" 2>/dev/null || true
-          }
-          trap cleanup EXIT
-          ready=0
-          for attempt in $(seq 1 60); do
-            if curl --silent --show-error --location --max-redirs 5 --fail http://127.0.0.1:4173/ -o "$RUNNER_TEMP/vinext-home.html"; then
-              ready=1
-              break
-            fi
-            sleep 2
-          done
-          if [ "$ready" -ne 1 ]; then
-            cat "$RUNNER_TEMP/vinext-runtime.log"
-            echo "Workers local runtime did not become ready" >&2
-            exit 1
-          fi
-          if ! grep -Eiq '<html([[:space:]>])' "$RUNNER_TEMP/vinext-home.html"; then
-            echo "Homepage response did not contain an HTML document marker." >&2
-            head -c 1000 "$RUNNER_TEMP/vinext-home.html" >&2 || true
-            cat "$RUNNER_TEMP/vinext-runtime.log" >&2
-            exit 1
-          fi
-          proxy_status=$(curl --silent --output "$RUNNER_TEMP/vinext-proxy.txt" --write-out '%{http_code}' http://127.0.0.1:4173/api/cloudflare-validation-probe)
-          if [ "$proxy_status" != "503" ]; then
-            echo "Expected API proxy HTTP 503 without TRADEMATE_API_ORIGIN; received HTTP $proxy_status." >&2
-            cat "$RUNNER_TEMP/vinext-proxy.txt" >&2 || true
-            cat "$RUNNER_TEMP/vinext-runtime.log" >&2
-            exit 1
-          fi
-          echo "Homepage rendered and unconfigured API proxy correctly returned HTTP 503."
+-- No contact columns are intentionally present. No public discovery route is enabled
+-- by this schema. Future ingestion must require an approved source and permitted
+-- sporting-data purpose; public display additionally requires review and freshness.
