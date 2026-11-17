@@ -60,7 +60,7 @@ This register distinguishes source implementation from verified user workflows. 
 | Workstream | Current assessment | Evidence / remaining gate |
 |---|---|---|
 | Product/cart removal and B2B terminology | **Implemented; audit outstanding** | PR #16 integrated the contract-first scope and current roadmap records Product/cart removal and B2B as a distinct listing type. Still audit every navigation, search, API and write path for legacy checkout/order/bid behaviour. |
-| All ten contract-category publishing and discovery | **Shared persistent review path implemented; CI acceptance required** | Every division is stored independently and uses the same organization-backed draft, review queue, approval and public discovery flow. Verify all ten categories, all organization member roles, rejected resubmission, category filters, and production moderation. |
+| All ten contract-category publishing and discovery | **All-ten PostgreSQL integration path present; live acceptance remains** | `apps/api/scripts/test-marketplace-listings.js` iterates all ten division slugs for owner, admin and member roles, verifies durable draft creation, review submission, pending-review privacy, moderation-queue division, approval, public discovery and contract proposal creation. Remaining: rejected/resubmission behaviour, category-filter UI, and production moderation acceptance. |
 | Contract lifecycle | **Implemented in part; E2E unverified** | Proposal, seller response, buyer cancellation, messages and dual fulfilment confirmation are present. Verify every transition, unauthorized cross-account access, retries, concurrency and persistence with two real accounts. |
 | Clients/Alpha modes | **Partially verified** | Both modes expose Contracts in the current product direction; internal Buyer/Seller roles remain for compatibility. Verify the same durable contract records and action permissions in both modes. |
 | Feed titles, attachments and voice notes | **Validation aligned in PR #79; device QA outstanding** | Feed APIs support posts, attachments, comments and reports. PR #79 aligns API validation with the optional-title composer while retaining the body requirement and 140-character title limit. Test uploads, playback, downloads, limits and mobile permission/failure states. |
@@ -83,7 +83,7 @@ PR #22 is an audit source, not an integration target. Its original branch is sta
 ### Next execution order
 
 1. **Exact-head CI and browser QA — merged baseline; live acceptance remains.** PR #79 was merged on 8 November 2026 as `2eec784074647936975954eab9fc854922638ee6`; its six-job CI and browser retry/two-account mocked contract tests are historical regression evidence, not outstanding review work. Subsequent PRs have extended the baseline. The latest feed-client source-boundary audit, PR #125, is merged as `eca423b3c952a27a8d4d32070d4d2980c7368361`; all eight CI jobs passed in run [43375530510](https://github.com/Iamgetty/TradeMate/actions/runs/43375530510), including database migration integration, browser app-shell smoke tests, API/web builds, security scanning, Cloudflare frontend, exchange-feed/MT5 and container builds. CI does not establish live two-account API/database acceptance or production user acceptance.
-2. **Services/B2B API/database coverage — integration tests present; production acceptance remains.** `apps/api/scripts/test-marketplace-listings.js` exercises Services/B2B draft creation, member authorization, moderation, public discovery, enquiries, owner/admin notifications and rollback on audit failure against PostgreSQL. `apps/api/scripts/test-marketplace-contracts.js` exercises contract access, messaging, seller decisions, cancellation, dual fulfilment confirmation and closed-state behaviour against PostgreSQL. Preserve these as automated integration evidence; the browser two-account contract journey still uses mocked API responses, so live UI-to-API-to-database acceptance across two real accounts remains outstanding.
+2. **All-ten listing API/database coverage — integration tests present; production acceptance remains.** `apps/api/scripts/test-marketplace-listings.js` exercises all ten divisions across owner/admin/member roles through draft creation, submission, moderation, public discovery and contract proposal creation against PostgreSQL. The same suite separately exercises B2B inventory, own-offer visibility, unrelated-account denial, submission audit, pending-review privacy and enquiry behaviour. `apps/api/scripts/test-marketplace-contracts.js` exercises contract access, messaging, seller decisions, cancellation, dual fulfilment confirmation and closed-state behaviour against PostgreSQL. Preserve these as automated integration evidence; the browser two-account contract journey still uses mocked API responses, so live UI-to-API-to-database acceptance across two real accounts remains outstanding.
 3. Current draft-creation policy permits any organization member (owner/admin/member) and denies unrelated accounts. This is the observed existing policy, not a new authorization decision. Product-owner confirmation is still needed before changing member publishing/submission permissions.
 4. The organization lookup and listing-draft creation paths currently select the most recently created organization for a user. Multi-organization account behaviour is therefore not explicitly selectable in the current publishing flow; decide whether TradeMate supports multiple organizations per user and, if so, add explicit organization selection and authorization tests. Do not assume this is resolved by the single-organization flow.
 5. Verify recoverable states/retry handling for market listings, organization/documents, own offers, contracts and enquiry conversations through browser failure-injection tests, without changing established marketplace/NFT layout dimensions. These UI recovery paths still need failure-injection and mobile acceptance evidence.
@@ -405,28 +405,21 @@ This section records the five engineering observations raised during the ongoing
 - These tests validate the existing contract state machine; they do not add payment, escrow, e-signature, dispute resolution or funds movement.
 
 
-### Services/B2B moderation and discovery acceptance coverage — follow-up
+### Services/B2B moderation and discovery acceptance coverage — implemented in current main; production acceptance remains
 
-- Extend the PostgreSQL-backed listing integration test beyond Services drafts to exercise B2B inventory creation and own-offer visibility.
-- Verify the existing organization-member submission policy, deny unrelated-account submission, and check the atomic submission audit event.
-- Verify pending-review B2B offers remain hidden from public browse, the reviewer credential protects the moderation queue, and approval records its audit event before the offer becomes publicly discoverable.
-- Verify a second account can open the approved B2B detail and create an enquiry, with the enquiry audit event persisted.
-- This is automated integration coverage, not proof of production user acceptance. It does not change organization-member publishing permissions or the unresolved multi-organization product decision.
+- The PostgreSQL-backed listing integration suite covers B2B inventory creation, own-offer visibility, unrelated-account submission denial, submission audit, pending-review privacy, reviewer-key-protected moderation, approval/public discovery and enquiry creation.
+- The all-ten division matrix also verifies owner/admin/member submission and category-aware moderation/discovery.
+- Keep live two-account UI-to-API-to-database acceptance outstanding; automated integration coverage is not proof of production user acceptance. Organization-member permissions and the single-organization account model remain unchanged.
 
 
-### B2B publishing wizard inventory handoff — follow-up
+### B2B publishing wizard inventory handoff — implemented in current main
 
-- Pass a whole-number B2B quantity from the publishing wizard into the API's `quantityAvailable` field so the published offer exposes inventory consistently with the backend and discovery UI.
-- Preserve non-numeric quantity/scope text (for example, regions or scope of work) in the offer description rather than coercing it into inventory.
-- Services publishing remains unchanged; numeric inventory is displayed separately and not duplicated in the description.
-- This is a frontend data-mapping correction only; no schema, permissions, moderation policy, or production data changes.
+- The publishing wizard maps a whole-number B2B quantity to the API `quantityAvailable` field. Non-numeric quantity/scope text remains in the offer description, and the quantity prompt is not duplicated there when a numeric inventory value is supplied. Services publishing remains separate.
 
 
-### B2B public offer detail inventory presentation — follow-up
+### B2B public offer detail inventory presentation — implemented; browser regression coverage present
 
-- Render the API's persisted `quantity_available` on public B2B offer detail pages; distinguish a real zero from an unspecified quantity and do not show a B2B inventory label on Services offers.
-- Add browser coverage for numeric inventory and missing inventory so the publishing wizard, listing API and counterparty detail stay connected.
-- This is a read-only presentation change; it does not reserve, decrement or otherwise mutate inventory and does not introduce stock-control semantics.
+- Public listing details render persisted `quantity_available`, distinguish zero from unspecified inventory, and do not show B2B inventory labels on Services. PR #151 adds browser coverage for zero inventory and Services detail semantics; positive and null inventory are covered by existing detail tests. This is presentation only, not stock reservation or decrement.
 
 
 ### Marketplace enquiry and reply notifications — follow-up
@@ -437,11 +430,9 @@ This section records the five engineering observations raised during the ongoing
 - Verify buyer/seller notification routing, audience isolation and rollback with PostgreSQL-backed integration tests.
 
 
-### Notification action-link navigation — follow-up
+### Notification action-link navigation — source implementation present; acceptance evidence to confirm
 
-- Make a notification click mark the item read and then follow its stored same-origin `action_url` when present; retain read-only behaviour for notifications without a destination.
-- Reject protocol-relative or backslash-containing destinations so notification clicks cannot redirect to an external origin.
-- Add browser coverage for a marketplace enquiry notification opening its conversation after the read request.
+- The current app runtime marks a notification read before following a stored same-origin path, and rejects protocol-relative or backslash-containing destinations. Confirm dedicated browser coverage for conversation routing and retain that as the remaining acceptance check.
 
 
 ### Browser exchange-feed client reconnect resilience — follow-up
