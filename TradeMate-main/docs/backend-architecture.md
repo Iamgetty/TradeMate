@@ -66,7 +66,7 @@ This is a proposed low-risk order, not permission to change product behaviour:
 1. Establish shared infrastructure modules/providers for database lifecycle, request context access, session identity and cryptographic helpers, with tests proving unchanged semantics.
 2. Extract Health, Preferences, Notifications and Support as small vertical modules.
 3. Extract Organizations with its document authorization and transactional audit tests.
-4. Extract marketplace Listings, Enquiries and Contracts separately; preserve Services/B2B contract gates and all concurrency tests.
+4. Extract marketplace Listings, Enquiries and Contracts separately; preserve all ten division-aware review and contract workflows, organization permissions and concurrency tests.
 5. Extract Market activity and quote retrieval.
 6. Extract P2P as its own module only after its lifecycle/audit/precision test gaps are covered.
 7. Extract Profiles and Feed, keeping attachment access and moderation permissions explicit.
