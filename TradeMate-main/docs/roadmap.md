@@ -612,6 +612,12 @@ Keep the feature inside the existing Sports Transfer Contract Category, while gi
 
 The experience must adapt to the signed-in user's verified role without assuming every user is a club or agent. Preserve TradeMate's existing Contract Category submission/review conventions where appropriate, but do not force confidential transfer negotiations or player data into public listing review.
 
+
+
+### Transfer-Window Centre implementation specification
+
+The detailed [Global Transfer-Window Centre specification](sports-transfer-window-centre.md) defines sport- and competition-specific calendar dimensions, authoritative source hierarchy, provenance and verification, versioned corrections, timezone-safe storage, confidence labels, alert operations and release gates. It is a design only: no live dates or source integrations are asserted.
+
 ### 9. Delivery order and release gates
 
 1. Inspect existing Sports category UI, app.js, API, schema, permissions and migrations; map current data and backward compatibility before renaming implementation identifiers.
