@@ -4,7 +4,7 @@ import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, 
 import { Pool } from 'pg';
 import { createRlsAwarePool } from './database-context';
 import { decimalToUnits, fiatCentsToQuantityUnits, productToFiatCents, unitsToDecimal } from './p2p-decimal';
-import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema, sportsOrganizationCreateBodySchema, sportsOrganizationMembershipInviteBodySchema } from './validation';
+import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema, sportsOrganizationCreateBodySchema, sportsOrganizationMembershipInviteBodySchema, sportsRepresentativeMandateCreateBodySchema, sportsRepresentativeMandateResponseBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -3713,6 +3713,354 @@ class SportsTransferOrganizationsController {
   }
 }
 
+
+@Controller('sports-transfer')
+class SportsTransferMandatesController {
+  private async currentUser(request: Request) {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to continue.');
+    const result = await databasePool.query(
+      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+      [tokenDigest(token)],
+    );
+    if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    return result.rows[0].id as string;
+  }
+
+  private async canRespond(client: any, mandate: any, userId: string) {
+    if (mandate.representative_user_id) return mandate.representative_user_id === userId;
+    const membership = await client.query(
+      `SELECT role FROM sports_org_memberships
+       WHERE sports_organization_id = $1 AND user_id = $2 AND status = 'active'
+         AND role IN ('owner', 'admin')
+         AND (starts_at IS NULL OR starts_at <= now())
+         AND (expires_at IS NULL OR expires_at > now())
+       FOR UPDATE`,
+      [mandate.representative_organization_id, userId],
+    );
+    return Boolean(membership.rowCount);
+  }
+
+  @Get('profiles/:id/mandates')
+  async listPlayerMandates(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
+    const userId = await this.currentUser(request);
+    const owner = await databasePool!.query(
+      'SELECT id FROM sports_profiles WHERE id = $1 AND user_id = $2',
+      [id, userId],
+    );
+    if (!owner.rowCount) throw new NotFoundException('Sports Transfer profile not found.');
+    const result = await databasePool!.query(
+      `SELECT m.id, m.representative_user_id, ru.display_name AS representative_name,
+              m.representative_organization_id, ro.display_name AS representative_organization_name,
+              m.mandate_type, m.permitted_actions, m.territory_codes, m.competition_ids,
+              m.status, m.representative_response, m.response_note, m.responded_at,
+              m.starts_at, m.expires_at, m.verified_at, m.created_at,
+              CASE WHEN m.status IN ('pending', 'active') AND m.expires_at <= now()
+                   THEN 'expired' ELSE m.status END AS effective_status
+       FROM sports_representative_mandates m
+       LEFT JOIN users ru ON ru.id = m.representative_user_id
+       LEFT JOIN sports_organizations ro ON ro.id = m.representative_organization_id
+       WHERE m.player_profile_id = $1
+       ORDER BY m.created_at DESC LIMIT 100`,
+      [id],
+    );
+    return { mandates: result.rows };
+  }
+
+  @Get('mandates/mine')
+  async myMandates(@Req() request: Request) {
+    const userId = await this.currentUser(request);
+    const result = await databasePool!.query(
+      `SELECT m.id, m.player_profile_id, p.display_name AS player_display_name, p.sport,
+              m.representative_user_id, m.representative_organization_id,
+              m.mandate_type, m.permitted_actions, m.territory_codes, m.competition_ids,
+              m.status, m.representative_response, m.response_note, m.responded_at,
+              m.starts_at, m.expires_at, m.verified_at, m.created_at,
+              CASE WHEN m.status IN ('pending', 'active') AND m.expires_at <= now()
+                   THEN 'expired' ELSE m.status END AS effective_status
+       FROM sports_representative_mandates m
+       JOIN sports_profiles p ON p.id = m.player_profile_id
+       WHERE m.representative_user_id = $1
+          OR EXISTS (
+            SELECT 1 FROM sports_org_memberships om
+            WHERE om.sports_organization_id = m.representative_organization_id
+              AND om.user_id = $1 AND om.status = 'active'
+              AND (om.starts_at IS NULL OR om.starts_at <= now())
+              AND (om.expires_at IS NULL OR om.expires_at > now())
+          )
+       ORDER BY m.created_at DESC LIMIT 100`,
+      [userId],
+    );
+    return { mandates: result.rows };
+  }
+
+  @Post('profiles/:id/mandates')
+  async createMandate(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+    parseUuidParam(id);
+    const input = parseBody(sportsRepresentativeMandateCreateBodySchema, body);
+    const userId = await this.currentUser(request);
+    const now = Date.now();
+    const expiresAt = new Date(input.expiresAt);
+    const startsAt = input.startsAt ? new Date(input.startsAt) : new Date(now);
+    if (!Number.isFinite(expiresAt.getTime()) || !Number.isFinite(startsAt.getTime())
+      || startsAt.getTime() < now - 5 * 60 * 1000
+      || expiresAt.getTime() <= startsAt.getTime()
+      || expiresAt.getTime() > now + 366 * 24 * 60 * 60 * 1000) {
+      throw new BadRequestException('Mandates must start now or later and expire within the next 12 months.');
+    }
+
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const profile = await client.query(
+        'SELECT id, user_id, sport FROM sports_profiles WHERE id = $1 AND user_id = $2 FOR UPDATE',
+        [id, userId],
+      );
+      if (!profile.rowCount) throw new NotFoundException('Sports Transfer profile not found.');
+
+      if (input.representativeUserId === userId) {
+        throw new BadRequestException('You cannot appoint yourself as your own representative.');
+      }
+
+      if (input.representativeUserId) {
+        const target = await client.query(
+          "SELECT id FROM users WHERE id = $1 AND status = 'active'",
+          [input.representativeUserId],
+        );
+        if (!target.rowCount) throw new NotFoundException('The representative account was not found.');
+      } else {
+        const target = await client.query(
+          'SELECT id FROM sports_organizations WHERE id = $1',
+          [input.representativeOrganizationId],
+        );
+        if (!target.rowCount) throw new NotFoundException('The representative organization was not found.');
+      }
+
+      const consent = await client.query(
+        `SELECT id, scope FROM sports_player_consents
+         WHERE player_profile_id = $1 AND granted_by_user_id = $2
+           AND purpose = 'representative_access' AND status = 'granted'
+           AND expires_at > now()
+           AND ((granted_to_user_id = $3 AND $3::uuid IS NOT NULL)
+             OR (granted_to_organization_id = $4 AND $4::uuid IS NOT NULL))
+         ORDER BY granted_at DESC LIMIT 1 FOR UPDATE`,
+        [id, userId, input.representativeUserId || null, input.representativeOrganizationId || null],
+      );
+      if (!consent.rowCount) {
+        throw new ForbiddenException('Grant current representative-access consent to this exact person or organization before creating a mandate.');
+      }
+      const consentScope = consent.rows[0].scope || {};
+      const allowedTerritories = Array.isArray(consentScope.territoryCodes) ? consentScope.territoryCodes : [];
+      const allowedCompetitions = Array.isArray(consentScope.competitionIds) ? consentScope.competitionIds : [];
+      if (allowedTerritories.length && (input.territoryCodes || []).some((code: string) => !allowedTerritories.includes(code))) {
+        throw new ForbiddenException('The mandate territory exceeds the territory in your representative-access consent.');
+      }
+      if (allowedCompetitions.length && (input.competitionIds || []).some((competitionId: string) => !allowedCompetitions.includes(competitionId))) {
+        throw new ForbiddenException('The mandate competition scope exceeds your representative-access consent.');
+      }
+
+      const duplicate = await client.query(
+        `SELECT id FROM sports_representative_mandates
+         WHERE player_profile_id = $1
+           AND status IN ('pending', 'active') AND expires_at > now()
+           AND ((representative_user_id = $2 AND $2::uuid IS NOT NULL)
+             OR (representative_organization_id = $3 AND $3::uuid IS NOT NULL))
+         LIMIT 1 FOR UPDATE`,
+        [id, input.representativeUserId || null, input.representativeOrganizationId || null],
+      );
+      if (duplicate.rowCount) throw new ConflictException('A current mandate already exists for this representative.');
+
+      const created = await client.query(
+        `INSERT INTO sports_representative_mandates
+           (player_profile_id, representative_user_id, representative_organization_id,
+            mandate_type, permitted_actions, territory_codes, competition_ids,
+            starts_at, expires_at, status, representative_response)
+         VALUES ($1, $2, $3, $4, $5, $6::char(2)[], $7::uuid[], $8, $9, 'pending', 'pending')
+         RETURNING id, player_profile_id, representative_user_id, representative_organization_id,
+                   mandate_type, permitted_actions, territory_codes, competition_ids,
+                   status, representative_response, starts_at, expires_at, created_at`,
+        [id, input.representativeUserId || null, input.representativeOrganizationId || null,
+         input.mandateType, input.permittedActions, input.territoryCodes || [],
+         input.competitionIds || [], startsAt.toISOString(), expiresAt.toISOString()],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.mandate.created', 'sports_representative_mandate', $2, $3::jsonb)",
+        [userId, created.rows[0].id, JSON.stringify({ profile_id: id, representative_type: input.representativeUserId ? 'user' : 'organization', mandate_type: input.mandateType, actions: input.permittedActions, expires_at: expiresAt.toISOString() })],
+      );
+      if (input.representativeUserId) {
+        await client.query(
+          "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'System', 'Sports Transfer representation request', 'A player has requested to appoint you as a representative. Review the mandate in Sports Transfer.', 'shield-check')",
+          [input.representativeUserId],
+        );
+      } else {
+        await client.query(
+          `INSERT INTO user_notifications (user_id, category, title, body, icon)
+           SELECT user_id, 'System', 'Sports Transfer representation request',
+                  'A player has requested to appoint your sporting organization as a representative.', 'shield-check'
+           FROM sports_org_memberships
+           WHERE sports_organization_id = $1 AND role IN ('owner', 'admin')
+             AND status = 'active' AND (expires_at IS NULL OR expires_at > now())`,
+          [input.representativeOrganizationId],
+        );
+      }
+      await client.query('COMMIT');
+      return { mandate: created.rows[0], message: 'Representation request sent. It is not active until accepted and separately verified.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  @Post('mandates/:id/accept')
+  async acceptMandate(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+    parseUuidParam(id);
+    const input = parseBody(sportsRepresentativeMandateResponseBodySchema, body || {});
+    const userId = await this.currentUser(request);
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const found = await client.query(
+        'SELECT * FROM sports_representative_mandates WHERE id = $1 FOR UPDATE',
+        [id],
+      );
+      if (!found.rowCount) throw new NotFoundException('Representation request not found.');
+      const mandate = found.rows[0];
+      if (mandate.status !== 'pending' || mandate.representative_response !== 'pending'
+        || new Date(mandate.expires_at).getTime() <= Date.now()
+        || (mandate.starts_at && new Date(mandate.starts_at).getTime() > Date.now())) {
+        throw new ConflictException('This representation request is not currently available to accept.');
+      }
+      if (!await this.canRespond(client, mandate, userId)) {
+        throw new NotFoundException('Representation request not found.');
+      }
+      const updated = await client.query(
+        `UPDATE sports_representative_mandates
+         SET representative_response = 'accepted', responded_by_user_id = $1,
+             responded_at = now(), response_note = $2, updated_at = now()
+         WHERE id = $3
+         RETURNING id, player_profile_id, representative_user_id, representative_organization_id,
+                   status, representative_response, responded_by_user_id, responded_at,
+                   response_note, expires_at`,
+        [userId, input.note || '', id],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.mandate.accepted', 'sports_representative_mandate', $2, $3::jsonb)",
+        [userId, id, JSON.stringify({ player_profile_id: mandate.player_profile_id, representative_organization_id: mandate.representative_organization_id })],
+      );
+      const player = await client.query('SELECT user_id FROM sports_profiles WHERE id = $1', [mandate.player_profile_id]);
+      await client.query(
+        "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'System', 'Sports Transfer mandate accepted', 'Your representative has accepted the request. TradeMate verification is still required before this mandate can be used.', 'shield-check')",
+        [player.rows[0].user_id],
+      );
+      await client.query('COMMIT');
+      return { mandate: updated.rows[0], message: 'Acceptance recorded. The mandate remains inactive until TradeMate completes authority verification.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  @Post('mandates/:id/reject')
+  async rejectMandate(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+    parseUuidParam(id);
+    const input = parseBody(sportsRepresentativeMandateResponseBodySchema, body || {});
+    const userId = await this.currentUser(request);
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const found = await client.query('SELECT * FROM sports_representative_mandates WHERE id = $1 FOR UPDATE', [id]);
+      if (!found.rowCount) throw new NotFoundException('Representation request not found.');
+      const mandate = found.rows[0];
+      if (mandate.status !== 'pending' || mandate.representative_response !== 'pending'
+        || new Date(mandate.expires_at).getTime() <= Date.now()) {
+        throw new ConflictException('This representation request is no longer available to reject.');
+      }
+      if (!await this.canRespond(client, mandate, userId)) {
+        throw new NotFoundException('Representation request not found.');
+      }
+      const updated = await client.query(
+        `UPDATE sports_representative_mandates
+         SET status = 'rejected', representative_response = 'rejected',
+             responded_by_user_id = $1, responded_at = now(), response_note = $2, updated_at = now()
+         WHERE id = $3
+         RETURNING id, player_profile_id, status, representative_response, responded_at, response_note`,
+        [userId, input.note || '', id],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.mandate.rejected', 'sports_representative_mandate', $2, $3::jsonb)",
+        [userId, id, JSON.stringify({ player_profile_id: mandate.player_profile_id })],
+      );
+      const player = await client.query('SELECT user_id FROM sports_profiles WHERE id = $1', [mandate.player_profile_id]);
+      await client.query(
+        "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'System', 'Sports Transfer mandate declined', 'The representative declined your request.', 'shield-x')",
+        [player.rows[0].user_id],
+      );
+      await client.query('COMMIT');
+      return { mandate: updated.rows[0], message: 'Representation request declined.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  @Post('mandates/:id/revoke')
+  async revokeMandate(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+    parseUuidParam(id);
+    const input = parseBody(sportsRepresentativeMandateResponseBodySchema, body || {});
+    const userId = await this.currentUser(request);
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const updated = await client.query(
+        `UPDATE sports_representative_mandates m
+         SET status = 'revoked', revoked_at = now(), updated_at = now(), response_note = $2
+         FROM sports_profiles p
+         WHERE m.id = $1 AND m.player_profile_id = p.id AND p.user_id = $3
+           AND m.status IN ('pending', 'active') AND m.revoked_at IS NULL
+         RETURNING m.id, m.player_profile_id, m.representative_user_id,
+                   m.representative_organization_id, m.status, m.revoked_at, m.response_note`,
+        [id, input.note || '', userId],
+      );
+      if (!updated.rowCount) throw new NotFoundException('Revocable representation mandate not found.');
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.mandate.revoked', 'sports_representative_mandate', $2, $3::jsonb)",
+        [userId, id, JSON.stringify({ profile_id: updated.rows[0].player_profile_id })],
+      );
+      const mandate = updated.rows[0];
+      if (mandate.representative_user_id) {
+        await client.query(
+          "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'System', 'Sports Transfer mandate revoked', 'The player has revoked your representation mandate. Do not act on their behalf.', 'shield-alert')",
+          [mandate.representative_user_id],
+        );
+      } else {
+        await client.query(
+          `INSERT INTO user_notifications (user_id, category, title, body, icon)
+           SELECT user_id, 'System', 'Sports Transfer mandate revoked',
+                  'The player has revoked the representation mandate granted to your organization.', 'shield-alert'
+           FROM sports_org_memberships WHERE sports_organization_id = $1
+             AND role IN ('owner', 'admin') AND status = 'active'`,
+          [mandate.representative_organization_id],
+        );
+      }
+      await client.query('COMMIT');
+      return { mandate, message: 'Representation mandate revoked. The representative must stop acting on your behalf.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+}
+
 const MARKET_SYMBOLS = new Set([
   '^GSPC','^DJI','^IXIC','^FTSE','^GDAXI','^FCHI','^N225','^HSI','^STOXX50E','^NSEI',
   'GC=F','SI=F','CL=F','BZ=F','NG=F','HG=F','ZW=F','ZC=F','ZS=F','KC=F',
@@ -3768,7 +4116,7 @@ class PublicMarketQuotesController {
   }
 }
 
-@Module({ controllers: [SportsTransferOrganizationsController, SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController] })
+@Module({ controllers: [SportsTransferMandatesController, SportsTransferOrganizationsController, SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController] })
 export class AppModule implements OnModuleDestroy {
   async onModuleDestroy() {
     if (databasePool) await databasePool.end();
