@@ -32,6 +32,7 @@ const MIGRATIONS = [
   '023_email_verification.sql',
   '026_all_contract_category_review.sql',
   '027_sports_transfer_identity_foundation.sql',
+  '028_sports_transfer_mandate_acceptance.sql',
 ];
 
 async function main() {
