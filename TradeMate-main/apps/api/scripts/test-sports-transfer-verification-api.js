@@ -73,9 +73,9 @@ async function main() {
 
     await pool.query(
       "UPDATE sports_transfer_verification_cases SET provider_key = 'sandbox', provider_subject_reference = '' WHERE id = $1",
-      [caseRecord.id],
+      [legalCase.id],
     );
-    const providerCase = 'future-provider-case-' + caseRecord.id;
+    const providerCase = 'future-provider-case-' + legalCase.id;
     const unmatchedEvent = JSON.stringify({
       eventId: 'unmatched-event-' + suffix,
       caseReference: providerCase,
@@ -94,7 +94,7 @@ async function main() {
     assert.equal((await pendingReconcile.json()).matched, false);
     await pool.query(
       'UPDATE sports_transfer_verification_cases SET provider_subject_reference = $1 WHERE id = $2',
-      [providerCase, caseRecord.id],
+      [providerCase, legalCase.id],
     );
     const reconciledEvent = await reviewRequest('POST', '/api/moderation/sports-transfer/verification-cases/provider-events/sandbox/unmatched-event-' + suffix + '/reconcile');
     assert.equal(reconciledEvent.status, 200);
@@ -122,7 +122,7 @@ async function main() {
     assert.equal(webhook.status, 200, 'valid signed provider webhook is accepted');
     const webhookResult = await webhook.json();
     assert.equal(webhookResult.humanReviewRequired, true);
-    const webhookCase = await pool.query('SELECT status FROM sports_transfer_verification_cases WHERE id = $1', [caseRecord.id]);
+    const webhookCase = await pool.query('SELECT status FROM sports_transfer_verification_cases WHERE id = $1', [legalCase.id]);
     assert.equal(webhookCase.rows[0].status, 'needs_review',
       'provider success must never directly approve an identity');
 
