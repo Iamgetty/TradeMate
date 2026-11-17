@@ -636,3 +636,77 @@ The detailed [Global Transfer-Window Centre specification](sports-transfer-windo
 ## Sports Transfer — guardian relationships and minor safeguarding design
 
 See [`sports-transfer-guardian-safeguarding.md`](sports-transfer-guardian-safeguarding.md) for the mandatory relationship lifecycle, evidence review, narrowly scoped permissions, minor protections, reviewer controls, API requirements and release gates. Existing guardian relationship rows are not proof of legal authority and do not grant access or representation powers. This design is not an implemented or live workflow.
+
+
+### 10. Global player discovery, listing provenance and account-independent introductions
+
+**Approved product requirement, 17 November 2026:** Sports Transfer is a continuously refreshed global player-discovery network, not merely a directory of players who have manually registered. A player may be discoverable before joining TradeMate, but external discovery never implies player consent, endorsement, representation or authority to negotiate.
+
+#### Listing and discovery entry paths
+
+- **Automatically discovered records:** ingest eligible player identity and market-availability information from contractually licensed sports-data providers, official clubs, leagues, federations/associations, authorized public announcements and other reviewed sources.
+- **Player-created opportunities:** a player creates and controls their own opportunity after claiming/creating a private profile and satisfying applicable identity, consent and safeguarding requirements.
+- **Representative-created opportunities:** a representative may create or manage an opportunity only after identity, professional status where applicable, mandate evidence, scope, territory, expiry and player consent have been separately verified.
+- **Club-created recruitment needs and referrals:** verified sporting organizations can publish recruitment requirements and refer a player through a permitted contact route. A club cannot claim to speak for a player merely because it employs or previously employed them.
+- **Claim and correction:** players can securely claim discovered records, resolve duplicate/mismatched identities, correct sporting facts and control which personal information is displayed. Claims must not merge identities without review where confidence is insufficient.
+
+#### Availability provenance and state
+
+- Keep **player identity**, **market availability**, **player consent**, **representative authority**, **contactability**, and **transaction status** as separate data dimensions.
+- Label externally sourced records clearly: discovered, source-reported available, availability unverified/conflicting, player-confirmed, representative-confirmed (only within verified mandate), unavailable/withdrawn, stale/expired.
+- A source-reported free-agent or transfer-listed status is not a player-confirmed listing. Never display an externally discovered player as endorsing TradeMate or having authorized an agent.
+- Store source/provider, source record ID where licensed, evidence/URL where permitted, source type, retrieval time, effective date, confidence, review outcome, last verification, expiry/freshness policy and revision history.
+- Reconcile duplicates and conflicting reports; retain provenance and corrections rather than silently overwriting. Do not fabricate missing data or infer free-agent status solely from an expired/unknown contract record.
+- Availability monitoring should detect transfers/signings, renewals, loan completion, withdrawal, changed roster status and stale source records. Expire or downgrade stale claims and preserve history.
+- Football and basketball availability vocabularies must remain sport-specific: e.g. football transfer-listed, loan-listed, out-of-contract and confirmed free agent; basketball unrestricted/restricted free agency, waivers, trade availability, draft rights and assignments. Do not conflate these statuses.
+
+#### Contact discovery and legitimate source strategy
+
+- Build a **Contact Discovery Engine** separately from player discovery. A sports-data license for identity, statistics or transfer data does not automatically grant access to personal contact data or permission to contact a person.
+- Prioritize contacts in this order: (1) player-supplied and verified contacts; (2) player-authorized representative/agency contacts; (3) official club/league/federation business contact channels and introductions; (4) official agent registers and association directories; (5) licensed commercial professional-contact directories under explicit contractual reuse and outreach rights; (6) verified referrals with documented provenance and permission.
+- Candidate official sources to evaluate include FIFA's agent directory and national association registers (including The FA where relevant), and the NBPA certified agent directory for NBA representation. These are starting points for professional agent identification, not a universal global player-contact database and not blanket permission to bulk-copy or market to listed individuals.
+- Candidate commercial directories to diligence include Footy Contacts for football-industry professional contacts and Passport Hoops for basketball agent contacts. Verify corporate identity, data provenance, geographical/sport coverage, update cadence, accuracy, licensing, API/bulk access, permitted storage, onward use, outreach permissions, deletion obligations and audit rights before procurement or extraction.
+- Evaluate Sportradar and Stats Perform/Opta as sports-data candidates for player identity, roster, transfer and market-status coverage. Do not assume either supplies private contact details; require explicit written confirmation of contact-data scope and lawful outreach rights.
+- Official club, agency, federation and league websites may supply published professional/business contact routes. Record the page/source and date, distinguish organizational inboxes from personal contacts, and respect site terms and applicable law. Do not scrape behind logins, bypass access controls, evade rate limits or harvest private personal data.
+- No provider, directory or source is approved, contracted, integrated or authorized for bulk extraction by this roadmap entry. Maintain a source-by-source permissions register and legal review before ingestion.
+
+#### Contact registry and account-independent notifications
+
+- Maintain a restricted contact registry separate from public player profiles. Store contact subject/owner, channel, source and provenance, verification status/method/time, permitted purpose and lawful basis, consent/preferences where applicable, territory, retention/review date, expiry, suppression/opt-out state and delivery history.
+- Apply privacy-by-design and applicable data protection/electronic communications laws. Publicly visible contact information is not automatically permission for recruitment outreach, bulk reuse or resale. Provide notice, purpose limitation, minimization, correction, opt-out/suppression and deletion/retention controls as legally required.
+- Build a **Notification & Introduction Engine** with in-app notifications for members and permitted email/SMS/other channels for non-members. Push notifications are for enrolled devices. Messaging channels such as WhatsApp require their own approved business access, consent and policy compliance; they are not assumed available.
+- A verified club may express interest in a discoverable player, but the club must not receive private player contact details. TradeMate sends a discreet, purpose-limited invitation only when a permitted contact route and outreach basis exist.
+- Account-independent invitations use single-purpose, expiring, revocable, recipient-bound links, appropriate recipient verification, rate limits, anti-enumeration controls, abuse reporting and audit events. A non-member may acknowledge/decline or request an introduction without immediate app installation; identity and authority verification are required before confidential engagement, document access, negotiation or transaction actions.
+- Distinguish invitation delivery, delivery failure, recipient verification, response and actual engagement. Never mark a person as notified when delivery is unconfirmed or no valid route exists. Provide fallback/manual introduction workflows without disclosing private details.
+- If no legitimate contact route exists, retain the club's interest/shortlist action without claiming the player was contacted. Offer an approved referral/introduction path where possible.
+- Agent notifications are permitted only where the agent's identity and professional status (where required) and an active, verified, player-authorized mandate cover the specific purpose, territory and time. An agent directory entry or pending mandate is not authority.
+- For minors, contact and notifications must follow verified guardian/safeguarding rules, age-appropriate discoverability, restricted messaging and applicable sport regulations. No unsolicited direct recruitment messaging to minors.
+
+#### User-facing workspaces and controls
+
+- **Player Interest Inbox:** interest requests, invitations, verified club identity, permitted opportunity details, accept/decline/request introduction, report and block.
+- **Agent Representation Inbox:** mandate-scoped opportunities and invitations; no representation actions before verification and player authorization.
+- **Club Recruitment Workspace:** discover, shortlist, express interest, track invitation/delivery/response status and manage authorized recruitment team access.
+- **Contact & Introduction Operations:** internal restricted tooling for source review, provenance, contact verification, bounce/failure, suppression, complaints and manual introductions.
+- Clearly label an expression of interest as neither a formal offer nor a signed agreement, and keep it separate from a transfer transaction and official registration/clearance.
+- Record actor, organization authority, target player/opportunity, contact-source and permission decision, notification channel, delivery outcome, response and access events in an auditable trail.
+
+#### Provider and delivery procurement candidates
+
+- Transactional email: Amazon SES and Postmark.
+- SMS/voice: Twilio and Vonage, subject to destination-country reach, sender registration, deliverability, cost and privacy review.
+- Push: Firebase Cloud Messaging and Apple Push Notification service for opted-in registered devices.
+- These are candidates only. Compare global reach, country-level delivery, sender requirements, data residency/processing terms, reliability, abuse controls, support, pricing and exit/data-portability before selection. Keep provider-neutral adapters.
+
+#### Delivery sequence and release gates
+
+1. Complete source-by-source contact/data permissions and provider coverage diligence; establish a documented legal basis and source register before importing contact data.
+2. Finish private opportunity draft foundation and verify its migration/API tests. PR #168 is merged; its records remain private drafts and are not publicly discoverable.
+3. Implement opportunity submission, moderation and publication with player consent, representative mandate, identity/authority, privacy and guardian checks. Keep public profile discovery distinct from confidential opportunity details.
+4. Implement external player identity/availability ingestion with source provenance, deduplication, freshness, correction, takedown and stale-data controls; begin with approved sources and non-sensitive sporting facts.
+5. Implement restricted contact registry and contact-source verification/permission decision service; do not bulk-import contact details until licensing and lawful outreach are confirmed.
+6. Implement club expression-of-interest and player/agent inbox workflows, account-independent secure invitations, notification delivery receipts, opt-out/suppression, rate limiting, abuse reporting and audit events.
+7. Add player profile claim, identity resolution, contact verification, agent mandate confirmation and safe onboarding.
+8. Complete football and basketball-specific validation, minors safeguarding, privacy/security threat modelling, penetration testing, delivery failure testing, legal review and staged live acceptance.
+
+**Release gate:** no player may be described as personally available/consenting or represented solely because an external source lists them; no private contact details are exposed to clubs; no unverified contact route is treated as a successful notification; no agent receives authority without a verified, active player mandate; no minor is exposed to unapproved direct contact.
