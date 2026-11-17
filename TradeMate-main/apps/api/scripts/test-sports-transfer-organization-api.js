@@ -82,6 +82,8 @@ async function main() {
     const membership = (await invite.json()).membership;
     assert.equal(membership.status, 'invited');
     assert.equal(membership.permission_scope, 'recruitment');
+    const duplicateInvite = await call('owner', 'POST', '/api/sports-transfer/organizations/' + organizationId + '/memberships', inviteBody);
+    assert.equal(duplicateInvite.status, 409, 'an unexpired invitation must not be duplicated');
 
     const outsiderList = await call('outsider', 'GET', '/api/sports-transfer/organizations/' + organizationId + '/members');
     assert.equal(outsiderList.status, 403);
@@ -142,6 +144,12 @@ async function main() {
 
     const revokedMemberList = await call('member', 'GET', '/api/sports-transfer/organizations/' + organizationId + '/members');
     assert.equal(revokedMemberList.status, 403);
+
+    const reinvite = await call('owner', 'POST', '/api/sports-transfer/organizations/' + organizationId + '/memberships', inviteBody);
+    assert.equal(reinvite.status, 201, 'a revoked member can be invited again');
+    assert.equal((await reinvite.json()).membership.id, membership.id, 're-invitation reuses the membership record');
+    const reaccepted = await call('member', 'POST', '/api/sports-transfer/memberships/' + membership.id + '/accept');
+    assert.equal(reaccepted.status, 201, 'the re-invited member can accept again');
 
     const ownerCanRevokeAdmin = await call('owner', 'POST', '/api/sports-transfer/memberships/' + adminMembershipId + '/revoke');
     assert.equal(ownerCanRevokeAdmin.status, 201);
