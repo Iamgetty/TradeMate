@@ -107,6 +107,9 @@ async function main() {
 
     const recruiterMine = await call('recruiter','GET','/api/sports-transfer/opportunities/mine');
     assert.ok((await recruiterMine.json()).opportunities.some(row => row.id === orgResult.id));
+    await pool.query("UPDATE sports_org_memberships SET status='revoked', updated_at=now() WHERE sports_organization_id=$1 AND user_id=$2", [org.rows[0].id, actors.recruiter.userId]);
+    const recruiterAfterRevocation = await call('recruiter','GET','/api/sports-transfer/opportunities/mine');
+    assert.ok(!(await recruiterAfterRevocation.json()).opportunities.some(row => row.id === orgResult.id), 'revoked organization members lose draft access');
     const outsiderMine = await call('outsider','GET','/api/sports-transfer/opportunities/mine');
     assert.equal((await outsiderMine.json()).opportunities.length,0);
     const unauthenticated = await call(null,'GET','/api/sports-transfer/opportunities/mine');
