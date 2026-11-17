@@ -4,7 +4,7 @@ import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, 
 import { Pool } from 'pg';
 import { createRlsAwarePool } from './database-context';
 import { decimalToUnits, fiatCentsToQuantityUnits, productToFiatCents, unitsToDecimal } from './p2p-decimal';
-import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema, sportsOrganizationCreateBodySchema, sportsOrganizationMembershipInviteBodySchema, sportsRepresentativeMandateCreateBodySchema, sportsRepresentativeMandateResponseBodySchema, sportsTransferOpportunityCreateBodySchema, sportsTransferDataSourceCreateBodySchema, sportsTransferDataSourceReviewBodySchema, sportsTransferExternalPlayerIngestBodySchema, sportsTransferExternalPlayerReviewBodySchema, sportsTransferExternalPlayerClaimCreateBodySchema, sportsTransferExternalPlayerClaimReviewBodySchema, sportsTransferVerificationCaseCreateBodySchema, sportsTransferVerificationReviewBodySchema } from './validation';
+import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema, sportsOrganizationCreateBodySchema, sportsOrganizationMembershipInviteBodySchema, sportsRepresentativeMandateCreateBodySchema, sportsRepresentativeMandateResponseBodySchema, sportsTransferOpportunityCreateBodySchema, sportsTransferDataSourceCreateBodySchema, sportsTransferDataSourceReviewBodySchema, sportsTransferExternalPlayerIngestBodySchema, sportsTransferExternalPlayerReviewBodySchema, sportsTransferExternalPlayerClaimCreateBodySchema, sportsTransferExternalPlayerClaimReviewBodySchema, sportsTransferVerificationCaseCreateBodySchema, sportsTransferVerificationReviewBodySchema, sportsTransferVerificationProviderEventBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -4775,6 +4775,71 @@ class SportsTransferVerificationCasesController {
   }
 }
 
+@Controller('webhooks/sports-transfer/identity')
+class SportsTransferVerificationProviderWebhookController {
+  @Post(':provider')
+  @HttpCode(200)
+  async receive(@Param('provider') provider: string, @Req() request: Request, @Body() body: any) {
+    if (!['sumsub','veriff','trulioo','sandbox'].includes(provider)) {
+      throw new NotFoundException('Verification provider webhook is not configured.');
+    }
+    const rawBody = (request as Request & { rawBody?: Buffer }).rawBody;
+    if (!rawBody || !Buffer.isBuffer(rawBody)) {
+      throw new BadRequestException('The signed raw webhook body is unavailable.');
+    }
+    const secret = process.env[`SPORTS_TRANSFER_${provider.toUpperCase()}_WEBHOOK_SECRET`] || '';
+    const signature = request.header('x-trademate-signature') || '';
+    if (!secret || !/^sha256=[a-f0-9]{64}$/i.test(signature)) {
+      throw new UnauthorizedException('Verification provider webhook signature is invalid.');
+    }
+    const expected = createHmac('sha256', secret).update(rawBody).digest();
+    const supplied = Buffer.from(signature.slice(7), 'hex');
+    if (supplied.length !== expected.length || !timingSafeEqual(expected, supplied)) {
+      throw new UnauthorizedException('Verification provider webhook signature is invalid.');
+    }
+    const input = parseBody(sportsTransferVerificationProviderEventBodySchema, body);
+    const payloadHash = createHash('sha256').update(rawBody).digest('hex');
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const found = await client.query(
+        `SELECT id, status FROM sports_transfer_verification_cases
+         WHERE provider_key = $1 AND provider_subject_reference = $2
+         FOR UPDATE`,
+        [provider, input.caseReference],
+      );
+      const caseId = found.rowCount ? found.rows[0].id as string : null;
+      const mappedOutcome = caseId ? input.outcome : 'unmatched';
+      await client.query(
+        `INSERT INTO sports_transfer_verification_provider_events
+          (provider_key, provider_event_id, verification_case_id, payload_sha256, mapped_outcome)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [provider, input.eventId, caseId, payloadHash, mappedOutcome],
+      );
+      if (caseId && ['submitted','processing'].includes(found.rows[0].status)) {
+        // Provider outcomes never approve or reject a TradeMate identity.
+        // They only move the case into independent human review.
+        await client.query(
+          "UPDATE sports_transfer_verification_cases SET status = 'needs_review', updated_at = now() WHERE id = $1",
+          [caseId],
+        );
+        await client.query(
+          "INSERT INTO audit_events (event_type, entity_type, entity_id, metadata) VALUES ('sports.identity.provider_event_received', 'sports_transfer_verification_case', $1, $2::jsonb)",
+          [caseId, JSON.stringify({ provider, event_id: input.eventId, outcome: input.outcome, payload_sha256: payloadHash })],
+        );
+      }
+      await client.query('COMMIT');
+      return { received: true, duplicate: false, matched: Boolean(caseId), humanReviewRequired: Boolean(caseId) };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      if ((error as { code?: string })?.code === '23505') {
+        return { received: true, duplicate: true };
+      }
+      throw error;
+    } finally { client.release(); }
+  }
+}
+
 @Controller('moderation/sports-transfer/verification-cases')
 class SportsTransferVerificationModerationController {
   private authorize(request: Request) {
@@ -4862,7 +4927,7 @@ class SportsTransferVerificationModerationController {
   }
 }
 
-@Module({ controllers: [SportsTransferVerificationCasesController, SportsTransferVerificationModerationController, SportsTransferExternalPlayerClaimsController, SportsTransferExternalPlayerClaimsModerationController, SportsTransferDiscoveryModerationController, SportsTransferOpportunitiesController, SportsTransferMandatesController, SportsTransferOrganizationsController, SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController] })
+@Module({ controllers: [SportsTransferVerificationProviderWebhookController, SportsTransferVerificationCasesController, SportsTransferVerificationModerationController, SportsTransferExternalPlayerClaimsController, SportsTransferExternalPlayerClaimsModerationController, SportsTransferDiscoveryModerationController, SportsTransferOpportunitiesController, SportsTransferMandatesController, SportsTransferOrganizationsController, SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController] })
 export class AppModule implements OnModuleDestroy {
   async onModuleDestroy() {
     if (databasePool) await databasePool.end();
