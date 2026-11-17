@@ -12,6 +12,7 @@ on:
       - feat/sports-transfer-private-profile-api
       - feat/sports-transfer-organization-memberships
       - feat/sports-transfer-representative-mandates
+      - feat/sports-transfer-opportunity-drafts
   pull_request:
     branches:
       - main
@@ -76,6 +77,11 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: node scripts/test-sports-transfer-organization-api.js
+      - name: Verify private Sports Transfer opportunity draft API authorization
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-sports-transfer-opportunities-api.js
       - name: Verify organization document permissions and rollback through HTTP endpoints
         working-directory: TradeMate-main/apps/api
         env:
