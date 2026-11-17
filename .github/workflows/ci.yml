@@ -50,7 +50,7 @@ jobs:
           node-version: 20
       - name: Install API dependencies
         working-directory: TradeMate-main/apps/api
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Build API for database context integration tests
         working-directory: TradeMate-main/apps/api
         run: npm run build
@@ -191,7 +191,7 @@ jobs:
           node-version: 20
       - name: Install API dependencies
         working-directory: TradeMate-main/apps/api
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Build API
         working-directory: TradeMate-main/apps/api
         run: npm run build
@@ -237,7 +237,7 @@ jobs:
       - name: API production dependency audit
         working-directory: TradeMate-main/apps/api
         run: |
-          npm install --omit=dev --no-audit --no-fund
+          npm ci --omit=dev --no-audit --no-fund
           npm audit --omit=dev --audit-level=high
 
       - name: Web dependency audit
@@ -294,7 +294,7 @@ jobs:
           node-version: 20
       - name: Install API dependencies
         working-directory: TradeMate-main/apps/api
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Build API for live browser acceptance
         working-directory: TradeMate-main/apps/api
         run: npm run build
