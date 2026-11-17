@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 
 type ListingDetail = { id:string; title:string; description:string; listing_type:'b2b'|'service'; division?:string; price_minor_units:string; currency_code:string; country_code:string; quantity_available:number|string|null; seller_name:string; category_name:string|null; media:{url:string;alt:string}[] };
 const API_BASE = ''.replace(/\/$/,'');
-const divisionLabel=(division?:string)=>({services:'Services',real_estate:'Real Estate',software:'Software',b2b:'B2B',industrial_trade:'Industrial & Trade',agriculture:'Agriculture',finance_investment:'Finance & Investment',institution_infrastructure:'Institution & Infrastructure',sports:'Sports',entertainment:'Entertainment'} as Record<string,string>)[division||'']||division;
+const divisionLabel=(division?:string)=>({services:'Services',real_estate:'Real Estate',software:'Software',b2b:'B2B',industrial_trade:'Industrial & Trade',agriculture:'Agriculture',finance_investment:'Finance & Investment',institution_infrastructure:'Institution & Infrastructure',sports:'Sports Transfer',entertainment:'Entertainment'} as Record<string,string>)[division||'']||division;
 const money=(minor:string,currency:string)=>{const n=Number(minor)/100;try{return new Intl.NumberFormat(undefined,{style:'currency',currency,maximumFractionDigits:2}).format(n)}catch{return currency+' '+n.toLocaleString()}};
 const quantityLabel=(value:number|string|null)=>value===null?'Quantity not specified':`${new Intl.NumberFormat().format(Number(value))} available`;
 export default function ListingDetailPage(){
