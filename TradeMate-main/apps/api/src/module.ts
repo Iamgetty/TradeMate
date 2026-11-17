@@ -3575,13 +3575,35 @@ class SportsTransferOrganizationsController {
       }
       const target = await client.query("SELECT id FROM users WHERE id = $1 AND status = 'active'", [input.userId]);
       if (!target.rowCount) throw new NotFoundException('The invited account was not found.');
-      const result = await client.query(
-        `INSERT INTO sports_org_memberships
-           (sports_organization_id, user_id, role, permission_scope, status, invited_by_user_id, expires_at)
-         VALUES ($1, $2, $3, $4, 'invited', $5, $6)
-         RETURNING id, user_id, role, permission_scope, status, expires_at, created_at`,
-        [id, input.userId, input.role, input.permissionScope, userId, expiresAt.toISOString()],
+      const existing = await client.query(
+        `SELECT id, status, expires_at FROM sports_org_memberships
+         WHERE sports_organization_id = $1 AND user_id = $2 FOR UPDATE`,
+        [id, input.userId],
       );
+      let result;
+      if (existing.rowCount) {
+        const prior = existing.rows[0];
+        const expired = prior.expires_at && new Date(prior.expires_at).getTime() <= now;
+        if (prior.status !== 'revoked' && !expired) {
+          throw new ConflictException('This account already has an active membership or unexpired invitation.');
+        }
+        result = await client.query(
+          `UPDATE sports_org_memberships
+           SET role = $1, permission_scope = $2, status = 'invited',
+               invited_by_user_id = $3, starts_at = NULL, expires_at = $4, updated_at = now()
+           WHERE id = $5
+           RETURNING id, user_id, role, permission_scope, status, expires_at, created_at`,
+          [input.role, input.permissionScope, userId, expiresAt.toISOString(), prior.id],
+        );
+      } else {
+        result = await client.query(
+          `INSERT INTO sports_org_memberships
+             (sports_organization_id, user_id, role, permission_scope, status, invited_by_user_id, expires_at)
+           VALUES ($1, $2, $3, $4, 'invited', $5, $6)
+           RETURNING id, user_id, role, permission_scope, status, expires_at, created_at`,
+          [id, input.userId, input.role, input.permissionScope, userId, expiresAt.toISOString()],
+        );
+      }
       await client.query(
         "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.organization.member_invited', 'sports_org_membership', $2, $3::jsonb)",
         [userId, result.rows[0].id, JSON.stringify({ sports_organization_id: id, invited_user_id: input.userId, role: input.role, permission_scope: input.permissionScope, expires_at: expiresAt.toISOString() })],
