@@ -116,10 +116,10 @@ export const verifySumsubWebhook = (
   const digest = headers['x-payload-digest'] || headers['X-Payload-Digest'];
   const algorithm = headers['x-payload-digest-alg'] || headers['X-Payload-Digest-Alg'];
   if (!secret || !digest || !algorithm) throw new Error('Sumsub webhook signature is missing.');
-  const algorithms: Record<string, 'sha1' | 'sha256' | 'sha512'> = {
+  // SHA-1 is deprecated by Sumsub. Require SHA-256 or SHA-512 for new integrations.
+  const algorithms: Record<string, 'sha256' | 'sha512'> = {
     HMAC_SHA256_HEX: 'sha256',
     HMAC_SHA512_HEX: 'sha512',
-    HMAC_SHA1_HEX: 'sha1',
   };
   const selected = algorithms[algorithm];
   if (!selected || !/^[a-f0-9]+$/i.test(digest)) throw new Error('Sumsub webhook signature algorithm is invalid.');
