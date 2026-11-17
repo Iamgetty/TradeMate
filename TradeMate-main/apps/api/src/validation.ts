@@ -430,3 +430,52 @@ export const sportsTransferOpportunityCreateBodySchema = z.object({
 }, {
   message: 'Structured financial terms require a currency and at least one term.',
 });
+
+export const sportsTransferDataSourceCreateBodySchema = z.object({
+  sourceKey: z.string().trim().min(2).max(100).regex(/^[a-zA-Z0-9._:-]+$/),
+  displayName: z.string().trim().min(2).max(180),
+  sourceType: z.enum(['official_federation','official_league','official_club','official_agent_register','licensed_sports_data','licensed_professional_directory','public_announcement','verified_referral']),
+  websiteUrl: z.string().url().max(2048).optional(),
+  accessMethod: z.enum(['manual_review','licensed_api','licensed_bulk','partner_feed']).default('manual_review'),
+  coverageSports: z.array(z.enum(['football','basketball'])).min(1).max(2),
+  coverageCountryCodes: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/)).max(100).optional(),
+}).strict().refine(value => new Set(value.coverageSports).size === value.coverageSports.length, {
+  message: 'Coverage sports must not contain duplicates.',
+}).refine(value => new Set(value.coverageCountryCodes || []).size === (value.coverageCountryCodes || []).length, {
+  message: 'Coverage country codes must not contain duplicates.',
+});
+
+export const sportsTransferDataSourceReviewBodySchema = z.object({
+  decision: z.enum(['under_review','approved','suspended','revoked']),
+  rightsBasis: z.string().trim().min(10).max(2000).optional(),
+  termsReference: z.string().trim().min(3).max(2048).optional(),
+  permittedDataCategories: z.array(z.enum(['player_identity','sporting_profile','roster','transfer_activity','availability_status','competition_data'])).max(6).optional(),
+  permittedPurposes: z.array(z.enum(['internal_research','player_discovery','public_sporting_profile','availability_monitoring'])).max(4).optional(),
+  note: z.string().trim().max(2000).optional(),
+}).strict().refine(value => value.decision !== 'approved' || (
+  Boolean(value.rightsBasis && value.termsReference)
+  && Boolean(value.permittedDataCategories?.length)
+  && Boolean(value.permittedPurposes?.length)
+), { message: 'Source approval requires a documented rights basis, terms reference, permitted data categories and permitted purposes.' });
+
+export const sportsTransferExternalPlayerIngestBodySchema = z.object({
+  sport: z.enum(['football','basketball']),
+  externalPlayerKey: z.string().trim().min(1).max(180),
+  displayName: z.string().trim().min(2).max(160),
+  positionOrRole: z.string().trim().max(100).optional(),
+  currentTeamName: z.string().trim().max(180).optional(),
+  competitionName: z.string().trim().max(180).optional(),
+  countryCode: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/).optional(),
+  availabilityStatus: z.string().trim().min(1).max(80),
+  sourceRecordUrl: z.string().url().max(2048).optional(),
+  sourcePublishedAt: z.string().datetime({ offset: true }).optional(),
+  effectiveAt: z.string().datetime({ offset: true }).optional(),
+  expiresAt: z.string().datetime({ offset: true }).optional(),
+  confidenceScore: z.number().min(0).max(1).optional(),
+}).strict();
+
+export const sportsTransferExternalPlayerReviewBodySchema = z.object({
+  decision: z.enum(['approved','rejected','stale','withdrawn']),
+  note: z.string().trim().max(2000).optional(),
+}).strict();
+
