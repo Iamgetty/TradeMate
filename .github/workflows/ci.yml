@@ -53,6 +53,11 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: npm run db:migrate
+      - name: Verify Sports Transfer identity, consent, mandate and guardian constraints
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-sports-transfer-identity.js
       - name: Verify organization document permissions and rollback through HTTP endpoints
         working-directory: TradeMate-main/apps/api
         env:
