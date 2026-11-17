@@ -40,6 +40,7 @@ const MIGRATIONS = [
   '033_sports_transfer_verification_cases.sql',
   '034_sports_transfer_verification_provider_events.sql',
   '035_sports_transfer_verification_sessions.sql',
+  '036_sports_transfer_verification_event_reconciliation.sql',
 ];
 
 async function main() {
