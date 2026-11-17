@@ -105,6 +105,7 @@ export default function SportsTransferVerificationPage() {
         current = created.verificationCase;
         setCaseRecord(current);
       }
+      if (!current) throw new Error('TradeMate could not create or load your verification case.');
       const caseId = current.id;
       const session = await requestJson(API + '/' + caseId + '/session', { method: 'POST' });
       setStatus('processing');
