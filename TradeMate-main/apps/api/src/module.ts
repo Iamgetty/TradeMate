@@ -4761,6 +4761,68 @@ class SportsTransferVerificationCasesController {
     } finally { client.release(); }
   }
 
+  @Post('verification-cases/:id/session')
+  async createProviderSession(@Param('id') id: string, @Req() request: Request) {
+    parseUuidParam(id);
+    const userId = await this.currentUser(request);
+    // The sandbox is an explicit non-production adapter. Real vendors remain disabled
+    // until a reviewed adapter, country policy and managed credentials are configured.
+    if (process.env.SPORTS_TRANSFER_IDENTITY_PROVIDER !== 'sandbox'
+      || process.env.SPORTS_TRANSFER_SANDBOX_ENABLED !== 'true') {
+      throw new HttpException('Identity verification sessions are not configured for this environment.', HttpStatus.SERVICE_UNAVAILABLE);
+    }
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const found = await client.query(
+        'SELECT id, subject_user_id, case_type, status, country_code FROM sports_transfer_verification_cases WHERE id = $1 FOR UPDATE',
+        [id],
+      );
+      if (!found.rowCount || found.rows[0].subject_user_id !== userId) {
+        throw new NotFoundException('Verification case not found.');
+      }
+      const verificationCase = found.rows[0];
+      if (verificationCase.case_type !== 'legal_identity') {
+        throw new BadRequestException('Provider KYC sessions are only available for legal identity cases.');
+      }
+      if (!['submitted','processing'].includes(verificationCase.status)) {
+        throw new ConflictException('This verification case is not eligible for a new provider session.');
+      }
+      await client.query(
+        "UPDATE sports_transfer_verification_sessions SET status = 'expired', updated_at = now() WHERE verification_case_id = $1 AND status IN ('created','submitted') AND expires_at <= now()",
+        [id],
+      );
+      const active = await client.query(
+        "SELECT id, provider_key, provider_session_reference, status, expires_at FROM sports_transfer_verification_sessions WHERE verification_case_id = $1 AND status IN ('created','submitted') AND expires_at > now() ORDER BY created_at DESC LIMIT 1",
+        [id],
+      );
+      if (active.rowCount) {
+        await client.query('COMMIT');
+        return { session: active.rows[0], reused: true, hostedUrl: null,
+          message: 'A sandbox session already exists. This is not a live identity check.' };
+      }
+      const sessionReference = 'sandbox_' + randomBytes(24).toString('hex');
+      const created = await client.query(
+        "INSERT INTO sports_transfer_verification_sessions (verification_case_id, provider_key, provider_session_reference, status, expires_at) VALUES ($1, 'sandbox', $2, 'created', now() + interval '30 minutes') RETURNING id, provider_key, provider_session_reference, status, expires_at",
+        [id, sessionReference],
+      );
+      await client.query(
+        "UPDATE sports_transfer_verification_cases SET provider_key = 'sandbox', provider_subject_reference = $1, status = 'processing', updated_at = now() WHERE id = $2",
+        [sessionReference, id],
+      );
+      await client.query(
+        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.identity.provider_session_created', 'sports_transfer_verification_case', $2, $3::jsonb)",
+        [userId, id, JSON.stringify({ provider: 'sandbox', session_id: created.rows[0].id, expires_at: created.rows[0].expires_at })],
+      );
+      await client.query('COMMIT');
+      return { session: created.rows[0], reused: false, hostedUrl: null,
+        message: 'Sandbox session created for integration testing only. No identity document was collected and no identity was verified.' };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
+  }
+
   @Get('verification-cases/mine')
   async mine(@Req() request: Request) {
     const userId = await this.currentUser(request);
