@@ -625,3 +625,8 @@ The experience must adapt to the signed-in user's verified role without assuming
 9. Complete security, privacy, safeguarding, legal, accessibility and abuse-case testing; then staged release and live acceptance.
 
 **Release gate:** no public launch until player consent, minors protections, organization/agent authority, confidential document handling, transaction state separation, auditability, abuse reporting and sport-specific legal/rule review are tested.
+
+
+## Sports Transfer — guardian relationships and minor safeguarding design
+
+See [`sports-transfer-guardian-safeguarding.md`](sports-transfer-guardian-safeguarding.md) for the mandatory relationship lifecycle, evidence review, narrowly scoped permissions, minor protections, reviewer controls, API requirements and release gates. Existing guardian relationship rows are not proof of legal authority and do not grant access or representation powers. This design is not an implemented or live workflow.
