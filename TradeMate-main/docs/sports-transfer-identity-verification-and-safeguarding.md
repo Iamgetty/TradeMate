@@ -1,6 +1,6 @@
 # Sports Transfer identity verification and safeguarding architecture
 
-**Status:** Architecture decision record and implementation specification. No identity provider is selected or connected by this document.
+**Status:** Architecture decision record and implementation specification. Sumsub is the initial KYC integration target. The API adapter, Sandbox-ready WebSDK token endpoint, signed webhook verification and status retrieval are implemented in code; no Sumsub account, credentials, commercial agreement, production access or live verification is configured yet. Frontend WebSDK presentation and production approval remain outstanding.
 
 ## 1. Purpose and release boundary
 
@@ -17,7 +17,7 @@ Until the required gates are implemented and independently tested, external disc
 
 ## 2. Provider strategy
 
-Use a provider-neutral adapter. Evaluate Sumsub as a primary candidate, with Veriff as a challenger; assess Trulioo for global identity and business verification coverage. Regional providers such as Smile ID and Dojah may supplement coverage where their legal entity, country support, document types, liveness, and assurance are demonstrably better. These are candidates only, not selected vendors.
+Use a provider-neutral adapter and implement Sumsub first for adult legal-identity KYC. Veriff remains a challenger; assess Trulioo for global identity and business verification coverage. Regional providers such as Smile ID and Dojah may supplement coverage where their legal entity, country support, document types, liveness, and assurance are demonstrably better. Sumsub is the engineering integration target, not yet a contracted or production-approved vendor. Country coverage and suitability must be validated before enabling any jurisdiction.
 
 Before contracting, produce a country-by-country coverage matrix for supported player/account countries:
 - Supported identity documents and document versions.
@@ -32,6 +32,19 @@ Before contracting, produce a country-by-country coverage matrix for supported p
 - Pricing, support escalation, audit evidence, security certifications and breach terms.
 
 Do not assume one vendor has truly global coverage. Provider selection requires legal/privacy review and measured test coverage, not marketing claims. Do not send sensitive documents to multiple vendors by default; use a controlled fallback only when the first provider cannot support the jurisdiction or document.
+
+## 2A. Initial Sumsub integration boundary
+
+The first adapter uses Sumsub's documented HMAC-SHA256 API request authentication and applicant-bound WebSDK access tokens. TradeMate uses the internal verification-case UUID as Sumsub's `userId` / `externalUserId`, so the provider callback can be correlated without sending a user's email, phone number, or identity document data in the initial API request.
+
+- Credentials are supplied only through deployment secrets: `SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY`, `SUMSUB_KYC_LEVEL_NAME`, and `SUMSUB_WEBHOOK_SECRET`.
+- The Sandbox or Production app-token pair selects the Sumsub environment; never reuse production credentials in tests.
+- WebSDK access tokens are short-lived and returned only from the authenticated, owner-checked case-session endpoint. They are not stored in TradeMate's database.
+- Sumsub webhook signatures are verified against the original raw body using the configured digest algorithm. The inbox event key is deterministically derived from Sumsub applicant/event metadata because the documented applicant webhook does not expose a universal event ID.
+- Webhook retries are idempotent. Provider events only move an open case into TradeMate's human-review queue; a Sumsub GREEN/RED result never directly verifies or rejects a TradeMate identity.
+- The owner status endpoint can retrieve current Sumsub review status as a recovery path; webhooks remain the primary delivery mechanism.
+- Sumsub's verification-level name must exist in the same environment as the app token. Sandbox configuration and Production configuration are separate.
+- No frontend SDK is presented until the client-side WebSDK is integrated and tested. No live identity checks occur until valid credentials, provider configuration, privacy review and country policy are in place.
 
 ## 3. Provider adapter contract
 
