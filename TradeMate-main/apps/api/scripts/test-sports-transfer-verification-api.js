@@ -97,6 +97,17 @@ async function main() {
     assert.equal(sessionResult.session.status, 'created');
     assert.equal(sessionResult.hostedUrl, null, 'sandbox must not pretend to provide a hosted identity flow');
     assert.equal(sessionResult.reused, false);
+    const unauthenticatedSessionStatus = await userRequest('GET', '/api/sports-transfer/verification-cases/' + legalCase.id + '/session', undefined, false);
+    assert.equal(unauthenticatedSessionStatus.status, 401, 'session status is private and requires authentication');
+    const sessionStatus = await userRequest('GET', '/api/sports-transfer/verification-cases/' + legalCase.id + '/session');
+    assert.equal(sessionStatus.status, 200);
+    const sessionStatusResult = await sessionStatus.json();
+    assert.equal(sessionStatusResult.session.status, 'created');
+    assert.equal(sessionStatusResult.session.provider_key, 'sandbox');
+    assert.equal(sessionStatusResult.providerPollingAvailable, false,
+      'the endpoint must not imply that a live provider status was polled');
+    assert.equal(Object.hasOwn(sessionStatusResult.session, 'provider_session_reference'), false,
+      'opaque provider references must not be exposed in the owner status response');
     const reusedSession = await userRequest('POST', '/api/sports-transfer/verification-cases/' + legalCase.id + '/session');
     assert.equal(reusedSession.status, 201);
     assert.equal((await reusedSession.json()).reused, true, 'active provider sessions are reused rather than duplicated');
