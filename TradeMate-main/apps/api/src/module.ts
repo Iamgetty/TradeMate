@@ -4872,6 +4872,7 @@ class SportsTransferVerificationProviderWebhookController {
       const found = await client.query(
         `SELECT id, status FROM sports_transfer_verification_cases
          WHERE provider_key = $1 AND provider_subject_reference = $2
+           AND case_type = 'legal_identity'
          FOR UPDATE`,
         [provider, input.caseReference],
       );
