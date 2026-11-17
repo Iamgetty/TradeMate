@@ -3473,7 +3473,8 @@ class SportsTransferOrganizationsController {
       `SELECT role FROM sports_org_memberships
        WHERE sports_organization_id = $1 AND user_id = $2 AND status = 'active'
          AND (starts_at IS NULL OR starts_at <= now())
-         AND (expires_at IS NULL OR expires_at > now())`,
+         AND (expires_at IS NULL OR expires_at > now())
+       FOR UPDATE`,
       [organizationId, userId],
     );
     if (!result.rowCount || !['owner', 'admin'].includes(result.rows[0].role)) {
@@ -3609,7 +3610,7 @@ class SportsTransferOrganizationsController {
         [userId, result.rows[0].id, JSON.stringify({ sports_organization_id: id, invited_user_id: input.userId, role: input.role, permission_scope: input.permissionScope, expires_at: expiresAt.toISOString() })],
       );
       await client.query(
-        "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'Sports Transfer', 'Sporting organization invitation', $2, 'users')",
+        "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'System', 'Sporting organization invitation', $2, 'users')",
         [input.userId, 'You have been invited to join a sporting organization as ' + input.role.replace(/_/g, ' ') + '.'],
       );
       await client.query('COMMIT');
@@ -3645,7 +3646,7 @@ class SportsTransferOrganizationsController {
       );
       await client.query(
         `INSERT INTO user_notifications (user_id, category, title, body, icon)
-         SELECT user_id, 'Sports Transfer', 'New sporting organization member',
+         SELECT user_id, 'System', 'New sporting organization member',
                 'A new member has accepted an invitation to your sporting organization.', 'users'
          FROM sports_org_memberships
          WHERE sports_organization_id = $1 AND role IN ('owner', 'admin')
@@ -3697,7 +3698,7 @@ class SportsTransferOrganizationsController {
       );
       if (row.user_id !== userId) {
         await client.query(
-          "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'Sports Transfer', 'Sporting organization access updated', 'Your membership in a sporting organization has been revoked.', 'users')",
+          "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'System', 'Sporting organization access updated', 'Your membership in a sporting organization has been revoked.', 'users')",
           [row.user_id],
         );
       }
