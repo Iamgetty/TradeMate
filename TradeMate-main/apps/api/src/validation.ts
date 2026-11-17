@@ -479,3 +479,15 @@ export const sportsTransferExternalPlayerReviewBodySchema = z.object({
   note: z.string().trim().max(2000).optional(),
 }).strict();
 
+export const sportsTransferExternalPlayerClaimCreateBodySchema = z.object({
+  profileId: z.string().uuid(),
+  claimStatement: z.string().trim().min(20).max(2000),
+  evidenceUrl: z.string().trim().url().max(2048).refine(value => value.startsWith('https://'), 'Evidence links must use HTTPS.').optional(),
+}).strict();
+
+export const sportsTransferExternalPlayerClaimReviewBodySchema = z.object({
+  decision: z.enum(['approved','rejected']),
+  note: z.string().trim().max(2000).optional(),
+}).strict();
+
+
