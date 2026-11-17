@@ -185,8 +185,8 @@ function section(startMark, endMark) {
     "only a whole-number B2B quantity may populate quantityAvailable");
   assert.match(publish, /null!==[\w$]+&&\([\w$]+=[\w$]+\.filter\(function\([\w$]+\)\{return"Quantity \/ scope"!==[\w$]+\[0\]\}\)\)/,
     "numeric inventory must be removed from description text when sent separately");
-  assert.match(publish, /listingType:SRV\[[\w$]+\][^}]*quantityAvailable:[\w$]+/,
-    "B2B publishing must send the API listing type and inventory field");
+  assert.match(publish, /listingType:"B2B"===[\w$]+\?"b2b":"service",division:DIVISION_SLUG\[[\w$]+\][^}]*quantityAvailable:[\w$]+/,
+    "all contract divisions must send their category while B2B retains its API listing type and inventory field");
   const browse = section("function mapListing(", "function loadMarket(");
   assert.match(browse, /"b2b"===[\w$]+\.listing_type\?"B2B":"Services"/,
     "public B2B listings must be mapped to the B2B division");
