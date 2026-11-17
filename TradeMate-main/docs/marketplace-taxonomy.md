@@ -1,8 +1,8 @@
 # TradeMate marketplace taxonomy
 
-**Status:** Approved target product architecture; implementation is staged and is not implied by this document.
+**Status:** Approved product architecture. All ten top-level Contract Categories are connected to the shared persistent listing draft and moderation workflow; division-specific attributes, safeguards and specialised workflows remain staged.
 
-This document defines the target taxonomy for TradeMate's hybrid marketplace. It is a product and domain model, not a statement that every division, listing type, regulated activity, payment rail or contract workflow is currently available.
+This document defines the taxonomy for TradeMate's hybrid marketplace. Every top-level Contract Category can be submitted by a signed-in user with a business space and is held for TradeMate review before public discovery. Category submission does not imply that every regulated activity, payment rail or specialised transaction workflow is available.
 
 ## 1. Marketplace model
 
