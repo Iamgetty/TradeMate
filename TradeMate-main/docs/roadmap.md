@@ -6,7 +6,7 @@ This roadmap records the current product direction. It is not a claim that each 
 
 - TradeMate connects counterparties; it is not a conventional exchange or product checkout.
 - The core outcome is a mutually agreed business contract.
-- Explore separates ten Contract Categories (Services, Real Estate, Software, B2B, Industrial & Trade, Agriculture, Finance & Investment, Institution & Infrastructure, Sports and Entertainment) from the four Marketplaces (P2P, NFTs, Forex and Crypto). All ten Contract Categories share the persistent review-submission workflow; P2P remains separate.
+- Explore separates ten Contract Categories (Services, Real Estate, Software, B2B, Industrial & Trade, Agriculture, Finance & Investment, Institution & Infrastructure, Sports Transfer and Entertainment) from the four Marketplaces (P2P, NFTs, Forex and Crypto). All ten Contract Categories share the persistent review-submission workflow; P2P remains separate.
 - Product listings and product-cart commerce are out of scope for the current build. A dedicated product marketplace may be reconsidered in a future version, subject to a deliberate product decision. It must not silently reappear in the current app.
 - Keep P2P separate from the current marketplace contract workflow.
 
@@ -449,3 +449,179 @@ This section records the five engineering observations raised during the ongoing
 - Preserve unsent marketplace enquiries and conversation replies in tab-scoped session storage when a request returns 401; restore the draft on return and clear it after a successful send.
 - Reject external, protocol-relative and backslash-containing return destinations to prevent open redirects.
 - Add browser coverage for login return, marketplace enquiry draft restoration and expired-session conversation reply recovery.
+
+## Third-party integration register — mandatory build reference
+
+The canonical inventory of current, planned, candidate, alternative, placeholder and unselected external providers is maintained in [`third-party-integrations.md`](third-party-integrations.md). Check it before every build session and update it in the same PR whenever an integration decision or dependency changes. Do not treat listed candidates or cloud targets as selected or deployed.
+
+
+## Sports Transfer — complete global experience (football and basketball first)
+
+**Approved product scope, 17 November 2026:** Sports Transfer is a complete global sports recruitment, player-movement and transfer-transaction experience. Football (soccer) and basketball are the first supported sports. The platform is extensible to other sports, but each sport must have its own transaction types, rules and state machines. This is an approved roadmap specification, not a claim that the feature is implemented or live.
+
+### 1. Transfer and movement types
+
+**Football**
+- Permanent transfer between clubs.
+- Domestic and international transfers.
+- Straight loan, loan with option to buy, loan with obligation to buy, and permitted loan extensions or recalls.
+- Free-agent / out-of-contract signing.
+- Pre-contract agreement where permitted by applicable rules and contract status.
+- Player exchange / swap, including cash-plus-player structures.
+- Transfer with instalments, conditional add-ons, performance bonuses and sell-on clauses.
+- Youth / academy movement and development-related arrangements, subject to strict minor safeguards and applicable rules.
+- Trial, training opportunity and scouting invitation (not represented as a transfer).
+- Contract renewal, extension, termination by mutual agreement and release (distinct from a transfer).
+- Women's, men's, amateur and other eligible football pathways with their own association/competition rules.
+
+**Basketball**
+- Free-agent signing and re-signing; restricted and unrestricted free agency where the competition recognizes those concepts.
+- Direct player trade, multi-player trade and multi-team trade.
+- Trade involving permitted draft rights/picks or other league-approved consideration.
+- Waiver placement, waiver claim and clearance; distinguish waiver from free agency.
+- Draft declaration, draft rights, selection and signing workflows where applicable.
+- Contract assignment, transfer, buyout, release, termination and renewal where permitted by league rules.
+- International transfer / federation clearance and domestic league movement.
+- Temporary assignment, loan or two-way/development arrangement only where the relevant league and contract permit it.
+- Training-camp, tryout and recruitment invitation (not represented as a completed player movement).
+
+**Shared classification rule:** a listing, scouting lead, trial, negotiation, signed agreement, league-approved move and official registration are different objects/states. Never label a rumour, interest or unsigned offer as a completed transfer. Each transaction type is enabled only for the relevant sport, competition, season and rule profile.
+
+### 2. Global Transfer-Window Centre
+
+A dedicated Transfer-Window Centre will provide:
+- Global calendar with filters for sport, country, association/federation, league, competition, gender/category, age group and season.
+- Opening/closing dates, local time zone, countdowns, deadline-day view, upcoming windows and recently closed windows.
+- Separate registration windows, transfer windows, trade deadlines, waiver periods, free-agency periods, draft dates and other competition-specific periods.
+- Rules and eligibility notes per competition, including exceptions, registration limits and relevant international clearance requirements.
+- Source attribution, last-verified timestamp, effective date, historical versions and correction history for every window.
+- Alerts and saved calendars for clubs, agents, players and scouts; deadline reminders for offers, options, loans, registrations and document expiry.
+- Calendar subscriptions/export and localized date/time display.
+- Distinct status for confirmed official dates, provisional dates and unverified reports.
+
+Window data must be competition-specific and versioned. No universal football window or basketball deadline may be assumed. Official association/league sources take precedence; commercial feeds can supplement but cannot silently override authoritative rules.
+
+### 3. People, organizations and authority
+
+**People**
+- Players/athletes, with personal profile, sporting profile, position/role, career history, availability preferences and consent settings.
+- Parents/legal guardians for minors, with restricted and auditable authority.
+- Licensed or otherwise authorized agents/intermediaries and their client mandates, scope, territory and expiry.
+- Club executives, sporting directors, general managers, recruitment leads, coaches and authorized negotiators.
+- Scouts and talent-identification staff, with limited access to permitted sporting information.
+- League/federation/association registration and compliance officers where formal access or review is authorized.
+- Lawyers, player representatives, translators and other invited professional advisers with scoped, revocable access.
+- TradeMate moderators, trust-and-safety reviewers and dispute specialists with least-privilege internal access.
+
+**Organizations**
+- Professional and amateur clubs, teams, academies and development programs.
+- National associations, federations, leagues, competitions and governing bodies.
+- Licensed agencies and representation firms.
+- Schools, universities and other eligible institutions where the competition rules allow participation.
+- Approved medical/fitness professionals only for specific, consented workflows—not as public profile viewers.
+- Data and verification providers.
+
+Every organization needs verified legal identity, official sporting identity where applicable, authorized signatories, role-based members, evidence and review history. A person acting for a club must prove authority; a club account must not automatically gain control of a player's profile. Agency membership alone does not prove a valid player mandate.
+
+### 4. Complete transfer transaction lifecycle
+
+1. **Onboard and verify:** verify the club/team, player identity, representative authority, agent mandate and required organization records.
+2. **Create opportunity:** publish a public, private or invitation-only player availability, club need, recruitment brief or permitted transaction proposal.
+3. **Set permissions and consent:** confirm who may see the opportunity, contact the player, represent them and access documents; record consent scope, timestamp, expiry and withdrawal.
+4. **Discover and shortlist:** search and filter by sport, position, age eligibility, competition, location, availability, contract status, budget/terms and verified status.
+5. **Express interest:** verified counterparties send an enquiry or invitation; protect player identity/contact details where privacy settings require it.
+6. **Open negotiation room:** invite only authorized parties; record offers, counteroffers, comments, versioned terms and timestamps.
+7. **Structure transaction:** select the correct sport-specific transaction type; capture fees/consideration, salary/contract terms, instalments, bonuses, sell-on, loan duration/options, trade assets, draft rights, conditions and deadlines as applicable.
+8. **Due diligence:** verify identity, club authority, player consent, agent mandate, existing contract constraints, eligibility, sanctions/other legally required screening and competition-specific restrictions.
+9. **Document and agree:** exchange controlled documents; capture approvals and signatures using a legally suitable e-signature process where selected; preserve immutable evidence and document versions.
+10. **Submit for official clearance:** track required federation/league registration, international transfer certificate, trade approval, roster/waiver clearance or other competition process. TradeMate does not impersonate or replace governing-body systems.
+11. **Resolve conditions:** track medical/fitness conditions only through separate, consented restricted channels; resolve work authorization, visas, clearances, registration limits and contractual conditions where applicable.
+12. **Confirm outcome:** states include proposed, negotiating, agreed in principle, documents pending, signed, submitted for clearance, approved/registered, rejected, withdrawn, expired, disputed and completed. Exact states vary by sport and transaction.
+13. **Close and archive:** provide each authorized party a final record, evidence bundle, obligations/deadlines and audit trail; restrict access according to retention and privacy rules.
+14. **Post-transaction:** reminders for instalments/bonuses/options/loan return/renewal/registration deadlines where the platform is authorized to track them; never imply that TradeMate itself moves funds unless a separately approved regulated payment flow exists.
+
+**Three separate truth layers are mandatory:** (a) commercial agreement between parties, (b) contract/document execution, and (c) official league/federation registration or clearance. One must never automatically imply another.
+
+### 5. Exceptional product features
+
+- **Transfer Intelligence:** verified player/club needs matching, explainable recommendations, saved searches, smart shortlists and availability alerts. No opaque or discriminatory ranking.
+- **Transfer Centre / live activity:** confirmed moves, official announcements, attributed reports and rumours in visibly separate categories; corrections and source links.
+- **Player career passport:** player-controlled sporting history, verified clubs/competitions, contract/registration timeline and portable evidence with granular sharing permissions.
+- **Club recruitment workspace:** squad planning, position gaps, recruitment boards, budgets, shortlists, internal notes and multi-user approvals.
+- **Agent workspace:** mandate/client management, mandate expiry, authorized opportunities, secure communications and compliance records.
+- **Deal room:** structured offers, counteroffers, term comparison, approval routing, version history, secure files and audit events.
+- **Transfer fee and contract-term reporting:** disclose only where sourced, licensed and legally shareable; mark estimates and undisclosed values clearly. Never fabricate fees or salaries.
+- **Deadline-day command centre:** live window countdown, pending deals, document/approval blockers and personalized alerts.
+- **Scouting tools:** structured reports, video links from licensed sources, performance context and private evaluation notes.
+- **Localization:** multiple languages, currencies, time zones, date formats and country-specific rule profiles.
+- **Accessibility and mobile-first workflows:** low-bandwidth support, resumable uploads, clear status and accessible controls.
+- **Reputation and trust signals:** verified identity/authority, transaction conduct and moderated feedback; no unverified public accusations or pay-to-rank.
+- **Disputes and incident reporting:** confidential reporting, evidence preservation, escalation, appeals and anti-retaliation controls.
+- **Analytics:** club recruitment pipeline and aggregate marketplace trends with privacy safeguards; no sale of sensitive player data.
+
+### 6. Third-party integrations to plan
+
+Maintain provider-neutral adapters and select providers only after technical, legal, coverage, licensing, privacy, cost and reliability evaluation.
+
+- **Governing-body / official rules:** FIFA and member associations for football; FIBA, national federations, NBA, WNBA and other relevant leagues for basketball. Official sources are authorities, not presumed APIs.
+- **Football registration:** FIFA TMS and International Transfer Certificate processes where access is authorized; association-specific registration sources and official window notices.
+- **Basketball transaction/roster data:** league/federation sources for roster, trade, waiver, free agency, draft and clearance status.
+- **Sports data:** evaluate Sportradar and Stats Perform/Opta for competition coverage, player identity matching, historical depth, freshness and redistribution rights.
+- **Identity and KYB:** evaluate global KYC/KYB providers from the canonical register; verify players, representatives, club legal entities, directors and beneficial owners proportionately.
+- **Agent credentials:** official licensing/registration sources where available, with manual evidence and periodic revalidation where no reliable API exists.
+- **Electronic signatures and document integrity:** evaluate legally valid e-signature, signer identity, authority, timestamps, tamper evidence and long-term verification.
+- **Secure file and video infrastructure:** private object storage, malware scanning, expiring access, content moderation and licensed video/data suppliers.
+- **Communications:** transactional email, optional SMS/voice and in-app notifications with delivery tracking and user preferences.
+- **Maps and localization:** geocoding/time-zone data and translation/localization services where useful.
+- **Security and risk:** sanctions/PEP screening where legally required, fraud detection, bot protection, security monitoring and independent penetration testing.
+- **Calendar and workflow:** calendar export/subscription and reliable event/queue infrastructure for deadline and obligation reminders.
+
+The detailed vendor/source register remains in [third-party-integrations.md](third-party-integrations.md). No provider is selected, contracted or integrated merely by appearing in this roadmap. No scraping, unlicensed redistribution or assumed restricted FIFA/league access.
+
+### 7. Important protections and controls
+
+- **Player autonomy:** player consent is explicit, informed, purpose-specific, time-bounded and revocable; no club or agent can list or negotiate on behalf of a player without verifiable authority.
+- **Minors:** age-aware onboarding, guardian verification/consent, restricted discoverability and messaging, no unsolicited direct contact, safeguarding review and jurisdiction/federation-specific rules.
+- **Anti-trafficking and exploitation:** detect suspicious recruitment, coercion, document retention, unlawful fees, sham agents and cross-border abuse; provide confidential reporting and specialist escalation.
+- **Agent/intermediary safeguards:** verify applicable licensing/authorization, mandate, representation scope, conflicts, expiry and transaction-specific permissions; reflect current rules rather than hardcoding outdated global assumptions.
+- **Privacy and data minimization:** protect identity documents, home/contact details, contract terms, salary and sensitive personal data; default to least disclosure and granular permissions.
+- **Medical confidentiality:** medical/fitness records are not public profile data; separate storage, explicit purpose and consent, narrow professional access, access logs and deletion/retention controls.
+- **Fraud prevention:** detect impersonation, fake clubs, forged mandates, duplicate identities, stolen documents, manipulated videos and suspicious payment requests; use human review and appeals.
+- **Financial safety:** no escrow, payment collection, commission settlement or custody claim without a separately approved legal, licensing and payment-provider design. Warn users against off-platform payment fraud.
+- **Competition-rule enforcement:** sport-, league-, season- and jurisdiction-aware rules; block or escalate prohibited transactions, eligibility conflicts, roster-limit issues and expired windows.
+- **Evidence and audit:** append-only transaction events, versioned documents, timestamps, actor attribution, consent evidence and defensible retention/legal-hold policies.
+- **Security:** encryption in transit/at rest, strong authentication, MFA for privileged actors, secure sessions, rate limits, abuse detection, malware scanning, signed webhooks and incident response.
+- **Fairness and integrity:** no discriminatory filters or protected-characteristic inference; transparent ranking factors, moderation and appeals; prohibit match-fixing, bribery, collusion and market manipulation.
+- **Regulatory and legal review:** country-specific employment, immigration, child protection, privacy, sports-agent, competition, tax and contract law review before enabling relevant workflows.
+
+### 8. TradeMate Sports Transfer experience structure
+
+Keep the feature inside the existing Sports Transfer Contract Category, while giving it a dedicated experience with clear navigation:
+
+1. **Sports Transfer Home:** personalized dashboard, recommended opportunities, saved players/clubs, recent verified activity and action items.
+2. **Discover:** browse players, club needs, opportunities, trials and verified recruitment listings; filter by sport and competition.
+3. **Transfer Windows:** global Transfer-Window Centre with calendars, countdowns, deadlines, rules and alerts.
+4. **Players:** player directory and player-controlled career passports with privacy-aware profiles.
+5. **Clubs & Teams:** verified organization directory, squad/recruitment needs and official organization profiles.
+6. **Agents & Representatives:** verified professional directory, mandates and authority status.
+7. **Transfer Activity:** confirmed transfers, trades and signings; separately labelled reports/rumours with sources.
+8. **My Workspace:** role-aware dashboard for players, clubs, agents and scouts; shortlists, recruitment boards, enquiries, offers, negotiations, approvals and documents.
+9. **Deal Room:** one secure workspace per transaction with terms, participants, approvals, evidence, deadlines and status.
+10. **Notifications & Calendar:** actionable updates, window deadlines, document expiry, pending approvals and reminders.
+11. **Trust & Support:** verification status, consent/permissions, safeguarding, report/appeal and dispute support.
+
+The experience must adapt to the signed-in user's verified role without assuming every user is a club or agent. Preserve TradeMate's existing Contract Category submission/review conventions where appropriate, but do not force confidential transfer negotiations or player data into public listing review.
+
+### 9. Delivery order and release gates
+
+1. Inspect existing Sports category UI, app.js, API, schema, permissions and migrations; map current data and backward compatibility before renaming implementation identifiers.
+2. Design shared sport/competition/season, club/team, player, agent/mandate, consent, verification, document, transaction and audit models.
+3. Implement role permissions, privacy boundaries, verification/manual review, safeguarding and sport-specific rule profiles.
+4. Build the Transfer-Window Centre with authoritative source attribution and update history.
+5. Deliver football transaction workflows and full end-to-end tests.
+6. Deliver basketball transaction workflows and full end-to-end tests.
+7. Build Deal Room, Transfer Activity, role workspaces, alerts and exceptional features.
+8. Integrate licensed/authorized providers after due diligence and acceptance tests.
+9. Complete security, privacy, safeguarding, legal, accessibility and abuse-case testing; then staged release and live acceptance.
+
+**Release gate:** no public launch until player consent, minors protections, organization/agent authority, confidential document handling, transaction state separation, auditability, abuse reporting and sport-specific legal/rule review are tested.
