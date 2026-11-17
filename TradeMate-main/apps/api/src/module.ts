@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, randomInt, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { Pool } from 'pg';
 import { createRlsAwarePool } from './database-context';
-import { configuredIdentityProvider } from './sports-transfer/identity-provider';
+import { configuredIdentityProvider, createSumsubWebSdkSession, getSumsubApplicantStatus, verifySumsubWebhook } from './sports-transfer/identity-provider';
 import { decimalToUnits, fiatCentsToQuantityUnits, productToFiatCents, unitsToDecimal } from './p2p-decimal';
 import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema, sportsOrganizationCreateBodySchema, sportsOrganizationMembershipInviteBodySchema, sportsRepresentativeMandateCreateBodySchema, sportsRepresentativeMandateResponseBodySchema, sportsTransferOpportunityCreateBodySchema, sportsTransferDataSourceCreateBodySchema, sportsTransferDataSourceReviewBodySchema, sportsTransferExternalPlayerIngestBodySchema, sportsTransferExternalPlayerReviewBodySchema, sportsTransferExternalPlayerClaimCreateBodySchema, sportsTransferExternalPlayerClaimReviewBodySchema, sportsTransferVerificationCaseCreateBodySchema, sportsTransferVerificationReviewBodySchema, sportsTransferVerificationProviderEventBodySchema } from './validation';
 
@@ -4766,10 +4766,9 @@ class SportsTransferVerificationCasesController {
   async createProviderSession(@Param('id') id: string, @Req() request: Request) {
     parseUuidParam(id);
     const userId = await this.currentUser(request);
-    // The sandbox is an explicit non-production adapter. Real vendors remain disabled
-    // until a reviewed adapter, country policy and managed credentials are configured.
-    if (configuredIdentityProvider() !== 'sandbox') {
-      throw new HttpException('Identity verification sessions are not configured for this environment.', HttpStatus.SERVICE_UNAVAILABLE);
+    const providerKey = configuredIdentityProvider();
+    if (!providerKey || !['sandbox', 'sumsub'].includes(providerKey)) {
+      throw new HttpException('Identity verification provider is not configured for this environment.', HttpStatus.SERVICE_UNAVAILABLE);
     }
     const client = await databasePool!.connect();
     try {
@@ -4797,26 +4796,43 @@ class SportsTransferVerificationCasesController {
         [id],
       );
       if (active.rowCount) {
+        const sdk = providerKey === 'sumsub' ? await createSumsubWebSdkSession(id) : null;
         await client.query('COMMIT');
-        return { session: active.rows[0], reused: true, hostedUrl: null,
-          message: 'A sandbox session already exists. This is not a live identity check.' };
+        return {
+          session: active.rows[0],
+          reused: true,
+          hostedUrl: null,
+          ...(sdk ? { sdkAccessToken: sdk.accessToken, sdkTokenExpiresAt: sdk.expiresAt.toISOString() } : {}),
+          message: providerKey === 'sumsub'
+            ? 'A Sumsub applicant session is ready. The WebSDK token is short-lived and must be used only by the authenticated case owner.'
+            : 'A sandbox session already exists. This is not a live identity check.',
+        };
       }
-      const sessionReference = 'sandbox_' + randomBytes(24).toString('hex');
+      const sessionReference = (providerKey === 'sumsub' ? 'sumsub_' : 'sandbox_') + randomBytes(24).toString('hex');
+      const sdk = providerKey === 'sumsub' ? await createSumsubWebSdkSession(id) : null;
+      const expiresAt = sdk?.expiresAt || new Date(Date.now() + 30 * 60 * 1000);
       const created = await client.query(
-        "INSERT INTO sports_transfer_verification_sessions (verification_case_id, provider_key, provider_session_reference, status, expires_at) VALUES ($1, 'sandbox', $2, 'created', now() + interval '30 minutes') RETURNING id, provider_key, provider_session_reference, status, expires_at",
-        [id, sessionReference],
+        "INSERT INTO sports_transfer_verification_sessions (verification_case_id, provider_key, provider_session_reference, status, expires_at) VALUES ($1,$2,$3,'created',$4) RETURNING id, provider_key, provider_session_reference, status, expires_at",
+        [id, providerKey, sessionReference, expiresAt.toISOString()],
       );
       await client.query(
-        "UPDATE sports_transfer_verification_cases SET provider_key = 'sandbox', provider_subject_reference = $1, status = 'processing', updated_at = now() WHERE id = $2",
-        [sessionReference, id],
+        "UPDATE sports_transfer_verification_cases SET provider_key = $1, provider_subject_reference = $2, status = 'processing', updated_at = now() WHERE id = $3",
+        [providerKey, providerKey === 'sumsub' ? id : sessionReference, id],
       );
       await client.query(
         "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.identity.provider_session_created', 'sports_transfer_verification_case', $2, $3::jsonb)",
-        [userId, id, JSON.stringify({ provider: 'sandbox', session_id: created.rows[0].id, expires_at: created.rows[0].expires_at })],
+        [userId, id, JSON.stringify({ provider: providerKey, session_id: created.rows[0].id, expires_at: created.rows[0].expires_at })],
       );
       await client.query('COMMIT');
-      return { session: created.rows[0], reused: false, hostedUrl: null,
-        message: 'Sandbox session created for integration testing only. No identity document was collected and no identity was verified.' };
+      return {
+        session: created.rows[0],
+        reused: false,
+        hostedUrl: null,
+        ...(sdk ? { sdkAccessToken: sdk.accessToken, sdkTokenExpiresAt: sdk.expiresAt.toISOString() } : {}),
+        message: providerKey === 'sumsub'
+          ? 'Sumsub WebSDK session created. Complete identity capture in the client SDK; TradeMate will independently review the provider result.'
+          : 'Sandbox session created for integration testing only. No identity document was collected and no identity was verified.',
+      };
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;
@@ -4828,7 +4844,7 @@ class SportsTransferVerificationCasesController {
     parseUuidParam(id);
     const userId = await this.currentUser(request);
     const ownedCase = await databasePool!.query(
-      "SELECT id, case_type FROM sports_transfer_verification_cases WHERE id = $1 AND subject_user_id = $2",
+      "SELECT id, case_type, provider_key, provider_subject_reference FROM sports_transfer_verification_cases WHERE id = $1 AND subject_user_id = $2",
       [id, userId],
     );
     if (!ownedCase.rowCount) throw new NotFoundException('Verification case not found.');
@@ -4842,15 +4858,45 @@ class SportsTransferVerificationCasesController {
       "UPDATE sports_transfer_verification_sessions SET status = 'expired', updated_at = now() WHERE verification_case_id = $1 AND status IN ('created','submitted') AND expires_at <= now()",
       [id],
     );
-    const result = await databasePool!.query(
+    let result = await databasePool!.query(
       "SELECT id, provider_key, status, expires_at, created_at, updated_at FROM sports_transfer_verification_sessions WHERE verification_case_id = $1 ORDER BY created_at DESC LIMIT 1",
       [id],
     );
+    let providerOutcome: string | null = null;
+    let providerPollingAvailable = false;
+    if (result.rowCount && result.rows[0].provider_key === 'sumsub') {
+      try {
+        const live = await getSumsubApplicantStatus(id);
+        providerPollingAvailable = true;
+        providerOutcome = live.outcome;
+        await databasePool!.query(
+          "UPDATE sports_transfer_verification_sessions SET status = $2, updated_at = now() WHERE id = $1",
+          [result.rows[0].id, live.status],
+        );
+        if (live.status === 'completed') {
+          // Provider outcomes are evidence only. A human reviewer must make the
+          // final TradeMate decision, even when Sumsub reports GREEN or RED.
+          await databasePool!.query(
+            "UPDATE sports_transfer_verification_cases SET status = 'needs_review', updated_at = now() WHERE id = $1 AND status IN ('submitted','processing')",
+            [id],
+          );
+        }
+        result = await databasePool!.query(
+          "SELECT id, provider_key, status, expires_at, created_at, updated_at FROM sports_transfer_verification_sessions WHERE id = $1",
+          [result.rows[0].id],
+        );
+      } catch {
+        throw new HttpException('Sumsub status is temporarily unavailable. Please retry shortly.', HttpStatus.BAD_GATEWAY);
+      }
+    }
     return {
       session: result.rows[0] || null,
-      providerPollingAvailable: false,
+      providerPollingAvailable,
+      providerOutcome,
       message: result.rowCount
-        ? 'Showing the last status recorded by TradeMate. Provider status polling is not yet configured.'
+        ? providerPollingAvailable
+          ? 'Current Sumsub status retrieved. Provider outcomes still require independent TradeMate review.'
+          : 'Showing the last status recorded by TradeMate; this sandbox session has no live provider polling.'
         : 'No provider session has been created for this verification case.',
     };
   }
@@ -4877,35 +4923,45 @@ class SportsTransferVerificationProviderWebhookController {
     if (!['sumsub','veriff','trulioo','sandbox'].includes(provider)) {
       throw new NotFoundException('Verification provider webhook is not configured.');
     }
-    // Vendor routes remain unavailable until their real provider-specific
-    // signature verification and payload adapters are implemented.
-    if (provider !== 'sandbox') {
-      throw new HttpException('This identity provider webhook adapter is not implemented.', HttpStatus.SERVICE_UNAVAILABLE);
-    }
     const rawBody = (request as Request & { rawBody?: Buffer }).rawBody;
     if (!rawBody || !Buffer.isBuffer(rawBody)) {
       throw new BadRequestException('The signed raw webhook body is unavailable.');
     }
-    const secret = process.env[`SPORTS_TRANSFER_${provider.toUpperCase()}_WEBHOOK_SECRET`] || '';
-    const timestampHeader = request.header('x-trademate-timestamp') || '';
-    const signature = request.header('x-trademate-signature') || '';
-    // Sandbox signatures bind the raw body to a short-lived Unix timestamp.
-    // Vendor adapters must implement each provider's own freshness contract.
-    if (!secret || !/^\d{10}$/.test(timestampHeader) || !/^sha256=[a-f0-9]{64}$/i.test(signature)) {
-      throw new UnauthorizedException('Verification provider webhook signature is invalid.');
+    let input: { eventId: string; caseReference: string; outcome: 'succeeded' | 'failed' | 'review_required' };
+    let payloadHash: string;
+    if (provider === 'sumsub') {
+      try {
+        const normalized = verifySumsubWebhook(rawBody, {
+          'x-payload-digest': request.header('x-payload-digest') || undefined,
+          'x-payload-digest-alg': request.header('x-payload-digest-alg') || undefined,
+        });
+        input = { eventId: normalized.eventId, caseReference: normalized.externalUserId, outcome: normalized.outcome };
+        payloadHash = normalized.payloadSha256;
+      } catch {
+        throw new UnauthorizedException('Sumsub webhook signature or payload is invalid.');
+      }
+    } else if (provider === 'sandbox') {
+      const secret = process.env.SPORTS_TRANSFER_SANDBOX_WEBHOOK_SECRET || '';
+      const timestampHeader = request.header('x-trademate-timestamp') || '';
+      const signature = request.header('x-trademate-signature') || '';
+      if (!secret || !/^\\d{10}$/.test(timestampHeader) || !/^sha256=[a-f0-9]{64}$/i.test(signature)) {
+        throw new UnauthorizedException('Verification provider webhook signature is invalid.');
+      }
+      const timestamp = Number(timestampHeader);
+      if (!Number.isSafeInteger(timestamp) || Math.abs(Math.floor(Date.now() / 1000) - timestamp) > 300) {
+        throw new UnauthorizedException('Verification provider webhook timestamp is outside the accepted window.');
+      }
+      const signedPayload = Buffer.concat([Buffer.from(timestampHeader + '.'), rawBody]);
+      const expected = createHmac('sha256', secret).update(signedPayload).digest();
+      const supplied = Buffer.from(signature.slice(7), 'hex');
+      if (supplied.length !== expected.length || !timingSafeEqual(expected, supplied)) {
+        throw new UnauthorizedException('Verification provider webhook signature is invalid.');
+      }
+      input = parseBody(sportsTransferVerificationProviderEventBodySchema, body);
+      payloadHash = createHash('sha256').update(rawBody).digest('hex');
+    } else {
+      throw new HttpException('This identity provider webhook adapter is not implemented.', HttpStatus.SERVICE_UNAVAILABLE);
     }
-    const timestamp = Number(timestampHeader);
-    if (!Number.isSafeInteger(timestamp) || Math.abs(Math.floor(Date.now() / 1000) - timestamp) > 300) {
-      throw new UnauthorizedException('Verification provider webhook timestamp is outside the accepted window.');
-    }
-    const signedPayload = Buffer.concat([Buffer.from(timestampHeader + '.'), rawBody]);
-    const expected = createHmac('sha256', secret).update(signedPayload).digest();
-    const supplied = Buffer.from(signature.slice(7), 'hex');
-    if (supplied.length !== expected.length || !timingSafeEqual(expected, supplied)) {
-      throw new UnauthorizedException('Verification provider webhook signature is invalid.');
-    }
-    const input = parseBody(sportsTransferVerificationProviderEventBodySchema, body);
-    const payloadHash = createHash('sha256').update(rawBody).digest('hex');
     const client = await databasePool!.connect();
     try {
       await client.query('BEGIN');
