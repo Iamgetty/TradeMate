@@ -2,6 +2,20 @@ const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const { Pool } = require('pg');
 
+async function expectConstraintFailure(client, query, values, message) {
+  await client.query('SAVEPOINT expected_constraint_failure');
+  try {
+    await assert.rejects(
+      client.query(query, values),
+      (error) => error.code === '23514',
+      message,
+    );
+  } finally {
+    await client.query('ROLLBACK TO SAVEPOINT expected_constraint_failure');
+    await client.query('RELEASE SAVEPOINT expected_constraint_failure');
+  }
+}
+
 async function main() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required.');
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
@@ -16,12 +30,10 @@ async function main() {
     assert.equal(candidate.rows[0].rights_status, 'candidate');
     assert.equal(candidate.rows[0].contact_data_permission, 'not_approved');
 
-    await assert.rejects(
-      client.query(
-        "UPDATE sports_transfer_data_sources SET rights_status='approved' WHERE id=$1",
-        [candidate.rows[0].id],
-      ),
-      (error) => error.code === '23514',
+    await expectConstraintFailure(
+      client,
+      "UPDATE sports_transfer_data_sources SET rights_status='approved' WHERE id=$1",
+      [candidate.rows[0].id],
       'a source cannot be approved without a documented rights basis, terms and reviewer',
     );
     await client.query('ROLLBACK');
@@ -56,25 +68,21 @@ async function main() {
     assert.equal(record.rows[0].review_status, 'pending_review');
     assert.equal(record.rows[0].claim_status, 'unclaimed');
 
-    await assert.rejects(
-      client.query(
-        `INSERT INTO sports_transfer_external_player_records
-          (data_source_id, sport, external_player_key, display_name, availability_status)
-         VALUES ($1, 'football', $2, 'Invalid Cross Sport Status', 'trade_available_reported')`,
-        [approved.rows[0].id, 'invalid-' + suffix],
-      ),
-      (error) => error.code === '23514',
+    await expectConstraintFailure(
+      client,
+      `INSERT INTO sports_transfer_external_player_records
+        (data_source_id, sport, external_player_key, display_name, availability_status)
+       VALUES ($1, 'football', $2, 'Invalid Cross Sport Status', 'trade_available_reported')`,
+      [approved.rows[0].id, 'invalid-' + suffix],
       'football records cannot use basketball availability states',
     );
 
-    await assert.rejects(
-      client.query(
-        `INSERT INTO sports_transfer_external_player_records
-          (data_source_id, sport, external_player_key, display_name, review_status)
-         VALUES ($1, 'football', $2, 'Unreviewed Public Player', 'approved')`,
-        [approved.rows[0].id, 'unreviewed-' + suffix],
-      ),
-      (error) => error.code === '23514',
+    await expectConstraintFailure(
+      client,
+      `INSERT INTO sports_transfer_external_player_records
+        (data_source_id, sport, external_player_key, display_name, review_status)
+       VALUES ($1, 'football', $2, 'Unreviewed Public Player', 'approved')`,
+      [approved.rows[0].id, 'unreviewed-' + suffix],
       'a discovered player cannot be approved without a reviewer and timestamp',
     );
 
