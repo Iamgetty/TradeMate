@@ -13,6 +13,7 @@ on:
       - feat/sports-transfer-organization-memberships
       - feat/sports-transfer-representative-mandates
       - feat/sports-transfer-opportunity-drafts
+      - feat/sports-transfer-external-player-discovery-foundation
   pull_request:
     branches:
       - main
