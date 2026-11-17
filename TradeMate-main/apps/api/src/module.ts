@@ -4845,6 +4845,11 @@ class SportsTransferVerificationProviderWebhookController {
     if (!['sumsub','veriff','trulioo','sandbox'].includes(provider)) {
       throw new NotFoundException('Verification provider webhook is not configured.');
     }
+    // Vendor routes remain unavailable until their real provider-specific
+    // signature verification and payload adapters are implemented.
+    if (provider !== 'sandbox') {
+      throw new HttpException('This identity provider webhook adapter is not implemented.', HttpStatus.SERVICE_UNAVAILABLE);
+    }
     const rawBody = (request as Request & { rawBody?: Buffer }).rawBody;
     if (!rawBody || !Buffer.isBuffer(rawBody)) {
       throw new BadRequestException('The signed raw webhook body is unavailable.');
