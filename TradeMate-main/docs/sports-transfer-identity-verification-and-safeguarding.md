@@ -1,6 +1,6 @@
 # Sports Transfer identity verification and safeguarding architecture
 
-**Status:** Architecture decision record and implementation specification. Sumsub is the initial KYC integration target. The API adapter, Sandbox-ready WebSDK token endpoint, signed webhook verification and status retrieval are implemented in code; no Sumsub account, credentials, commercial agreement, production access or live verification is configured yet. Frontend WebSDK presentation and production approval remain outstanding.
+**Status:** Architecture decision record and implementation specification. Sumsub is the initial KYC integration target. The API adapter, Sandbox-ready WebSDK token endpoint, signed webhook verification and status retrieval are implemented in code; no Sumsub account, credentials, commercial agreement, production access or live verification is configured yet. Real Sandbox credential validation, country coverage approval and production approval remain outstanding.
 
 ## 1. Purpose and release boundary
 
@@ -35,7 +35,7 @@ Do not assume one vendor has truly global coverage. Provider selection requires 
 
 ## 2A. Initial Sumsub integration boundary
 
-The first adapter uses Sumsub's documented HMAC-SHA256 API request authentication and applicant-bound WebSDK access tokens. TradeMate uses the internal verification-case UUID as Sumsub's `userId` / `externalUserId`, so the provider callback can be correlated without sending a user's email, phone number, or identity document data in the initial API request.
+The first adapter uses Sumsub's documented HMAC-SHA256 API request authentication and applicant-bound WebSDK access tokens. A TradeMate account-page flow launches the official client-side WebSDK and supports token refresh. TradeMate uses the internal verification-case UUID as Sumsub's `userId` / `externalUserId`, so the provider callback can be correlated without sending a user's email, phone number, or identity document data in the initial API request.
 
 - Credentials are supplied only through deployment secrets: `SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY`, `SUMSUB_KYC_LEVEL_NAME`, and `SUMSUB_WEBHOOK_SECRET`.
 - The Sandbox or Production app-token pair selects the Sumsub environment; never reuse production credentials in tests.
@@ -44,7 +44,7 @@ The first adapter uses Sumsub's documented HMAC-SHA256 API request authenticatio
 - Webhook retries are idempotent. Provider events only move an open case into TradeMate's human-review queue; a Sumsub GREEN/RED result never directly verifies or rejects a TradeMate identity.
 - The owner status endpoint can retrieve current Sumsub review status as a recovery path; webhooks remain the primary delivery mechanism.
 - Sumsub's verification-level name must exist in the same environment as the app token. Sandbox configuration and Production configuration are separate.
-- No frontend SDK is presented until the client-side WebSDK is integrated and tested. No live identity checks occur until valid credentials, provider configuration, privacy review and country policy are in place.
+- The client-side WebSDK screen is implemented but awaits real Sandbox credentials and end-to-end testing. No live identity checks occur until valid credentials, provider configuration, privacy review and country policy are in place.
 
 ## 3. Provider adapter contract
 
