@@ -184,6 +184,8 @@ async function main() {
         const visible = await fetch(baseUrl + '/api/market/listings?division=' + division + '&q=' + encodeURIComponent(title));
         assert.equal(visible.status, 200);
         assert.ok((await visible.json()).data.some((offer) => offer.id === createdListing.id && offer.division === division), division + ' must be publicly discoverable after approval');
+        const proposal = await fetch(baseUrl + '/api/market/contracts', { method: 'POST', headers: { cookie: 'trademate_session=' + encodeURIComponent(actors.outsider.token), 'content-type': 'application/json' }, body: JSON.stringify({ listingId: createdListing.id, amount: '100.00', scope: 'Complete the agreed ' + division + ' opportunity scope and deliverables.', terms: 'Both parties will confirm the agreed milestones and completion terms.' }) });
+        assert.equal(proposal.status, 201, 'a published ' + division + ' offer must accept contract proposals');
       }
     }
     const b2bDetail = await fetch(baseUrl + '/api/market/listings/' + b2bDraft.id);
