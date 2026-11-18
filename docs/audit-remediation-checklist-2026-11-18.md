@@ -4,14 +4,14 @@ Baseline reviewed: `main` at `02d27f0313ca817b030c7fe2d2b8b5f5b9a692c1` (2026-11
 
 This checklist records the source/configuration audit findings. Items are not complete until the relevant code change, automated checks, and required runtime verification have passed. Do not merge or deploy without explicit approval.
 
-## 1. Database migrations and profile integrity — first code fix
+## 1. Database migrations and profile integrity — code fix validated in CI
 
-- [ ] Update `apps/api/scripts/migrate.js` so migrations `024_usernames.sql` and `025_ensure_public_profile_rows.sql` are included and applied in the correct order.
-- [ ] Update `updateMyProfile()` in `apps/api/src/module.ts` so every profile-row insert satisfies the username NOT NULL constraint and username uniqueness rules.
-- [ ] Update the `test-rls-pilot.js` fixture to provide a valid username after migration 024.
-- [ ] Add a regression test that compares migration files with the runner's applied migration list, so future migrations cannot silently be skipped.
-- [ ] Run clean-database migration integration tests and profile create/update tests.
-- [ ] Review PR #216 against this branch's fix; do not merge it blindly or duplicate conflicting changes.
+- [x] Update `apps/api/scripts/migrate.js` so migrations `024_usernames.sql` and `025_ensure_public_profile_rows.sql` are included and applied in the correct order.
+- [x] Update `updateMyProfile()` in `apps/api/src/module.ts` so every profile-row insert satisfies the username NOT NULL constraint and username uniqueness rules.
+- [x] Update the `test-rls-pilot.js` fixture to provide a valid username after migration 024.
+- [x] Add a regression test that compares migration files with the runner's applied migration list, so future migrations cannot silently be skipped (runner fails fast on manifest mismatch).
+- [x] Run clean-database migration integration tests and profile create/update tests (CI run `44409164204`, all 8 jobs passed, including the full database integration and browser acceptance jobs).
+- [x] Review PR #216 against this branch's fix: it overlaps the migration registration and profile username insert, but omits the manifest guard and RLS fixture update. PR #219 contains the superset; leave #216 open and unmerged pending explicit PR housekeeping approval.
 
 ## 2. Database backup and restore verification — urgent operational item
 
