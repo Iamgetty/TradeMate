@@ -2,7 +2,7 @@
  * Home screen: replaces the single "Your promotion could appear here" card with
  * a compact, swipeable slide of five promo cards covering the platform
  * (advertise slot, P2P, zero-fee offers, NFTs, Alpha spotlight). The card is
- * a more readable, medium-height carousel card. Copy comes from text already shown in the
+ * a large, spacious carousel card. Copy comes from text already shown in the
  * app (Promotions page, market descriptions); nothing here is invented stats.
  * Runs as a DOM patch so app.js does not need to change. Taps use the app's
  * existing [data-pg] / [data-mm] / [data-f] handlers.
@@ -31,20 +31,21 @@
   var css = document.createElement('style');
   css.id = 'tm-promo-css';
   css.textContent = [
-    '.banner.promo-slides{padding:0;min-height:124px;height:124px;margin:12px 16px 14px}',
+    '.banner.promo-slides{padding:0;min-height:184px;height:184px;margin:14px 16px 16px;border-radius:20px}',
     '.promo-track{display:flex;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}',
     '.promo-track::-webkit-scrollbar{display:none}',
-    '.promo-slide{flex:0 0 100%;min-width:0;box-sizing:border-box;scroll-snap-align:start;scroll-snap-stop:always;display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:14px 16px 22px;color:inherit;text-align:left;cursor:pointer}',
-    '.promo-ic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:color-mix(in srgb,var(--am) 16%,transparent);color:var(--am)}',
-    '.promo-ic svg{width:24px;height:24px}',
+    '.promo-slide{flex:0 0 100%;min-width:0;box-sizing:border-box;scroll-snap-align:start;scroll-snap-stop:always;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:20px;align-items:center;padding:24px 28px 34px;color:inherit;text-align:left;cursor:pointer}',
+    '.promo-ic{width:60px;height:60px;border-radius:18px;display:grid;place-items:center;background:color-mix(in srgb,var(--am) 16%,transparent);color:var(--am)}',
+    '.promo-ic svg{width:30px;height:30px}',
     '.banner .promo-tx{min-width:0}',
-    '.banner .promo-tx .chip{display:block;line-height:1}',
-    '.banner .promo-tx h3{margin:6px 0 3px;font-size:16px;line-height:1.25;max-width:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
-    '.banner .promo-tx p{margin:0;max-width:none;font-size:12px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
-    '.promo-cta{flex:none;padding:9px 14px;border-radius:99px;font-size:12.5px;font-weight:700;line-height:1;white-space:nowrap;background:var(--am);color:#1b1006}',
+    '.banner .promo-tx .chip{display:block;line-height:1;font-size:11px;letter-spacing:.08em}',
+    '.banner .promo-tx h3{margin:10px 0 7px;font-size:20px;line-height:1.25;max-width:none;white-space:normal;overflow:visible;text-overflow:clip}',
+    '.banner .promo-tx p{margin:0;max-width:none;font-size:14px;line-height:1.5;white-space:normal;overflow:visible;text-overflow:clip}',
+    '.promo-cta{flex:none;padding:12px 18px;border-radius:99px;font-size:14px;font-weight:700;line-height:1;white-space:nowrap;background:var(--am);color:#1b1006}',
     'html[data-theme="light"] .promo-cta{color:#fff}',
     '.promo-dots{position:absolute;left:0;right:0;bottom:7px;display:flex;justify-content:center;gap:6px;pointer-events:none}',
-    '.promo-dots i{width:6px;height:6px;border-radius:99px;background:var(--line);transition:width .2s,background .2s}',
+    '.promo-dots i{width:7px;height:7px;border-radius:99px;background:var(--line);transition:width .2s,background .2s}',
+    '@media(max-width:600px){.banner.promo-slides{min-height:196px;height:196px;margin:12px 12px 14px}.promo-slide{grid-template-columns:48px minmax(0,1fr);gap:14px;padding:20px 18px 36px;align-content:center}.promo-ic{width:48px;height:48px;border-radius:15px}.promo-ic svg{width:25px;height:25px}.banner .promo-tx h3{font-size:18px;white-space:normal}.banner .promo-tx p{font-size:13px;white-space:normal}.promo-cta{grid-column:2;justify-self:start;padding:10px 15px;font-size:13px;margin-top:2px}}',
     '.promo-dots i.on{width:16px;background:var(--am)}'
   ].join('\n');
   (document.head || document.documentElement).appendChild(css);
