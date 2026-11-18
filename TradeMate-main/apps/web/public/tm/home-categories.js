@@ -35,7 +35,7 @@
       '#app .view>.grid .opt{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important;padding:0!important}',
       '#app .view>.grid .opt .tile{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important}',
       '#app .view>.grid .opt:hover .tile{transform:translateY(-2px)!important;box-shadow:none!important}',
-      '#app .view .mk-grid .mk-card{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important;padding:12px 8px!important;min-height:0!important}',
+      '#app .view .mk-grid .mk-card{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important}',
       '#app .view .mk-grid .mk-card:before{display:none!important}',
       '#app .view .mk-grid .mk-card:hover{transform:translateY(-2px)!important;box-shadow:none!important}',
       '#app .view .mk-grid .mk-card .mk-ico{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important}',
