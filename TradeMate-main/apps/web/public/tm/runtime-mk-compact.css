@@ -93,3 +93,7 @@
   border:0!important;
   box-shadow:none!important;
 }
+
+
+/* Home category buttons: keep each label close beneath its icon. */
+#app .view>.grid .opt{gap:2px!important}
