@@ -120,3 +120,20 @@
    Explore keeps its original marketplace tile height and spacing. */
 #app .view .home-market-shortcuts{row-gap:4px!important}
 #app .view .home-market-shortcuts .mk-card{min-height:68px!important;padding:4px 6px!important}
+
+
+/* Homepage feature/promotion carousel: reduce slide height by ~40% while
+   keeping the copy and action side-by-side, vertically centered and readable. */
+#app .view .tbn-s{
+  min-height:107px!important;
+  padding:12px!important;
+  gap:10px!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  align-items:center!important;
+  align-content:center!important;
+}
+#app .view .tbn-copy{min-width:0!important}
+#app .view .tbn h2{font-size:20px!important;line-height:1.12!important;margin:6px 0 3px!important}
+#app .view .tbn-tag{padding:4px 8px!important}
+#app .view .tbn-cta{justify-self:end!important;align-self:center!important;padding:9px 14px!important;font-size:12px!important;white-space:nowrap!important}
+#app .view .tbn-list{max-width:100%!important;min-width:0!important}
