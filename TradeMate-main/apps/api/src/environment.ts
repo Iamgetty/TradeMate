@@ -23,8 +23,9 @@ const environmentSchema = z.object({
   ).optional(),
   RESEND_API_KEY: z.string().min(1).optional(),
   RESEND_FROM_EMAIL: z.string().refine((value) => {
-    if (z.string().email().safeParse(value).success) return true;
-    const match = value.match(/^(?:"[^"\\r\\n]+"|[^"<>\\r\\n]+)\\s*<([^<>\\s]+)>$/);
+    const trimmed = value.trim();
+    if (z.string().email().safeParse(trimmed).success) return true;
+    const match = trimmed.match(/^(?:"[^"\r\n]+"|[^"<>\r\n]+?)\s*<([^<>\s]+)>$/);
     return Boolean(match && z.string().email().safeParse(match[1]).success);
   }, 'Must be a valid email address, optionally with a display name (for example: TradeMate <noreply@trademate.cfd>).').optional(),
 }).passthrough();
