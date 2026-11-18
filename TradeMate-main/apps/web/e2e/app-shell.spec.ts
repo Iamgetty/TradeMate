@@ -70,7 +70,7 @@ test('homepage shortcut cards do not use the legacy view-entry animation after l
     // The Home view uses .mk-card for its marketplace shortcut tiles. Keep
     // the market-page animations scoped to their own components, but never
     // animate those Home tiles through the shared .view.enter class.
-    expect(source).not.toMatch(/\\.view\\.enter\\s+\\.mk-card\\s*\\{/);
+    expect(source).not.toMatch(/\.view\.enter\s+\.mk-card\s*\{/);
     expect(source).not.toMatch(/\.view\.enter\s*>\s*\*/);
   }
 
