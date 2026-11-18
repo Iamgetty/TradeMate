@@ -1,4 +1,4 @@
-const { readFile } = require('node:fs/promises');
+const { readFile, readdir } = require('node:fs/promises');
 const path = require('node:path');
 const { Pool } = require('pg');
 
@@ -30,6 +30,8 @@ const MIGRATIONS = [
   '021_totp_replay_protection.sql',
   '022_password_reset_tokens.sql',
   '023_email_verification.sql',
+  '024_usernames.sql',
+  '025_ensure_public_profile_rows.sql',
   '026_all_contract_category_review.sql',
   '027_sports_transfer_identity_foundation.sql',
   '028_sports_transfer_mandate_acceptance.sql',
@@ -38,6 +40,19 @@ const MIGRATIONS = [
 ];
 
 async function main() {
+  const migrationsDirectory = path.join(__dirname, '..', 'database', 'migrations');
+  const migrationFiles = (await readdir(migrationsDirectory))
+    .filter((file) => file.endsWith('.sql'))
+    .sort();
+  const registeredMigrations = [...MIGRATIONS].sort();
+  const unregistered = migrationFiles.filter((file) => !registeredMigrations.includes(file));
+  const missingFiles = registeredMigrations.filter((file) => !migrationFiles.includes(file));
+  if (unregistered.length || missingFiles.length) {
+    throw new Error(
+      `Migration manifest mismatch. Unregistered files: [${unregistered.join(', ')}]. Missing files: [${missingFiles.join(', ')}].`,
+    );
+  }
+
   const migrationDatabaseUrl = process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL;
   if (!migrationDatabaseUrl) {
     throw new Error('MIGRATION_DATABASE_URL (or DATABASE_URL during the transition) is required to run database migrations.');
