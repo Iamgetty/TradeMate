@@ -114,3 +114,7 @@
 
 /* Keep homepage shortcut names close to their icons. */
 #app .view>.grid .opt{gap:2px!important}
+
+
+/* Tighten only the vertical gap between the two homepage marketplace shortcut rows. */
+#app .view .home-market-shortcuts{row-gap:3px!important}
