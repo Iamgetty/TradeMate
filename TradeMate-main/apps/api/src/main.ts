@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './module';
 import { attachMarketFeed } from './market-feed';
+import { attachMarketHighlights } from './market-highlights';
 import { json } from 'express';
 import { validateEnvironment } from './environment';
 import { databaseRequestContextMiddleware } from './database-context';
@@ -39,6 +40,9 @@ async function bootstrap() {
     },
     credentials: true,
   });
+
+  // Registered after CORS so the highlights route gets the same CORS headers.
+  attachMarketHighlights(app);
 
   const port = Number(process.env.PORT || 4000);
   await app.listen(port, '0.0.0.0');
