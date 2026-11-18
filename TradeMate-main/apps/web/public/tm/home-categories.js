@@ -33,7 +33,7 @@
     style.id = 'tm-flat-home-buttons';
     style.textContent = [
       '#app .view>.grid .opt{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important;padding:0!important}',
-      '#app .view>.grid .opt .tile{background:var(--s2)!important;border:1px solid var(--line)!important;box-shadow:none!important;border-radius:12px!important}',
+      '#app .view>.grid .opt .tile{background:linear-gradient(150deg,color-mix(in srgb,var(--h) 24%,var(--s1)),color-mix(in srgb,var(--h) 6%,var(--s1)))!important;border:1px solid color-mix(in srgb,var(--h) 34%,transparent)!important;box-shadow:none!important;border-radius:15px!important}',
       '#app .view>.grid .opt:hover .tile{transform:translateY(-2px)!important;box-shadow:none!important}',
       '#app .view .mk-grid .mk-card{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important}',
       '#app .view .mk-grid .mk-card:before{display:none!important}',
@@ -41,9 +41,10 @@
       '#app .view .mk-grid .mk-card .mk-ico{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important}',
       '#app .view .mk-grid .mk-card:hover .mk-ico,#app .view .mk-grid .mk-card:focus-visible .mk-ico{background:transparent!important;transform:translateY(-2px)!important}',
       '#app .view>.grid .opt{height:68px!important;min-height:68px!important;gap:2px!important}',
+      '#app .view>.grid .opt .opt-label{margin:0!important}',
       '#app .view>.grid .opt .tile{width:50px!important;height:50px!important;flex:none!important}',
       '#app .view>.grid .opt .tile svg{width:25px!important;height:25px!important}',
-      '#app .view>.grid .opt .opt-label{font-size:11.5px!important;line-height:1.15!important}'
+      ''
     ].join('');
     document.head.appendChild(style);
   }
