@@ -79,6 +79,11 @@ html.tm-desktop body{background:var(--bg)}
 .tm-desktop .mk-ico svg{width:22px!important;height:22px!important}
 .tm-desktop .mk-card:hover .mk-ico,.tm-desktop .mk-card:focus-visible .mk-ico{background:var(--s3)!important;color:var(--txt)!important;transform:none!important}
 .tm-desktop .mk-name{font:800 24px/1.1 'Bricolage Grotesque',sans-serif!important;letter-spacing:-.02em;color:var(--txt);max-width:100%}
+/* Slightly roomier Explore category and marketplace shortcuts */
+.tm-desktop .mk-card{min-height:180px!important;padding:26px!important}
+.tm-desktop .mk-ico{width:50px!important;height:50px!important}
+.tm-desktop .mk-ico svg{width:24px!important;height:24px!important}
+.tm-desktop .mk-name{font-size:25px!important}
 }
 
 /* ---- theme-aware overrides (light / purple / dark) ---- */

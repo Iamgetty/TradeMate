@@ -35,11 +35,15 @@
       '#app .view>.grid .opt{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important;padding:0!important}',
       '#app .view>.grid .opt .tile{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important}',
       '#app .view>.grid .opt:hover .tile{transform:translateY(-2px)!important;box-shadow:none!important}',
-      '#app .view .mk-grid .mk-card{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important;padding:12px 8px!important;min-height:0!important}',
+      '#app .view .mk-grid .mk-card{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important}',
       '#app .view .mk-grid .mk-card:before{display:none!important}',
       '#app .view .mk-grid .mk-card:hover{transform:translateY(-2px)!important;box-shadow:none!important}',
       '#app .view .mk-grid .mk-card .mk-ico{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important}',
-      '#app .view .mk-grid .mk-card:hover .mk-ico,#app .view .mk-grid .mk-card:focus-visible .mk-ico{background:transparent!important;transform:translateY(-2px)!important}'
+      '#app .view .mk-grid .mk-card:hover .mk-ico,#app .view .mk-grid .mk-card:focus-visible .mk-ico{background:transparent!important;transform:translateY(-2px)!important}',
+      '#app .view>.grid .opt{height:68px!important;min-height:68px!important;gap:12px!important}',
+      '#app .view>.grid .opt .tile{width:42px!important;height:42px!important;flex:none!important}',
+      '#app .view>.grid .opt .tile svg{width:22px!important;height:22px!important}',
+      '#app .view>.grid .opt .opt-label{font-size:15.5px!important;line-height:1.15!important}'
     ].join('');
     document.head.appendChild(style);
   }
@@ -79,6 +83,7 @@
   }
 
   function start() {
+    applyFlatButtonStyles();
     patch();
     new MutationObserver(patch).observe(document.body, { childList: true, subtree: true });
   }

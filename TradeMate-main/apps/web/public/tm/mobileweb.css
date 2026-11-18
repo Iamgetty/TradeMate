@@ -76,6 +76,12 @@ html.tm-mw .shandle,html.tm-desktop .shandle{display:none!important}
 .mk-ico{width:42px!important;height:42px!important;border-radius:12px!important;margin:0!important;display:grid;place-items:center;background:var(--s2)!important;color:var(--am)!important}
 .mk-ico svg{width:21px!important;height:21px!important}
 .mk-name{font:800 19px/1.1 'Bricolage Grotesque',sans-serif!important;letter-spacing:-.02em;color:var(--txt);max-width:100%}
+/* Slightly roomier Explore category and marketplace shortcuts */
+.mk-grid{gap:12px!important}
+.mk-card{min-height:124px!important;padding:18px!important}
+.mk-ico{width:46px!important;height:46px!important}
+.mk-ico svg{width:23px!important;height:23px!important}
+.mk-name{font-size:20px!important}
 
 /* ---- bottom tab bar with labels ---- */
 .nav{background:var(--dk-bg)!important;border-top:1px solid var(--dk-line)!important}
