@@ -22,8 +22,8 @@ async function main() {
       const userId = created.rows[0].id;
       users.push(userId);
       await pool.query(
-        'INSERT INTO user_profiles (user_id, bio) VALUES ($1, $2)',
-        [userId, `Public bio ${label}`],
+        'INSERT INTO user_profiles (user_id, username, bio) VALUES ($1, $2, $3)',
+        [userId, `tm_${userId.replace(/-/g, '').slice(0, 21)}`, `Public bio ${label}`],
       );
       await pool.query(
         'INSERT INTO user_preferences (user_id, preferences) VALUES ($1, $2::jsonb)',
