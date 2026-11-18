@@ -130,10 +130,12 @@
     track.scrollTo({ left: ((current + 1) % SLIDES.length) * track.clientWidth, behavior: 'smooth' });
   }, 5000);
 
+  // Install before the app runtime paints its first Home view. Observe the
+  // document element so this also works when the script executes in <head>,
+  // before document.body or #app exists.
   function start() {
     patch();
-    new MutationObserver(patch).observe(document.body, { childList: true, subtree: true });
+    new MutationObserver(patch).observe(document.documentElement, { childList: true, subtree: true });
   }
-  if (document.body) start();
-  else document.addEventListener('DOMContentLoaded', start);
+  start();
 })();
