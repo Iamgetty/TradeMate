@@ -2,7 +2,7 @@
  * Home screen: replaces the single "Your promotion could appear here" card with
  * a compact, swipeable slide of five promo cards covering the platform
  * (advertise slot, P2P, zero-fee offers, NFTs, Alpha spotlight). The card is
- * about 40% shorter than before. Copy comes from text already shown in the
+ * a more readable, medium-height carousel card. Copy comes from text already shown in the
  * app (Promotions page, market descriptions); nothing here is invented stats.
  * Runs as a DOM patch so app.js does not need to change. Taps use the app's
  * existing [data-pg] / [data-mm] / [data-f] handlers.
@@ -31,21 +31,21 @@
   var css = document.createElement('style');
   css.id = 'tm-promo-css';
   css.textContent = [
-    '.banner.promo-slides{padding:0;min-height:0;height:76px;margin:10px 16px 12px}',
+    '.banner.promo-slides{padding:0;min-height:124px;height:124px;margin:12px 16px 14px}',
     '.promo-track{display:flex;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}',
     '.promo-track::-webkit-scrollbar{display:none}',
-    '.promo-slide{flex:0 0 100%;min-width:0;box-sizing:border-box;scroll-snap-align:start;scroll-snap-stop:always;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:8px 14px 14px;color:inherit;text-align:left;cursor:pointer}',
-    '.promo-ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--am) 16%,transparent);color:var(--am)}',
-    '.promo-ic svg{width:20px;height:20px}',
+    '.promo-slide{flex:0 0 100%;min-width:0;box-sizing:border-box;scroll-snap-align:start;scroll-snap-stop:always;display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:14px 16px 22px;color:inherit;text-align:left;cursor:pointer}',
+    '.promo-ic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:color-mix(in srgb,var(--am) 16%,transparent);color:var(--am)}',
+    '.promo-ic svg{width:24px;height:24px}',
     '.banner .promo-tx{min-width:0}',
     '.banner .promo-tx .chip{display:block;line-height:1}',
-    '.banner .promo-tx h3{margin:4px 0 1px;font-size:14px;line-height:1.2;max-width:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
-    '.banner .promo-tx p{margin:0;max-width:none;font-size:11px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
-    '.promo-cta{flex:none;padding:7px 12px;border-radius:99px;font-size:11.5px;font-weight:700;line-height:1;white-space:nowrap;background:var(--am);color:#1b1006}',
+    '.banner .promo-tx h3{margin:6px 0 3px;font-size:16px;line-height:1.25;max-width:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.banner .promo-tx p{margin:0;max-width:none;font-size:12px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.promo-cta{flex:none;padding:9px 14px;border-radius:99px;font-size:12.5px;font-weight:700;line-height:1;white-space:nowrap;background:var(--am);color:#1b1006}',
     'html[data-theme="light"] .promo-cta{color:#fff}',
-    '.promo-dots{position:absolute;left:0;right:0;bottom:5px;display:flex;justify-content:center;gap:5px;pointer-events:none}',
-    '.promo-dots i{width:5px;height:5px;border-radius:99px;background:var(--line);transition:width .2s,background .2s}',
-    '.promo-dots i.on{width:14px;background:var(--am)}'
+    '.promo-dots{position:absolute;left:0;right:0;bottom:7px;display:flex;justify-content:center;gap:6px;pointer-events:none}',
+    '.promo-dots i{width:6px;height:6px;border-radius:99px;background:var(--line);transition:width .2s,background .2s}',
+    '.promo-dots i.on{width:16px;background:var(--am)}'
   ].join('\n');
   (document.head || document.documentElement).appendChild(css);
 
