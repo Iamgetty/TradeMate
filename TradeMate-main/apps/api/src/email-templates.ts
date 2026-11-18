@@ -68,10 +68,10 @@ export const renderTradeMateEmail = (subject: string, content: string) => {
     }
   </style>
 </head>
-<body style="margin:0;padding:0;background-color:#f3f5f7;color:#20242a;font-family:Manrope,Arial,Helvetica,sans-serif;">
+<body style="margin:0;padding:0;background-color:#ffffff;color:#20242a;font-family:Manrope,Arial,Helvetica,sans-serif;">
   <div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${preheader}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background-color:#f3f5f7;">
-    <tr><td class="email-outer" align="center" style="padding:34px 16px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background-color:#ffffff;">
+    <tr><td class="email-outer" align="center" style="padding:28px 16px;">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;">
         <tr><td class="email-brand" style="padding:0 10px 22px;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0">
@@ -81,8 +81,7 @@ export const renderTradeMateEmail = (subject: string, content: string) => {
             </tr>
           </table>
         </td></tr>
-        <tr><td style="background-color:#ffffff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
-          <div style="height:3px;background-color:#F6A43A;font-size:0;line-height:0;">&nbsp;</div>
+        <tr><td style="background-color:#ffffff;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
             <tr><td class="email-card" style="padding:34px 38px 31px;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:18px;">
