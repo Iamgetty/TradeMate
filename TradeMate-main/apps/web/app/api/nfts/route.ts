@@ -39,7 +39,7 @@ export async function GET(request: Request) {
   const params = new URLSearchParams({ query: search.slice(0, 100), chains: chain, asset_types: 'nft', limit: String(Math.min(limit, 50)) });
   try {
     const response = await fetch(`https://api.opensea.io/api/v2/search?${params.toString()}`, {
-      headers: { 'x-api-key': apiKey, accept: 'application/json' }, next: { revalidate: 30 }
+      headers: { 'x-api-key': apiKey, accept: 'application/json' }, next: { revalidate: 30 }, signal: AbortSignal.timeout(8000)
     });
     if (!response.ok) return NextResponse.json({ configured: true, items: [], message: `OpenSea returned status ${response.status}. Check the key, rate limits, and API access.` }, { status: response.status === 429 ? 429 : 502 });
 
@@ -66,7 +66,7 @@ export async function GET(request: Request) {
       if (typeof item.price === 'number' || !item.collectionSlug || !item.tokenId) return item;
       try {
         const listingResponse = await fetch(`https://api.opensea.io/api/v2/listings/collection/${encodeURIComponent(item.collectionSlug)}/nfts/${encodeURIComponent(item.tokenId)}/best`, {
-          headers: { 'x-api-key': apiKey, accept: 'application/json' }, next: { revalidate: 30 }
+          headers: { 'x-api-key': apiKey, accept: 'application/json' }, next: { revalidate: 30 }, signal: AbortSignal.timeout(8000)
         });
         if (!listingResponse.ok) return item;
         const listing = await listingResponse.json();
