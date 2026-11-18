@@ -135,6 +135,11 @@ export const verifySumsubWebhook = (
     || typeof payload.externalUserId !== 'string' || typeof payload.createdAtMs !== 'string') {
     throw new Error('Sumsub webhook must be an applicantReviewed event with valid correlation fields.');
   }
+  // Sumsub's Dashboard "Test webhook" is a delivery diagnostic, not an
+  // applicant verification result. Never let it create a review case/event.
+  if (payload.testMode === true) {
+    throw new Error('Sumsub manual test webhooks are not applicant verification events.');
+  }
   const reviewStatus = String(payload.reviewStatus || '');
   const answer = String(payload.reviewResult?.reviewAnswer || '');
   const outcome = reviewStatus !== 'completed' ? 'review_required'
