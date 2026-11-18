@@ -62,3 +62,12 @@
   #app .view .mk-grid .mk-card .mk-ico{width:46px!important;height:46px!important}
   #app .view .mk-grid .mk-card .mk-name{font-size:14px!important}
 }
+
+
+/* Keep Explore labels at their original size and tighten icon-label spacing. */
+#app .view .mk-grid .mk-card{gap:2px!important}
+#app .view .mk-grid .mk-card .mk-ico{margin:0!important}
+#app .view .mk-grid .mk-card .mk-name{font-size:12px!important;line-height:1.15!important}
+@media(min-width:900px){
+  #app .view .mk-grid .mk-card .mk-name{font-size:12px!important}
+}
