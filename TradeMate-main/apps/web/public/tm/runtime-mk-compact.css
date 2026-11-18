@@ -73,6 +73,7 @@
 }
 
 
-/* Homepage favorite cards: enlarge the icon only; preserve the existing name size. */
-#app .view .favs .fav .fh{gap:6px!important}
-#app .view .favs .fav .fh .coin.sm{width:30px!important;height:30px!important;font-size:13px!important;flex:none!important}
+/* Homepage favorite cards: target the rendered favorites container directly.
+   Enlarge only the coin icon; inherit the existing name typography unchanged. */
+#app .favs .fav .fh{gap:3px!important}
+#app .favs .fav .fh .coin.sm{width:30px!important;height:30px!important;font-size:13px!important;flex:none!important}
