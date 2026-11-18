@@ -25,7 +25,8 @@ This checklist records the source/configuration audit findings. Items are not co
 
 - [ ] Reconcile actual Render `autoDeployTrigger: commit` settings with `render.yaml` `checksPass` policy.
 - [ ] Decide whether Render's health check should use a database-aware readiness endpoint; distinguish process liveness from database readiness.
-- [ ] Reconcile the Blueprint's declared `MIGRATION_DATABASE_URL` with the API's required `DATABASE_URL`; verify actual service environment without exposing secret values.
+- [x] Update the Render Blueprint to declare `DATABASE_URL` for the API runtime separately from `MIGRATION_DATABASE_URL` for migrations; both remain `sync: false`, and no secret values are stored in the repository.
+- [ ] Verify the live API service has both variables configured and that they point to the intended roles/database, without exposing secret values.
 - [ ] Measure web/API-to-exchange-feed cross-region latency and decide whether region alignment is warranted.
 - [ ] Verify deployment commit SHAs and check results before treating a service as current or healthy.
 
