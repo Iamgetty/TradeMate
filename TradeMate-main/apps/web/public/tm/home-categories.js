@@ -41,6 +41,10 @@
       '#app .view .mk-grid .mk-card .mk-ico{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important}',
       '#app .view .mk-grid .mk-card:hover .mk-ico,#app .view .mk-grid .mk-card:focus-visible .mk-ico{background:transparent!important;transform:translateY(-2px)!important}'
     ].join('');
+      '#app .view>.grid .opt{height:68px!important;min-height:68px!important;gap:12px!important}',
+      '#app .view>.grid .opt .tile{width:42px!important;height:42px!important;flex:none!important}',
+      '#app .view>.grid .opt .tile svg{width:22px!important;height:22px!important}',
+      '#app .view>.grid .opt .opt-label{font-size:15.5px!important;line-height:1.15!important}',
     document.head.appendChild(style);
   }
 
