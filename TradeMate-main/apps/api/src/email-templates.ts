@@ -110,7 +110,7 @@ export const renderTradeMateEmail = (subject: string, content: string) => {
               <td align="right" style="font-family:'Courier New',monospace;font-size:9px;line-height:16px;letter-spacing:.7px;color:#6b7280;">TRADE SMARTER. TOGETHER.</td>
             </tr>
           </table>
-          <p style="margin:9px 0 0;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:11px;line-height:18px;color:#6b7280;">Automated account message · Please do not reply<br><a href="https://trademate.cfd" style="color:#F6A43A;text-decoration:none;">trademate.cfd</a>&nbsp;&nbsp;·&nbsp;&nbsp;© ${new Date().getUTCFullYear()} TradeMate</p>
+          <p style="margin:12px 0 0;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:11px;line-height:19px;color:#6b7280;">TradeMate · <a href="https://trademate.cfd" style="color:#c77716;text-decoration:none;">trademate.cfd</a><br>Automated account notification. This message was sent because you have a TradeMate account or requested an account-related action. Please do not reply to this email.<br>If you do not recognise this activity or believe this message is suspicious, visit <a href="https://trademate.cfd" style="color:#c77716;text-decoration:none;">our official website</a> and contact TradeMate through its official support channels. Never share your password or one-time verification code by email.<br>© ${new Date().getUTCFullYear()} TradeMate. All rights reserved.</p>
         </td></tr>
       </table>
     </td></tr>
