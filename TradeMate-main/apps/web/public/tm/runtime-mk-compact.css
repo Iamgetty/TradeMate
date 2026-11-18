@@ -97,3 +97,22 @@
 
 /* Home category buttons: keep each label close beneath its icon. */
 #app .view>.grid .opt{gap:2px!important}
+
+
+/* Requested rollback: remove ONLY the small surfaces behind navigation icons.
+   Preserve each control, icon size, labels, and all surrounding card/layout styling. */
+#app .grid .opt .tile{
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+}
+#app .mk-grid .mk-card .mk-ico{
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+}
+
+/* Home shortcuts: bring each name close beneath its icon without changing type or size. */
+#app .grid .opt{gap:2px!important}
