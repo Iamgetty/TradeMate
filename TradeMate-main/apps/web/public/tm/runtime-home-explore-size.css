@@ -25,3 +25,6 @@ html .pc,html .pc:hover,html[data-theme="light"] .pc{background:transparent!impo
 /* List rows: Assets, User Center, etc. (.lr + .lic) */
 html .pgs .lr:not(.pfoot .lr),html .pgs .lr:not(.pfoot .lr):hover{background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important}
 html .lr .lic{background:transparent!important;border:0!important;box-shadow:none!important}
+/* Notifications (.nf-card + .nf-ic): no card, no colored icon circle; unread dot stays */
+html .nf-card,html .nf-card:hover,html .nf-card.unread{background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important}
+html .nf-ic,html .nf-ic[class*="k-"]{background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important;color:var(--txt)!important}
