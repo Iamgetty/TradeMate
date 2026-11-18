@@ -71,3 +71,8 @@
 @media(min-width:900px){
   #app .view .mk-grid .mk-card .mk-name{font-size:12px!important}
 }
+
+
+/* Homepage favorite cards: enlarge the icon only; preserve the existing name size. */
+#app .view .favs .fav .fh{gap:6px!important}
+#app .view .favs .fav .fh .coin.sm{width:30px!important;height:30px!important;font-size:13px!important;flex:none!important}
