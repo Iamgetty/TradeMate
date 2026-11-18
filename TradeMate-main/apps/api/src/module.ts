@@ -487,7 +487,7 @@ class AuthController {
       void sendTransactionalEmail(
         account.rows[0].email,
         'Reset your TradeMate password',
-        '<p>We received a request to reset your TradeMate password.</p><p><a href="' + resetUrl + '">Reset your password</a></p><p>This link expires in 30 minutes and can be used once. If you did not request this, you can ignore this email.</p>',
+        '<p>We received a request to reset your TradeMate password.</p><p><a href="' + resetUrl + '" style="display:inline-block;padding:13px 22px;background-color:#087f70;color:#ffffff;text-decoration:none;font-weight:700;border-radius:8px;">Reset your password</a></p><p>This link expires in 30 minutes and can be used once. If you did not request this, you can ignore this email.</p>',
       ).then((sent) => sent ? undefined : databasePool?.query('DELETE FROM password_reset_tokens WHERE token_hash = $1', [tokenDigest(rawToken)]).catch(() => undefined));
     } else if (account.rowCount && !resetOrigin) {
       console.warn('[auth] Password reset email was not sent because TRADEMATE_WEB_ORIGIN/PUBLIC_APP_URL is not configured with an allowed origin.');
