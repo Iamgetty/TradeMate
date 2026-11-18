@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 type User={id:string;email:string;display_name:string;country_code:string|null};
@@ -36,7 +36,7 @@ export default function AccountPage(){
   })();
   return()=>{cancelled=true};
  },[router]);
- async function saveProfile(e:React.FormEvent<HTMLFormElement>){
+ async function saveProfile(e:FormEvent<HTMLFormElement>){
   e.preventDefault();
   const displayName=nameDraft.trim();
   if(displayName.length<2||displayName.length>24){setProfileError('Your nickname must be between 2 and 24 characters.');return;}
