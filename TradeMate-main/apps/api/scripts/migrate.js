@@ -30,6 +30,8 @@ const MIGRATIONS = [
   '021_totp_replay_protection.sql',
   '022_password_reset_tokens.sql',
   '023_email_verification.sql',
+  '024_usernames.sql',
+  '025_ensure_public_profile_rows.sql',
   '026_all_contract_category_review.sql',
   '027_sports_transfer_identity_foundation.sql',
   '028_sports_transfer_mandate_acceptance.sql',
