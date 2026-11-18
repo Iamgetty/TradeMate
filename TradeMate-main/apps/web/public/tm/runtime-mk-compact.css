@@ -77,3 +77,19 @@
    Enlarge only the coin icon; inherit the existing name typography unchanged. */
 #app .favs .fav .fh{gap:3px!important}
 #app .favs .fav .fh .coin.sm{width:30px!important;height:30px!important;font-size:13px!important;flex:none!important}
+
+
+/* Restore only the icon tiles' card surfaces on Home and Explore.
+   Keep shortcut labels, icon dimensions, spacing, and outer controls unchanged. */
+#app .grid .opt .tile{
+  border-radius:15px!important;
+  background:linear-gradient(150deg,color-mix(in srgb,var(--h) 24%,var(--s1)),color-mix(in srgb,var(--h) 6%,var(--s1)))!important;
+  border:1px solid color-mix(in srgb,var(--h) 34%,transparent)!important;
+  box-shadow:none!important;
+}
+#app .mk-grid .mk-card .mk-ico{
+  border-radius:15px!important;
+  background:var(--s2)!important;
+  border:0!important;
+  box-shadow:none!important;
+}
