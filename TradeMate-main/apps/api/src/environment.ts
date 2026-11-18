@@ -22,7 +22,11 @@ const environmentSchema = z.object({
     'Every configured web origin must use HTTPS (HTTP is allowed only for localhost).',
   ).optional(),
   RESEND_API_KEY: z.string().min(1).optional(),
-  RESEND_FROM_EMAIL: z.string().email().optional(),
+  RESEND_FROM_EMAIL: z.string().refine((value) => {
+    if (z.string().email().safeParse(value).success) return true;
+    const match = value.match(/^(?:"[^"\\r\\n]+"|[^"<>\\r\\n]+)\\s*<([^<>\\s]+)>$/);
+    return Boolean(match && z.string().email().safeParse(match[1]).success);
+  }, 'Must be a valid email address, optionally with a display name (for example: TradeMate <noreply@trademate.cfd>).').optional(),
 }).passthrough();
 
 export const validateEnvironment = (input: Record<string, string | undefined> = process.env) => {

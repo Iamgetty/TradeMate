@@ -4,6 +4,7 @@ import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, 
 import { Pool } from 'pg';
 import { createRlsAwarePool } from './database-context';
 import { decimalToUnits, fiatCentsToQuantityUnits, productToFiatCents, unitsToDecimal } from './p2p-decimal';
+import { renderTradeMateEmail } from './email-templates';
 import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema, sportsOrganizationCreateBodySchema, sportsOrganizationMembershipInviteBodySchema, sportsRepresentativeMandateCreateBodySchema, sportsRepresentativeMandateResponseBodySchema, sportsTransferOpportunityCreateBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
@@ -103,7 +104,7 @@ const sendTransactionalEmail = async (to: string, subject: string, html: string)
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to: [to], subject, html }),
+      body: JSON.stringify({ from, to: [to], subject, html: renderTradeMateEmail(subject, html) }),
     });
     if (!response.ok) {
       console.error('[email] Resend delivery failed:', response.status, (await response.text()).slice(0, 500));
@@ -486,7 +487,7 @@ class AuthController {
       void sendTransactionalEmail(
         account.rows[0].email,
         'Reset your TradeMate password',
-        '<p>We received a request to reset your TradeMate password.</p><p><a href="' + resetUrl + '">Reset your password</a></p><p>This link expires in 30 minutes and can be used once. If you did not request this, you can ignore this email.</p>',
+        '<p>We received a request to reset your TradeMate password.</p><p><a href="' + resetUrl + '" style="display:inline-block;padding:13px 22px;background-color:#F6A43A;color:#17120b;text-decoration:none;font-weight:800;border-radius:9px;">Reset your password</a></p><p>This link expires in 30 minutes and can be used once. If you did not request this, you can ignore this email.</p>',
       ).then((sent) => sent ? undefined : databasePool?.query('DELETE FROM password_reset_tokens WHERE token_hash = $1', [tokenDigest(rawToken)]).catch(() => undefined));
     } else if (account.rowCount && !resetOrigin) {
       console.warn('[auth] Password reset email was not sent because TRADEMATE_WEB_ORIGIN/PUBLIC_APP_URL is not configured with an allowed origin.');
