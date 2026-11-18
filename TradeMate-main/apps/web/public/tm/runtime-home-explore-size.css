@@ -17,14 +17,12 @@ html .grid .opt .tile,html .view>.grid .opt .tile{background:transparent!importa
 html .mk-card,html .mk-card:hover,html .mk-card:active,html .mk-card:focus-visible{background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important;min-height:0!important;padding:8px 2px!important;align-items:center!important;text-align:center!important;gap:6px!important}
 html .mk-card:before{display:none!important}
 html .mk-card .mk-ico,html .mk-card:hover .mk-ico,html .mk-card:focus-visible .mk-ico{background:transparent!important;border:0!important;box-shadow:none!important;margin-bottom:0!important}
-/* Help: Quick Actions + Popular Help Topics (.sp-qi, .sp-row, .sp-ri) */
+/* The groups below lose their outer card only; their icon cards (tiles) are kept. */
+/* Help: Quick Actions + Popular Help Topics (.sp-qi, .sp-row) */
 html .sp-qi,html .sp-qi:hover,html .sp-row,html .sp-row:hover{background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important}
-html .sp-ri{background:transparent!important;border:0!important;box-shadow:none!important}
 /* Profile shortcut cards: TradeMate Card, Rewards Hub, Contracts, Invite Friends (.pc) */
 html .pc,html .pc:hover,html[data-theme="light"] .pc{background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important}
-/* List rows: Assets, User Center, etc. (.lr + .lic) */
+/* List rows: Assets, User Center, etc. (.lr) */
 html .pgs .lr:not(.pfoot .lr),html .pgs .lr:not(.pfoot .lr):hover{background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important}
-html .lr .lic{background:transparent!important;border:0!important;box-shadow:none!important}
-/* Notifications (.nf-card + .nf-ic): no card, no colored icon circle; unread dot stays */
+/* Notifications (.nf-card): no outer card; unread dot stays */
 html .nf-card,html .nf-card:hover,html .nf-card.unread{background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important}
-html .nf-ic,html .nf-ic[class*="k-"]{background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important;color:var(--txt)!important}
