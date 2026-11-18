@@ -68,6 +68,38 @@ async function main() {
     assert.equal(record.rows[0].review_status, 'pending_review');
     assert.equal(record.rows[0].claim_status, 'unclaimed');
 
+    const reviewerCandidate = await client.query(
+      "INSERT INTO sports_transfer_data_sources (source_key, display_name, source_type) VALUES ($1, 'Reviewer-key source', 'official_league') RETURNING id",
+      ['review-key-' + suffix],
+    );
+    await client.query(
+      `UPDATE sports_transfer_data_sources
+       SET rights_status='approved', rights_basis='Written terms permit sporting player discovery.',
+           terms_reference='review-key-license', permitted_data_categories=ARRAY['player_identity','availability_status'],
+           permitted_purposes=ARRAY['player_discovery'], reviewed_at=now(), reviewer_key_id='review-key-test'
+       WHERE id=$1`,
+      [reviewerCandidate.rows[0].id],
+    );
+    const reviewerSource = await client.query(
+      'SELECT rights_status, reviewer_key_id FROM sports_transfer_data_sources WHERE id=$1',
+      [reviewerCandidate.rows[0].id],
+    );
+    assert.equal(reviewerSource.rows[0].rights_status, 'approved');
+    assert.equal(reviewerSource.rows[0].reviewer_key_id, 'review-key-test');
+
+    await client.query(
+      `UPDATE sports_transfer_external_player_records
+       SET review_status='approved', reviewed_at=now(), reviewer_key_id='review-key-test'
+       WHERE id=$1`,
+      [record.rows[0].id],
+    );
+    const reviewedRecord = await client.query(
+      'SELECT review_status, reviewer_key_id FROM sports_transfer_external_player_records WHERE id=$1',
+      [record.rows[0].id],
+    );
+    assert.equal(reviewedRecord.rows[0].review_status, 'approved');
+    assert.equal(reviewedRecord.rows[0].reviewer_key_id, 'review-key-test');
+
     await expectConstraintFailure(
       client,
       `INSERT INTO sports_transfer_external_player_records
