@@ -1,4 +1,3 @@
-
 html:not(.tm-desktop) .view>.grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important;padding:0 16px 10px!important}
 html:not(.tm-desktop) .view>.grid .opt{display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:8px!important;aspect-ratio:1/1;height:auto!important;min-height:0!important;min-width:0;padding:6px 2px!important;border-radius:20px!important;background:var(--s1)!important;border:1px solid var(--line)!important;box-sizing:border-box;text-align:center!important;overflow:visible!important;grid-column:auto!important}
 html:not(.tm-desktop) .view>.grid .opt .tile{width:34px!important;height:34px!important;border-radius:12px!important;background:var(--s2)!important;color:var(--txt)!important;box-shadow:none!important;border:0!important;flex:none;display:grid;place-items:center}
@@ -10,3 +9,6 @@ html.tm-desktop .view>.grid .opt{flex-direction:column!important;align-items:fle
 html.tm-desktop .view>.grid .opt .tile{width:46px!important;height:46px!important;border-radius:13px!important}
 html.tm-desktop .view>.grid .opt .tile svg{width:22px!important;height:22px!important}
 html.tm-desktop .view>.grid .opt .opt-label{flex:none!important;font:800 24px/1.1 'Bricolage Grotesque',sans-serif!important;letter-spacing:-.02em!important;max-width:100%}
+/* No cards: home grid buttons show only the icon and the name */
+html .view>.grid .opt,html .view>.grid .opt:hover,html .view>.grid .opt:active,html .view>.grid .opt:focus-visible{background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important}
+html .view>.grid .opt .tile{background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important}
