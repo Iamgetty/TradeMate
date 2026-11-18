@@ -187,3 +187,14 @@
 #app .view .tbn p{font-size:10px!important;line-height:1.15!important}
 #app .view .tbn-tag{padding:2px 6px!important;font-size:8px!important}
 #app .view .tbn-cta{padding:5px 8px!important;font-size:10px!important}
+
+
+/* Homepage five-slide platform promotions: swipeable, compact, and self-advancing. */
+#app .view .home-ad-carousel{margin:0 16px 14px!important}
+#app .view .home-ad-carousel .tbn-track{touch-action:pan-x pan-y;scroll-behavior:smooth}
+#app .view .home-ad-carousel .tbn-s{background:radial-gradient(120% 140% at 100% 0,#ff9f2e26,transparent 60%)!important}
+#app .view .home-ad-carousel .tbn-copy{display:flex!important;flex-direction:column!important;justify-content:center!important}
+#app .view .home-ad-carousel .tbn-cta{align-self:center!important}
+#app .view .home-ad-dots{gap:6px!important}
+#app .view .home-ad-dots button{appearance:none;border:0;padding:0;width:6px;height:6px;border-radius:50%;background:#ffffff33;cursor:pointer;transition:all .25s}
+#app .view .home-ad-dots button.on{width:18px;border-radius:4px;background:var(--am)}
