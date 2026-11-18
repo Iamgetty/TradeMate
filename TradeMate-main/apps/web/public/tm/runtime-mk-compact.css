@@ -97,3 +97,20 @@
 
 /* Home category buttons: keep each label close beneath its icon. */
 #app .view>.grid .opt{gap:2px!important}
+
+/* Final, higher-specificity icon-only surfaces: keep the surrounding controls flat. */
+#app .view .grid .opt .tile{
+  border-radius:15px!important;
+  background:linear-gradient(150deg,color-mix(in srgb,var(--h) 24%,var(--s1)),color-mix(in srgb,var(--h) 6%,var(--s1)))!important;
+  border:1px solid color-mix(in srgb,var(--h) 34%,transparent)!important;
+  box-shadow:none!important;
+}
+#app .view .mk-grid .mk-card .mk-ico{
+  border-radius:15px!important;
+  background:var(--s2)!important;
+  border:0!important;
+  box-shadow:none!important;
+}
+
+/* Keep homepage shortcut names close to their icons. */
+#app .view>.grid .opt{gap:2px!important}
