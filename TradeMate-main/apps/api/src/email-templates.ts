@@ -51,7 +51,7 @@ export const renderTradeMateEmail = (subject: string, content: string) => {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <meta name="supported-color-schemes" content="dark">
+  <meta name="supported-color-schemes" content="light">
   <title>${safeSubject}</title>
   <style>
     body,table,td,a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
