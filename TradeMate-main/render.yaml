@@ -16,6 +16,10 @@ services:
         value: https://trademate-web.onrender.com
       - key: TOTP_ENCRYPTION_KEY
         sync: false
+      # Runtime API queries use the least-privilege application database role.
+      - key: DATABASE_URL
+        sync: false
+      # Migrations use a separate elevated role; it may target the same database.
       - key: MIGRATION_DATABASE_URL
         sync: false
       - key: WORKER_DATABASE_URL
