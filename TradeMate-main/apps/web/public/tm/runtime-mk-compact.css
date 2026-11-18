@@ -125,13 +125,23 @@
 /* Homepage feature/promotion carousel: compact height with centered,
    readable copy and a vertically centered action. */
 #app .view .tbn-s{
-  min-height:82px!important;
-  height:auto!important;
+  height:96px!important;
+  min-height:96px!important;
+  max-height:96px!important;
+  box-sizing:border-box!important;
   padding:8px 10px!important;
   gap:8px!important;
   grid-template-columns:minmax(0,1fr) auto!important;
   align-items:center!important;
   align-content:center!important;
+  overflow:hidden!important;
+}
+@media(min-width:900px){
+  #app .view .tbn-s{
+    height:120px!important;
+    min-height:120px!important;
+    max-height:120px!important;
+  }
 }
 #app .view .tbn-copy{min-width:0!important}
 #app .view .tbn h2{font-size:17px!important;line-height:1.12!important;margin:3px 0 2px!important}
