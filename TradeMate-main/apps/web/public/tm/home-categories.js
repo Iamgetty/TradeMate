@@ -40,10 +40,10 @@
       '#app .view .mk-grid .mk-card:hover{transform:translateY(-2px)!important;box-shadow:none!important}',
       '#app .view .mk-grid .mk-card .mk-ico{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important}',
       '#app .view .mk-grid .mk-card:hover .mk-ico,#app .view .mk-grid .mk-card:focus-visible .mk-ico{background:transparent!important;transform:translateY(-2px)!important}',
-      '#app .view>.grid .opt{height:68px!important;min-height:68px!important;gap:12px!important}',
-      '#app .view>.grid .opt .tile{width:42px!important;height:42px!important;flex:none!important}',
-      '#app .view>.grid .opt .tile svg{width:22px!important;height:22px!important}',
-      '#app .view>.grid .opt .opt-label{font-size:15.5px!important;line-height:1.15!important}'
+      '#app .view>.grid .opt{height:68px!important;min-height:68px!important;gap:4px!important}',
+      '#app .view>.grid .opt .tile{width:50px!important;height:50px!important;flex:none!important}',
+      '#app .view>.grid .opt .tile svg{width:25px!important;height:25px!important}',
+      '#app .view>.grid .opt .opt-label{font-size:11.5px!important;line-height:1.15!important}'
     ].join('');
     document.head.appendChild(style);
   }
