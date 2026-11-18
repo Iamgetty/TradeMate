@@ -116,5 +116,7 @@
 #app .view>.grid .opt{gap:2px!important}
 
 
-/* Tighten only the vertical gap between the two homepage marketplace shortcut rows. */
-#app .view .home-market-shortcuts{row-gap:3px!important}
+/* Compact the homepage-only shortcut cards so their two rows sit naturally closer.
+   Explore keeps its original marketplace tile height and spacing. */
+#app .view .home-market-shortcuts{row-gap:4px!important}
+#app .view .home-market-shortcuts .mk-card{min-height:68px!important;padding:4px 6px!important}
