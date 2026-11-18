@@ -12,7 +12,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         {children}
         <Script src="/tm/home-categories.js?v=2" strategy="beforeInteractive" />
-        <Script src="/tm/home-promos.js?v=1" strategy="afterInteractive" />
+        <Script src="/tm/home-promos.js?v=2" strategy="beforeInteractive" />
       </body>
     </html>
   );
