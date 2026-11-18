@@ -27,6 +27,23 @@
     brief: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5h6v2M3 13h18"/>'
   };
 
+  function applyFlatButtonStyles() {
+    if (document.getElementById('tm-flat-home-buttons')) return;
+    var style = document.createElement('style');
+    style.id = 'tm-flat-home-buttons';
+    style.textContent = [
+      '#app .view>.grid .opt{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important;padding:0!important}',
+      '#app .view>.grid .opt .tile{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important}',
+      '#app .view>.grid .opt:hover .tile{transform:translateY(-2px)!important;box-shadow:none!important}',
+      '#app .view .mk-grid .mk-card{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important;padding:12px 8px!important;min-height:0!important}',
+      '#app .view .mk-grid .mk-card:before{display:none!important}',
+      '#app .view .mk-grid .mk-card:hover{transform:translateY(-2px)!important;box-shadow:none!important}',
+      '#app .view .mk-grid .mk-card .mk-ico{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important}',
+      '#app .view .mk-grid .mk-card:hover .mk-ico,#app .view .mk-grid .mk-card:focus-visible .mk-ico{background:transparent!important;transform:translateY(-2px)!important}'
+    ].join('');
+    document.head.appendChild(style);
+  }
+
   function build(grid) {
     var frag = document.createDocumentFragment();
     CATS.forEach(function (c) {
