@@ -100,6 +100,21 @@ export const renderTradeMateEmail = (subject: string, content: string) => {
               <div style="height:1px;background-color:#e5e7eb;margin:27px 0 17px;font-size:0;line-height:0;">&nbsp;</div>
               <p style="margin:0;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:12px;line-height:19px;color:#6b7280;">For your security, never share your password or one-time verification code with anyone.</p>
             </td></tr>
+            <tr><td style="padding:0 38px 30px;" class="email-card">
+              <div style="height:1px;background-color:#e5e7eb;margin:0 0 23px;font-size:0;line-height:0;">&nbsp;</div>
+              <p style="margin:0 0 8px;font-family:'Courier New',monospace;font-size:10px;line-height:15px;font-weight:700;letter-spacing:1.35px;color:#F6A43A;">MORE WITH TRADEMATE</p>
+              <h2 style="margin:0 0 10px;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:22px;line-height:29px;letter-spacing:-.4px;font-weight:800;color:#20242a;">One place to move opportunities forward.</h2>
+              <p style="margin:0 0 17px;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:14px;line-height:23px;color:#4b5563;">TradeMate brings people and organisations together to discover opportunities, connect with the right counterparties, discuss terms and build agreements.</p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr><td valign="top" width="22" style="padding:0 9px 10px 0;font-family:Arial,sans-serif;font-size:15px;line-height:21px;font-weight:700;color:#F6A43A;">01</td><td style="padding:0 0 10px;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#374151;"><strong style="color:#20242a;">Discover opportunities</strong><br>Explore specialist categories across business, services, property, technology, sports and more.</td></tr>
+                <tr><td valign="top" width="22" style="padding:0 9px 10px 0;font-family:Arial,sans-serif;font-size:15px;line-height:21px;font-weight:700;color:#F6A43A;">02</td><td style="padding:0 0 10px;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#374151;"><strong style="color:#20242a;">Connect and negotiate</strong><br>Start conversations, exchange proposals and work through the terms together.</td></tr>
+                <tr><td valign="top" width="22" style="padding:0 9px 0 0;font-family:Arial,sans-serif;font-size:15px;line-height:21px;font-weight:700;color:#F6A43A;">03</td><td style="padding:0;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#374151;"><strong style="color:#20242a;">Manage agreements</strong><br>Keep contract discussions, decisions and fulfilment steps connected.</td></tr>
+              </table>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:21px;">
+                <tr><td align="center" bgcolor="#F6A43A" style="border-radius:4px;"><a href="https://trademate.cfd" target="_blank" style="display:inline-block;padding:12px 20px;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;font-weight:800;color:#20242a;text-decoration:none;">Explore TradeMate&nbsp; →</a></td></tr>
+              </table>
+              <p style="margin:12px 0 0;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:11px;line-height:18px;color:#9ca3af;">Discover more at <a href="https://trademate.cfd" style="color:#c77716;text-decoration:none;">trademate.cfd</a>.</p>
+            </td></tr>
           </table>
         </td></tr>
         <tr><td align="center" style="padding:20px 10px 3px;">
