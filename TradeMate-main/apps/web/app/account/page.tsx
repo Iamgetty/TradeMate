@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 type User={id:string;email:string;display_name:string;country_code:string|null};
@@ -11,6 +11,11 @@ export default function AccountPage(){
  const [organization,setOrganization]=useState<Organization|null>(null);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState('');
+ const [editingName,setEditingName]=useState(false);
+ const [nameDraft,setNameDraft]=useState('');
+ const [savingProfile,setSavingProfile]=useState(false);
+ const [profileError,setProfileError]=useState('');
+ const [profileSuccess,setProfileSuccess]=useState('');
  useEffect(()=>{
   let cancelled=false;
   (async()=>{
@@ -31,6 +36,21 @@ export default function AccountPage(){
   })();
   return()=>{cancelled=true};
  },[router]);
+ async function saveProfile(e:FormEvent<HTMLFormElement>){
+  e.preventDefault();
+  const displayName=nameDraft.trim();
+  if(displayName.length<2||displayName.length>24){setProfileError('Your nickname must be between 2 and 24 characters.');return;}
+  setSavingProfile(true);setProfileError('');setProfileSuccess('');
+  try{
+   const response=await fetch(API_BASE+'/api/auth/profile',{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({displayName})});
+   const body=await response.json().catch(()=>({}));
+   if(response.status===401){router.replace('/auth?mode=login');return;}
+   if(!response.ok)throw new Error(body.message||'Could not update your profile. Please try again.');
+   if(body.user)setUser(current=>current?{...current,...body.user}:current);
+   setEditingName(false);setProfileSuccess('Your display name has been updated.');
+  }catch(error){setProfileError(error instanceof Error?error.message:'A connection issue occurred. Please try again.');}
+  finally{setSavingProfile(false);}
+ }
  async function logout(){await fetch(API_BASE+'/api/auth/logout',{method:'POST',credentials:'include'}).catch(()=>undefined);router.replace('/');}
  return <main className="web3-shell account-shell">
   <header className="top-nav"><Link className="wordmark" href="/"><span className="logo-glyph">T<span>↗</span></span><span>TradeMate</span></Link><button className="nav-pill account-logout" onClick={logout}>Sign out ↗</button></header>
@@ -42,6 +62,15 @@ export default function AccountPage(){
     <h1>Good to have you<br/><span>{user.display_name.split(' ')[0]}.</span></h1>
     <p className="account-lead">Your TradeMate account and Alpha workspace are managed here.</p>
     <div className="account-card"><div className="account-avatar">{user.display_name.trim().charAt(0).toUpperCase()}</div><div><strong>{user.display_name}</strong><span>{user.email}</span><small>TRADEMATE MEMBER</small></div><i>●</i></div>
+    <div className="account-profile-actions">
+     {!editingName?<button type="button" className="account-secondary-link" onClick={()=>{setNameDraft(user.display_name);setEditingName(true);setProfileError('');setProfileSuccess('');}}>Edit display name</button>
+     :<form className="auth-form" onSubmit={saveProfile}>
+      <label>Display name<input value={nameDraft} onChange={e=>setNameDraft(e.target.value)} minLength={2} maxLength={24} autoComplete="name" required/></label>
+      {profileError&&<div className="auth-error" role="alert">{profileError}</div>}
+      <div style={{display:'flex',gap:'.7rem',flexWrap:'wrap'}}><button className="auth-submit" type="submit" disabled={savingProfile}>{savingProfile?'Saving…':'Save profile'}</button><button className="account-secondary-link" type="button" onClick={()=>{setEditingName(false);setProfileError('');}}>Cancel</button></div>
+     </form>}
+     {profileSuccess&&<p role="status" style={{color:'#9effc7',fontSize:'.85rem'}}>{profileSuccess}</p>}
+    </div>
     {organization?
      <div className="account-next">
       <div className="section-kicker"><span/> BUSINESS SPACE CREATED</div>
