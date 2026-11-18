@@ -3,3 +3,62 @@
 .mk-card{padding:10px 6px!important;border-radius:16px!important;min-height:96px!important}
 .mk-ico svg{width:22px!important;height:22px!important}
 .mk-name{font-size:12.5px!important}
+
+/* TradeMate home shortcuts and Explore category/marketplace buttons:
+   flat icon-and-label controls, with a modest size increase. */
+#app .view .grid .opt{
+  min-height:68px!important;
+  gap:10px!important;
+  padding:4px 2px!important;
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+}
+#app .view .grid .opt .tile{
+  width:56px!important;
+  height:56px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+#app .view .grid .opt .tile svg{width:25px!important;height:25px!important}
+#app .view .grid .opt:hover .tile{transform:translateY(-2px)!important;box-shadow:none!important}
+
+/* Only the Explore navigation tiles are flattened; listing cards elsewhere
+   keep their existing card treatment. */
+#app .view .mk-grid .mk-card{
+  min-height:104px!important;
+  padding:12px 6px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+#app .view .mk-grid .mk-card:before{display:none!important}
+#app .view .mk-grid .mk-card:hover,
+#app .view .mk-grid .mk-card:focus-visible{
+  transform:translateY(-2px)!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
+}
+#app .view .mk-grid .mk-card .mk-ico{
+  width:42px!important;
+  height:42px!important;
+  margin:0 0 4px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+#app .view .mk-grid .mk-card .mk-ico svg{width:24px!important;height:24px!important}
+#app .view .mk-grid .mk-card .mk-name{font-size:13px!important;line-height:1.2!important}
+#app .view .mk-grid .mk-card .mk-go{display:none!important}
+
+/* Slightly roomier desktop Explore shortcuts without changing the grid layout. */
+@media(min-width:900px){
+  #app .view .mk-grid .mk-card{min-height:112px!important;padding:14px 8px!important}
+  #app .view .mk-grid .mk-card .mk-ico{width:46px!important;height:46px!important}
+  #app .view .mk-grid .mk-card .mk-name{font-size:14px!important}
+}
