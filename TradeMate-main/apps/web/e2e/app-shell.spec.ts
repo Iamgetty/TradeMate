@@ -59,6 +59,30 @@ test('direct app route renders on a real mobile-user-agent context', async ({ br
   }
 });
 
+test('homepage shortcut cards do not use the legacy view-entry animation after load or refresh', async ({ page }) => {
+  await isolateApi(page);
+
+  async function expectHomepageEntranceAnimationRemoved() {
+    const response = await page.request.get('/tm/app.js');
+    expect(response.ok(), 'the deployed legacy app bundle should be available').toBeTruthy();
+    const source = await response.text();
+
+    // The Home view uses .mk-card for its marketplace shortcut tiles. Keep
+    // the market-page animations scoped to their own components, but never
+    // animate those Home tiles through the shared .view.enter class.
+    expect(source).not.toContain('.view.enter .mk-card{animation:mkUp');
+    expect(source).not.toMatch(/\.view\.enter\s*>\s*\*/);
+  }
+
+  await page.goto('/app');
+  await expectPublicLanding(page);
+  await expectHomepageEntranceAnimationRemoved();
+
+  await page.reload();
+  await expectPublicLanding(page);
+  await expectHomepageEntranceAnimationRemoved();
+});
+
 test('the core app still renders when the optional exchange-feed browser helper is unavailable', async ({ page }) => {
   await isolateApi(page);
   await page.route('**/tm/feed-client.js*', route => route.abort());
