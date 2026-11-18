@@ -31,8 +31,8 @@ This checklist records the source/configuration audit findings. Items are not co
 
 ## 4. Homepage animation and frontend behavior
 
-- [ ] Remove the unwanted legacy `.view.enter > *` entrance animation and its associated keyframes, as requested.
-- [ ] Preserve the boot gate's purpose without reintroducing a homepage flash or entrance animation.
+- [x] Remove the unwanted legacy `.view.enter > *` entrance animation and its redundant override. The shared `@keyframes in` remains because other non-homepage screens (`.pgw`, `.lg`, and `#out`) still use it.
+- [x] Preserve the existing boot-gate loader in `app/layout.tsx`; the homepage entrance selector is removed. Runtime refresh/navigation verification remains open.
 - [ ] Verify refresh, direct navigation, back/forward navigation, mobile layout, and reduced-motion behavior.
 - [ ] Regression-test homepage carousel and Explore category interactions; distinguish the active homepage carousel from the currently unloaded `category-ads.js`.
 
