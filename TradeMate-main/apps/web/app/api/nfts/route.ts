@@ -79,7 +79,7 @@ export async function GET(request: Request) {
     const stats = await mapLimit(slugs, 4, async (slug: string) => {
       try {
         const statsResponse = await fetch(`https://api.opensea.io/api/v2/collections/${encodeURIComponent(slug)}/stats`, {
-          headers: { 'x-api-key': apiKey, accept: 'application/json' }, next: { revalidate: 300 }
+          headers: { 'x-api-key': apiKey, accept: 'application/json' }, next: { revalidate: 300 }, signal: AbortSignal.timeout(8000)
         });
         if (!statsResponse.ok) return [slug, null] as const;
         const value = await statsResponse.json();
