@@ -112,8 +112,12 @@
         last: trades.length ? trades[0].price : mid,
         trades,                                       // [{ exchange, market, ts, price, qty, side }] newest first
         booksCombined: fresh.length,                  // "N exchange books combined"
-        feedsLive: Number.isFinite(msg.feeds.live) ? msg.feeds.live : 0, // "N/M FEEDS LIVE"
-        feedsTotal: Number.isFinite(msg.feeds.total) ? msg.feeds.total : 0,
+        feedsLive: Array.isArray(msg.feeds)
+          ? msg.feeds.filter((feed) => feed && feed.status === 'live' && feed.stale !== true).length
+          : Number.isFinite(msg.feeds.live) ? msg.feeds.live : 0,
+        feedsTotal: Array.isArray(msg.feeds)
+          ? msg.feeds.length
+          : Number.isFinite(msg.feeds.total) ? msg.feeds.total : 0,
         fxQuotes: Array.isArray(msg.fxQuotes) ? msg.fxQuotes : [],
         // Expose fresh spot best-bid/ask/last data for the market catalogue.
         marketQuotes: Array.isArray(msg.books) ? msg.books.filter((b) => b && b.market === 'spot' && !b.stale).map((b) => ({
