@@ -632,3 +632,12 @@ Sources rechecked on the remediation branch: apps/api/src/module.ts (authenticat
 - [ ] Keep immutable audit table insert-only in all proposed auth grants/functions.
 
 - [x] This reconciliation pass was documentation-only. No application SQL, migration, database role, policy, production data, service, configuration, or deployment was changed.
+
+
+## 50. Scope verification-resend cleanup to the requested account (2026-11-19)
+
+- [x] Changed verification resend cleanup from a global expired/used-row predicate to `DELETE FROM email_verification_codes WHERE user_id = $1`, so the resend transaction replaces only the requested pending user's verification rows.
+- [x] Extended `apps/api/scripts/test-auth-audit.js`: before resending one pending account's code, create a separate pending account with one expired code and one used code; after resend, assert both unrelated rows remain, including their expired/used state.
+- [x] Retained the existing assertions that the replacement digest is persisted and receives a fresh attempt budget.
+- [ ] Await CI for the resulting PR head. No local build or integration-test execution is claimed.
+- [x] The change is limited to the resend cleanup predicate and its integration regression coverage. It does not introduce global cleanup, alter code expiry/attempt semantics, or change database roles, RLS, migrations, production configuration, data, services or deployments.
