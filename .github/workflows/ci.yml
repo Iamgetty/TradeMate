@@ -118,6 +118,11 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: node scripts/test-db-roles.js
+      - name: Execute account-deletion transaction as the restricted worker role
+        working-directory: TradeMate-main/apps/api
+        env:
+          ACCOUNT_DELETION_TEST_DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-account-deletion-worker.js
       - name: Verify RLS owner isolation and FORCE RLS behaviour
         working-directory: TradeMate-main/apps/api
         env:
