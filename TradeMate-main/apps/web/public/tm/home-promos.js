@@ -1,62 +1,45 @@
 /*
  * Home screen: replaces the single "Your promotion could appear here" card with
- * a swipeable slide of five large cards that cover the ten Contract categories
- * (two per card). Each card has a tappable pill per category; tapping the rest
- * of the card opens the first category. Sizing is the large carousel card.
- * Copy is condensed from each category's own description in the app; nothing
- * here is invented stats.
- * Runs as a DOM patch so app.js does not need to change. Taps use the app's
- * existing [data-mm] handler (the same one the category tiles use).
+ * a swipeable slide of five cards in the same style as the Explore page slides
+ * (.tbn): a tag, a headline with one highlighted word, a short line, and a row
+ * of chips. There are no buttons. Each card covers two Contract categories and
+ * shows real activity (live listing counts) as chips; tapping the card, or a
+ * chip, opens that category through the app's existing [data-mm] handler.
+ *
+ * All styling comes from the app's own .tbn classes, so the cards match Explore
+ * exactly and follow its light/dark themes. Nothing here is invented stats: a
+ * category with no listings says so.
+ * Runs as a DOM patch so app.js does not need to change.
  */
 (function () {
   'use strict';
 
-  var ICONS = {
-    brief: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5h6v2M3 13h18"/>',
-    estate: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10M10 20v-6h4v6"/>',
-    factory: '<path d="M3 21V11l6 4v-4l6 4V5h4v16zM3 21h18"/>',
-    uprt: '<path d="M7 17L17 7M8 7h9v9"/>',
-    sports: '<path d="M8 4h8v5a4 4 0 01-8 0z"/><path d="M8 6H5v1a3 3 0 003 3M16 6h3v1a3 3 0 01-3 3M12 13v4M9 20h6M10 17h4"/>'
-  };
-  // key = the app's category key (what [data-mm] expects); label = what people see.
+  // key = the app's category key (what [data-mm] expects); div = API division.
   var SLIDES = [
-    { title: 'Services & B2B', sub: 'Skilled pros, suppliers & partners', icon: 'brief',
-      cats: [{ key: 'Services', label: 'Services' }, { key: 'B2B', label: 'B2B' }] },
-    { title: 'Real Estate & Technology', sub: 'Homes, land, apps & licences', icon: 'estate',
-      cats: [{ key: 'Real Estate', label: 'Real Estate' }, { key: 'Software', label: 'Technology' }] },
-    { title: 'Industrial & Agriculture', sub: 'Manufacturing, supply, produce & land', icon: 'factory',
-      cats: [{ key: 'Industrial & Trade', label: 'Industrial' }, { key: 'Agriculture', label: 'Agriculture' }] },
-    { title: 'Finance & Institution', sub: 'Funding, investment & public projects', icon: 'uprt',
-      cats: [{ key: 'Finance & Investment', label: 'Finance' }, { key: 'Institution & Infrastructure', label: 'Institution' }] },
-    { title: 'Sports Transfer & Art', sub: 'Transfers, signings, talent & film', icon: 'sports',
-      cats: [{ key: 'Sports', label: 'Sports' }, { key: 'Entertainment', label: 'Art' }] }
+    { tag: 'TRENDING \u00b7 SERVICES & B2B', lead: 'Hire and ', em: 'get hired',
+      sub: 'Skilled pros, suppliers and business partners.',
+      cats: [{ key: 'Services', label: 'Services', div: 'services' }, { key: 'B2B', label: 'B2B', div: 'b2b' }] },
+    { tag: 'ACTIVITY \u00b7 REAL ESTATE & TECHNOLOGY', lead: 'Homes, land and ', em: 'software',
+      sub: 'Property listings, apps and licences.',
+      cats: [{ key: 'Real Estate', label: 'Real Estate', div: 'real_estate' }, { key: 'Software', label: 'Technology', div: 'software' }] },
+    { tag: 'TRENDING \u00b7 INDUSTRIAL & AGRICULTURE', lead: 'Trade across ', em: 'industry',
+      sub: 'Manufacturing, supply, produce and land.',
+      cats: [{ key: 'Industrial & Trade', label: 'Industrial', div: 'industrial_trade' }, { key: 'Agriculture', label: 'Agriculture', div: 'agriculture' }] },
+    { tag: 'PROMOTION \u00b7 FINANCE & INSTITUTION', lead: 'Zero contract ', em: 'fees',
+      sub: 'Publish your first offer free this month.',
+      cats: [{ key: 'Finance & Investment', label: 'Finance', div: 'finance_investment' }, { key: 'Institution & Infrastructure', label: 'Institution', div: 'institution_infrastructure' }] },
+    { tag: 'ACTIVITY \u00b7 SPORTS TRANSFER & ART', lead: 'Transfers and ', em: 'talent',
+      sub: 'Signings, loans, music, film and art.',
+      cats: [{ key: 'Sports', label: 'Sports Transfer', div: 'sports' }, { key: 'Entertainment', label: 'Art', div: 'entertainment' }] }
   ];
+  var TTL = 60000;
+  var counts = null;        // { division: number } once the listings feed has loaded
+  var countsAt = 0;
+  var failedAt = 0;
+  var inflight = null;
   var current = 0;
   var pausedUntil = 0;
   var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  var css = document.createElement('style');
-  css.id = 'tm-promo-css';
-  css.textContent = [
-    '.banner.promo-slides{padding:0;min-height:184px;height:184px;margin:14px 16px 16px;border-radius:20px}',
-    '.promo-track{display:flex;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}',
-    '.promo-track::-webkit-scrollbar{display:none}',
-    '.promo-slide{flex:0 0 100%;min-width:0;box-sizing:border-box;scroll-snap-align:start;scroll-snap-stop:always;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:20px;align-items:center;padding:24px 28px 34px;color:inherit;text-align:left;cursor:pointer}',
-    '.promo-ic{width:60px;height:60px;border-radius:18px;display:grid;place-items:center;background:color-mix(in srgb,var(--am) 16%,transparent);color:var(--am)}',
-    '.promo-ic svg{width:30px;height:30px}',
-    '.banner .promo-tx{min-width:0}',
-    '.banner .promo-tx .chip{display:block;line-height:1;font-size:11px;letter-spacing:.08em}',
-    '.banner .promo-tx h3{margin:10px 0 7px;font-size:20px;line-height:1.25;max-width:none;white-space:normal;overflow:visible;text-overflow:clip}',
-    '.banner .promo-tx p{margin:0;max-width:none;font-size:14px;line-height:1.5;white-space:normal;overflow:visible;text-overflow:clip}',
-    '.promo-pills{display:flex;flex-direction:column;gap:8px;align-items:stretch}',
-    '.promo-pill{flex:none;padding:11px 18px;border-radius:99px;font-size:13px;font-weight:700;line-height:1;white-space:nowrap;text-align:center;background:var(--am);color:#1b1006;cursor:pointer}',
-    'html[data-theme="light"] .promo-pill{color:#fff}',
-    '.promo-dots{position:absolute;left:0;right:0;bottom:7px;display:flex;justify-content:center;gap:6px;pointer-events:none}',
-    '.promo-dots i{width:7px;height:7px;border-radius:99px;background:var(--line);transition:width .2s,background .2s}',
-    '@media(max-width:600px){.banner.promo-slides{min-height:196px;height:196px;margin:12px 12px 14px}.promo-slide{grid-template-columns:48px minmax(0,1fr);gap:14px;padding:20px 18px 36px;align-content:center}.promo-ic{width:48px;height:48px;border-radius:15px}.promo-ic svg{width:25px;height:25px}.banner .promo-tx h3{font-size:18px;white-space:normal}.banner .promo-tx p{font-size:13px;white-space:normal}.promo-pills{grid-column:2;flex-direction:row;flex-wrap:wrap;justify-self:start;gap:8px;margin-top:2px}.promo-pill{padding:9px 14px;font-size:12.5px}}',
-    '.promo-dots i.on{width:16px;background:var(--am)}'
-  ].join('\n');
-  (document.head || document.documentElement).appendChild(css);
 
   function el(tag, cls, text) {
     var n = document.createElement(tag);
@@ -65,45 +48,94 @@
     return n;
   }
 
-  function setActive(banner, i) {
-    var dots = banner.querySelectorAll('.promo-dots i');
-    for (var k = 0; k < dots.length; k++) dots[k].classList.toggle('on', k === i);
+  // ---- live activity: how many real listings each category has ----
+  function loadCounts() {
+    if (counts && Date.now() - countsAt < TTL) return Promise.resolve(counts);
+    if (!counts && failedAt && Date.now() - failedAt < 15000) return Promise.resolve(null);
+    if (inflight) return inflight;
+    inflight = fetch('/api/market/listings?limit=50', { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('bad status'); return r.json(); })
+      .then(function (d) {
+        var c = {};
+        (d && d.data || []).forEach(function (l) { if (l && l.division) c[l.division] = (c[l.division] || 0) + 1; });
+        counts = c; countsAt = Date.now(); failedAt = 0;
+        return c;
+      })
+      .catch(function () { failedAt = Date.now(); return null; })
+      .then(function (c) { inflight = null; return c; });
+    return inflight;
+  }
+
+  function paintCounts(root) {
+    var chips = root.querySelectorAll('.tbn-chip[data-div]');
+    for (var i = 0; i < chips.length; i++) {
+      var small = chips[i].querySelector('small');
+      if (!small) continue;
+      var n = counts ? (counts[chips[i].getAttribute('data-div')] || 0) : null;
+      if (n === null) { small.textContent = ''; small.className = ''; continue; }
+      small.textContent = n === 0 ? 'No listings yet' : (n >= 50 ? '50+' : n) + (n === 1 ? ' listing' : ' listings');
+      small.className = n === 0 ? '' : 'up';
+    }
+  }
+
+  function setActive(root, i) {
+    var dots = root.querySelectorAll('.tbn-dots i');
+    for (var k = 0; k < dots.length; k++) dots[k].className = k === i ? 'on' : '';
+  }
+
+  function goTo(root, i, smooth) {
+    var track = root.querySelector('.tbn-track');
+    if (!track || !track.clientWidth) return;
+    current = (i % SLIDES.length + SLIDES.length) % SLIDES.length;
+    track.scrollTo({ left: current * track.clientWidth, behavior: smooth ? 'smooth' : 'auto' });
+    setActive(root, current);
   }
 
   function make() {
-    var banner = el('div', 'banner promo-slides');
-    banner.setAttribute('aria-roledescription', 'carousel');
-    banner.setAttribute('aria-label', 'Contract categories');
-    var track = el('div', 'promo-track');
+    var root = el('div', 'tbn home-promo-tbn');
+    root.setAttribute('role', 'region');
+    root.setAttribute('aria-roledescription', 'carousel');
+    root.setAttribute('aria-label', 'Contract category activity and promotions');
+    var track = el('div', 'tbn-track');
     SLIDES.forEach(function (s, i) {
-      var slide = el('div', 'promo-slide');
-      slide.setAttribute('role', 'button');
-      slide.tabIndex = 0;
-      slide.setAttribute('data-mm', s.cats[0].key);
-      slide.setAttribute('aria-label', (i + 1) + ' of ' + SLIDES.length + ': ' + s.title);
-      var ic = el('span', 'promo-ic');
-      ic.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICONS[s.icon] + '</svg>';
-      var tx = el('div', 'promo-tx');
-      tx.appendChild(el('span', 'chip', 'CONTRACT CATEGORIES'));
-      tx.appendChild(el('h3', null, s.title));
-      tx.appendChild(el('p', null, s.sub));
-      var pills = el('div', 'promo-pills');
+      var slide = el('div', 'tbn-s');
+      slide.setAttribute('data-mm', s.cats[0].key); // tapping the card opens the first category
+      slide.setAttribute('aria-label', (i + 1) + ' of ' + SLIDES.length);
+      var copy = el('div', 'tbn-copy');
+      copy.appendChild(el('span', 'tbn-tag', s.tag));
+      var h2 = el('h2');
+      h2.appendChild(document.createTextNode(s.lead));
+      h2.appendChild(el('em', null, s.em));
+      copy.appendChild(h2);
+      copy.appendChild(el('p', null, s.sub));
+      var list = el('div', 'tbn-list');
       s.cats.forEach(function (c) {
-        var p = el('span', 'promo-pill', c.label);
-        p.setAttribute('role', 'button');
-        p.tabIndex = 0;
-        p.setAttribute('data-mm', c.key);
-        pills.appendChild(p);
+        var chip = el('button', 'tbn-chip');
+        chip.type = 'button';
+        chip.setAttribute('data-mm', c.key);
+        chip.setAttribute('data-div', c.div);
+        chip.appendChild(el('b', null, c.label));
+        chip.appendChild(el('small'));
+        list.appendChild(chip);
       });
-      slide.appendChild(ic);
-      slide.appendChild(tx);
-      slide.appendChild(pills);
+      slide.appendChild(copy);
+      slide.appendChild(list);
       track.appendChild(slide);
     });
-    banner.appendChild(track);
-    var dots = el('div', 'promo-dots');
-    SLIDES.forEach(function () { dots.appendChild(el('i')); });
-    banner.appendChild(dots);
+    root.appendChild(track);
+    var dots = el('div', 'tbn-dots');
+    SLIDES.forEach(function (s, i) {
+      var d = el('i');
+      d.setAttribute('role', 'button');
+      d.setAttribute('aria-label', 'Slide ' + (i + 1));
+      d.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        pausedUntil = Date.now() + 10000;
+        goTo(root, i, true);
+      });
+      dots.appendChild(d);
+    });
+    root.appendChild(dots);
 
     var raf = 0;
     track.addEventListener('scroll', function () {
@@ -112,38 +144,40 @@
         raf = 0;
         if (!track.clientWidth) return;
         current = Math.round(track.scrollLeft / track.clientWidth);
-        setActive(banner, current);
+        setActive(root, current);
       });
     }, { passive: true });
     ['pointerdown', 'touchstart', 'wheel'].forEach(function (ev) {
-      banner.addEventListener(ev, function () { pausedUntil = Date.now() + 10000; }, { passive: true });
+      root.addEventListener(ev, function () { pausedUntil = Date.now() + 10000; }, { passive: true });
     });
-    return banner;
+    return root;
   }
 
   function patch() {
     var app = document.getElementById('app');
     if (!app) return;
-    var old = app.querySelector('.view .banner:not(.promo-slides)');
+    var old = app.querySelector('.view .banner');
     if (!old) return;
     // The home card is the one right below the Contract Scout button.
     var prev = old.previousElementSibling;
     if (!prev || !prev.classList.contains('sc-promo')) return;
-    var banner = make();
-    old.parentNode.replaceChild(banner, old);
-    var track = banner.querySelector('.promo-track');
+    var root = make();
+    old.parentNode.replaceChild(root, old);
+    var track = root.querySelector('.tbn-track');
     track.scrollLeft = current * track.clientWidth;
-    setActive(banner, current);
+    setActive(root, current);
+    paintCounts(root);                    // instant if already loaded
+    loadCounts().then(function () {
+      var live = document.querySelector('#app .home-promo-tbn');
+      if (live) paintCounts(live);
+    });
   }
 
   // Auto-advance every 5s; pauses while the person is interacting or the tab is hidden.
   setInterval(function () {
     if (reduced || document.hidden || Date.now() < pausedUntil) return;
-    var banner = document.querySelector('#app .promo-slides');
-    if (!banner) return;
-    var track = banner.querySelector('.promo-track');
-    if (!track || !track.clientWidth) return;
-    track.scrollTo({ left: ((current + 1) % SLIDES.length) * track.clientWidth, behavior: 'smooth' });
+    var root = document.querySelector('#app .home-promo-tbn');
+    if (root) goTo(root, current + 1, true);
   }, 5000);
 
   // Install before the app runtime paints its first Home view. Observe the
