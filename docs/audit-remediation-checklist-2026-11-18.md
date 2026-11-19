@@ -390,3 +390,13 @@ This checklist records the source/configuration audit findings. Items are not co
 - [x] Reviewed mandate acceptance/rejection/revocation: acceptance and rejection require the exact named representative or active organization owner/admin; player revocation is owner-scoped and audited. Acceptance explicitly leaves mandate inactive pending separate TradeMate verification.
 - [x] No recipient-side API route currently consumes mandate permissions to expose profile or document content. Do not add such a route without checking mandate status, acceptance, verification, start/expiry, representative identity/membership, permitted action, territory, competition, and revocation.
 - [x] No source behavior changed. No runtime tests were run in this source-review pass. No production data, services, deployments, or infrastructure were changed.
+
+
+## 36. Legacy marketplace enquiry and contract authorization consistency review (2026-11-19)
+
+- [x] Reviewed enquiry participant authorization. `authorizedEnquiry()` allows the buyer or any user with a row in legacy `organization_members` for the seller organization to read the enquiry and messages. Reply uses the same participant helper, then rejects closed/reported enquiries and rechecks status under a row lock.
+- [x] Reviewed contract actions. Contract proposal response and seller-side completion confirmation explicitly require legacy organization membership role `owner` or `admin`; buyer-side cancellation is restricted to the buyer. Contract detail/messages use the shared `authorizedContract()` helper.
+- [x] This establishes a concrete policy inconsistency: ordinary organization members can access and reply to buyer enquiries, while only owner/admin can accept/reject contracts or confirm seller completion. The legacy membership model has no date-window or permission-scope columns, so Sports Transfer membership rules must not be applied to it.
+- [ ] Product decision required: confirm whether every legacy organization member is intentionally allowed to see and respond to commercial enquiries. If yes, document this as a deliberate distinction between enquiry collaboration and contract authority, and ensure the UI explains it. If no, introduce a defined enquiry permission/role rule and add DB-backed HTTP tests for member versus owner/admin access to enquiry read/reply, contract read/respond, and completion confirmation.
+- [x] The inspected contract queries use buyer identity or seller-organization membership predicates; no cross-organization contract access path was identified in this source pass.
+- [x] No source behavior changed. No runtime tests were run in this source-review pass. No production data, services, deployments, or infrastructure were changed.
