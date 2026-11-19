@@ -4053,7 +4053,9 @@ class SportsTransferMandatesController {
            SELECT user_id, 'System', 'Sports Transfer mandate revoked',
                   'The player has revoked the representation mandate granted to your organization.', 'shield-alert'
            FROM sports_org_memberships WHERE sports_organization_id = $1
-             AND role IN ('owner', 'admin') AND status = 'active'`,
+             AND role IN ('owner', 'admin') AND status = 'active'
+             AND (starts_at IS NULL OR starts_at <= now())
+             AND (expires_at IS NULL OR expires_at > now())`,
           [mandate.representative_organization_id],
         );
       }
