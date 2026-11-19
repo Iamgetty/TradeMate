@@ -19,7 +19,7 @@ async function main() {
   try {
     const suffix = randomUUID();
     const actors = {};
-    for (const role of ['owner', 'member', 'admin', 'outsider', 'secondMember']) {
+    for (const role of ['owner', 'member', 'admin', 'expiredAdmin', 'futureAdmin', 'outsider', 'secondMember']) {
       const user = await rawPool.query(
         "INSERT INTO users (email, display_name, status) VALUES ($1, $2, 'active') RETURNING id",
         [role + '-' + suffix + '@example.invalid', 'Sports org test ' + role],
@@ -66,6 +66,14 @@ async function main() {
     assert.equal(organization.membership.status, 'active');
     const organizationId = organization.id;
     const ownerMembershipId = organization.membership.id;
+    await rawPool.query(
+      "INSERT INTO sports_org_memberships (sports_organization_id, user_id, role, permission_scope, status, invited_by_user_id, starts_at, expires_at) VALUES ($1, $2, 'admin', 'workspace', 'active', $3, now() - interval '2 days', now() - interval '1 day')",
+      [organizationId, actors.expiredAdmin.userId, actors.owner.userId],
+    );
+    await rawPool.query(
+      "INSERT INTO sports_org_memberships (sports_organization_id, user_id, role, permission_scope, status, invited_by_user_id, starts_at) VALUES ($1, $2, 'admin', 'workspace', 'active', $3, now() + interval '1 day')",
+      [organizationId, actors.futureAdmin.userId, actors.owner.userId],
+    );
 
     const mine = await call('owner', 'GET', '/api/sports-transfer/organizations/mine');
     assert.equal(mine.status, 200);
@@ -92,6 +100,17 @@ async function main() {
 
     const outsiderList = await call('outsider', 'GET', '/api/sports-transfer/organizations/' + organizationId + '/members');
     assert.equal(outsiderList.status, 403);
+    for (const actor of ['expiredAdmin', 'futureAdmin']) {
+      const inactiveManagerList = await call(actor, 'GET', '/api/sports-transfer/organizations/' + organizationId + '/members');
+      assert.equal(inactiveManagerList.status, 403, actor + ' cannot inspect organization membership outside the active date window');
+      const inactiveManagerInvite = await call(actor, 'POST', '/api/sports-transfer/organizations/' + organizationId + '/memberships', {
+        userId: actors.secondMember.userId,
+        role: 'member',
+        permissionScope: 'read_only',
+        expiresAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+      });
+      assert.equal(inactiveManagerInvite.status, 403, actor + ' cannot invite members outside the active date window');
+    }
     const outsiderInvite = await call('outsider', 'POST', '/api/sports-transfer/organizations/' + organizationId + '/memberships', {
       ...inviteBody,
       userId: actors.secondMember.userId,
