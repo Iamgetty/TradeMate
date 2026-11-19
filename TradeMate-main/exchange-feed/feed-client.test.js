@@ -147,6 +147,37 @@ for (const [label, factory] of [
     client.close();
   });
 
+  test(label + ': stale venue books are excluded from aggregated depth and catalogue quotes', () => {
+    const h = harness(factory);
+    const updates = [];
+    const client = h.create({ onUpdate: update => updates.push(update) });
+    h.sockets[0].open();
+    h.sockets[0].message({
+      books: [
+        {
+          base: 'BTC', quote: 'USDT', market: 'spot', stale: false,
+          bids: [['64000', '1']], asks: [['64010', '2']],
+          bid: 64000, ask: 64010, last: 64005, exchange: 'binance',
+        },
+        {
+          base: 'BTC', quote: 'USDT', market: 'spot', stale: true,
+          bids: [['65000', '9']], asks: [['65010', '9']],
+          bid: 65000, ask: 65010, last: 65005, exchange: 'bybit',
+        },
+      ],
+      trades: [],
+      feeds: { live: 1, total: 2 },
+      ts: 456,
+    });
+
+    const update = updates.at(-1);
+    assert.equal(update.booksCombined, 1);
+    assert.deepEqual(update.bids, [{ price: 64000, size: 1, total: 1 }]);
+    assert.deepEqual(update.asks, [{ price: 64010, size: 2, total: 2 }]);
+    assert.deepEqual(update.marketQuotes.map(quote => quote.exchange), ['binance']);
+    client.close();
+  });
+
   test(label + ': disconnect clears market quotes rather than leaving stale catalogue prices', () => {
     const h = harness(factory);
     const updates = [];
