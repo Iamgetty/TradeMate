@@ -21,6 +21,7 @@ on:
 
 permissions:
   contents: read
+  checks: read
   id-token: write
 
 concurrency:
@@ -46,6 +47,7 @@ jobs:
         env:
           EXPECTED_API_IMAGE_URI: ${{ inputs.expected_api_image_uri }}
           RELEASE_SOURCE_SHA: ${{ inputs.release_source_sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [[ ! "$EXPECTED_API_IMAGE_URI" =~ ^[0-9]{12}\.dkr\.ecr\.eu-north-1\.amazonaws\.com/.+@sha256:[a-f0-9]{64}$ ]]; then
@@ -61,6 +63,29 @@ jobs:
             echo "::error::The image source commit must be an ancestor of the checked-out main revision."
             exit 1
           fi
+
+          CHECK_RUNS="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_SOURCE_SHA/check-runs?per_page=100" --jq '.check_runs')"
+          REQUIRED_CHECKS=(
+            "Browser app-shell and live API acceptance tests"
+            "AWS API and exchange-feed container builds"
+            "Exchange feed and MT5 tests"
+            "Database migration integration"
+            "Security scanning (SAST, SCA and secrets)"
+            "API TypeScript build"
+            "Web build and runtime syntax"
+            "Isolated Cloudflare Workers frontend build and runtime"
+            "Lint AWS CloudFormation templates (no deployment)"
+            "Non-destructive vinext compatibility scan"
+            "Generate and validate lockfiles"
+          )
+          for required_check in "${REQUIRED_CHECKS[@]}"; do
+            conclusion="$(jq -r --arg name "$required_check" '[.[] | select(.name==$name)] | sort_by(.completed_at // .started_at) | last | .conclusion // "missing"' <<< "$CHECK_RUNS")"
+            if [[ "$conclusion" != "success" ]]; then
+              echo "::error::Required validation '$required_check' is not successful for release source $RELEASE_SOURCE_SHA (conclusion: $conclusion)."
+              exit 1
+            fi
+          done
+
           echo "image_uri=$EXPECTED_API_IMAGE_URI" >> "$GITHUB_OUTPUT"
           echo "source_sha=$RELEASE_SOURCE_SHA" >> "$GITHUB_OUTPUT"
 
