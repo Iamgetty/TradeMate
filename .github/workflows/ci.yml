@@ -46,7 +46,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          node-version: 24.22.1
       - name: Install API dependencies
         working-directory: TradeMate-main/apps/api
         run: npm install --no-audit --no-fund
@@ -151,7 +151,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          node-version: 24.22.1
       - name: Validate TradeMate runtime JavaScript
         run: node --check TradeMate-main/apps/web/public/tm/app.js
       - name: Verify connected account cache isolation
@@ -175,7 +175,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          node-version: 24.22.1
       - name: Install exchange-feed dependencies
         working-directory: TradeMate-main/exchange-feed
         run: npm install --no-audit --no-fund
@@ -193,7 +193,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          node-version: 24.22.1
       - name: Install API dependencies
         working-directory: TradeMate-main/apps/api
         run: npm install --no-audit --no-fund
@@ -251,7 +251,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          node-version: 24.22.1
 
       - name: API dependency audit
         working-directory: TradeMate-main/apps/api
@@ -310,7 +310,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          node-version: 24.22.1
       - name: Install API dependencies
         working-directory: TradeMate-main/apps/api
         run: npm install --no-audit --no-fund
@@ -374,7 +374,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: 24.22.1
       - name: Create disposable frontend copy
         run: |
           mkdir -p "$RUNNER_TEMP/trademate-web"
