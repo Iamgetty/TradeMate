@@ -251,7 +251,7 @@ This checklist records the source/configuration audit findings. Items are not co
 ## 23. Sports Transfer organization owner-role assignment — schema boundary regression test (2026-11-19)
 
 - [x] Reviewed the organization membership invitation schema and confirmed it explicitly excludes the `owner` role; ownership can only be established when an organization is created. The route separately restricts admin invitations to owners.
-- [x] The first added test incorrectly expected HTTP 403 for an owner-role invitation. CI correctly returned HTTP 400 because Zod rejects the role before route authorization. The source guard was restored to its original, schema-aligned behavior; no owner-escalation vulnerability was established by this test.
+- [x] The first added test incorrectly expected HTTP 403 for an owner-role invitation. TradeMate CI run 1556 reached the organization integration test and correctly returned HTTP 400 because Zod rejects the role before route authorization. The source guard was restored to its original, schema-aligned behavior; no owner-escalation vulnerability was established by this test.
 - [x] Updated the regression assertion to require HTTP 400 and document that owner assignment is rejected by the invitation schema.
 - [ ] Re-run the full database-backed organization/Sports Transfer integration suite and full CI on the corrected commit.
 - [ ] Continue auditing organization-role changes, membership reactivation, and all organization-scoped opportunity/document actions for independent privilege escalation paths.
