@@ -83,13 +83,13 @@ function attachMarketFeed(server: Server) {
     try { pathname = new URL(request.url || '/', 'http://localhost').pathname; } catch { return; }
     if (pathname !== '/api/market-feed') return;
     if (!isAllowedMarketFeedOrigin(request.headers.origin)) {
-      socket.write('HTTP/1.1 403 Forbidden\\r\\nConnection: close\\r\\n\\r\\n');
+      socket.write('HTTP/1.1 403 Forbidden\r\\nConnection: close\r\\n\r\\n');
       socket.destroy();
       return;
     }
     const ip = marketFeedClientIp(request);
     if (wss.clients.size >= MARKET_FEED_LIMITS.maxConnections || (connectionsByIp.get(ip) || 0) >= MARKET_FEED_LIMITS.maxConnectionsPerIp) {
-      socket.write('HTTP/1.1 429 Too Many Requests\\r\\nConnection: close\\r\\n\\r\\n');
+      socket.write('HTTP/1.1 429 Too Many Requests\r\\nConnection: close\r\\n\r\\n');
       socket.destroy();
       return;
     }
