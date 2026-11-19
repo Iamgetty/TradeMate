@@ -11,7 +11,7 @@ on:
           - "no"
           - "yes"
       expected_api_image_uri:
-        description: Exact ECR API image URI, pinned by sha256 digest, already deployed in the staging services stack.
+        description: Exact ECR API image URI, pinned by sha256 digest, built and validated for the next release but not yet promoted.
         type: string
         required: true
       release_source_sha:
@@ -177,7 +177,11 @@ jobs:
           TASK_ROLE_ARN="$(jq -r '.taskRoleArn' <<< "$TASK_DEFINITION")"
 
           if [[ "$TASK_FAMILY" != "trademate-staging-database-migration" || "$NETWORK_MODE" != "awsvpc" || "$COMPATIBILITIES" != *FARGATE* || "$CONTAINER_COUNT" != "1" || "$CONTAINER_NAME" != "database-migration" ]]; then
-            echo "::error::The deployed task definition does not match the expected single-container Fargate migration task."
+            echo "::error::The deployed baseline task definition does not match the expected single-container Fargate migration task."
+            exit 1
+          fi
+          if [[ ! "$TASK_IMAGE" =~ ^[0-9]{12}\\.dkr\\.ecr\\.eu-north-1\\.amazonaws\\.com/.+@sha256:[a-f0-9]{64}$ ]]; then
+            echo "::error::The baseline migration task image is not digest-pinned."
             exit 1
           fi
           if [[ "$TASK_COMMAND" != "node scripts/migrate.js" || "$TASK_SECRET_NAMES" != "MIGRATION_DATABASE_URL" || "$TASK_SECRET_ARN" != "$MIGRATION_SECRET_ARN" ]]; then
@@ -188,8 +192,33 @@ jobs:
             echo "::error::The migration task IAM roles do not match the reviewed CloudFormation stack outputs."
             exit 1
           fi
-          if [[ "$TASK_IMAGE" != "$EXPECTED_API_IMAGE_URI" ]]; then
-            echo "::error::The deployed migration task image does not match the explicitly approved API image digest."
+
+          IMAGE_REGISTRY="${EXPECTED_API_IMAGE_URI%%/*}"
+          IMAGE_PATH="${EXPECTED_API_IMAGE_URI#*/}"
+          IMAGE_REPOSITORY="${IMAGE_PATH%@sha256:*}"
+          IMAGE_DIGEST="sha256:${EXPECTED_API_IMAGE_URI##*@sha256:}"
+          REGISTRY_ACCOUNT="${IMAGE_REGISTRY%%.*}"
+          aws ecr describe-images \
+            --registry-id "$REGISTRY_ACCOUNT" \
+            --repository-name "$IMAGE_REPOSITORY" \
+            --image-ids "imageDigest=$IMAGE_DIGEST" >/dev/null
+
+          MIGRATION_TASK_INPUT="$RUNNER_TEMP/trademate-migration-task-definition.json"
+          jq --arg image "$EXPECTED_API_IMAGE_URI" '
+            del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                .compatibilities, .registeredAt, .registeredBy, .deregisteredAt)
+            | .containerDefinitions[0].image = $image
+          ' <<< "$TASK_DEFINITION" > "$MIGRATION_TASK_INPUT"
+          REGISTERED_TASK="$(aws ecs register-task-definition \
+            --cli-input-json "file://$MIGRATION_TASK_INPUT" \
+            --query taskDefinition --output json)"
+          REGISTERED_TASK_ARN="$(jq -r '.taskDefinitionArn' <<< "$REGISTERED_TASK")"
+          REGISTERED_TASK_IMAGE="$(jq -r '.containerDefinitions[0].image' <<< "$REGISTERED_TASK")"
+          REGISTERED_SECRET_ARN="$(jq -r '.containerDefinitions[0].secrets[] | select(.name=="MIGRATION_DATABASE_URL") | .valueFrom' <<< "$REGISTERED_TASK")"
+          REGISTERED_EXECUTION_ROLE="$(jq -r '.executionRoleArn' <<< "$REGISTERED_TASK")"
+          REGISTERED_TASK_ROLE="$(jq -r '.taskRoleArn' <<< "$REGISTERED_TASK")"
+          if [[ -z "$REGISTERED_TASK_ARN" || "$REGISTERED_TASK_IMAGE" != "$EXPECTED_API_IMAGE_URI" || "$REGISTERED_SECRET_ARN" != "$MIGRATION_SECRET_ARN" || "$REGISTERED_EXECUTION_ROLE" != "$MIGRATION_EXECUTION_ROLE_ARN" || "$REGISTERED_TASK_ROLE" != "$MIGRATION_TASK_ROLE_ARN" ]]; then
+            echo "::error::The newly registered migration revision failed its artifact, secret or IAM identity checks."
             exit 1
           fi
 
@@ -212,7 +241,7 @@ jobs:
           fi
 
           echo "cluster=$CLUSTER_NAME" >> "$GITHUB_OUTPUT"
-          echo "task_definition=$TASK_DEFINITION_ARN" >> "$GITHUB_OUTPUT"
+          echo "task_definition=$REGISTERED_TASK_ARN" >> "$GITHUB_OUTPUT"
           echo "network_configuration=$NETWORK_CONFIGURATION" >> "$GITHUB_OUTPUT"
 
       - name: Start the one-off migration task
