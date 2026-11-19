@@ -266,6 +266,14 @@ export default function TradeMateRuntime() {
     metadata.src = '/tm/market-metadata.js?v=1';
     metadata.async = false;
     metadata.onload = () => {
+      if (!window.createMarketMetadataRefresher || !window.applyCoinGeckoMarketMetadata) {
+        window.tmMarketMetadataStatus = {
+          state: 'unavailable',
+          lastAttemptAt: null,
+          lastSuccessAt: null,
+          error: 'Market metadata helper did not initialise correctly',
+        };
+      }
       metadataReady = true;
       loadApp();
     };
