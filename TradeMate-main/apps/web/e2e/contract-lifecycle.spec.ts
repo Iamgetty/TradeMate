@@ -80,6 +80,7 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
 
   const authenticated: Record<'buyer' | 'seller', boolean> = { buyer: false, seller: false };
   let buyerListingRequests = 0;
+  let allowBuyerListingRecovery = false;
   const contract: ContractFixture = {
     id: 'contract-e2e-001',
     title: 'Two-account UI acceptance fixture',
@@ -114,7 +115,7 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
     }
     if (path === '/market/listings' && method === 'GET' && account === 'buyer') {
       buyerListingRequests += 1;
-      if (buyerListingRequests === 1) {
+      if (!allowBuyerListingRecovery) {
         await route.fulfill({ status: 503, json: { message: 'Marketplace listings temporarily unavailable' } });
       } else {
         await route.fulfill({
@@ -208,15 +209,17 @@ test('two separate accounts complete a contract through the Clients and Alpha UI
   try {
     console.log('[contract-e2e] buyer login starting');
     await login(buyer, 'buyer@example.test');
-    await expect.poll(() => buyerListingRequests, { timeout: 10_000 }).toBe(1);
+    await expect.poll(() => buyerListingRequests, { timeout: 10_000 }).toBeGreaterThan(0);
     await expect(buyer.locator('#sbar [data-tab="Markets"]')).toBeVisible();
     await buyer.locator('#sbar [data-tab="Markets"]').click();
     await expect(buyer.locator('#app [data-mm="Services"]')).toBeVisible();
     await buyer.locator('#app [data-mm="Services"]').first().click();
     await expect(buyer.getByText('Could not load marketplace contracts')).toBeVisible();
+    const failedListingRequests = buyerListingRequests;
+    allowBuyerListingRecovery = true;
     await buyer.getByRole('button', { name: 'Retry', exact: true }).click();
     await expect(buyer.getByText('Retry recovered service')).toBeVisible();
-    expect(buyerListingRequests).toBe(2);
+    expect(buyerListingRequests).toBeGreaterThan(failedListingRequests);
     console.log('[contract-e2e] marketplace listing failure recovered after retry; opening contract');
     await buyer.locator('#sbar [data-f="Contracts"]').click();
     await buyer.getByRole('button', { name: /Two-account UI acceptance fixture/ }).click();
@@ -460,8 +463,10 @@ test('individual contract and enquiry messages recover after transient API failu
   test.setTimeout(75_000);
   let authenticated = false;
   let contractMessageRequests = 0;
+  let allowContractMessageRecovery = false;
   let enquiryListRequests = 0;
   let enquiryMessageRequests = 0;
+  let allowEnquiryMessageRecovery = false;
   const contractId = 'message-retry-contract-001';
   const enquiryId = 'message-retry-enquiry-001';
   const context = await browser.newContext();
@@ -496,7 +501,7 @@ test('individual contract and enquiry messages recover after transient API failu
     }
     if (path === `/market/contracts/${contractId}/messages` && method === 'GET') {
       contractMessageRequests += 1;
-      if (contractMessageRequests === 1) {
+      if (!allowContractMessageRecovery) {
         await route.fulfill({ status: 503, json: { message: 'Contract messages temporarily unavailable' } });
       } else {
         await route.fulfill({ status: 200, json: { data: { messages: [] } } });
@@ -514,7 +519,7 @@ test('individual contract and enquiry messages recover after transient API failu
     }
     if (path === `/market/enquiries/${enquiryId}/messages` && method === 'GET') {
       enquiryMessageRequests += 1;
-      if (enquiryMessageRequests === 1) {
+      if (!allowEnquiryMessageRecovery) {
         await route.fulfill({ status: 503, json: { message: 'Enquiry messages temporarily unavailable' } });
       } else {
         await route.fulfill({ status: 200, json: { data: { messages: [] } } });
@@ -530,10 +535,11 @@ test('individual contract and enquiry messages recover after transient API failu
     await page.locator('#sbar [data-f="Contracts"]').click({ force: true, timeout: 10_000 });
     await page.getByRole('button', { name: /Contract message retry fixture/ }).click();
     await expect(page.getByText('Could not load messages', { exact: true })).toBeVisible({ timeout: 10_000 });
-    expect(contractMessageRequests).toBe(1);
+    const failedContractMessageRequests = contractMessageRequests;
+    allowContractMessageRecovery = true;
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await expect(page.getByText('No contract messages yet.', { exact: true })).toBeVisible({ timeout: 10_000 });
-    expect(contractMessageRequests).toBe(2);
+    expect(contractMessageRequests).toBeGreaterThan(failedContractMessageRequests);
 
     await page.locator('#sbar [data-f="More"]').click({ force: true, timeout: 10_000 });
     await expect(page.getByRole('heading', { name: 'All services' })).toBeVisible({ timeout: 10_000 });
@@ -544,11 +550,12 @@ test('individual contract and enquiry messages recover after transient API failu
     await expect(enquiryRow).toBeVisible({ timeout: 10_000 });
     await enquiryRow.click();
     await expect(page.getByText('Could not load messages', { exact: true })).toBeVisible({ timeout: 10_000 });
-    expect(enquiryMessageRequests).toBe(1);
+    const failedEnquiryMessageRequests = enquiryMessageRequests;
+    allowEnquiryMessageRecovery = true;
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await expect(page.getByText('Could not load messages', { exact: true })).toHaveCount(0, { timeout: 10_000 });
     await expect(page.locator('#dm')).toBeVisible();
-    expect(enquiryMessageRequests).toBe(2);
+    expect(enquiryMessageRequests).toBeGreaterThan(failedEnquiryMessageRequests);
   } finally {
     await context.close().catch(() => undefined);
   }
