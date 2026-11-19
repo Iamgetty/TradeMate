@@ -49,3 +49,21 @@ test('RLS pilot rejects malformed and non-PostgreSQL URLs', () => {
     /requires a PostgreSQL connection URL/,
   );
 });
+
+test('RLS pilot rejects URL query parameters that could override connection settings', () => {
+  assert.throws(
+    () => resolveRlsPilotConnectionString({
+      RLS_PILOT_TEST_DATABASE_URL: 'postgres://user:pass@localhost:5432/trademate_test?host=db.example.com',
+    }),
+    /must not contain query parameters or a fragment/,
+  );
+});
+
+test('RLS pilot rejects URL fragments', () => {
+  assert.throws(
+    () => resolveRlsPilotConnectionString({
+      RLS_PILOT_TEST_DATABASE_URL: 'postgres://user:pass@localhost:5432/trademate_test#production',
+    }),
+    /must not contain query parameters or a fragment/,
+  );
+});

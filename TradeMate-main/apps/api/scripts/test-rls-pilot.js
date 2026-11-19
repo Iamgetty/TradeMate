@@ -21,6 +21,10 @@ function resolveRlsPilotConnectionString(env = process.env) {
     throw new Error('RLS pilot requires a PostgreSQL connection URL.');
   }
 
+  if (parsed.search || parsed.hash) {
+    throw new Error('RLS pilot connection URL must not contain query parameters or a fragment.');
+  }
+
   const hostname = parsed.hostname.replace(/^\[|\]$/g, '').toLowerCase();
   if (!['localhost', '127.0.0.1', '::1'].includes(hostname)) {
     throw new Error('RLS pilot is restricted to a loopback PostgreSQL host.');

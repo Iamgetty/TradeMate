@@ -34,15 +34,22 @@
 
 **Important:** These are conservative initial domain-level assessments based on the currently available project audit context. They are not individual feature-level checkmarks and do not constitute production acceptance. Revalidate each row against the exact current branch and deployed environment before upgrading its status.
 
-## Current verified engineering increment
+## Current engineering increment (verification pending)
 
 | Item | Evidence | Status |
 |---|---|---|
 | RLS pilot refuses generic `DATABASE_URL` and requires a dedicated test URL | Commit `2ea5d8ce467e7fb6996de186c9af6dec8efd85f0`; `TradeMate-main/apps/api/scripts/test-rls-pilot.js` | ✓ Implemented in repository; CI result pending |
 | CI supplies dedicated disposable RLS test database URL | Commit `3b7072f75f388b80967c122d6eec5736cc485709`; `.github/workflows/ci.yml` | ✓ Implemented in repository; CI result pending |
-| Regression tests for RLS pilot connection guard | Commit `7a02a33e11c91380be98055b942bb0711adb0529`; `TradeMate-main/apps/api/test/test-rls-pilot-safety.test.cjs` | ✓ Test cases added; execution not yet verified |
-| CI validation of the above increment | Workflow run [44482164593](https://github.com/Iamgetty/TradeMate/actions/runs/44482164593) tested implementation commit `b98731550e7452e5eef9f5fc802b189fd0ef0721`. API lint/build/security validation, web runtime/cache isolation/build, exchange-feed + MT5 tests, and API/exchange-feed container builds passed. The overall run was later cancelled before database migration integration reached the RLS pilot step, before browser acceptance completed, and before SAST/secret scanning and isolated Cloudflare runtime completed. No workflow run is currently recorded for the latest docs-only head. | ◐ Cancelled/incomplete; RLS guard regression and pilot execution remain unverified |
+| Regression tests for RLS pilot connection guard | Current increment adds rejection of URL query parameters/fragments and wires `node --test test/test-rls-pilot-safety.test.cjs` into the database CI job | ◐ Test cases and CI invocation added; execution pending a completed run |
+| CI validation of prior increment | Workflow run [44482164593](https://github.com/Iamgetty/TradeMate/actions/runs/44482164593) tested implementation commit `b98731550e7452e5eef9f5fc802b189fd0ef0721`. API lint/build/security validation, web runtime/cache isolation/build, exchange-feed + MT5 tests, and API/exchange-feed container builds passed. The overall run was later cancelled before database migration integration reached the RLS pilot step, before browser acceptance completed, and before SAST/secret scanning and isolated Cloudflare runtime completed. | ◐ Cancelled/incomplete; not a full CI pass |
 | Production RLS enablement | Not performed; live audit found RLS disabled on all 50 application tables with zero policies | ☐ Not implemented; intentionally blocked pending safe design and adversarial tests |
+
+## Current RLS test-harness hardening increment (repository change; CI pending)
+
+- Rejects URL query parameters and fragments so alternate connection parameters cannot silently override the validated loopback target.
+- Adds two regression cases for those rejected URL forms.
+- Adds an explicit Node test-runner step to CI before the RLS pilot database script; previously the standalone test file was not invoked by the workflow.
+- No database schema, production role, RLS policy or production setting is changed by this increment.
 
 ## Update template
 

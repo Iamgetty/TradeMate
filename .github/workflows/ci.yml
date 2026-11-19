@@ -123,6 +123,9 @@ jobs:
         env:
           ACCOUNT_DELETION_TEST_DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: node scripts/test-account-deletion-worker.js
+      - name: Test RLS pilot connection-target guard
+        working-directory: TradeMate-main/apps/api
+        run: node --test test/test-rls-pilot-safety.test.cjs
       - name: Verify RLS owner isolation and FORCE RLS behaviour
         working-directory: TradeMate-main/apps/api
         env:
