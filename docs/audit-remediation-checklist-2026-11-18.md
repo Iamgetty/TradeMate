@@ -185,3 +185,13 @@ This checklist records the source/configuration audit findings. Items are not co
 - [x] Identified an exact Node 22 candidate from the official Node.js release archive: Node 22.23.5 (published 2026-11-11), bundled npm 10.9.9. The official Node.js security release notice identifies this as the current 22.x security release at the time of this audit. This is the proposed pin, not yet an adopted or tested toolchain.
 - [ ] Verify the Node 22.23.5 patch is accepted by Render's native runtime and all dependency engine constraints; then, in a real checkout/build environment, align primary CI, all three Render services, Docker build/runtime images, and local development on Node 22.23.5/npm 10.9.9. Run clean installs, API/web/feed builds and tests, and container builds before changing deployment configuration.
 - [ ] No `.node-version`, `.nvmrc`, `engines`, CI runtime, Docker image, or live Render setting was changed as part of this documentation-only verification.
+
+
+## 18. API lint scope review — source inspection (2026-11-19)
+
+- [x] Inspected the API TypeScript configuration: strict TypeScript is enabled; compiler module is CommonJS; target is ES2021; production build includes `src/**/*.ts` and excludes tests/spec files.
+- [x] Enumerated the API source tree on the review branch: ten TypeScript source files are currently present under `src`; the largest is `src/module.ts` (approximately 252 KB). The API test suite is JavaScript `.cjs` and is exercised separately with Node's built-in test runner.
+- [x] Confirmed the existing lint glob `eslint "{src,apps,libs,test}/**/*.ts"` does not accurately describe the current API project layout: the checked API root has `src` and `test`, but no `apps` or `libs` directories, and the test files are `.cjs`, not TypeScript. A future lint script should target the actual TypeScript source and explicitly define whether test/config TypeScript is in scope.
+- [ ] Implement a pinned ESLint 9 + typescript-eslint flat-config setup only after it can be installed and executed against the full API source tree. Select rules deliberately; do not enable broad type-aware or stylistic rules without checking compatibility and existing code findings.
+- [ ] Run lint against all ten source files, resolve or explicitly justify findings, then add the lint command to CI. The GitHub file-editing connection does not provide a repository checkout or Node/npm execution, so no lint package/config changes are claimed as validated in this audit.
+- [ ] Keep the existing API TypeScript build and security tests as separate gates; passing them does not mean ESLint is configured or passing.
