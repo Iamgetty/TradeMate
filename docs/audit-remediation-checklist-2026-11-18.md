@@ -266,3 +266,10 @@ This checklist records the source/configuration audit findings. Items are not co
 - [x] Existing opportunity integration test covers player-owned versus organization-owned drafts, outsider denial, and access removal after membership revocation. Mandate integration test covers owner/admin visibility and denial for ordinary, expired, future-dated, and outsider memberships.
 - [ ] Continue a separate review of all read and write paths for organization documents, negotiation, offer, and opportunity lifecycle actions before treating Sports Transfer authorization as fully audited. Current opportunity API exposes private draft creation and owner-scoped listing; it does not provide publish/edit/delete routes in this controller.
 - [ ] Add socket-level WebSocket tests for slow-client closure, heartbeat termination, subscription timeout, and upstream cleanup; CI passing does not replace these missing targeted tests or a Render proxy/load validation.
+
+
+## 25. Sports Transfer organization-manager date-window regression coverage (2026-11-19)
+
+- [x] Extended the database-backed organization HTTP integration test with active-status admin rows whose membership windows are expired or future-dated.
+- [x] Added assertions that both expired and future-dated admins receive HTTP 403 for member listing and membership invitations; this exercises the shared manager-role date-window guard.
+- [ ] Run the updated organization integration test and full CI on this commit before treating the new regression cases as verified.
