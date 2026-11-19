@@ -331,3 +331,15 @@ This checklist records the source/configuration audit findings. Items are not co
 - [ ] Extend the document integration tests with cross-organization owner/admin denial and upload input edge cases; do not add date-window cases to the legacy membership schema.
 - [ ] Continue reviewing organization moderation/reviewer routes and cross-controller sports-related access before closing the broader audit.
 - [x] No production data, services, or deployments were changed.
+
+
+## 31. Cross-organization document isolation and organization moderation review (2026-11-19)
+
+- [x] Traced both document routes in `OrganizationsController`: listing and upload first require a membership row matching the exact target organization ID and authenticated user ID, then require owner/admin role. The document list query is additionally constrained by the same target organization ID. No cross-organization data exposure was found in these paths.
+- [x] Extended `apps/api/scripts/test-organization-documents.js` with a second unrelated organization and regression assertions that an owner/admin from organization A receives 403 when listing or uploading documents for organization B. This is a source-level test addition; it has not yet been executed against PostgreSQL.
+- [x] Reviewed `ModerationController`: organization queue and review endpoints require the dedicated `TRADEMATE_REVIEW_API_KEY` via constant-time comparison; organization decisions are limited to pending records and transactionally update organization status, review record, pending document review statuses, and audit event.
+- [x] Identified a workflow completeness gap: moderation queue returns organization identity/contact metadata but not document metadata or bytes. The moderation decision updates all pending documents for that organization, but no API route was found to retrieve the uploaded `file_data` for actual content inspection. Do not treat this as evidence that a reviewer has examined the documents.
+- [x] Repository search found `file_data` only in the migration definition and upload insert path; no API download/read path was found. Sports Transfer offer/negotiation/document endpoints were also not found in the reviewed controller/search scope.
+- [ ] Product/security decision required before building reviewer access: define reviewer identity and least-privilege document read scope, safe streaming/download headers, file-signature validation, read-access audit events, retention/deletion, and cross-organization denial tests. Do not expose document bytes through the existing organization member list endpoint or public listing moderation.
+- [ ] Run the updated PostgreSQL-backed organization-document integration test in CI and inspect the result before marking cross-organization isolation runtime-verified.
+- [x] No production data, services, or deployments were changed.
