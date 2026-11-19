@@ -71,7 +71,8 @@ This checklist records the source/configuration audit findings. Items are not co
   - #176, #147, #142, #131, and #130 open, not mergeable.
   - #146 and #134 open, mergeable; still require content/overlap/CI review before merge.
   - #209, #214, #215, and #218 remain previously merged.
-- [ ] Inspect the changed files and current checks for #213, #146, and #134; determine whether any are superseded by newer work.
+- [x] Inspect changed files for #213, #146, and #134. PR #213 adds an API `package-lock.json` and changes the API Docker build to `npm ci`, but its lockfile root includes `@nestjs/cli` and `@nestjs/schematics` as devDependencies that are absent from the current API `package.json`. Treat that lockfile as out of sync; regenerate/validate it before adopting the `npm ci` change. #146 is a single browser scroll-anchor assertion adjustment; #134 adds a production data-integrity document and roadmap reference.
+- [ ] Review the actual test evidence and overlap for #213, #146, and #134; determine whether any are superseded by newer work.
 - [ ] Reassess non-mergeable PRs #176, #147, #171, #172, #173, #142, #131, and #130; decide rebase, retarget, close, or retain only after explicit approval.
 - [ ] No PR merge, close, retarget, or branch deletion without explicit approval.
 
@@ -84,7 +85,7 @@ This checklist records the source/configuration audit findings. Items are not co
 
 ## 9. Build reproducibility and static checks
 
-- [ ] Add and commit package lockfiles for the API, web, and exchange-feed workspaces, then use deterministic `npm ci` installs in CI and deployment builds. The current repository tree contains no `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, or `yarn.lock`; CI and Render currently use `npm install`.
+- [ ] Add and commit package lockfiles for the API, web, and exchange-feed workspaces, then use deterministic `npm ci` installs in CI and deployment builds. The current review branch contains no lockfiles; CI and Render currently use `npm install`. Do not copy PR #213's API lockfile as-is: its root devDependency set does not match the current API `package.json`.
 - [ ] Resolve API lint configuration: `apps/api/package.json` declares a lint script invoking ESLint, but ESLint is not declared in API devDependencies and the current CI workflow does not run that lint script.
 
 
