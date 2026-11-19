@@ -1,16 +1,9 @@
 name: Database migrations
 
 on:
+  # Deliberately manual until a separately approved migration/release
+  # orchestrator proves credential isolation and exact-artifact promotion.
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'TradeMate-main/apps/api/database/migrations/**'
-      - 'TradeMate-main/apps/api/scripts/migrate.js'
-      - 'TradeMate-main/apps/api/package.json'
-      - 'TradeMate-main/apps/api/package-lock.json'
-      - '.github/workflows/database-migrations.yml'
 
 permissions:
   contents: read
@@ -24,9 +17,12 @@ jobs:
     name: Apply database migrations
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Configure required reviewers and the migration-only secret in this
+    # GitHub Environment before enabling any production use.
+    environment:
+      name: production-migrations
     env:
       MIGRATION_DATABASE_URL: ${{ secrets.TRADEMATE_MIGRATION_DATABASE_URL }}
-      DATABASE_URL: ${{ secrets.TRADEMATE_DATABASE_URL }}
       PGSSLMODE: require
     steps:
       - name: Check out repository
@@ -37,10 +33,10 @@ jobs:
         with:
           node-version: 24.22.1
 
-      - name: Verify database secret is configured
+      - name: Verify dedicated migration secret is configured
         run: |
-          if [ -z "$MIGRATION_DATABASE_URL" ] && [ -z "$DATABASE_URL" ]; then
-            echo "::error::Configure TRADEMATE_MIGRATION_DATABASE_URL or the temporary TRADEMATE_DATABASE_URL fallback."
+          if [ -z "$MIGRATION_DATABASE_URL" ]; then
+            echo "::error::Configure TRADEMATE_MIGRATION_DATABASE_URL as a protected, environment-scoped secret."
             exit 1
           fi
 
