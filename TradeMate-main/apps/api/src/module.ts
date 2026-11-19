@@ -1292,7 +1292,7 @@ class OrganizationsController {
     const client = await databasePool!.connect();
     try {
       await client.query('BEGIN');
-      const member = await client.query('SELECT member_role FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
+      const member = await client.query('SELECT member_role FROM organization_members WHERE organization_id = $1 AND user_id = $2 AND status = 'active' AND (starts_at IS NULL OR starts_at <= now()) AND (expires_at IS NULL OR expires_at > now()) LIMIT 1', [id, userId]);
       if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
       if (!organizationDocumentManagerRoleSchema.safeParse(member.rows[0].member_role).success) throw new ForbiddenException('Only organization owners and admins can upload verification documents.');
       const saved: Array<Record<string, unknown>> = [];
@@ -1329,7 +1329,7 @@ class OrganizationsController {
   async organizationDocuments(@Req() request: Request, @Param('id') id: string) {
     parseUuidParam(id);
     const userId = await this.currentUser(request);
-    const member = await databasePool!.query('SELECT member_role FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
+    const member = await databasePool!.query('SELECT member_role FROM organization_members WHERE organization_id = $1 AND user_id = $2 AND status = 'active' AND (starts_at IS NULL OR starts_at <= now()) AND (expires_at IS NULL OR expires_at > now()) LIMIT 1', [id, userId]);
     if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
     if (!organizationDocumentManagerRoleSchema.safeParse(member.rows[0].member_role).success) throw new ForbiddenException('Only organization owners and admins can view verification documents.');
     const result = await databasePool!.query(
