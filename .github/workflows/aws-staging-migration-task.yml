@@ -122,7 +122,7 @@ jobs:
             exit 1
           fi
 
-      - name: Resolve and verify deployed migration task definition
+      - name: Resolve baseline and register next-release migration task definition
         id: task
         env:
           EXPECTED_API_IMAGE_URI: ${{ steps.release.outputs.image_uri }}
