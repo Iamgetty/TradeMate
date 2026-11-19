@@ -35,10 +35,18 @@ test('ordinary API JSON requests retain the 1 MiB body limit', async () => {
   }
 });
 
-test('feed-post creation receives the larger JSON allowance', async () => {
+test('feed-post creation accepts the encoded-size envelope for four 5 MiB attachments', async () => {
   const server = await startParserServer();
   try {
-    const response = await postJson(server.url, '/api/feed/posts', JSON.stringify({ attachments: [], payload: 'x'.repeat(1024 * 1024) }));
+    const encodedFiveMiB = 'A'.repeat(Math.ceil((5 * 1024 * 1024) / 3) * 4);
+    const attachments = Array.from({ length: 4 }, (_, index) => ({
+      name: `attachment-${index}.bin`,
+      type: 'application/octet-stream',
+      data: encodedFiveMiB,
+    }));
+    const body = JSON.stringify({ type: 'post', title: 'Test', body: 'Maximum attachment envelope', attachments });
+    assert.ok(Buffer.byteLength(body) < 28 * 1024 * 1024);
+    const response = await postJson(server.url, '/api/feed/posts', body);
     assert.equal(response.status, 200);
   } finally {
     await server.close();
