@@ -320,3 +320,14 @@ This checklist records the source/configuration audit findings. Items are not co
 - [x] No dedicated Sports Transfer document, negotiation-room, offer, or transaction-document route was found in the reviewed Sports Transfer controller. The current Sports Transfer API remains profiles, consents, organizations/memberships, mandates, quotes, and private opportunity drafts/listing.
 - [x] No production data or services changed.
 - [ ] Continue repository-wide review of any frontend document access assumptions and other controllers that may handle sports-related records before closing the authorization audit.
+
+
+## 30. Document authorization schema verification and frontend recovery review (2026-11-19)
+
+- [x] Verified the legacy `organization_members` schema in migration 001: it contains organization ID, user ID, member role, and creation timestamp only. It does not have membership status, start, or expiry columns. The earlier Sports Transfer date-window predicates apply to the separate `sports_org_memberships` table and must not be copied onto this legacy table.
+- [x] Rejected the initial hypothesis that legacy document routes had a date-window bypass. The temporary attempted predicate/test edits were reverted immediately after schema verification; final source retains the existing schema-compatible owner/admin role check. No migration was added.
+- [x] Confirmed the frontend has an organization-document loading/retry path and a Playwright recovery test for transient document API failures in `apps/web/e2e/contract-lifecycle.spec.ts`.
+- [x] Confirmed the current UI integration exercises document metadata loading and retry; it does not establish file download/review capability. No client call for retrieving `file_data` was found in the reviewed search results.
+- [ ] Extend the document integration tests with cross-organization owner/admin denial and upload input edge cases; do not add date-window cases to the legacy membership schema.
+- [ ] Continue reviewing organization moderation/reviewer routes and cross-controller sports-related access before closing the broader audit.
+- [x] No production data, services, or deployments were changed.
