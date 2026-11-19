@@ -174,3 +174,14 @@ This checklist records the source/configuration audit findings. Items are not co
 - [ ] Select one supported Node major for all three services and CI. Node 22 is the leading alignment candidate because both runtime Dockerfiles and the Cloudflare compatibility job already use it; verify framework engine constraints and Render's supported Node version mechanism before pinning.
 - [ ] Pin the selected Node version for Render and local development (for example, a repository `.node-version` plus an explicit Render `NODE_VERSION` setting if supported), then validate all builds/tests and production startup on that exact major before deployment.
 - [ ] Keep the live Render services unchanged until this has been validated and separately approved. This is a source configuration finding only; no live Render settings were changed.
+
+
+## 17. Node runtime compatibility and Render pinning mechanism — documentation verification (2026-11-19)
+
+- [x] Verified from the official Next.js 16 upgrade guide that Next.js 16 requires Node.js 20.9 or later. This makes Node 22 compatible with the declared framework minimum; it does not by itself certify every dependency or the full application on Node 22.
+- [x] Verified from current Render documentation that native Node services can be pinned, in precedence order, with the service's `NODE_VERSION` environment variable, a repository-root `.node-version`, a root `.nvmrc`, or a bounded `engines.node` range. Render recommends an upper bound for ranges and documents the Blueprint `NODE_VERSION` environment variable.
+- [x] Confirmed that the current Render default is Node 24.22.1 for services created on/after 2026-10-21; older services can retain different defaults. Therefore the existing unpinned Render services must not be assumed to use Node 22 or the same Node major as CI/Docker.
+- [x] Node 22 remains the best alignment candidate from repository evidence: API and exchange-feed Dockerfiles use Node 22; Cloudflare compatibility CI uses Node 22; Next.js 16's documented minimum is Node 20.9. Primary CI currently uses Node 20 and must be aligned only after an exact Node/npm version is selected and validated.
+- [ ] Select an exact supported Node 22 patch and npm version from the current supported release line; verify Render accepts the chosen patch and verify all package engines. Do not use an old patch merely because it appears in historical Render documentation.
+- [ ] After a real checkout/build environment is available, align primary CI, all three Render services, Docker build/runtime images, and local development on the selected toolchain; run clean installs, API/web/feed builds and tests, and container builds before changing deployment configuration.
+- [ ] No `.node-version`, `.nvmrc`, `engines`, CI runtime, Docker image, or live Render setting was changed as part of this documentation-only verification.
