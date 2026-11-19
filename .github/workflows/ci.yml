@@ -394,7 +394,7 @@ jobs:
             throw new Error('Unexpected existing webpack override; refusing to replace it.');
           }
           manifest.overrides.webpack = '5.112.2';
-          fs.writeFileSync(path, JSON.stringify(manifest, null, 2) + '\\n');
+          fs.writeFileSync(path, JSON.stringify(manifest, null, 2) + '\n');
           NODE
       - name: Initialize Cloudflare Workers adapter in disposable copy
         working-directory: ${{ runner.temp }}/trademate-web
