@@ -136,6 +136,14 @@ async function main() {
     });
     assert.equal(adminEscalation.status, 403, 'admins cannot invite other admins');
 
+    const adminOwnerEscalation = await call('admin', 'POST', '/api/sports-transfer/organizations/' + organizationId + '/memberships', {
+      userId: actors.secondMember.userId,
+      role: 'owner',
+      permissionScope: 'workspace',
+      expiresAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    assert.equal(adminOwnerEscalation.status, 403, 'admins cannot promote another account to organization owner');
+
     const adminInviteMember = await call('admin', 'POST', '/api/sports-transfer/organizations/' + organizationId + '/memberships', {
       userId: actors.secondMember.userId,
       role: 'scout',
