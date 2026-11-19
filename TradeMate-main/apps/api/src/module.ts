@@ -4,6 +4,7 @@ import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, 
 import { Pool } from 'pg';
 import type { PoolClient } from 'pg';
 import { createRlsAwarePool } from './database-context';
+import { decodeProfileImageDataUrl, hasMatchingUploadSignature } from './upload-validation';
 import { decimalToUnits, fiatCentsToQuantityUnits, productToFiatCents, unitsToDecimal } from './p2p-decimal';
 import { renderTradeMateEmail } from './email-templates';
 import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema, sportsOrganizationCreateBodySchema, sportsOrganizationMembershipInviteBodySchema, sportsRepresentativeMandateCreateBodySchema, sportsRepresentativeMandateResponseBodySchema, sportsTransferOpportunityCreateBodySchema } from './validation';
@@ -2733,7 +2734,7 @@ class PublicProfilesController {
     if (instagram && !/^[A-Za-z0-9._]{1,30}$/.test(instagram)) throw new BadRequestException('Enter a valid Instagram username.');
     if (x && !/^[A-Za-z0-9_]{1,15}$/.test(x)) throw new BadRequestException('Enter a valid X username.');
     if (website && (!/^https:\/\//i.test(website) || website.length > 2048)) throw new BadRequestException('Enter a valid HTTPS website URL.');
-    const validImage = (value: string) => !value || (/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value) && value.length <= 900000);
+    const validImage = (value: string) => !value || !!decodeProfileImageDataUrl(value);
     if (!validImage(photo) || !validImage(cover)) throw new BadRequestException('Profile images must be JPEG, PNG or WebP and smaller than 650 KB each.');
     if (highlights.length > 12 || JSON.stringify(highlights).length > 200000 || highlights.some((h) => !h || typeof h !== 'object' || !isRecord(h) || typeof h.id !== 'string' || typeof h.title !== 'string' || h.title.length > 20 || typeof h.img !== 'string' || h.img.length > 700000)) {
       throw new BadRequestException('Highlights are invalid or exceed the profile limits.');
@@ -2897,6 +2898,9 @@ class CommunityFeedController {
       const bytes = Buffer.from(encoded, 'base64');
       if (!bytes.length || bytes.length > 5 * 1024 * 1024 || bytes.toString('base64') !== encoded) {
         throw new BadRequestException('Each attachment must be valid and 5 MB or smaller.');
+      }
+      if (!hasMatchingUploadSignature(mime, bytes)) {
+        throw new BadRequestException('The attachment content does not match its declared file type.');
       }
       return { name, mime, bytes };
     });
