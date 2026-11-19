@@ -4,7 +4,7 @@ FROM node:24-bookworm-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY TradeMate-main/exchange-feed/package*.json ./
-RUN npm install --omit=dev --no-audit --no-fund \
+RUN npm ci --omit=dev --no-audit --no-fund \
     && npm cache clean --force
 COPY TradeMate-main/exchange-feed/ ./
 USER node
