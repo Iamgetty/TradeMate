@@ -11,7 +11,7 @@ const identityByHash = new Map([
   [hash('user-b-token'), 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'],
 ]);
 
-const createMockPool = () => {
+const createMockPool = ({ failOnSql } = {}) => {
   const clients = [];
   const pool = {
     async connect() {
@@ -22,6 +22,7 @@ const createMockPool = () => {
         userId: '',
         async query(sql, values) {
           this.calls.push({ sql, values });
+          if (failOnSql && sql.includes(failOnSql)) throw new Error('simulated database context setup failure');
           if (sql.includes("set_config('app.session_token_hash'")) this.sessionHash = values[0];
           if (sql.includes('FROM user_sessions')) {
             const userId = identityByHash.get(this.sessionHash);
@@ -125,3 +126,23 @@ test('shared session cookie parser decodes valid cookies and fails closed on mal
   assert.equal(sessionTokenFromCookieHeader('other_cookie=value'), '');
   assert.equal(sessionTokenFromCookieHeader(undefined), '');
 });
+
+test('explicit transaction is rolled back when request identity setup fails', async () => {
+  const { pool, clients } = createMockPool({ failOnSql: "set_config('app.session_token_hash'" });
+  const database = createRlsAwarePool(pool);
+  await assert.rejects(runRequest('trademate_session=raw-session-token', async () => {
+    const client = await database.connect();
+    try {
+      await client.query('BEGIN');
+    } finally {
+      client.release();
+    }
+  }), /simulated database context setup failure/);
+  assert.deepEqual(clients[0].calls.map((call) => call.sql), [
+    'BEGIN',
+    "SELECT set_config('app.session_token_hash', $1, true)",
+    'ROLLBACK',
+  ]);
+  assert.equal(clients[0].released, true);
+});
+
