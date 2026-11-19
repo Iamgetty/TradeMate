@@ -147,6 +147,27 @@ for (const [label, factory] of [
     client.close();
   });
 
+  test(label + ': feed health counts the server array and excludes stale venues from the live total', () => {
+    const h = harness(factory);
+    const updates = [];
+    const client = h.create({ onUpdate: update => updates.push(update) });
+    h.sockets[0].open();
+    h.sockets[0].message({
+      books: [],
+      trades: [],
+      feeds: [
+        { venue: 'binance', market: 'spot', status: 'live', stale: false },
+        { venue: 'bybit', market: 'spot', status: 'stale', stale: true },
+        { venue: 'coinbase', market: 'spot', status: 'reconnecting', stale: true },
+      ],
+      ts: 789,
+    });
+
+    assert.equal(updates.at(-1).feedsLive, 1);
+    assert.equal(updates.at(-1).feedsTotal, 3);
+    client.close();
+  });
+
   test(label + ': stale venue books are excluded from aggregated depth and catalogue quotes', () => {
     const h = harness(factory);
     const updates = [];
