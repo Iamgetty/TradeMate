@@ -229,8 +229,9 @@ This checklist records the source/configuration audit findings. Items are not co
 - [x] Added snapshot backpressure handling: skip sends while buffered output exceeds 1 MiB and close a client after 3 consecutive over-limit snapshots.
 - [x] Added cleanup for upstream connection timeouts and Bybit ping intervals when sessions stop, preventing timers from surviving client disconnects.
 - [x] Added `market-feed.test.cjs` coverage for allowed/blocked origins, configured-origin normalization, trusted proxy client-IP selection, and explicit resource ceilings.
+- [x] Added `market-feed.integration.test.cjs` coverage that opens real local WebSocket connections and verifies rejection of an untrusted Origin and the fifth-to-sixth per-IP connection boundary.
 - [ ] Execute the API TypeScript build and API test suite on the review branch; this GitHub-only editing environment cannot run Node/npm, so compilation and test execution are not yet verified.
-- [ ] Add live WebSocket integration tests for handshake rejection, actual connection-cap enforcement, slow-client closure, and upstream cleanup; the current added tests exercise exported policy helpers rather than opening real sockets.
+- [ ] Add live WebSocket integration tests for slow-client closure, heartbeat termination, subscription timeout, and upstream cleanup; those behaviors currently have implementation but not dedicated socket-level regression coverage.
 - [ ] Validate the Render edge proxy's actual `X-Forwarded-For` behavior before rollout. The current per-IP quota assumes the one trusted proxy hop configured in `main.ts` appends the connecting client IP as the right-most value.
 - [ ] Capacity values are conservative initial per-instance ceilings, not production load-test results. Revisit after observing real concurrent-client and upstream-connection metrics.
 - [ ] No production deployment, Render setting, or live service was changed.
