@@ -92,3 +92,15 @@ Two independently maintained implementations of the browser-side feed client exi
 
 Treat the web asset as the source of truth for the currently deployed TradeMate browser runtime. Treat the package-side file as a separate reusable/example implementation and test target until its intended distribution contract is clarified. Do not overwrite either copy or claim they are interchangeable. Any future consolidation must first map the extra protections to explicit tests, define whether the package copy is a supported public integration surface, and verify both test suites and the web app-shell regression tests.
 
+
+
+### CoinGecko refresh: field-level ownership verified
+
+A direct inspection of the current `liveRefresh()` implementation confirms a narrower contract than a generic “market refresh” description suggests:
+
+- The browser requests CoinGecko's `/coins/markets` endpoint on startup and every 90 seconds while the document is visible and one of the supported tabs is active.
+- For a matching `BASE/USDT` item, the response updates 24-hour percentage change, market capitalization, total volume and (when not embedded) the token image. It does **not** assign CoinGecko's `current_price` to the displayed market price field.
+- The displayed crypto spot price is assigned by the exchange-feed WebSocket path, which derives a midpoint from valid bid/ask values or falls back to a positive last/bid/ask value. The browser records provider and quote timestamp metadata for that feed.
+- The CoinGecko request currently swallows request/HTTP/JSON failures and has no explicit in-flight guard or user-visible provider-health state. This can make metadata refresh failures invisible and allows overlapping refreshes if a request takes longer than the 90-second interval; it does not, by itself, establish a live-price overwrite defect.
+
+Keep this distinction explicit: CoinGecko is currently a secondary market-metadata source, not the authoritative live spot-price source. Before changing it, add deterministic tests for metadata-only field ownership, overlapping/out-of-order responses, provider failure and recovery, and ensure the exchange-feed quote remains authoritative. Any proxy/cache move must preserve rate-limit behavior, freshness labels, attribution and the existing exchange-feed contract. No provider cutover or runtime change is implied by this audit.
