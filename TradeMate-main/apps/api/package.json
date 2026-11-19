@@ -7,7 +7,7 @@
     "start": "node dist/main.js",
     "start:prod": "node dist/main.js",
     "db:migrate": "node scripts/migrate.js",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
+    "lint": "eslint \"src/**/*.ts\"",
     "test:security": "node --test test/*.test.cjs"
   },
   "dependencies": {
@@ -25,7 +25,10 @@
     "@types/node": "^22.10.2",
     "@types/pg": "^8.11.10",
     "typescript": "^5.7.2",
-    "@types/ws": "^8.5.13"
+    "@types/ws": "^8.5.13",
+    "@eslint/js": "9.39.5",
+    "eslint": "9.39.5",
+    "typescript-eslint": "8.73.0"
   },
   "overrides": {
     "multer": "^2.5.0",
