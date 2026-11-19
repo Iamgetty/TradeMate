@@ -70,11 +70,11 @@ jobs:
           AWS_STAGING_ACCOUNT_ID: ${{ vars.AWS_STAGING_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          if [[ ! "$AWS_STAGING_DEPLOY_ROLE_ARN" =~ ^arn:aws:iam::([0-9]{12}):role/[A-Za-z0-9+=,.@_/-]+$ ]]; then
+          if [[ ! "$AWS_STAGING_DEPLOY_ROLE_ARN" =~ ^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$ ]]; then
             echo "::error::Configure AWS_STAGING_DEPLOY_ROLE_ARN in the aws-staging-migrations environment."
             exit 1
           fi
-          if [[ ! "$AWS_STAGING_ACCOUNT_ID" =~ ^[0-9]{12}$ || "${BASH_REMATCH[1]}" != "$AWS_STAGING_ACCOUNT_ID" ]]; then
+          if [[ ! "$AWS_STAGING_ACCOUNT_ID" =~ ^[0-9]{12}$ || "$AWS_STAGING_DEPLOY_ROLE_ARN" != "arn:aws:iam::$AWS_STAGING_ACCOUNT_ID:role/"* ]]; then
             echo "::error::AWS_STAGING_ACCOUNT_ID must match the account in AWS_STAGING_DEPLOY_ROLE_ARN."
             exit 1
           fi
@@ -129,9 +129,15 @@ jobs:
           CONTAINER_COUNT="$(jq '.containerDefinitions | length' <<< "$TASK_DEFINITION")"
           CONTAINER_NAME="$(jq -r '.containerDefinitions[0].name' <<< "$TASK_DEFINITION")"
           TASK_IMAGE="$(jq -r '.containerDefinitions[0].image' <<< "$TASK_DEFINITION")"
+          TASK_COMMAND="$(jq -r '.containerDefinitions[0].command | join(" ")' <<< "$TASK_DEFINITION")"
+          TASK_SECRET_NAMES="$(jq -r '.containerDefinitions[0].secrets | map(.name) | sort | join(",")' <<< "$TASK_DEFINITION")"
 
           if [[ "$TASK_FAMILY" != "trademate-staging-database-migration" || "$NETWORK_MODE" != "awsvpc" || "$COMPATIBILITIES" != *FARGATE* || "$CONTAINER_COUNT" != "1" || "$CONTAINER_NAME" != "database-migration" ]]; then
             echo "::error::The deployed task definition does not match the expected single-container Fargate migration task."
+            exit 1
+          fi
+          if [[ "$TASK_COMMAND" != "node scripts/migrate.js" || "$TASK_SECRET_NAMES" != "MIGRATION_DATABASE_URL" ]]; then
+            echo "::error::The migration task command or secret boundary does not match the reviewed template."
             exit 1
           fi
           if [[ "$TASK_IMAGE" != "$EXPECTED_API_IMAGE_URI" ]]; then
