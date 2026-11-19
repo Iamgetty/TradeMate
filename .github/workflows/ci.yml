@@ -334,9 +334,10 @@ jobs:
           PORT: 4000
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: |
-          export TOTP_ENCRYPTION_KEY="$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))")"
+          TOTP_ENCRYPTION_KEY="$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))")"
+          export TOTP_ENCRYPTION_KEY
           nohup npm run start:prod > "$RUNNER_TEMP/trademate-api.log" 2>&1 &
-          for attempt in $(seq 1 40); do
+          for _ in $(seq 1 40); do
             if curl --silent --fail http://127.0.0.1:4000/api/health >/dev/null; then
               echo "Disposable API is ready."
               exit 0
@@ -438,7 +439,7 @@ jobs:
           }
           trap cleanup EXIT
           ready=0
-          for attempt in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             if curl --silent --show-error --location --max-redirs 5 --fail http://127.0.0.1:4173/ -o "$RUNNER_TEMP/vinext-home.html"; then
               ready=1
               break
