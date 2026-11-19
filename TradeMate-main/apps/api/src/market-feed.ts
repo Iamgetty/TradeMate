@@ -13,12 +13,9 @@ type Session = { client: WebSocket; symbol: string; feeds: Map<string, Feed>; tr
 
 const validSymbol = (value: unknown) => typeof value === 'string' && /^[A-Z0-9]{5,24}$/.test(value);
 const keyOf = (venue: string, market: string) => venue + ':' + market;
-const levels = (rows: unknown): Level[] => Array.isArray(rows) ? rows
-  .filter((row: any) => Array.isArray(row) && Number(row[0]) > 0 && Number(row[1]) > 0)
-  .map((row: any) => ({ p: String(row[0]), q: String(row[1]) })) : [];
 const putLevels = (target: Map<string, string>, rows: unknown) => {
   if (!Array.isArray(rows)) return;
-  for (const row of rows as any[]) {
+  for (const row of rows as unknown[]) {
     if (!Array.isArray(row)) continue;
     const price = String(row[0]);
     const qty = Number(row[1]);
@@ -138,7 +135,7 @@ function attachMarketFeed(server: Server) {
     session.trades = session.trades.slice(0, 100);
     feed.tradeAt = Date.now();
   };
-  const connect = (session: Session, feed: Feed, url: string, onMessage: (data: any) => void, onOpen?: (ws: WebSocket) => void) => {
+  const connect = (session: Session, feed: Feed, url: string, onMessage: (data: unknown) => void, onOpen?: (ws: WebSocket) => void) => {
     if (session.closed) return;
     feed.status = 'connecting';
     let ws: WebSocket;
