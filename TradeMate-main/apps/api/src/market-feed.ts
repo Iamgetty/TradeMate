@@ -11,6 +11,8 @@ type Feed = {
 };
 type Session = { client: WebSocket; symbol: string; feeds: Map<string, Feed>; trades: Trade[]; timer: NodeJS.Timeout; closed: boolean; backpressureStrikes: number };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 const validSymbol = (value: unknown) => typeof value === 'string' && /^[A-Z0-9]{5,24}$/.test(value);
 const keyOf = (venue: string, market: string) => venue + ':' + market;
 const putLevels = (target: Map<string, string>, rows: unknown) => {
