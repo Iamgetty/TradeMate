@@ -83,6 +83,35 @@ test('homepage shortcut cards do not use the legacy view-entry animation after l
   await expectHomepageEntranceAnimationRemoved();
 });
 
+test('CoinGecko metadata helper loads before the app and reports a successful refresh', async ({ page }) => {
+  await isolateApi(page);
+  await page.route('https://api.coingecko.com/**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: '[]',
+  }));
+
+  await page.goto('/app');
+  await expectPublicLanding(page);
+  await expect.poll(() => page.evaluate(() =>
+    (window as Window & { tmMarketMetadataStatus?: { state: string } }).tmMarketMetadataStatus?.state,
+  )).toBe('fresh');
+});
+
+test('the core app still renders when the optional market metadata helper is unavailable', async ({ page }) => {
+  await isolateApi(page);
+  await page.route('**/tm/market-metadata.js*', route => route.abort());
+  await page.route('https://api.coingecko.com/**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: '[]',
+  }));
+
+  await page.goto('/app');
+  await expectPublicLanding(page);
+  await expect(page.locator('main[role="alert"]')).toHaveCount(0);
+});
+
 test('the core app still renders when the optional exchange-feed browser helper is unavailable', async ({ page }) => {
   await isolateApi(page);
   await page.route('**/tm/feed-client.js*', route => route.abort());
