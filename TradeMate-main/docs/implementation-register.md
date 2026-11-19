@@ -1,6 +1,6 @@
 # TradeMate implementation register
 
-**Canonical cross-stack status ledger.** Updated: 2026-11-19 (PR #219 head `62eae8e975f1ab76a5fbc35ba1761c1f222ec0c7`; Node.js runtime alignment CI pending)  
+**Canonical cross-stack status ledger.** Updated: 2026-11-19 (PR #219 head `9589c823f4fff35ab6612ca95c0d3db73d408ae2`; Node.js runtime alignment CI verified)  
 **Branch baseline:** `fix/audit-remediation-2026-11-18`  
 **Rule:** no domain is complete merely because its first component exists. Repository implementation, CI verification, staging validation and production acceptance are tracked separately.
 
@@ -59,7 +59,7 @@
 - **Deployment credential-isolation limitation identified during review:** `render.yaml` gives the API service `MIGRATION_DATABASE_URL` and executes migrations in that same service's `startCommand`. Because the API process inherits the service environment, the elevated migration credential remains available to the long-running API process. A distinct URL is not sufficient isolation while both commands share the same service environment. Separate, gated migration execution and a deployment-order/rollback design are required before claiming runtime/migrator separation.
 
 
-| Node.js runtime lifecycle alignment | Node.js 20 was still used by six CI setup steps even though the Node.js project lists v20 as EOL; API and exchange-feed Docker images used Node 22; the Render Blueprint had no explicit Node version. PR #219 now pins Node.js 24.22.1 in `TradeMate-main/.node-version`, package `engines` constraints (`>=24.22.1 <25`) for API/web/exchange-feed, all active root CI setup steps, Cloudflare compatibility and database migration workflows, both Docker images (`node:24-bookworm-slim`), and all three Render services via `NODE_VERSION`. Exact head `62eae8e975f1ab76a5fbc35ba1761c1f222ec0c7`; TradeMate CI run [44607161777](https://github.com/Iamgetty/TradeMate/actions/runs/44607161777) and Cloudflare compatibility run [44607161926](https://github.com/Iamgetty/TradeMate/actions/runs/44607161926) were pending at last check. | ◐ Repository configuration aligned; exact-head CI and deployed runtime verification still required. Render Blueprint changes have not been applied to production. |
+| Node.js runtime lifecycle alignment | Node.js 20 had reached EOL while CI still used it; API and exchange-feed Docker images used Node 22; the Render Blueprint had no explicit Node version. PR #219 pins Node.js 24.22.1 in `TradeMate-main/.node-version`, package `engines` constraints (`>=24.22.1 <25`) for API/web/exchange-feed, all active root CI setup steps, Cloudflare compatibility and database migration workflows, both Docker images (`node:24-bookworm-slim`), and all three Render services via `NODE_VERSION`. Exact PR head `9589c823f4fff35ab6612ca95c0d3db73d408ae2` passed TradeMate CI run [44607210438](https://github.com/Iamgetty/TradeMate/actions/runs/44607210438), all 8/8 jobs, and Cloudflare compatibility run [44607210444](https://github.com/Iamgetty/TradeMate/actions/runs/44607210444). | ◐ Repository configuration aligned and exact-head CI verified; deployed runtime verification remains outstanding. Render Blueprint changes have not been applied to production. |
 
 ## Dependency reproducibility gate (rechecked 19 Nov 2026)
 
