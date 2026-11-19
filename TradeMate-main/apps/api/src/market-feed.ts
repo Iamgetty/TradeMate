@@ -137,7 +137,7 @@ function attachMarketFeed(server: Server) {
     session.trades = session.trades.slice(0, 100);
     feed.tradeAt = Date.now();
   };
-  const connect = (session: Session, feed: Feed, url: string, onMessage: (data: unknown) => void, onOpen?: (ws: WebSocket) => void) => {
+  const connect = (session: Session, feed: Feed, url: string, onMessage: (data: Record<string, unknown>) => void, onOpen?: (ws: WebSocket) => void) => {
     if (session.closed) return;
     feed.status = 'connecting';
     let ws: WebSocket;
@@ -152,7 +152,10 @@ function attachMarketFeed(server: Server) {
     feed.connectionTimeout = timeout;
     ws.on('open', () => { clearTimeout(timeout); feed.connectionTimeout = undefined; feed.reconnectAttempts = 0; feed.status = 'connected'; onOpen?.(ws); });
     ws.on('message', (raw) => {
-      try { onMessage(JSON.parse(raw.toString())); } catch { /* ignore malformed upstream frames */ }
+      try {
+        const message: unknown = JSON.parse(raw.toString());
+        if (isRecord(message)) onMessage(message);
+      } catch { /* ignore malformed upstream frames */ }
     });
     ws.on('error', () => { try { ws.close(); } catch { /* noop */ } });
     ws.on('close', () => {
@@ -180,7 +183,7 @@ function attachMarketFeed(server: Server) {
     connect(session, spot,
       'wss://stream.binance.com:443/stream?streams=' + symbol + '@depth20@100ms/' + symbol + '@trade',
       (message) => {
-        const d = message.data || message;
+        const d = isRecord(message.data) ? message.data : message;
         if (d.e === 'depthUpdate' || (d.bids && d.asks)) {
           spot.bids.clear(); spot.asks.clear();
           putLevels(spot.bids, d.b || d.bids); putLevels(spot.asks, d.a || d.asks);
@@ -210,14 +213,19 @@ function attachMarketFeed(server: Server) {
       const feed = addFeed(session, 'bybit', market);
       const endpoint = market === 'spot' ? 'spot' : 'linear';
       connect(session, feed, 'wss://stream.bybit.com/v5/public/' + endpoint, (d) => {
-        if (d.topic?.startsWith('orderbook.')) {
+        if (typeof d.topic === 'string' && d.topic.startsWith('orderbook.')) {
           const targetBids = feed.bids, targetAsks = feed.asks;
           if (d.type === 'snapshot') { targetBids.clear(); targetAsks.clear(); }
-          putLevels(targetBids, d.data?.b);
-          putLevels(targetAsks, d.data?.a);
+          const data = isRecord(d.data) ? d.data : {};
+          putLevels(targetBids, data.b);
+          putLevels(targetAsks, data.a);
           feed.bookAt = Date.now();
-        } else if (d.topic?.startsWith('publicTrade.')) {
-          for (const t of d.data || []) addTrade(session, feed, t.i, t.p, t.v, t.T, t.S === 'Sell' ? 'sell' : 'buy');
+        } else if (typeof d.topic === 'string' && d.topic.startsWith('publicTrade.')) {
+          const trades = Array.isArray(d.data) ? d.data as unknown[] : [];
+          for (const trade of trades) {
+            if (!isRecord(trade)) continue;
+            addTrade(session, feed, trade.i, trade.p, trade.v, trade.T, trade.S === 'Sell' ? 'sell' : 'buy');
+          }
         }
         if (feed.bookAt || feed.tradeAt) feed.status = 'live';
       }, (ws) => {
@@ -236,10 +244,15 @@ function attachMarketFeed(server: Server) {
           putLevels(feed.bids, d.bids); putLevels(feed.asks, d.asks);
           feed.bookAt = Date.now();
         } else if (d.type === 'l2update' && d.product_id === product) {
-          for (const [side, price, qty] of d.changes || []) putLevels(side === 'buy' ? feed.bids : feed.asks, [[price, qty]]);
+          const changes = Array.isArray(d.changes) ? d.changes as unknown[] : [];
+          for (const change of changes) {
+            if (!Array.isArray(change) || change.length < 3) continue;
+            const [side, price, qty] = change as unknown[];
+            putLevels(side === 'buy' ? feed.bids : feed.asks, [[price, qty]]);
+          }
           feed.bookAt = Date.now();
         } else if (d.type === 'match' && d.product_id === product) {
-          addTrade(session, feed, d.trade_id, d.price, d.size, d.time ? Date.parse(d.time) : Date.now(), d.side);
+          addTrade(session, feed, d.trade_id, d.price, d.size, typeof d.time === 'string' ? Date.parse(d.time) : Date.now(), d.side);
         }
         if (feed.bookAt || feed.tradeAt) feed.status = 'live';
       }, (ws) => ws.send(JSON.stringify({ type: 'subscribe', product_ids: [product], channels: ['level2', 'matches'] })));
