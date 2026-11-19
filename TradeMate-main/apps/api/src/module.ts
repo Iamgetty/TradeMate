@@ -471,7 +471,7 @@ class AuthController {
       try {
         await client.query('BEGIN');
         await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [account.rows[0].id]);
-        await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1 OR expires_at <= now() OR used_at IS NOT NULL', [account.rows[0].id]);
+        await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [account.rows[0].id]);
         await client.query(
           "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '30 minutes')",
           [account.rows[0].id, tokenDigest(rawToken)],
