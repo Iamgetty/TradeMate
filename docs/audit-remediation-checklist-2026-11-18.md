@@ -427,6 +427,16 @@ This checklist records the source/configuration audit findings. Items are not co
 - [x] Applied signature checks to community-feed attachments after canonical Base64 and size validation; a client-supplied MIME label or matching data-URL MIME is no longer sufficient by itself.
 - [x] Applied decoded-byte signature validation to profile and cover image data URLs, with canonical Base64 enforcement and a 650 KiB decoded-byte ceiling per image.
 - [x] Added unit regression coverage for valid signatures, MIME spoofing, truncated/unsupported payloads, malformed Base64, and oversized profile images.
-- [ ] GitHub Actions for commit 8eb6123527d4d97bdf21c3b0eedea774efbd812d were queued/in progress at review time. Do not mark the changes CI-verified until both TradeMate CI and Cloudflare compatibility finish successfully.
+- [x] Follow-up GitHub Actions for the later branch head completed successfully: all eight TradeMate CI jobs and the Cloudflare compatibility scan passed. The API job explicitly runs `npm run build` followed by `npm run test:security`, whose glob includes `test/*.test.cjs`.
 - [ ] Signature checks establish file-type correspondence at the container/header level; they are not a full malware scan or a guarantee that every image/audio/document decoder will accept the entire payload. Consider safe image decode/re-encode and isolated document inspection as separate defense-in-depth work.
+- [x] No production data, services, deployments, or infrastructure were changed.
+
+
+## 40. Organization verification-document upload consistency review (2026-11-19)
+
+- [x] Reviewed the separate organization verification-document upload route. It already enforced owner/admin authorization, a four-file maximum, a 5 MiB per-file limit, an allowed PDF/JPEG/PNG MIME set, data-URL MIME consistency, and signature checks.
+- [x] Identified a consistency gap: unlike feed uploads, organization documents did not compare decoded bytes re-encoded as Base64 with the supplied Base64. Non-canonical padding bits could therefore pass the syntax check.
+- [x] Reused the shared upload-signature validator for organization PDF/JPEG/PNG documents and added canonical Base64 round-trip validation before storage.
+- [x] Added an HTTP integration regression case for non-canonical Base64. The existing integration suite also covers spoofed PDF content, data-URL MIME mismatch, role restrictions, cross-organization denial, and transaction rollback.
+- [ ] CI for this follow-up commit is pending; do not treat the new regression as verified until the new head's API and complete workflow checks pass.
 - [x] No production data, services, deployments, or infrastructure were changed.
