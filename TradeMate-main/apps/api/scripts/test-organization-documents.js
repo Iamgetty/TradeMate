@@ -94,6 +94,12 @@ async function main() {
     });
     assert.equal(mismatchedDataUrl.status, 400, 'a data URL MIME type must match the declared document type');
 
+    const nonCanonicalBase64 = validPdfBase64.slice(0, -3) + 'h==';
+    const nonCanonicalUpload = await request('owner', 'POST', {
+      files: [{ fileName: 'non-canonical.pdf', mimeType: 'application/pdf', dataBase64: nonCanonicalBase64 }],
+    });
+    assert.equal(nonCanonicalUpload.status, 400, 'non-canonical Base64 padding bits must be rejected');
+
     const ownerUpload = await request('owner', 'POST', file('owner.pdf'));
     assert.equal(ownerUpload.status, 201, 'owner upload must succeed');
     const adminUpload = await request('admin', 'POST', file('admin.pdf'));
