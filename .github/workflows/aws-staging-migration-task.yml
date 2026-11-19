@@ -288,8 +288,24 @@ jobs:
           TASK_DEFINITION_ARN: ${{ steps.task.outputs.task_definition }}
         run: |
           set -euo pipefail
-          aws ecs wait tasks-stopped --cluster "$CLUSTER_NAME" --tasks "$TASK_ARN"
-          TASK="$(aws ecs describe-tasks --cluster "$CLUSTER_NAME" --tasks "$TASK_ARN" --output json)"
+          TASK_STATUS=""
+          TASK=""
+          for attempt in {1..150}; do
+            TASK="$(aws ecs describe-tasks --cluster "$CLUSTER_NAME" --tasks "$TASK_ARN" --output json)"
+            TASK_STATUS="$(jq -r '.tasks[0].lastStatus // "MISSING"' <<< "$TASK")"
+            if [[ "$TASK_STATUS" == "STOPPED" ]]; then
+              break
+            fi
+            if [[ "$TASK_STATUS" == "MISSING" ]]; then
+              echo "::error::ECS no longer returns the migration task."
+              exit 1
+            fi
+            sleep 10
+          done
+          if [[ "$TASK_STATUS" != "STOPPED" ]]; then
+            echo "::error::Migration task did not stop within the 25-minute observation window. It has not been force-stopped; inspect it before retrying."
+            exit 1
+          fi
           STOP_CODE="$(jq -r '.tasks[0].stopCode // "unknown"' <<< "$TASK")"
           STOP_REASON="$(jq -r '.tasks[0].stoppedReason // "unknown"' <<< "$TASK")"
           EXIT_CODE="$(jq -r '.tasks[0].containers[] | select(.name=="database-migration") | .exitCode // empty' <<< "$TASK")"
