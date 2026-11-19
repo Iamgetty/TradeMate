@@ -189,6 +189,13 @@ function attachMarketFeed(server: Server, options: MarketFeedOptions = {}) {
       clearTimeout(timeout);
       if (feed.connectionTimeout === timeout) feed.connectionTimeout = undefined;
       if (session.closed || feed.socket !== ws) return;
+      // The heartbeat belongs to this upstream connection. Clear it before
+      // scheduling a replacement, otherwise reconnects overwrite the timer
+      // reference and leave the previous interval keeping Node alive.
+      if (feed.pingInterval) {
+        clearInterval(feed.pingInterval);
+        feed.pingInterval = undefined;
+      }
       feed.status = 'reconnecting';
       feed.bids.clear();
       feed.asks.clear();
