@@ -659,3 +659,16 @@ Sources rechecked on the remediation branch: apps/api/src/module.ts (authenticat
 - [x] Added an auth integration regression case that simulates the transactional email provider returning HTTP 503 and verifies the account returns to `active`, the cancellation digest is cleared, and the request is marked cancelled.
 - [ ] Await CI for the resulting PR head. No local build or integration-test execution is claimed.
 - [x] The original deletion-request transaction, session revocation, generic failure response and normal successful email path remain unchanged. No schema, migration, role, RLS, production data/configuration, service or deployment was changed.
+
+
+## 53. Block RLS rollout on caller-settable identity GUCs (2026-11-19)
+
+- [x] Re-read the current RLS pilot policy, request-context middleware, and RLS integration test on the remediation branch.
+- [x] Confirmed the five pilot tables authorize rows directly from `current_setting('app.user_id', true)`; `database-context.ts` writes that value with transaction-local `set_config` after resolving the presented session token.
+- [x] Confirmed the current test enters `trademate_app` and itself calls `set_config('app.user_id', <chosen user UUID>, true)`. It verifies row filtering and FORCE RLS owner behavior, but does not prove that the database authenticates the identity value.
+- [x] Security boundary: PostgreSQL custom GUCs are caller-settable by a session using the shared runtime role. A compromised query path or arbitrary SQL execution as `trademate_app` can replace `app.user_id` with another user's UUID and satisfy the current pilot policies. Transaction-local scope prevents pool leakage; it does not make the value tamper-proof.
+- [x] Therefore the pilot demonstrates row-filter mechanics only, not database-enforced identity isolation. Do not expand or enable these policies in production based on the current test result.
+- [ ] Design a database-verifiable bootstrap capability that derives the principal from the presented session-token proof without accepting an arbitrary user ID. Keep the bootstrap lookup narrowly scoped and preserve pre-session operations (registration, login/TOTP, verification, reset, deletion cancellation and logout).
+- [ ] Add an adversarial test proving that setting or changing `app.user_id` alone cannot access another user's rows; include token-A/user-B mismatch, expired/revoked sessions, pooled requests and explicit transaction boundaries.
+- [ ] Review function ownership, fixed safe `search_path`, PUBLIC EXECUTE revocation, role grants, secret exposure and SECURITY DEFINER risks before adopting any capability function.
+- [x] No policy, migration, role, production database, service, deployment or application behavior was changed in this review.
