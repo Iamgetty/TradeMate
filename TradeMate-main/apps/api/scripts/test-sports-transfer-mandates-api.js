@@ -105,7 +105,7 @@ async function main() {
     const noConsent = await createMandate(football.id, { representativeUserId: actors.representative.userId });
     assert.equal(noConsent.status, 403, 'mandates cannot be created without prior representative-access consent');
 
-    await grantConsent(football.id, { targetUserId: actors.representative.userId });
+    const userConsent = await grantConsent(football.id, { targetUserId: actors.representative.userId });
     const userMandateResponse = await createMandate(football.id, { representativeUserId: actors.representative.userId });
     assert.equal(userMandateResponse.status, 201);
     const userMandate = (await userMandateResponse.json()).mandate;
@@ -222,6 +222,18 @@ async function main() {
       expiresAt: expiresAt(),
     });
     assert.equal(badScope.status, 403, 'mandate scope cannot exceed the explicit consent scope');
+
+    const consentRevoked = await call('player', 'POST', '/api/sports-transfer/consents/' + userConsent.id + '/revoke');
+    assert.equal(consentRevoked.status, 201, 'player can revoke representative-access consent');
+    const representativeAfterConsentRevoke = await call('representative', 'GET', '/api/sports-transfer/mandates/mine');
+    assert.equal(representativeAfterConsentRevoke.status, 200);
+    assert.equal((await representativeAfterConsentRevoke.json()).mandates.find((mandate) => mandate.id === userMandate.id).effective_status, 'revoked',
+      'revoking representative-access consent must revoke the associated mandate');
+    const consentRevocationNotice = await pool.query(
+      "SELECT id FROM user_notifications WHERE user_id = $1 AND title = 'Sports Transfer mandate revoked'",
+      [actors.representative.userId],
+    );
+    assert.equal(consentRevocationNotice.rowCount, 1, 'representative is notified when underlying consent is revoked');
 
     const audit = await pool.query(
       "SELECT event_type FROM audit_events WHERE entity_type = 'sports_representative_mandate' AND entity_id = ANY($1::uuid[])",
