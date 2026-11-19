@@ -53,9 +53,14 @@ async function main() {
     );
   }
 
-  const migrationDatabaseUrl = process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL;
+  const isProduction = process.env.NODE_ENV === 'production';
+  const migrationDatabaseUrl = isProduction
+    ? process.env.MIGRATION_DATABASE_URL
+    : (process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL);
   if (!migrationDatabaseUrl) {
-    throw new Error('MIGRATION_DATABASE_URL (or DATABASE_URL during the transition) is required to run database migrations.');
+    throw new Error(isProduction
+      ? 'MIGRATION_DATABASE_URL is required in production; refusing to run migrations with the runtime DATABASE_URL role.'
+      : 'MIGRATION_DATABASE_URL (or DATABASE_URL for local development) is required to run database migrations.');
   }
 
   const pool = new Pool({
