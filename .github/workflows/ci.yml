@@ -186,6 +186,7 @@ jobs:
   api:
     name: API TypeScript build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -204,7 +205,18 @@ jobs:
         run: npm run build
       - name: Run API security validation tests
         working-directory: TradeMate-main/apps/api
-        run: npm run test:security
+        timeout-minutes: 12
+        run: |
+          for test_file in test/*.test.cjs; do
+            echo "::group::API security test file: $test_file"
+            if timeout 90s node --test "$test_file"; then
+              echo "::endgroup::"
+            else
+              result=$?
+              echo "::endgroup::"
+              exit "$result"
+            fi
+          done
 
 
   container-images:
