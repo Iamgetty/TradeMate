@@ -7,7 +7,7 @@ type Trade = { id: string; venue: string; market: string; price: string; quantit
 type Feed = {
   venue: string; market: string; status: string;
   bids: Map<string, string>; asks: Map<string, string>;
-  bookAt: number; tradeAt: number; socket?: WebSocket; reconnect?: NodeJS.Timeout; connectionTimeout?: NodeJS.Timeout; pingInterval?: NodeJS.Timeout; reconnectAttempts?: number;
+  bookAt: number; tradeAt: number; sequence: number | null; sequenceStatus: 'unsupported' | 'awaiting_snapshot' | 'synchronized' | 'gap'; socket?: WebSocket; reconnect?: NodeJS.Timeout; connectionTimeout?: NodeJS.Timeout; pingInterval?: NodeJS.Timeout; reconnectAttempts?: number;
 };
 type Session = { client: WebSocket; symbol: string; feeds: Map<string, Feed>; trades: Trade[]; timer: NodeJS.Timeout; closed: boolean; backpressureStrikes: number };
 
@@ -46,6 +46,19 @@ function marketFeedBookFreshness(bookAt: number, now = Date.now(), maxAgeMs = MA
     ? Math.max(0, now - timestamp)
     : null;
   return { stale: ageMs === null || ageMs > maxAgeMs, ageMs };
+}
+
+function marketFeedSequenceAction(
+  current: number | null,
+  incoming: unknown,
+  previous: unknown,
+  mode: 'previous' | 'incremental',
+): 'apply' | 'ignore' | 'resync' {
+  const next = Number(incoming);
+  if (!Number.isSafeInteger(next) || next < 0 || current === null) return 'resync';
+  if (next <= current) return 'ignore';
+  if (mode === 'previous') return Number(previous) === current ? 'apply' : 'resync';
+  return next === current + 1 ? 'apply' : 'resync';
 }
 
 const DEFAULT_MARKET_FEED_ORIGINS = ['https://trademate-web.onrender.com', 'http://localhost:3000'];
@@ -172,6 +185,11 @@ function attachMarketFeed(server: Server) {
       if (feed.connectionTimeout === timeout) feed.connectionTimeout = undefined;
       if (session.closed || feed.socket !== ws) return;
       feed.status = 'reconnecting';
+      feed.bids.clear();
+      feed.asks.clear();
+      feed.bookAt = 0;
+      feed.sequence = null;
+      if (feed.sequenceStatus !== 'unsupported') feed.sequenceStatus = 'awaiting_snapshot';
       const attempts = feed.reconnectAttempts || 0;
       const backoffMs = Math.min(30_000, 1_000 * (2 ** Math.min(attempts, 5)));
       const jitterMs = Math.floor(Math.random() * 500);
@@ -182,7 +200,7 @@ function attachMarketFeed(server: Server) {
     });
   };
   const addFeed = (session: Session, venue: string, market: string) => {
-    const feed: Feed = { venue, market, status: 'connecting', bids: new Map(), asks: new Map(), bookAt: 0, tradeAt: 0 };
+    const feed: Feed = { venue, market, status: 'connecting', bids: new Map(), asks: new Map(), bookAt: 0, tradeAt: 0, sequence: null, sequenceStatus: venue === 'binance' ? 'unsupported' : 'awaiting_snapshot' };
     session.feeds.set(keyOf(venue, market), feed);
     return feed;
   };
@@ -223,12 +241,33 @@ function attachMarketFeed(server: Server) {
       const endpoint = market === 'spot' ? 'spot' : 'linear';
       connect(session, feed, 'wss://stream.bybit.com/v5/public/' + endpoint, (d) => {
         if (typeof d.topic === 'string' && d.topic.startsWith('orderbook.')) {
-          const targetBids = feed.bids, targetAsks = feed.asks;
-          if (d.type === 'snapshot') { targetBids.clear(); targetAsks.clear(); }
           const data = isRecord(d.data) ? d.data : {};
-          putLevels(targetBids, data.b);
-          putLevels(targetAsks, data.a);
-          feed.bookAt = Date.now();
+          const incomingSequence = Number(data.u);
+          if (d.type === 'snapshot') {
+            if (!Number.isSafeInteger(incomingSequence) || incomingSequence < 0) {
+              feed.sequenceStatus = 'gap';
+              feed.bids.clear(); feed.asks.clear(); feed.bookAt = 0;
+              feed.socket?.close();
+              return;
+            }
+            feed.bids.clear(); feed.asks.clear();
+            putLevels(feed.bids, data.b); putLevels(feed.asks, data.a);
+            feed.sequence = incomingSequence;
+            feed.sequenceStatus = 'synchronized';
+            feed.bookAt = Date.now();
+          } else if (d.type === 'delta') {
+            const action = marketFeedSequenceAction(feed.sequence, data.u, data.pu, 'previous');
+            if (action === 'ignore') return;
+            if (action === 'resync') {
+              feed.sequenceStatus = 'gap';
+              feed.bids.clear(); feed.asks.clear(); feed.bookAt = 0;
+              feed.socket?.close();
+              return;
+            }
+            putLevels(feed.bids, data.b); putLevels(feed.asks, data.a);
+            feed.sequence = incomingSequence;
+            feed.bookAt = Date.now();
+          }
         } else if (typeof d.topic === 'string' && d.topic.startsWith('publicTrade.')) {
           const trades = Array.isArray(d.data) ? d.data as unknown[] : [];
           for (const trade of trades) {
@@ -249,16 +288,34 @@ function attachMarketFeed(server: Server) {
       const feed = addFeed(session, 'coinbase', 'spot');
       connect(session, feed, 'wss://ws-feed.exchange.coinbase.com', (d) => {
         if (d.type === 'snapshot' && d.product_id === product) {
+          const sequence = Number(d.sequence_num);
+          if (!Number.isSafeInteger(sequence) || sequence < 0) {
+            feed.sequenceStatus = 'gap';
+            feed.bids.clear(); feed.asks.clear(); feed.bookAt = 0;
+            feed.socket?.close();
+            return;
+          }
           feed.bids.clear(); feed.asks.clear();
           putLevels(feed.bids, d.bids); putLevels(feed.asks, d.asks);
+          feed.sequence = sequence;
+          feed.sequenceStatus = 'synchronized';
           feed.bookAt = Date.now();
         } else if (d.type === 'l2update' && d.product_id === product) {
+          const action = marketFeedSequenceAction(feed.sequence, d.sequence_num, undefined, 'incremental');
+          if (action === 'ignore') return;
+          if (action === 'resync') {
+            feed.sequenceStatus = 'gap';
+            feed.bids.clear(); feed.asks.clear(); feed.bookAt = 0;
+            feed.socket?.close();
+            return;
+          }
           const changes = Array.isArray(d.changes) ? d.changes as unknown[] : [];
           for (const change of changes) {
             if (!Array.isArray(change) || change.length < 3) continue;
             const [side, price, qty] = change as unknown[];
             putLevels(side === 'buy' ? feed.bids : feed.asks, [[price, qty]]);
           }
+          feed.sequence = Number(d.sequence_num);
           feed.bookAt = Date.now();
         } else if (d.type === 'match' && d.product_id === product) {
           addTrade(session, feed, d.trade_id, d.price, d.size, typeof d.time === 'string' ? Date.parse(d.time) : Date.now(), d.side);
@@ -315,7 +372,7 @@ function attachMarketFeed(server: Server) {
             : feed.status;
           return {
             venue: feed.venue, market: feed.market, status,
-            stale: freshness.stale, bookAgeMs: freshness.ageMs,
+            stale: freshness.stale || feed.sequenceStatus === 'gap' || feed.sequenceStatus === 'awaiting_snapshot', bookAgeMs: freshness.ageMs, sequenceStatus: feed.sequenceStatus, sequence: feed.sequence,
             bids: snapshotLevels(feed.bids).sort((a, b) => Number(b.p) - Number(a.p)).slice(0, 20),
             asks: snapshotLevels(feed.asks).slice(0, 20),
             bookAt: feed.bookAt, tradeAt: feed.tradeAt,
@@ -324,8 +381,8 @@ function attachMarketFeed(server: Server) {
         send(session!, {
           type: 'snapshot', symbol: session!.symbol, ts: snapshotAt, books,
           trades: session!.trades.slice(0, 80),
-          feeds: books.map(({ venue, market, status, stale, bookAgeMs, bookAt, tradeAt }) => ({
-            venue, market, status, stale, bookAgeMs, bookAt, tradeAt,
+          feeds: books.map(({ venue, market, status, stale, bookAgeMs, sequenceStatus, sequence, bookAt, tradeAt }) => ({
+            venue, market, status, stale, bookAgeMs, sequenceStatus, sequence, bookAt, tradeAt,
           })),
         });
       }, 1000);
@@ -342,4 +399,4 @@ function attachMarketFeed(server: Server) {
   };
 }
 
-export { attachMarketFeed, isAllowedMarketFeedOrigin, marketFeedClientIp, marketFeedBookFreshness, MARKET_FEED_LIMITS };
+export { attachMarketFeed, isAllowedMarketFeedOrigin, marketFeedClientIp, marketFeedBookFreshness, marketFeedSequenceAction, MARKET_FEED_LIMITS };
