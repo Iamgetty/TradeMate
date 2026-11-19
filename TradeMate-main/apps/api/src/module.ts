@@ -3429,22 +3429,68 @@ class SportsTransferIdentityController {
     const client = await databasePool!.connect();
     try {
       await client.query('BEGIN');
+      const profile = await client.query(
+        `SELECT p.id FROM sports_player_consents c
+         JOIN sports_profiles p ON p.id = c.player_profile_id
+         WHERE c.id = $1 AND p.user_id = $2
+         FOR UPDATE OF p`,
+        [id, userId],
+      );
+      if (!profile.rowCount) throw new NotFoundException('Active consent not found.');
       const result = await client.query(
         `UPDATE sports_player_consents c
          SET status = 'revoked', revoked_at = now()
-         FROM sports_profiles p
-         WHERE c.id = $1 AND c.player_profile_id = p.id AND p.user_id = $2
+         WHERE c.id = $1 AND c.player_profile_id = $2
            AND c.status = 'granted' AND c.revoked_at IS NULL
-         RETURNING c.id, c.player_profile_id, c.purpose, c.status, c.revoked_at`,
-        [id, userId],
+         RETURNING c.id, c.player_profile_id, c.granted_to_user_id,
+                   c.granted_to_organization_id, c.purpose, c.status, c.revoked_at`,
+        [id, profile.rows[0].id],
       );
       if (!result.rowCount) throw new NotFoundException('Active consent not found.');
+      const consent = result.rows[0];
       await client.query(
         "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.consent.revoked', 'sports_player_consent', $2, $3::jsonb)",
-        [userId, id, JSON.stringify({ profile_id: result.rows[0].player_profile_id, purpose: result.rows[0].purpose })],
+        [userId, id, JSON.stringify({ profile_id: consent.player_profile_id, purpose: consent.purpose })],
       );
+      if (consent.purpose === 'representative_access') {
+        const mandates = await client.query(
+          `UPDATE sports_representative_mandates
+           SET status = 'revoked', revoked_at = now(), updated_at = now(),
+               response_note = 'Underlying representative-access consent was revoked.'
+           WHERE player_profile_id = $1 AND status IN ('pending', 'active')
+             AND revoked_at IS NULL
+             AND (($2::uuid IS NOT NULL AND representative_user_id = $2)
+               OR ($3::uuid IS NOT NULL AND representative_organization_id = $3))
+           RETURNING id, representative_user_id, representative_organization_id`,
+          [consent.player_profile_id, consent.granted_to_user_id, consent.granted_to_organization_id],
+        );
+        for (const mandate of mandates.rows) {
+          await client.query(
+            "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.mandate.revoked', 'sports_representative_mandate', $2, $3::jsonb)",
+            [userId, mandate.id, JSON.stringify({ profile_id: consent.player_profile_id, consent_id: id, reason: 'consent_revoked' })],
+          );
+          if (mandate.representative_user_id) {
+            await client.query(
+              "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'System', 'Sports Transfer mandate revoked', 'The player revoked the consent authorizing this representation mandate. Do not act on their behalf.', 'shield-alert')",
+              [mandate.representative_user_id],
+            );
+          } else {
+            await client.query(
+              `INSERT INTO user_notifications (user_id, category, title, body, icon)
+               SELECT user_id, 'System', 'Sports Transfer mandate revoked',
+                      'The player revoked the consent authorizing this organization representation mandate.', 'shield-alert'
+               FROM sports_org_memberships
+               WHERE sports_organization_id = $1 AND role IN ('owner', 'admin')
+                 AND status = 'active'
+                 AND (starts_at IS NULL OR starts_at <= now())
+                 AND (expires_at IS NULL OR expires_at > now())`,
+              [mandate.representative_organization_id],
+            );
+          }
+        }
+      }
       await client.query('COMMIT');
-      return { consent: result.rows[0], message: 'Consent has been revoked.' };
+      return { consent: { id: consent.id, player_profile_id: consent.player_profile_id, purpose: consent.purpose, status: consent.status, revoked_at: consent.revoked_at }, message: 'Consent has been revoked.' };
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;
