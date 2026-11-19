@@ -62,8 +62,32 @@
     };
   }
 
+  function applyCoinGeckoMarketMetadata(rows, options = {}) {
+    if (!Array.isArray(rows)) throw new TypeError('Market metadata must be an array');
+    const coinIds = options.coinIds || {};
+    const findMarketItem = options.findMarketItem || function () { return null; };
+    const isEmbedded = options.isEmbedded || function () { return false; };
+    const setLogo = options.setLogo || function () {};
+
+    rows.forEach((coin) => {
+      if (!coin || !(coin.current_price > 0)) return;
+      const symbol = Object.keys(coinIds).find((key) => coinIds[key] === coin.id);
+      if (!symbol) return;
+      const marketItem = findMarketItem(symbol + '/USDT');
+      if (!marketItem) return;
+
+      marketItem.c = coin.price_change_percentage_24h_in_currency != null
+        ? coin.price_change_percentage_24h_in_currency
+        : coin.price_change_percentage_24h || 0;
+      if (coin.market_cap) marketItem.cap = coin.market_cap;
+      if (coin.total_volume) marketItem.vol = coin.total_volume;
+      if (coin.image && !isEmbedded(symbol)) setLogo(symbol, coin.image);
+    });
+  }
+
   root.createMarketMetadataRefresher = createMarketMetadataRefresher;
+  root.applyCoinGeckoMarketMetadata = applyCoinGeckoMarketMetadata;
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { createMarketMetadataRefresher };
+    module.exports = { createMarketMetadataRefresher, applyCoinGeckoMarketMetadata };
   }
 })(typeof window !== 'undefined' ? window : globalThis);
