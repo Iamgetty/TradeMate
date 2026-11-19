@@ -248,10 +248,10 @@ This checklist records the source/configuration audit findings. Items are not co
 - [ ] Continue auditing other Sports Transfer reads for equivalent role/date-scope mismatches. This is a targeted source finding, not a certification of the entire Sports Transfer module.
 
 
-## 23. Sports Transfer organization owner-role escalation — authorization fix (2026-11-19)
+## 23. Sports Transfer organization owner-role assignment — schema boundary regression test (2026-11-19)
 
-- [x] Route review found that an organization admin was prevented from inviting another admin but could still invite a user with the `owner` role, granting owner-level authority without the existing owner's approval.
-- [x] Updated the membership-invitation authorization guard so admins cannot assign either `owner` or `admin`; owners retain the ability to invite either role.
-- [x] Extended the database-backed organization HTTP integration test to assert that an admin's attempt to invite an owner is rejected with HTTP 403.
-- [ ] Run the API build and full database-backed organization/Sports Transfer integration suite against the updated commit; do not treat source edits as runtime validation.
-- [ ] Continue auditing organization-role changes, membership reactivation, and all organization-scoped opportunity/document actions for equivalent privilege escalation paths.
+- [x] Reviewed the organization membership invitation schema and confirmed it explicitly excludes the `owner` role; ownership can only be established when an organization is created. The route separately restricts admin invitations to owners.
+- [x] The first added test incorrectly expected HTTP 403 for an owner-role invitation. CI correctly returned HTTP 400 because Zod rejects the role before route authorization. The source guard was restored to its original, schema-aligned behavior; no owner-escalation vulnerability was established by this test.
+- [x] Updated the regression assertion to require HTTP 400 and document that owner assignment is rejected by the invitation schema.
+- [ ] Re-run the full database-backed organization/Sports Transfer integration suite and full CI on the corrected commit.
+- [ ] Continue auditing organization-role changes, membership reactivation, and all organization-scoped opportunity/document actions for independent privilege escalation paths.
