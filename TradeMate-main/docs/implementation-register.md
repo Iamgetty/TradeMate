@@ -1,6 +1,6 @@
 # TradeMate implementation register
 
-**Canonical cross-stack status ledger.** Updated: 2026-11-19 (PR #219 head `14ed88c8f1558295fe1b0477d89a8b13e902ebbf` passed TradeMate CI, Cloudflare compatibility and lockfile validation)  
+**Canonical cross-stack status ledger.** Updated: 2026-11-19 (latest PR #219 head `a957842659d17fd9a44bc8cc0069e20a9869fd88` passed TradeMate CI, Cloudflare compatibility and lockfile validation)  
 **Branch baseline:** `fix/audit-remediation-2026-11-18`  
 **Rule:** no domain is complete merely because its first component exists. Repository implementation, CI verification, staging validation and production acceptance are tracked separately.
 
@@ -64,11 +64,11 @@
 ## Dependency reproducibility gate (verified 19 Nov 2026)
 
 - The API, web and exchange-feed packages each have a committed `package-lock.json`, generated on a GitHub-hosted runner using Node.js 24.22.1 and the package's own manifest. The stale API lockfile from PR #213 was not reused.
-- Lockfile workflow [run 44630984045](https://github.com/Iamgetty/TradeMate/actions/runs/44630984045) passed on exact PR head `14ed88c8f1558295fe1b0477d89a8b13e902ebbf`; it performed clean `npm ci` installs and available build validation for all three packages.
-- TradeMate CI [run 44630983984](https://github.com/Iamgetty/TradeMate/actions/runs/44630983984) passed all 8/8 jobs on the same exact head, including the API and exchange-feed Docker image builds. Those Dockerfiles now use `npm ci` in the API build and runtime stages and exchange-feed runtime stage.
+- Lockfile workflow [run 44631486231](https://github.com/Iamgetty/TradeMate/actions/runs/44631486231) passed on exact PR head `a957842659d17fd9a44bc8cc0069e20a9869fd88`; it performed clean `npm ci` installs and available build validation for all three packages.
+- TradeMate CI [run 44631486251](https://github.com/Iamgetty/TradeMate/actions/runs/44631486251) passed all 8/8 jobs on the same exact head, including the API and exchange-feed Docker image builds. Those Dockerfiles now use `npm ci` in the API build and runtime stages and exchange-feed runtime stage.
 - All three Render Blueprint service build commands now use `npm ci`; API explicitly includes dev dependencies for TypeScript compilation. This is repository configuration only; the Blueprint has not been applied to production and deployed Render build behavior remains unverified.
 - Standard CI, database migration, web, API, exchange-feed, security audit and Cloudflare compatibility installs use committed lockfiles with `npm ci`. The one deliberate exception is the disposable Cloudflare adapter copy, whose package manifest is rewritten in the runner temp directory to pin an adapter peer dependency; it retains `npm install` because its copied lockfile no longer matches that modified manifest.
-- Cloudflare compatibility [run 44630984030](https://github.com/Iamgetty/TradeMate/actions/runs/44630984030) passed on the same exact head.
+- Cloudflare compatibility [run 44631486236](https://github.com/Iamgetty/TradeMate/actions/runs/44631486236) passed on the same exact head.
 - Status: ✓ repository-level lockfile reproducibility and CI/Docker validation verified on exact PR head; production Render adoption, deployed runtime verification, dependency update automation and artifact provenance remain outstanding. No production environment was changed.
 
 ## Update template
