@@ -259,7 +259,9 @@ function attachMarketFeed(server: Server) {
             // Bybit's standard orderbook stream documents consecutive `u` update IDs;
             // `pu` is not part of this message contract. `seq` is cross-level metadata,
             // not a consecutive per-book update counter.
-            const action = marketFeedSequenceAction(feed.sequence, data.u, undefined, 'incremental');
+            const action = incomingSequence === 1
+              ? 'resync'
+              : marketFeedSequenceAction(feed.sequence, data.u, undefined, 'incremental');
             if (action === 'ignore') return;
             if (action === 'resync') {
               feed.sequenceStatus = 'gap';
