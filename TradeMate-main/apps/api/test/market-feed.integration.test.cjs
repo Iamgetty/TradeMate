@@ -17,9 +17,16 @@ test.before(async () => {
 });
 
 test.after(async () => {
-  for (const client of clients) {
-    try { client.terminate(); } catch { /* already closed */ }
-  }
+  // Finish every client close before closing the HTTP server. Calling
+  // terminate() and immediately invoking server.close() can leave upgraded
+  // sockets alive long enough for server.close() to wait indefinitely.
+  await Promise.all([...clients].map((client) => {
+    if (client.readyState === WebSocket.CLOSED) return Promise.resolve();
+    return new Promise((resolve) => {
+      client.once('close', resolve);
+      client.terminate();
+    });
+  }));
   detach?.();
   if (server?.listening) await new Promise((resolve) => server.close(resolve));
 });
