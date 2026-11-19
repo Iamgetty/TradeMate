@@ -343,3 +343,15 @@ This checklist records the source/configuration audit findings. Items are not co
 - [ ] Product/security decision required before building reviewer access: define reviewer identity and least-privilege document read scope, safe streaming/download headers, file-signature validation, read-access audit events, retention/deletion, and cross-organization denial tests. Do not expose document bytes through the existing organization member list endpoint or public listing moderation.
 - [ ] Run the updated PostgreSQL-backed organization-document integration test in CI and inspect the result before marking cross-organization isolation runtime-verified.
 - [x] No production data, services, or deployments were changed.
+
+
+## 32. Organization membership lifecycle, Sports Transfer manager boundaries, and reviewer-route audit (2026-11-19)
+
+- [x] Searched all API mutations of the legacy `organization_members` table. The only insert in the reviewed API module creates the initial owner membership alongside organization creation; no invite, role-change, removal, or reactivation route was found for this legacy organization model. This is an absent lifecycle capability, not evidence of an exploitable membership-change endpoint.
+- [x] Re-reviewed all `SportsTransferOrganizationsController` membership operations. Member listing and invitation require an active owner/admin membership with valid `starts_at`/`expires_at` bounds. Invitation expiry is constrained to the next 30 days; invitation acceptance is restricted to the invited user and an unexpired invitation.
+- [x] Confirmed the invitation schema excludes `owner`; admins cannot invite another admin. Revocation rejects owner removal and prevents an admin from revoking another admin. Revocation and invitation changes write audit events transactionally.
+- [x] Confirmed `GET /sports-transfer/organizations/mine` is a self-membership listing, not an authorization grant. It currently returns historical/revoked or out-of-window membership rows as well as active rows; downstream manager authorization separately enforces active status and date windows. Consider filtering or explicitly labelling inactive rows in the UI to avoid stale membership presentation.
+- [x] Rechecked every route in `ModerationController`: organization queue, organization review, listing queue, and listing review each invoke the shared `TRADEMATE_REVIEW_API_KEY` authorization check. No alternate unauthenticated reviewer route was identified in this controller.
+- [ ] The shared review key remains a service-level identity rather than named staff accounts with per-reviewer roles, revocation, or separation of duties; retain the documented product/security decision before expanding sensitive reviewer workflows.
+- [ ] No changes to source code were required by this pass. No runtime tests were run as part of this source review; existing test/CI evidence remains scoped to the commits and runs documented above.
+- [x] No production data, services, deployments, or infrastructure were changed.
