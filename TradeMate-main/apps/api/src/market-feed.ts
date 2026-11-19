@@ -7,7 +7,7 @@ type Trade = { id: string; venue: string; market: string; price: string; quantit
 type Feed = {
   venue: string; market: string; status: string;
   bids: Map<string, string>; asks: Map<string, string>;
-  bookAt: number; tradeAt: number; socket?: WebSocket; reconnect?: NodeJS.Timeout; connectionTimeout?: NodeJS.Timeout; pingInterval?: NodeJS.Timeout;
+  bookAt: number; tradeAt: number; socket?: WebSocket; reconnect?: NodeJS.Timeout; connectionTimeout?: NodeJS.Timeout; pingInterval?: NodeJS.Timeout; reconnectAttempts?: number;
 };
 type Session = { client: WebSocket; symbol: string; feeds: Map<string, Feed>; trades: Trade[]; timer: NodeJS.Timeout; closed: boolean; backpressureStrikes: number };
 
@@ -142,7 +142,7 @@ function attachMarketFeed(server: Server) {
     if (session.closed) return;
     feed.status = 'connecting';
     let ws: WebSocket;
-    try { ws = new WebSocket(url); } catch {
+    try { ws = new WebSocket(url, { handshakeTimeout: 10_000 }); } catch {
       feed.status = 'unavailable';
       return;
     }
@@ -151,7 +151,7 @@ function attachMarketFeed(server: Server) {
       if (!feed.bookAt && !feed.tradeAt && feed.status === 'connecting') feed.status = 'stale';
     }, 12000);
     feed.connectionTimeout = timeout;
-    ws.on('open', () => { clearTimeout(timeout); feed.connectionTimeout = undefined; feed.status = 'connected'; onOpen?.(ws); });
+    ws.on('open', () => { clearTimeout(timeout); feed.connectionTimeout = undefined; feed.reconnectAttempts = 0; feed.status = 'connected'; onOpen?.(ws); });
     ws.on('message', (raw) => {
       try { onMessage(JSON.parse(raw.toString())); } catch { /* ignore malformed upstream frames */ }
     });
@@ -161,9 +161,13 @@ function attachMarketFeed(server: Server) {
       if (feed.connectionTimeout === timeout) feed.connectionTimeout = undefined;
       if (session.closed || feed.socket !== ws) return;
       feed.status = 'reconnecting';
+      const attempts = feed.reconnectAttempts || 0;
+      const backoffMs = Math.min(30_000, 1_000 * (2 ** Math.min(attempts, 5)));
+      const jitterMs = Math.floor(Math.random() * 500);
+      feed.reconnectAttempts = attempts + 1;
       feed.reconnect = setTimeout(() => {
         if (!session.closed && feed.socket === ws) connect(session, feed, url, onMessage, onOpen);
-      }, 2500);
+      }, backoffMs + jitterMs);
     });
   };
   const addFeed = (session: Session, venue: string, market: string) => {
