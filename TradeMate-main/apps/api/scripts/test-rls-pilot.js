@@ -4,9 +4,39 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { Pool } = require('pg');
 
+function resolveRlsPilotConnectionString(env = process.env) {
+  const connectionString = env.RLS_PILOT_TEST_DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('RLS_PILOT_TEST_DATABASE_URL is required; the RLS pilot never uses the generic DATABASE_URL.');
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(connectionString);
+  } catch {
+    throw new Error('RLS_PILOT_TEST_DATABASE_URL must be a valid PostgreSQL URL.');
+  }
+
+  if (!['postgres:', 'postgresql:'].includes(parsed.protocol)) {
+    throw new Error('RLS pilot requires a PostgreSQL connection URL.');
+  }
+
+  const hostname = parsed.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (!['localhost', '127.0.0.1', '::1'].includes(hostname)) {
+    throw new Error('RLS pilot is restricted to a loopback PostgreSQL host.');
+  }
+
+  const databaseName = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
+  if (!/(^|[_-])(test|testing|ci)([_-]|$)/i.test(databaseName)) {
+    throw new Error('RLS pilot database name must explicitly identify a test/CI database.');
+  }
+
+  return connectionString;
+}
+
 async function main() {
-  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required for the RLS pilot test.');
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.PGSSLMODE === 'require' ? true : undefined, max: 2 });
+  const connectionString = resolveRlsPilotConnectionString();
+  const pool = new Pool({ connectionString, ssl: process.env.PGSSLMODE === 'require' ? true : undefined, max: 2 });
   const suffix = randomUUID();
   const users = [];
   let client;
@@ -128,7 +158,11 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error('RLS pilot test failed:', error);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error('RLS pilot test failed:', error);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { resolveRlsPilotConnectionString };
