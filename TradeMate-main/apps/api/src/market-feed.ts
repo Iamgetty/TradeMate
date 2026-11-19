@@ -58,7 +58,8 @@ function marketFeedClientIp(request: IncomingMessage): string {
   // main.ts configures exactly one trusted proxy hop. The edge proxy appends
   // the connecting client address as the right-most X-Forwarded-For value.
   const forwarded = request.headers['x-forwarded-for'];
-  const candidate = (Array.isArray(forwarded) ? forwarded.join(',') : forwarded || '').split(',').map((value) => value.trim()).filter(Boolean).at(-1);
+  const candidate = (Array.isArray(forwarded) ? forwarded.join(',') : forwarded || '').split(',').map((value) => value.trim()).filter(Boolean);
+  const candidate = forwardedValues.length ? forwardedValues[forwardedValues.length - 1] : undefined;
   if (candidate && isIP(candidate)) return candidate;
   return request.socket.remoteAddress || 'unknown';
 }
