@@ -70,8 +70,8 @@ async function main() {
       if (String(input) === 'https://api.resend.com/emails') {
         const payload = JSON.parse(options.body);
         const match = String(payload.html).match(/letter-spacing:8px">([0-9]{6})<\/p>/);
-        assert.ok(match, 'verification email must contain a six-digit code');
-        lastVerificationCode = match[1];
+        if (match) lastVerificationCode = match[1];
+        else assert.match(payload.subject, /Reset your TradeMate password/, 'non-code test email must be the password-reset message');
         return new Response(JSON.stringify({ id: 'test-email-id' }), {
           status: 200, headers: { 'content-type': 'application/json' },
         });
@@ -296,6 +296,37 @@ async function main() {
       body: JSON.stringify({ email: 'auth-audit-' + suffix + '@example.invalid', password: 'a newly chosen secure password' }),
     });
     assert.equal(loginAfterReset.status, 200, 'the new password must authenticate after reset');
+
+
+    // Requesting one account's password reset must not clean up another account's tokens.
+    process.env.TRADEMATE_WEB_ORIGIN = 'https://trademate.example';
+    const unrelatedResetEmail = 'unrelated-reset-' + suffix + '@example.invalid';
+    const unrelatedResetUser = await pool.query(
+      "INSERT INTO users (email, display_name, status, email_verified_at) VALUES ($1, 'Unrelated reset', 'active', now()) RETURNING id",
+      [unrelatedResetEmail],
+    );
+    await pool.query(
+      "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, now() - interval '1 minute'), ($1, $3, now() + interval '30 minutes')",
+      [unrelatedResetUser.rows[0].id, digest('expired-unrelated-reset-' + suffix), digest('used-unrelated-reset-' + suffix)],
+    );
+    await pool.query(
+      'UPDATE password_reset_tokens SET used_at = now() WHERE user_id = $1 AND token_hash = $2',
+      [unrelatedResetUser.rows[0].id, digest('used-unrelated-reset-' + suffix)],
+    );
+    const resetRequest = await fetch(base + '/api/auth/password-reset/request', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'auth-audit-' + suffix + '@example.invalid' }),
+    });
+    assert.equal(resetRequest.status, 200, 'active account must be able to request a password reset');
+    const unrelatedResetTokens = await pool.query(
+      'SELECT token_hash, used_at, expires_at FROM password_reset_tokens WHERE user_id = $1',
+      [unrelatedResetUser.rows[0].id],
+    );
+    assert.equal(unrelatedResetTokens.rowCount, 2, 'requesting another account reset must preserve unrelated reset tokens');
+    assert.ok(unrelatedResetTokens.rows.some((row) => row.token_hash === digest('expired-unrelated-reset-' + suffix) && new Date(row.expires_at).getTime() < Date.now()),
+      'unrelated expired password-reset token must remain untouched');
+    assert.ok(unrelatedResetTokens.rows.some((row) => row.token_hash === digest('used-unrelated-reset-' + suffix) && row.used_at),
+      'unrelated used password-reset token must remain untouched');
 
     // New registrations remain pending and cannot sign in until the emailed code is confirmed.
     process.env.RESEND_API_KEY = 'test-resend-key';
