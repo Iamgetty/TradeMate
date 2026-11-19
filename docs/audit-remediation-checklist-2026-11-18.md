@@ -13,12 +13,15 @@ This checklist records the source/configuration audit findings. Items are not co
 - [x] Run clean-database migration integration tests and profile create/update tests (CI run `44425744634`, all 8 jobs passed). Revalidated the complete migration integration and browser acceptance jobs on latest branch commit `218c9d0b02f76aa0880d8f80380019f075255fe1` in CI run `44429637981` (8/8 jobs passed).
 - [x] Review PR #216 against this branch's fix: it overlaps the migration registration and profile username insert, but omits the manifest guard and RLS fixture update. PR #219 contains the superset; leave #216 open and unmerged pending explicit PR housekeeping approval.
 
-## 2. Database backup and restore verification — urgent operational item
+## 2. Database backup and restore verification — local restore proven (2026-11-19)
 
-- [ ] Complete a restore of the existing custom-format backup into the local disposable database `trademate_restore_test`.
-- [ ] Verify restore exit status, expected schema/tables, representative row counts, and application-level connectivity.
-- [ ] Record backup file size, archive validation result, restore result, and verification evidence without putting database URLs or passwords in chat or repository files.
-- [ ] Confirm a recoverable backup before the Render database expiry on 2026-11-25.
+- [x] Confirmed the custom-format backup exists at the user's local path `Documents/TradeMate-Backups/trademate-backup.dump`; file size is 440,829 bytes (modified 2026-11-18 22:16 local time). No credentials or database URLs were recorded.
+- [x] Confirmed PostgreSQL 18 `pg_restore --list` can read the archive; the archive listing contains table-data and constraint entries.
+- [x] Restored the exact backup into a fresh, separate local verification database `trademate_restore_verify_20261119`; `pg_restore --exit-on-error` returned exit code 0.
+- [x] Queried the fresh verification database and confirmed 50 public base tables. A prior local test database also contained 50 tables, 35 migration records, representative application rows, 133 index entries, zero invalid/unready indexes, and zero unvalidated foreign keys; its provenance was not relied upon for the independent restore proof.
+- [x] Confirmed the restored `audit_events.id` identity generator resolves to `public.audit_events_id_seq`.
+- [ ] Application-level connectivity and full source-to-restore row-by-row/data-equivalence comparison were not performed; the successful clean restore proves archive recoverability and schema restoration, not exact data equivalence.
+- [x] Confirmed a recoverable local backup before the Render database expiry on 2026-11-25. Keep the original dump and restore-verification log safe; do not delete the verification database until a separate retention decision.
 - [ ] After backup/access needs are resolved, replace the broad database IP allowlist `0.0.0.0/0` with the narrowest practical allowlist.
 
 ## 3. Render deployment and health configuration
