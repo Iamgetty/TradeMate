@@ -704,3 +704,30 @@ Sources rechecked on the remediation branch: apps/api/src/module.ts (authenticat
 - [ ] Add real PostgreSQL integration tests under SET ROLE trademate_app. The existing mock-only database-context tests are insufficient for this boundary.
 
 - [x] No implementation, migration, policy, role, production database, service, deployment or application behavior was changed in this design pass.
+
+
+
+## 55. Resolve RLS bootstrap privilege and test-safety blockers before prototyping (2026-11-19)
+
+### Findings from the current role and pilot scripts
+
+- [x] Re-read the branch's role bootstrap, role-bootstrap assertions, RLS pilot policies, pilot integration script, request-context wrapper and unit tests.
+- [x] The checked-in role bootstrap creates only `trademate_app`, `trademate_migrator` and `trademate_worker`. It does not create the separate non-login authorization-context owner proposed in section 54. The migrator is a LOGIN role and owns the public schema/application objects; it should not be repurposed as the private authorization function owner.
+- [x] The bootstrap gives `trademate_app` CRUD grants on all public tables (with explicit audit/schema-migration restrictions) and future default CRUD grants. This is compatible with a future RLS design only if every protected table has complete policies and the pre-session operations are separately accounted for; grants alone are not row authorization.
+- [x] A SECURITY DEFINER function owner that is not a table owner and has no BYPASSRLS will itself be subject to FORCE ROW LEVEL SECURITY on `users` and `user_sessions`. The proposed bootstrap therefore cannot simply query those tables and assume SECURITY DEFINER bypasses RLS. Its lookup path needs a deliberate, narrowly scoped database authorization policy for the non-login function owner (or another reviewed design), exact SELECT grants, and adversarial tests. Do not grant BYPASSRLS or broad table access as a shortcut.
+- [x] The current pilot test requires only `DATABASE_URL`, reads and executes `003_rls_pilot.sql` directly, and does not wrap the DDL in a rollbackable transaction. It permanently enables/forces RLS and replaces policies on five tables in whichever database that variable targets. Its CI-only comment is not an execution guard. This is a test-safety defect: a misconfigured invocation could alter a non-test database before any fixture assertion runs.
+- [x] The pilot test intentionally uses `SET ROLE trademate_app` and then sets `app.user_id` itself. Its current assertions are useful for policy mechanics but are not adversarial identity-authentication tests.
+- [x] The role-bootstrap SQL and tests do not yet assert the existence, attributes, membership isolation, schema/table ACLs or function EXECUTE grants for a dedicated authorization-context role because no such role/functions exist.
+- [x] The production database was previously observed as PostgreSQL 18. This makes modern transaction-ID functions plausible, but exact function choice and transaction semantics still require a real PostgreSQL integration test; do not infer support from the live version alone or run a production probe.
+
+### Required changes before any RLS implementation
+
+- [ ] Harden `test-rls-pilot.js` so it cannot execute policy DDL using the ordinary `DATABASE_URL`. Introduce an explicit test-only connection variable, validate a test database name before connecting/issuing SQL, and add a test that rejects missing or production-like targets. Confirm CI wiring before changing the variable contract.
+- [ ] Define a separate `NOLOGIN`, `NOSUPERUSER`, `NOBYPASSRLS`, non-owner authorization function role. Prove `trademate_app`, `trademate_worker` and the ordinary migration/runtime paths cannot `SET ROLE` to it and cannot access its private schema/table directly. Review membership grants and PUBLIC privileges, not only role attributes.
+- [ ] Design how that function role can validate a session digest against `user_sessions` and active `users` while those tables are subject to FORCE RLS. Prefer explicit, tightly scoped bootstrap policies for that non-login role and minimum required SELECT columns; document why the function's fixed SQL cannot be turned into an arbitrary-row oracle. Do not rely on SECURITY DEFINER alone to bypass RLS.
+- [ ] Verify the transaction-bound context insert and helper lookup under real PostgreSQL, including function volatility, transaction-ID assignment, rollback behavior, stale-row cleanup, backend PID reuse and transaction boundaries. The context row must not survive a rollback as authorization, and a later transaction on the same backend must not match it.
+- [ ] Extend role-bootstrap assertions to cover the private schema/table owner, schema ACLs, absence of runtime membership, exact function owners, PUBLIC EXECUTE revocation, runtime EXECUTE only on intended entry points, and no direct runtime DML/SELECT on private context.
+- [ ] Add real database adversarial tests under `SET ROLE trademate_app`: forged GUCs, valid token A paired with attempted user B, invalid/expired/revoked token, suspended user, anonymous request, rollback, explicit transactions, concurrent pooled requests and failed bootstrap. Keep pre-session auth endpoints and the separate health-check pool outside authenticated identity assumptions.
+- [ ] Keep the five-table pilot CI-only until the test-target guard, bootstrap lookup policy, role ACL assertions and adversarial database tests are all in place and reviewed.
+
+- [x] This pass changed only this audit checklist. No pilot SQL, application code, database role, migration, policy, production data, service, configuration or deployment was changed.
