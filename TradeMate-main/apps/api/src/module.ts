@@ -3651,7 +3651,10 @@ class SportsTransferOrganizationsController {
                 'A new member has accepted an invitation to your sporting organization.', 'users'
          FROM sports_org_memberships
          WHERE sports_organization_id = $1 AND role IN ('owner', 'admin')
-           AND status = 'active' AND user_id <> $2`,
+           AND status = 'active'
+           AND (starts_at IS NULL OR starts_at <= now())
+           AND (expires_at IS NULL OR expires_at > now())
+           AND user_id <> $2`,
         [result.rows[0].sports_organization_id, userId],
       );
       await client.query('COMMIT');
@@ -3903,7 +3906,9 @@ class SportsTransferMandatesController {
                   'A player has requested to appoint your sporting organization as a representative.', 'shield-check'
            FROM sports_org_memberships
            WHERE sports_organization_id = $1 AND role IN ('owner', 'admin')
-             AND status = 'active' AND (expires_at IS NULL OR expires_at > now())`,
+             AND status = 'active'
+             AND (starts_at IS NULL OR starts_at <= now())
+             AND (expires_at IS NULL OR expires_at > now())`,
           [input.representativeOrganizationId],
         );
       }
