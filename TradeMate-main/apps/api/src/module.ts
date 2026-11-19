@@ -3572,8 +3572,8 @@ class SportsTransferOrganizationsController {
       const organization = await client.query('SELECT id FROM sports_organizations WHERE id = $1 FOR UPDATE', [id]);
       if (!organization.rowCount) throw new NotFoundException('Sporting organization not found.');
       const actorRole = await this.managerRole(client, id, userId);
-      if (actorRole === 'admin' && ['owner', 'admin'].includes(input.role)) {
-        throw new ForbiddenException('Only an organization owner can invite an owner or admin.');
+      if (actorRole === 'admin' && input.role === 'admin') {
+        throw new ForbiddenException('Only an organization owner can invite another admin.');
       }
       const target = await client.query("SELECT id FROM users WHERE id = $1 AND status = 'active'", [input.userId]);
       if (!target.rowCount) throw new NotFoundException('The invited account was not found.');
