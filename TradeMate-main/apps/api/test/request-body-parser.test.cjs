@@ -1,22 +1,17 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const http = require('node:http');
+const express = require('express');
 const { createApiJsonBodyParser } = require('../dist/request-body-parser');
 
 const startParserServer = async () => {
-  const parser = createApiJsonBodyParser();
-  const server = http.createServer((request, response) => {
-    parser(request, response, (error) => {
-      if (error) {
-        response.statusCode = error.status || 500;
-        response.end(error.type || 'parser_error');
-        return;
-      }
-      response.statusCode = 200;
-      response.end('parsed');
-    });
+  const app = express();
+  app.use(createApiJsonBodyParser());
+  app.use((_request, response) => response.status(200).send('parsed'));
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve, reject) => {
+    server.once('listening', resolve);
+    server.once('error', reject);
   });
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   return {
     url: `http://127.0.0.1:${address.port}`,
