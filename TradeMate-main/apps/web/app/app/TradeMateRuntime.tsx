@@ -12,6 +12,15 @@ declare global {
       lastSuccessAt: number | null;
       error: string | null;
     };
+    createMarketMetadataRefresher?: (options?: {
+      onStatus?: (status: {
+        state: 'fresh' | 'stale' | 'unavailable';
+        lastAttemptAt: number | null;
+        lastSuccessAt: number | null;
+        error: string | null;
+      }) => void;
+    }) => unknown;
+    applyCoinGeckoMarketMetadata?: (rows: unknown[], options?: Record<string, unknown>) => void;
   }
 }
 
