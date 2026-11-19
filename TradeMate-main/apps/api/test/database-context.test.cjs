@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
-const { createRlsAwarePool, databaseRequestContextMiddleware } = require('../dist/database-context');
+const { createRlsAwarePool, databaseRequestContextMiddleware, sessionTokenFromCookieHeader } = require('../dist/database-context');
 
 const hash = (token) => createHash('sha256').update(token).digest('hex');
 const identityByHash = new Map([
@@ -115,4 +115,13 @@ test('malformed cookie encoding produces anonymous context without leaking raw i
   assert.equal(clients[0].calls[1].values[0], '');
   assert.equal(clients[0].userId, '');
   assert.ok(!clients[0].calls.some((call) => call.values?.includes('%E0%A4%A')));
+});
+
+
+test('shared session cookie parser decodes valid cookies and fails closed on malformed encoding', () => {
+  assert.equal(sessionTokenFromCookieHeader('theme=dark; trademate_session=valid%2Dtoken'), 'valid-token');
+  assert.equal(sessionTokenFromCookieHeader('trademate_session=%E0%A4%A'), '');
+  assert.equal(sessionTokenFromCookieHeader('trademate_session=bad%ZZ'), '');
+  assert.equal(sessionTokenFromCookieHeader('other_cookie=value'), '');
+  assert.equal(sessionTokenFromCookieHeader(undefined), '');
 });
