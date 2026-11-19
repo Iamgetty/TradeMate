@@ -86,3 +86,12 @@ For each material feature, add a row with:
 ## Acceptance rule
 
 Only use **★ Production accepted** when the exact deployed release has passed the agreed acceptance suite in the intended production environment and the accountable owner has approved the evidence. A green build, source-code presence, a successful deployment operation, a restore exit code, or an unexecuted test is not production acceptance.
+
+## Request-scoped database context failure handling (CI verified; production acceptance not implied)
+
+- Runtime fix: `TradeMate-main/apps/api/src/database-context.ts`, commit `ad18db95b6d4c2b0054f230cfc1c10c94718eaf0`. After a successful explicit `BEGIN`, if establishing the transaction-local request identity fails, the code now attempts `ROLLBACK` before propagating the original error. The transaction remains marked active until rollback succeeds, preserving the existing release-time cleanup attempt if rollback fails.
+- Regression coverage: `TradeMate-main/apps/api/test/database-context.test.cjs`, commit `50fb12ab69b70f5edac91378994872a2ba5dd21d`. The test injects an identity-context setup failure and asserts the SQL sequence is `BEGIN`, failed `set_config`, `ROLLBACK`, followed by client release.
+- Exact tested PR head: `50fb12ab69b70f5edac91378994872a2ba5dd21d`. TradeMate CI run [44610295002](https://github.com/Iamgetty/TradeMate/actions/runs/44610295002) completed successfully with all 8/8 jobs, including API lint/build/security validation, database migration integration, browser app-shell/live two-account API acceptance, web build, exchange-feed/MT5 tests, isolated Cloudflare Workers build/runtime, AWS container builds and SAST/SCA/secret scanning. Separate Cloudflare compatibility run [44610295040](https://github.com/Iamgetty/TradeMate/actions/runs/44610295040) also passed.
+- This verifies the repository implementation and automated test suite only. It does not prove the database's behavior during an actual network partition or a failed rollback; those require dedicated fault-injection coverage. No production database, role, policy, deployment or credential was changed.
+- Status: ✓ repository implementation and CI execution verified; staging and production acceptance not run.
+
