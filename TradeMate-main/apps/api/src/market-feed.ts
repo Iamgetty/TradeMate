@@ -1,5 +1,6 @@
 import WebSocket, { WebSocketServer } from 'ws';
 import type { IncomingMessage, Server } from 'node:http';
+import { isIP } from 'node:net';
 
 type Level = { p: string; q: string };
 type Trade = { id: string; venue: string; market: string; price: string; quantity: string; time: number; side: 'buy' | 'sell' };
@@ -45,15 +46,20 @@ function isAllowedMarketFeedOrigin(origin: string | undefined, configuredOrigins
   if (!origin) return true;
   let normalized: string;
   try { normalized = new URL(origin).origin; } catch { return false; }
-  const allowed = new Set([
-    ...DEFAULT_MARKET_FEED_ORIGINS,
-    ...configuredOrigins.split(',').map((value) => value.trim()).filter(Boolean),
-  ]);
+  if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) return false;
+  const configured = configuredOrigins.split(',').map((value) => {
+    try { return new URL(value.trim()).origin; } catch { return ''; }
+  }).filter(Boolean);
+  const allowed = new Set([...DEFAULT_MARKET_FEED_ORIGINS, ...configured]);
   return allowed.has(normalized);
 }
 
 function marketFeedClientIp(request: IncomingMessage): string {
-  // Do not trust caller-controlled X-Forwarded-For values for connection quotas.
+  // main.ts configures exactly one trusted proxy hop. The edge proxy appends
+  // the connecting client address as the right-most X-Forwarded-For value.
+  const forwarded = request.headers['x-forwarded-for'];
+  const candidate = (Array.isArray(forwarded) ? forwarded.join(',') : forwarded || '').split(',').map((value) => value.trim()).filter(Boolean).at(-1);
+  if (candidate && isIP(candidate)) return candidate;
   return request.socket.remoteAddress || 'unknown';
 }
 
