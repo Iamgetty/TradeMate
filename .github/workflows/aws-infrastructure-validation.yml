@@ -36,7 +36,8 @@ jobs:
       - name: Install actionlint
         run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
       - name: Lint GitHub Actions workflows
-        run: "$HOME/go/bin/actionlint" .github/workflows/*.yml
+        run: |
+          "$HOME/go/bin/actionlint" .github/workflows/*.yml
 
 # Intentionally no AWS credentials, CloudFormation change-set creation,
 # stack deployment, resource provisioning, or production access in this workflow.
