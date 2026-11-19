@@ -958,3 +958,35 @@ A material technology initiative is not complete until its owner can demonstrate
 7. **Continuously improve:** review architecture, technology lifecycle, incidents, costs, performance and market-leading alternatives on a defined cadence.
 
 The technology inventory, baseline and prioritization are prerequisites to selecting specific upgrades. Vendor and product names in other roadmap material are evaluation candidates only unless a separate decision record and approval explicitly select them. No tool purchase, vendor commitment, production change, deployment, merge, infrastructure migration, database change or trading cutover is authorized merely by this roadmap section.
+
+
+## Implementation register — evidence and production acceptance governance
+
+The canonical cross-stack implementation register is `TradeMate-main/docs/implementation-register.md`. Keep it synchronized with repository changes and independently verified deployed/production behavior. This register is an evidence ledger, not a progress estimate or a declaration of certification.
+
+### Status definitions
+
+- **Implemented (repository):** code/configuration exists on the tracked branch and has been reviewed; required automated checks pass. This status alone does not mean production acceptance.
+- **Partially implemented:** only a subset, prototype, foundation or non-production capability exists, or required tests/operational controls remain outstanding.
+- **Production accepted:** the exact deployed version/configuration has been identified and production acceptance evidence is recorded, including successful relevant end-to-end checks, operational telemetry, security/privacy review, rollback/recovery readiness and accountable owner approval.
+- **Not implemented:** no qualifying implementation evidence exists.
+- **Unverified:** evidence is insufficient, stale, contradictory or unavailable. Do not convert unverified to implemented by inference.
+
+### Evidence required for every status change
+
+1. Record the repository path(s), commit SHA and concise implementation description.
+2. Link the automated test/workflow run and record its final conclusion. A skipped, cancelled, queued or merely started job is not a pass.
+3. For production acceptance, identify the deployed release/version and environment, deployment evidence, production-safe acceptance result, observed SLO/SLI evidence where applicable, and named accountable approval. Do not expose secrets or sensitive customer data.
+4. Record known gaps, dependencies, risks, owner and next verification date.
+5. Re-check affected rows whenever code, dependencies, infrastructure, provider behavior, architecture or production configuration changes. Downgrade status when evidence expires or a regression is found.
+
+### Non-negotiable reporting rules
+
+- Never tick an entire technology domain because one library, service, endpoint or prototype exists.
+- Separate repository implementation, CI verification, staging validation and production acceptance; they are different gates.
+- Never infer production state from source code, a successful build, a deployment request, a database restore exit code or a vendor feature list.
+- A test pass applies only to the tested commit, configuration, environment and scope.
+- Keep evidence links and timestamps with the row; do not claim certification or regulatory compliance without independent, applicable evidence.
+- Update the register in the same change as material implementation work, or immediately after the evidence becomes available.
+- Preserve the agreed constraint that broad file/folder restructuring occurs at the end of the roadmap, except for a narrowly justified safety/correctness fix.
+- Register maintenance does not authorize production changes, deployments, merges, purchases, vendor commitments, data movement or cutovers.
