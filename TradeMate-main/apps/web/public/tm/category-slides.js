@@ -37,7 +37,6 @@
     'Forex': { kind: 'rows', word: 'pairs' },
     'NFTs': { kind: 'nft' }
   };
-  var NFT_COPY = { title: 'Discover NFT collections', sub: 'Live collections across chains.' };
   var TTL = 60000;
   var SVGNS = 'http://www.w3.org/2000/svg';
   var insts = {};       // page title -> instance (kept across the app's redraws)
@@ -51,15 +50,13 @@
   var css = document.createElement('style');
   css.id = 'tm-cs-css';
   css.textContent = [
-    '.tm-cs{margin:0 16px 14px}',
-    /* extra bottom padding leaves room for the dots so they never sit on the chips */
-    '.tm-cs .tbn-s{min-height:0;grid-template-columns:1fr;align-content:start;align-items:start;gap:12px;padding:16px 16px 38px}',
-    '@media(min-width:700px){.tm-cs .tbn-s{padding:22px 28px 42px;gap:14px}}',
-    '.tm-cs .tbn-list{flex-wrap:wrap}',
+    /* Size comes from the app's own .tbn-s rules (same as the Home cards). The stored Home card height, when known, makes it exact. */
+    '.tm-cs .tbn-s{height:var(--tm-slide-h,auto)}',
+    '.tm-cs-s1{grid-template-columns:1fr!important;align-content:space-between;align-items:stretch!important}',
     '.tm-cs .tbn-chip b{font-weight:800}',
     '.tm-cs-tagrow{display:flex;align-items:center;justify-content:space-between;gap:10px}',
-    '.tm-cs-chart svg{display:block;width:100%;height:84px;overflow:visible}',
-    '.tm-cs-cap{display:flex;justify-content:space-between;gap:10px;margin-top:4px;font:500 10px "DM Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}',
+    '.tm-cs-chart svg{display:block;width:100%;height:36px;overflow:visible}',
+    '.tm-cs-cap{display:flex;justify-content:space-between;gap:10px;margin-top:3px;font:500 9px "DM Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}',
     '.tm-cs .gl{stroke:var(--line);stroke-width:1;stroke-dasharray:3 4}',
     '.tm-cs .zl{stroke:var(--mut);stroke-width:1;opacity:.55}',
     '.tm-cs .ln{fill:none;stroke:var(--am);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:var(--len);stroke-dashoffset:var(--len)}',
@@ -88,7 +85,7 @@
     '@keyframes tmcsDraw{to{stroke-dashoffset:0}}',
     '@keyframes tmcsFade{from{opacity:0}to{opacity:1}}',
     '@keyframes tmcsUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}',
-    '@keyframes tmcsPulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(3.4);opacity:0}}',
+    '@keyframes tmcsPulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(2.4);opacity:0}}',
     '@media(prefers-reduced-motion:reduce){.tm-cs *{animation:none!important}.tm-cs .ln:not(.flat){stroke-dashoffset:0;stroke-dasharray:none}.tm-cs .ar,.tm-cs .dot{opacity:1}}'
   ].join('\n');
   (document.head || document.documentElement).appendChild(css);
@@ -129,7 +126,7 @@
   }
   // values: numbers; fromZero: scale from 0 (activity counts) instead of min..max (changes)
   function chart(values, fromZero, captionL, captionR) {
-    var W = 320, H = 84, T = 8, B = 6, X0 = 6;
+    var W = 320, H = 36, T = 5, B = 4, X0 = 6;
     var wrap = el('div', 'tm-cs-chart');
     var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, preserveAspectRatio: 'none', 'aria-hidden': 'true' });
     [0.25, 0.6, 0.95].forEach(function (f) {
@@ -172,8 +169,8 @@
     svg.appendChild(line);
     if (!flat) {
       var end = pts[pts.length - 1];
-      svg.appendChild(sv('circle', { cx: end[0], cy: end[1], r: 5, 'class': 'pulse' }));
-      svg.appendChild(sv('circle', { cx: end[0], cy: end[1], r: 3.5, 'class': 'dot' }));
+      svg.appendChild(sv('circle', { cx: end[0], cy: end[1], r: 4, 'class': 'pulse' }));
+      svg.appendChild(sv('circle', { cx: end[0], cy: end[1], r: 3, 'class': 'dot' }));
     }
     wrap.appendChild(svg);
     var cap = el('div', 'tm-cs-cap');
@@ -252,7 +249,7 @@
 
   // ---------- slide contents ----------
   function slideCategory(inst) {
-    var s = el('div', 'tbn-s tm-cs-s');
+    var s = el('div', 'tbn-s tm-cs-s tm-cs-s1');
     var copy = el('div', 'tbn-copy');
     var tagRow = el('div', 'tm-cs-tagrow');
     tagRow.appendChild(el('span', 'tbn-tag', inst.key.toUpperCase()));
@@ -264,8 +261,6 @@
       tagRow.appendChild(live);
     }
     copy.appendChild(tagRow);
-    copy.appendChild(headline(inst.title));
-    copy.appendChild(el('p', null, inst.sub));
     s.appendChild(copy);
 
     var d = inst.data;
@@ -278,7 +273,7 @@
         var st = d.stats;
         chips = [
           statChip(st.listings, 0, plural(st.listings, 'listing', 'listings')),
-          statChip(st.newThisWeek, 0, 'new this week'),
+          statChip(st.newThisWeek, 0, 'new \u00b7 7d'),
           statChip(st.enquiries7d, 0, plural(st.enquiries7d, 'enquiry', 'enquiries') + ' \u00b7 7d'),
           statChip(st.deals7d, 0, plural(st.deals7d, 'deal', 'deals') + ' \u00b7 7d')
         ];
@@ -387,7 +382,7 @@
     s.setAttribute('data-pg', 'advertise'); // tapping the card opens the Advertise page
     var copy = el('div', 'tbn-copy');
     copy.appendChild(el('span', 'tbn-tag', 'PROMOTION \u00b7 ' + inst.key.toUpperCase()));
-    copy.appendChild(headline('Your promotion could appear here'));
+    copy.appendChild(headline('Promote your offer'));
     copy.appendChild(el('p', null, 'Reserved for ' + inst.key + ' contracts and announcements.'));
     s.appendChild(copy);
     var list = el('div', 'tbn-list');
@@ -443,7 +438,7 @@
   }
 
   function create(key, cfg) {
-    var inst = { key: key, cfg: cfg, title: key, sub: '', data: null, index: 0, sig: '' };
+    var inst = { key: key, cfg: cfg, data: null, index: 0, sig: '' };
     var root = el('div', 'tbn tm-cs');
     root.setAttribute('role', 'region');
     root.setAttribute('aria-roledescription', 'carousel');
@@ -500,6 +495,15 @@
     if (inst.root.isConnected) { inst.track.scrollLeft = inst.index * inst.track.clientWidth; if (!settled) setActive(inst, inst.index); }
   }
 
+  // The Home screen stores the height of its slide card; using it makes these cards exactly the same size.
+  function applyHeight(root) {
+    try {
+      var h = Number(localStorage.getItem('tm.slideH'));
+      if (h >= 120 && h <= 420) root.style.setProperty('--tm-slide-h', h + 'px');
+      else root.style.removeProperty('--tm-slide-h');
+    } catch (e) { /* storage unavailable: the app's own card size still applies */ }
+  }
+
   // ---------- mounting on the app's pages ----------
   function pageHost() {
     var h = document.querySelector('.pgs header.ph h2') || document.querySelector('header.ph h2');
@@ -526,15 +530,12 @@
     }
     if (!inst) {
       inst = insts[page.title] = create(page.title, cfg);
-      if (cfg.kind === 'nft') { inst.title = NFT_COPY.title; inst.sub = NFT_COPY.sub; render(inst, false); }
     }
     if (hero) {
-      var h1 = hero.querySelector('.mk-hero-tx h1'), p = hero.querySelector('.mk-hero-tx p');
-      var title = h1 ? h1.textContent.trim() : '', sub = p ? p.textContent.trim() : '';
-      if (title && (title !== inst.title || sub !== inst.sub)) { inst.title = title; inst.sub = sub; render(inst, inst.root.getAttribute('data-ready') === '1'); }
       var pill = hero.querySelector('.mk-live');
       if (pill && inst.livePill) { inst.livePill.className = pill.className; inst.livePill.lastChild.textContent = pill.textContent; }
     }
+    applyHeight(inst.root);
     parent.insertBefore(inst.root, anchor);
     if (hero) hero.remove();
     // a node that was detached by a redraw starts back at slide 1: put it where it was
