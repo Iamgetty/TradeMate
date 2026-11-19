@@ -198,7 +198,7 @@ function attachMarketFeed(server: Server) {
     connect(session, futures,
       'wss://fstream.binance.com/market/stream?streams=' + symbol + '@depth20@100ms/' + symbol + '@aggTrade',
       (message) => {
-        const d = message.data || message;
+        const d = isRecord(message.data) ? message.data : message;
         if (d.e === 'depthUpdate' || (d.bids && d.asks)) {
           futures.bids.clear(); futures.asks.clear();
           putLevels(futures.bids, d.b || d.bids); putLevels(futures.asks, d.a || d.asks);
