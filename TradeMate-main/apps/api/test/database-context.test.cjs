@@ -11,7 +11,8 @@ const identityByHash = new Map([
   [hash('user-b-token'), 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'],
 ]);
 
-const createMockPool = ({ failOnSql } = {}) => {
+const createMockPool = ({ failOnSql, failOnceOnSql } = {}) => {
+  let failOnceTriggered = false;
   const clients = [];
   const pool = {
     async connect() {
@@ -23,6 +24,10 @@ const createMockPool = ({ failOnSql } = {}) => {
         async query(sql, values) {
           this.calls.push({ sql, values });
           if (failOnSql && sql.includes(failOnSql)) throw new Error('simulated database context setup failure');
+          if (failOnceOnSql && !failOnceTriggered && sql.includes(failOnceOnSql)) {
+            failOnceTriggered = true;
+            throw new Error('simulated one-time database rollback failure');
+          }
           if (sql.includes("set_config('app.session_token_hash'")) this.sessionHash = values[0];
           if (sql.includes('FROM user_sessions')) {
             const userId = identityByHash.get(this.sessionHash);
@@ -146,3 +151,30 @@ test('explicit transaction is rolled back when request identity setup fails', as
   assert.equal(clients[0].released, true);
 });
 
+
+
+test('release retries rollback when the setup-failure rollback also fails', async () => {
+  const { pool, clients } = createMockPool({
+    failOnSql: "set_config('app.session_token_hash'",
+    failOnceOnSql: 'ROLLBACK',
+  });
+  const database = createRlsAwarePool(pool);
+  await assert.rejects(runRequest('trademate_session=raw-session-token', async () => {
+    const client = await database.connect();
+    try {
+      await client.query('BEGIN');
+    } finally {
+      client.release();
+    }
+  }), /simulated database context setup failure/);
+
+  // release() intentionally schedules its final rollback before returning.
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(clients[0].calls.map((call) => call.sql), [
+    'BEGIN',
+    "SELECT set_config('app.session_token_hash', $1, true)",
+    'ROLLBACK',
+    'ROLLBACK',
+  ]);
+  assert.equal(clients[0].released, true);
+});
