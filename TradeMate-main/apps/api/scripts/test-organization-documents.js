@@ -26,6 +26,11 @@ async function main() {
       ['Document integration ' + suffix],
     );
     const organizationId = organization.rows[0].id;
+    const organizationB = await rawPool.query(
+      "INSERT INTO organizations (name, organization_type, country_code, default_currency, status) VALUES ($1, 'business', 'NG', 'NGN', 'active') RETURNING id",
+      ['Unrelated document organization ' + suffix],
+    );
+    const unrelatedOrganizationId = organizationB.rows[0].id;
     const actors = {};
 
     for (const role of ['owner', 'admin', 'member']) {
@@ -54,7 +59,7 @@ async function main() {
     await app.listen(0, '127.0.0.1');
     const address = app.getHttpServer().address();
     const baseUrl = 'http://127.0.0.1:' + address.port;
-    const request = (role, method, body) => fetch(baseUrl + '/api/organizations/' + organizationId + '/documents', {
+    const request = (role, method, body, targetOrganizationId = organizationId) => fetch(baseUrl + '/api/organizations/' + targetOrganizationId + '/documents', {
       method,
       headers: {
         cookie: 'trademate_session=' + encodeURIComponent(actors[role].token),
@@ -72,6 +77,11 @@ async function main() {
     }
     const memberList = await request('member', 'GET');
     assert.equal(memberList.status, 403, 'ordinary members must not list verification documents');
+
+    const crossOrganizationList = await request('owner', 'GET', undefined, unrelatedOrganizationId);
+    assert.equal(crossOrganizationList.status, 403, 'an owner of another organization must not list its documents');
+    const crossOrganizationUpload = await request('admin', 'POST', file('cross-organization.pdf'), unrelatedOrganizationId);
+    assert.equal(crossOrganizationUpload.status, 403, 'an admin of another organization must not upload its documents');
 
     const ownerUpload = await request('owner', 'POST', file('owner.pdf'));
     assert.equal(ownerUpload.status, 201, 'owner upload must succeed');
