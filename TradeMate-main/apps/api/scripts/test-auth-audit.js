@@ -357,11 +357,36 @@ async function main() {
       body: JSON.stringify({ email: attemptsEmail, code: issuedCode }),
     });
     assert.equal(lockedCode.status, 401, 'a code must be locked after five incorrect attempts');
+
+    // Resending one account's code must not clean up another account's expired or used codes.
+    const unrelatedEmail = 'unrelated-verification-' + suffix + '@example.invalid';
+    const unrelatedUser = await pool.query(
+      "INSERT INTO users (email, display_name, status) VALUES ($1, 'Unrelated verification', 'pending') RETURNING id",
+      [unrelatedEmail],
+    );
+    await pool.query(
+      "INSERT INTO email_verification_codes (user_id, code_hash, expires_at) VALUES ($1, $2, now() - interval '1 minute'), ($1, $3, now() + interval '10 minutes')",
+      [unrelatedUser.rows[0].id, digest('expired-unrelated-code'), digest('used-unrelated-code')],
+    );
+    await pool.query(
+      "UPDATE email_verification_codes SET used_at = now() WHERE user_id = $1 AND code_hash = $2",
+      [unrelatedUser.rows[0].id, digest('used-unrelated-code')],
+    );
+
     const resend = await fetch(base + '/api/auth/email-verification/resend', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: attemptsEmail }),
     });
     assert.equal(resend.status, 200, 'pending accounts must be able to request a replacement code');
+    const unrelatedCodes = await pool.query(
+      'SELECT code_hash, used_at, expires_at FROM email_verification_codes WHERE user_id = $1 ORDER BY code_hash',
+      [unrelatedUser.rows[0].id],
+    );
+    assert.equal(unrelatedCodes.rowCount, 2, 'resending another account must preserve unrelated verification rows');
+    assert.ok(unrelatedCodes.rows.some((row) => row.code_hash === digest('expired-unrelated-code') && new Date(row.expires_at).getTime() < Date.now()),
+      'unrelated expired verification code must remain untouched');
+    assert.ok(unrelatedCodes.rows.some((row) => row.code_hash === digest('used-unrelated-code') && row.used_at),
+      'unrelated used verification code must remain untouched');
     const replacementCode = lastVerificationCode;
     const replacementRecord = await pool.query('SELECT code_hash, attempts FROM email_verification_codes WHERE user_id = (SELECT id FROM users WHERE lower(email) = $1) ORDER BY created_at DESC LIMIT 1', [attemptsEmail]);
     assert.equal(replacementRecord.rows[0].code_hash, digest(replacementCode), 'resend must persist the replacement code digest');
