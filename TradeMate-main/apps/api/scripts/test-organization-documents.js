@@ -46,6 +46,29 @@ async function main() {
       actors[role] = { userId, token };
     }
 
+    for (const [role, membershipStatus, windowSql] of [
+      ['expired_admin', 'active', "now() - interval '2 days', now() - interval '1 day'"],
+      ['future_admin', 'active', "now() + interval '1 day', now() + interval '2 days'"],
+      ['revoked_admin', 'revoked', 'NULL, NULL'],
+    ]) {
+      const user = await rawPool.query(
+        "INSERT INTO users (email, display_name, status) VALUES ($1, $2, 'active') RETURNING id",
+        [role + '-' + suffix + '@example.invalid', 'Document test ' + role],
+      );
+      const userId = user.rows[0].id;
+      const token = 'document-test-' + role + '-' + suffix;
+      await rawPool.query(
+        'INSERT INTO user_sessions (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval \'10 minutes\')',
+        [userId, tokenHash(token)],
+      );
+      await rawPool.query(
+        `INSERT INTO organization_members (organization_id, user_id, member_role, status, starts_at, expires_at)
+         VALUES ($1, $2, 'admin', $3, ${windowSql})`,
+        [organizationId, userId, membershipStatus],
+      );
+      actors[role] = { userId, token };
+    }
+
     app = await NestFactory.create(AppModule, { logger: false, bodyParser: false });
     app.use(json({ limit: '28mb' }));
     app.use(databaseRequestContextMiddleware);
@@ -78,6 +101,13 @@ async function main() {
     assert.equal(adminUpload.status, 201, 'admin upload must succeed');
     const memberUpload = await request('member', 'POST', file('member.pdf'));
     assert.equal(memberUpload.status, 403, 'ordinary member upload must be forbidden');
+
+    for (const role of ['expired_admin', 'future_admin', 'revoked_admin']) {
+      const list = await request(role, 'GET');
+      assert.equal(list.status, 403, role + ' must not list verification documents');
+      const upload = await request(role, 'POST', file(role + '.pdf'));
+      assert.equal(upload.status, 403, role + ' must not upload verification documents');
+    }
 
     const beforeFailure = await rawPool.query(
       'SELECT count(*)::int AS count FROM organization_documents WHERE organization_id = $1',
