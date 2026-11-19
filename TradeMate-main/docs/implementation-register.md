@@ -1,6 +1,6 @@
 # TradeMate implementation register
 
-**Canonical cross-stack status ledger.** Updated: 2026-11-19 (PR #219 head `fc094efa2fe69d15fdfc4fa647d4bccafa651f28`; TradeMate CI run [44601661238](https://github.com/Iamgetty/TradeMate/actions/runs/44601661238) and Cloudflare compatibility run [44601660723](https://github.com/Iamgetty/TradeMate/actions/runs/44601660723) verified)  
+**Canonical cross-stack status ledger.** Updated: 2026-11-19 (PR #219 head `62eae8e975f1ab76a5fbc35ba1761c1f222ec0c7`; Node.js runtime alignment CI pending)  
 **Branch baseline:** `fix/audit-remediation-2026-11-18`  
 **Rule:** no domain is complete merely because its first component exists. Repository implementation, CI verification, staging validation and production acceptance are tracked separately.
 
@@ -58,6 +58,8 @@
 - **Security limitation identified during review:** `app.user_id` is a caller-settable PostgreSQL custom setting for the runtime role. The pilot verifies policy behavior when the context is correctly populated; it does not prove protection against arbitrary SQL executed as `trademate_app` or a compromised application session. Session-derived context in `database-context.ts` is application-side groundwork, not an unforgeable database identity assertion. Do not describe this pilot as a complete authorization boundary. An independent trusted-context design and adversarial impersonation test are still required before production RLS approval.
 - **Deployment credential-isolation limitation identified during review:** `render.yaml` gives the API service `MIGRATION_DATABASE_URL` and executes migrations in that same service's `startCommand`. Because the API process inherits the service environment, the elevated migration credential remains available to the long-running API process. A distinct URL is not sufficient isolation while both commands share the same service environment. Separate, gated migration execution and a deployment-order/rollback design are required before claiming runtime/migrator separation.
 
+
+| Node.js runtime lifecycle alignment | Node.js 20 was still used by six CI setup steps even though the Node.js project lists v20 as EOL; API and exchange-feed Docker images used Node 22; the Render Blueprint had no explicit Node version. PR #219 now pins Node.js 24.22.1 in `TradeMate-main/.node-version`, package `engines` constraints (`>=24.22.1 <25`) for API/web/exchange-feed, all active root CI setup steps, Cloudflare compatibility and database migration workflows, both Docker images (`node:24-bookworm-slim`), and all three Render services via `NODE_VERSION`. Exact head `62eae8e975f1ab76a5fbc35ba1761c1f222ec0c7`; TradeMate CI run [44607161777](https://github.com/Iamgetty/TradeMate/actions/runs/44607161777) and Cloudflare compatibility run [44607161926](https://github.com/Iamgetty/TradeMate/actions/runs/44607161926) were pending at last check. | ◐ Repository configuration aligned; exact-head CI and deployed runtime verification still required. Render Blueprint changes have not been applied to production. |
 
 ## Dependency reproducibility gate (rechecked 19 Nov 2026)
 
