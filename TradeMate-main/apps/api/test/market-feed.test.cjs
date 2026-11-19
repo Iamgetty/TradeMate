@@ -42,6 +42,7 @@ test('market feed resource ceilings remain explicit and bounded', () => {
   assert.equal(MARKET_FEED_LIMITS.subscriptionTimeoutMs, 10_000);
   assert.equal(MARKET_FEED_LIMITS.maxBufferedBytes, 1_048_576);
   assert.equal(MARKET_FEED_LIMITS.maxBackpressureStrikes, 3);
+  assert.equal(MARKET_FEED_LIMITS.bookFreshnessMs, 10_000);
   assert.equal(Object.isFrozen(MARKET_FEED_LIMITS), true);
 });
 
