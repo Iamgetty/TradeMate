@@ -126,6 +126,7 @@ jobs:
         id: task
         env:
           EXPECTED_API_IMAGE_URI: ${{ steps.release.outputs.image_uri }}
+          RELEASE_SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
         run: |
           set -euo pipefail
           FOUNDATION_STATUS="$(aws cloudformation describe-stacks \
@@ -204,10 +205,18 @@ jobs:
             --image-ids "imageDigest=$IMAGE_DIGEST" >/dev/null
 
           MIGRATION_TASK_INPUT="$RUNNER_TEMP/trademate-migration-task-definition.json"
-          jq --arg image "$EXPECTED_API_IMAGE_URI" '
+          jq --arg image "$EXPECTED_API_IMAGE_URI" --arg source "$RELEASE_SOURCE_SHA" '
             del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
                 .compatibilities, .registeredAt, .registeredBy, .deregisteredAt)
             | .containerDefinitions[0].image = $image
+            | (.tags //= [])
+            | .tags += [
+                {key:"Project", value:"TradeMate"},
+                {key:"Environment", value:"staging"},
+                {key:"Purpose", value:"pre-migration"},
+                {key:"SourceCommit", value:$source},
+                {key:"ImageDigest", value:$image}
+              ]
           ' <<< "$TASK_DEFINITION" > "$MIGRATION_TASK_INPUT"
           REGISTERED_TASK="$(aws ecs register-task-definition \
             --cli-input-json "file://$MIGRATION_TASK_INPUT" \
@@ -276,6 +285,7 @@ jobs:
           TASK_ARN: ${{ steps.run.outputs.task_arn }}
           RELEASE_SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
           EXPECTED_API_IMAGE_URI: ${{ steps.release.outputs.image_uri }}
+          TASK_DEFINITION_ARN: ${{ steps.task.outputs.task_definition }}
         run: |
           set -euo pipefail
           aws ecs wait tasks-stopped --cluster "$CLUSTER_NAME" --tasks "$TASK_ARN"
@@ -294,7 +304,8 @@ jobs:
             echo "- Result: successful (container exit code 0)"
             echo "- Source commit: `$RELEASE_SOURCE_SHA`"
             echo "- API image: `$EXPECTED_API_IMAGE_URI`"
-            echo "- ECS task: `$TASK_ARN`"
+            echo "- Migration task definition: `$TASK_DEFINITION_ARN`"
+            echo "- ECS task: `$TASK_ARN`
             echo "- Stop code: `$STOP_CODE`"
             echo
             echo "This workflow runs the migration task only. It does not update or promote the API service."
