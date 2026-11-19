@@ -14,7 +14,8 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const scriptDirectory = path.dirname(path.resolve(process.argv[1]));\nconst runtimePath = path.join(scriptDirectory, "../public/tm/app.js");
+const scriptDirectory = path.dirname(path.resolve(process.argv[1]));
+const runtimePath = path.join(scriptDirectory, "../public/tm/app.js");
 const source = fs.readFileSync(runtimePath, "utf8");
 
 // Index of the first match of a string or RegExp at/after `from` (-1 if none).
