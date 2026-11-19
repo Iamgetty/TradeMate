@@ -67,8 +67,9 @@ async function main() {
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
+    const validPdfBase64 = Buffer.from('%PDF-1.4\\n').toString('base64');
     const file = (name) => ({
-      files: [{ fileName: name, mimeType: 'application/pdf', dataBase64: 'YQ==' }],
+      files: [{ fileName: name, mimeType: 'application/pdf', dataBase64: validPdfBase64 }],
     });
 
     for (const role of ['owner', 'admin']) {
@@ -82,6 +83,16 @@ async function main() {
     assert.equal(crossOrganizationList.status, 403, 'an owner of another organization must not list its documents');
     const crossOrganizationUpload = await request('admin', 'POST', file('cross-organization.pdf'), unrelatedOrganizationId);
     assert.equal(crossOrganizationUpload.status, 403, 'an admin of another organization must not upload its documents');
+
+    const spoofedPdf = await request('owner', 'POST', {
+      files: [{ fileName: 'spoofed.pdf', mimeType: 'application/pdf', dataBase64: Buffer.from('not a PDF').toString('base64') }],
+    });
+    assert.equal(spoofedPdf.status, 400, 'a file with a PDF MIME label but no PDF signature must be rejected');
+
+    const mismatchedDataUrl = await request('owner', 'POST', {
+      files: [{ fileName: 'mismatch.pdf', mimeType: 'application/pdf', dataBase64: 'data:image/png;base64,' + Buffer.from('not a PNG').toString('base64') }],
+    });
+    assert.equal(mismatchedDataUrl.status, 400, 'a data URL MIME type must match the declared document type');
 
     const ownerUpload = await request('owner', 'POST', file('owner.pdf'));
     assert.equal(ownerUpload.status, 201, 'owner upload must succeed');
