@@ -66,9 +66,15 @@ async function main() {
     const base = 'http://127.0.0.1:' + app.getHttpServer().address().port;
     originalFetch = global.fetch;
     let lastVerificationCode = null;
+    let failDeletionEmail = false;
     global.fetch = async (input, options) => {
       if (String(input) === 'https://api.resend.com/emails') {
         const payload = JSON.parse(options.body);
+        if (failDeletionEmail && /account deletion requested/i.test(payload.subject)) {
+          return new Response(JSON.stringify({ error: 'simulated email delivery failure' }), {
+            status: 503, headers: { 'content-type': 'application/json' },
+          });
+        }
         const match = String(payload.html).match(/letter-spacing:8px">([0-9]{6})<\/p>/);
         if (match) lastVerificationCode = match[1];
         else assert.match(payload.subject, /Reset your TradeMate password/, 'non-code test email must be the password-reset message');
@@ -327,6 +333,37 @@ async function main() {
       'unrelated expired password-reset token must remain untouched');
     assert.ok(unrelatedResetTokens.rows.some((row) => row.token_hash === digest('used-unrelated-reset-' + suffix) && row.used_at),
       'unrelated used password-reset token must remain untouched');
+
+    // Failed account-deletion email delivery must atomically restore status and invalidate only this request token.
+    process.env.RESEND_API_KEY = 'test-resend-key';
+    process.env.RESEND_FROM_EMAIL = 'TradeMate Test <test@example.invalid>';
+    const deletionUserEmail = 'deletion-email-failure-' + suffix + '@example.invalid';
+    const deletionUser = await pool.query(
+      "INSERT INTO users (email, display_name, status, email_verified_at) VALUES ($1, 'Deletion email failure', 'active', now()) RETURNING id",
+      [deletionUserEmail],
+    );
+    await pool.query('INSERT INTO user_credentials (user_id, password_hash) VALUES ($1, $2)', [deletionUser.rows[0].id, encodedOldPassword]);
+    const deletionSessionToken = 'deletion-email-failure-session-' + suffix;
+    await pool.query(
+      "INSERT INTO user_sessions (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes')",
+      [deletionUser.rows[0].id, digest(deletionSessionToken)],
+    );
+    failDeletionEmail = true;
+    const deletionFailure = await fetch(base + '/api/auth/account-deletion/request', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'trademate_session=' + encodeURIComponent(deletionSessionToken) },
+      body: JSON.stringify({ password: 'old password for reset test' }),
+    });
+    failDeletionEmail = false;
+    assert.equal(deletionFailure.status, 503, 'failed cancellation-email delivery must report service unavailable');
+    const deletionRecovery = await pool.query(
+      "SELECT u.status, d.cancellation_token_hash, d.cancelled_at FROM users u JOIN user_deletion_requests d ON d.user_id = u.id WHERE u.id = $1",
+      [deletionUser.rows[0].id],
+    );
+    assert.equal(deletionRecovery.rowCount, 1, 'failed email delivery must retain an auditable deletion-request row');
+    assert.equal(deletionRecovery.rows[0].status, 'active', 'failed email delivery must restore the account status');
+    assert.equal(deletionRecovery.rows[0].cancellation_token_hash, null, 'failed email delivery must invalidate its cancellation token');
+    assert.ok(deletionRecovery.rows[0].cancelled_at, 'failed email delivery must mark the request cancelled');
 
     // New registrations remain pending and cannot sign in until the emailed code is confirmed.
     process.env.RESEND_API_KEY = 'test-resend-key';
