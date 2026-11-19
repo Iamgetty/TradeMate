@@ -99,9 +99,18 @@ export const createRlsAwarePool = (pool: Pool): Pool => new Proxy(pool, {
 
                 if (isBeginCommand(sql)) {
                   const result = await (inner.query as (...queryArgs: unknown[]) => unknown).apply(inner, args);
-                  await establishTransactionContext(inner, context);
                   inTransaction = true;
-                  return result;
+                  try {
+                    await establishTransactionContext(inner, context);
+                    return result;
+                  } catch (error) {
+                    // Keep the client marked as transactional until rollback succeeds.
+                    // If rollback itself fails, release() makes one final cleanup attempt.
+                    await inner.query('ROLLBACK').then(() => {
+                      inTransaction = false;
+                    }).catch(() => undefined);
+                    throw error;
+                  }
                 }
 
                 if (isCommitCommand(sql) || isRollbackCommand(sql)) {
