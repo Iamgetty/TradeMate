@@ -295,3 +295,16 @@ This checklist records the source/configuration audit findings. Items are not co
 - [ ] Run full CI on the resulting commit before treating this change as validated.
 - [ ] Continue authorization review for the complete Sports Transfer opportunity lifecycle and any future document routes.
 - [ ] No production services or database were changed.
+
+
+## 28. Sports Transfer opportunity authorization and lifecycle review (2026-11-19)
+
+- [x] Re-reviewed the opportunity creation request schema: it strictly validates allowed fields, sport/movement compatibility, exactly one owner (player profile or organization), visibility, and structured financial terms.
+- [x] Re-reviewed player-owned creation: the profile is selected by both profile ID and authenticated user ID under row lock, and the opportunity sport must match the profile.
+- [x] Re-reviewed organization-owned creation: the organization must exist, and the creator must hold an active recruitment-capable membership with workspace/recruitment scope and a currently valid start/expiry window.
+- [x] Re-reviewed `GET /sports-transfer/opportunities/mine`: player records are scoped to profiles owned by the authenticated user; organization records require active, in-window membership, an allowed role, and workspace/recruitment scope.
+- [x] Confirmed migration 029 enforces exactly one owner, sport-specific movement types, bounded fields, allowed visibility/status values, and states that drafts are private and unpublished. No public discovery or publication transition is implemented in this controller.
+- [x] Confirmed this controller currently exposes draft creation and owner-scoped listing only; no edit, delete, submission, publication, pause, or close endpoint was found. This is a product lifecycle limitation, not an authorization defect to patch by inventing endpoints.
+- [ ] Continue the separate audit of document authorization and any negotiation/offer endpoints outside this controller before declaring Sports Transfer authorization fully reviewed.
+- [x] Latest head `1103d188e2915ba08dc643b88c7bcfb2f3feb711` passed TradeMate CI #1570 and Cloudflare compatibility #386.
+- [x] No production services, deployments, or databases were changed.
