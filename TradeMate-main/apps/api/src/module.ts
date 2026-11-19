@@ -816,8 +816,22 @@ class AuthController {
     } finally { client.release(); }
     const emailSent = await sendTransactionalEmail(current.rows[0].email, 'TradeMate account deletion requested', `<p>Your account is scheduled for deletion in 30 days.</p><p>To cancel, submit this one-time cancellation token in TradeMate account recovery:</p><p><strong>${cancelToken}</strong></p><p>Your sessions have been revoked and account access is disabled.</p>`);
     if (!emailSent) {
-      await databasePool.query("UPDATE users SET status = 'active', updated_at = now() WHERE id = $1 AND status = 'deletion_pending'", [current.rows[0].id]);
-      await databasePool.query("UPDATE user_deletion_requests SET cancellation_token_hash = NULL, cancelled_at = now() WHERE user_id = $1", [current.rows[0].id]);
+      const recovery = await databasePool.connect();
+      try {
+        await recovery.query('BEGIN');
+        await recovery.query(
+          "UPDATE users u SET status = 'active', updated_at = now() WHERE u.id = $1 AND u.status = 'deletion_pending' AND EXISTS (SELECT 1 FROM user_deletion_requests d WHERE d.user_id = u.id AND d.cancellation_token_hash = $2 AND d.cancelled_at IS NULL)",
+          [current.rows[0].id, tokenDigest(cancelToken)],
+        );
+        await recovery.query(
+          "UPDATE user_deletion_requests SET cancellation_token_hash = NULL, cancelled_at = now() WHERE user_id = $1 AND cancellation_token_hash = $2 AND cancelled_at IS NULL",
+          [current.rows[0].id, tokenDigest(cancelToken)],
+        );
+        await recovery.query('COMMIT');
+      } catch (error) {
+        await recovery.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      } finally { recovery.release(); }
       throw new HttpException('We could not send your cancellation email, so the deletion request was not activated. Please try again later.', HttpStatus.SERVICE_UNAVAILABLE);
     }
     response.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' });
