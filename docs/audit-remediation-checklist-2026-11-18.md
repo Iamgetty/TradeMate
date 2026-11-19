@@ -549,3 +549,11 @@ This is a design inventory, not an approved SQL/API implementation. Each operati
 - [ ] Add forced-RLS integration tests using the actual runtime role for each positive operation above and negative tests for cross-account reads/writes, forged `app.user_id`, arbitrary session lookup, token replay, expired/revoked sessions, and concurrent one-time-token consumption.
 - [ ] Specifically prove that a TOTP-enabled account cannot receive a session from password-only login when the auth-security row is inaccessible under ordinary owner policies.
 - [x] This pass changed documentation only. No function, role, policy, migration, API code, production configuration, data, service, or deployment was changed.
+## 47. Consistent fail-closed session cookie parsing (2026-11-19)
+
+- [x] Reproduced the parser inconsistency: request-context middleware already treated malformed percent-encoding as an absent session, while the authentication controller's separate sessionTokenFrom helper allowed decodeURIComponent to throw.
+- [x] Added one shared sessionTokenFromCookieHeader parser in database-context.ts. It selects the named session cookie, decodes it, and returns an empty token for absent or malformed values.
+- [x] Updated both database request-context middleware and authentication controller session extraction to use the shared parser, preventing divergent cookie interpretation between database identity setup and endpoint authorization.
+- [x] Extended database-context.test.cjs to cover valid percent-decoding, malformed UTF-8 percent sequences, invalid percent escapes, absent cookies and unrelated cookies. Existing middleware integration test continues to assert malformed input establishes anonymous context and does not pass raw cookie text into SQL context.
+- [ ] Await CI on the resulting PR head. No local test execution is claimed.
+- [x] This change only normalizes malformed-cookie handling; it does not alter session validity, token hashing, authentication policy, database roles, RLS policies, migrations, production configuration, data, services, or deployments.
