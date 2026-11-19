@@ -1,13 +1,13 @@
 # Build from the repository root:
 # docker build -f TradeMate-main/apps/api/Dockerfile -t trademate-api:local .
-FROM node:22-bookworm-slim AS build
+FROM node:24-bookworm-slim AS build
 WORKDIR /app
 COPY TradeMate-main/apps/api/package*.json ./
 RUN npm install --include=dev --no-audit --no-fund
 COPY TradeMate-main/apps/api/ ./
 RUN npm run build
 
-FROM node:22-bookworm-slim AS runtime
+FROM node:24-bookworm-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY TradeMate-main/apps/api/package*.json ./
