@@ -285,3 +285,13 @@ This checklist records the source/configuration audit findings. Items are not co
 - [ ] Run full CI on the resulting commit before treating these changes as validated.
 - [ ] Continue the separate audit of Sports Transfer document access and all remaining organization-scoped actions. This notification fix does not certify document authorization.
 - [ ] No production database, service, or deployment was changed.
+
+## 27. Sports Transfer mandate revocation notification audience (2026-11-19)
+
+- [x] Reviewed organization mandate revocation notification recipients.
+- [x] Found the revocation notification query selected active owner/admin memberships but did not enforce membership start and expiry timestamps.
+- [x] Added both membership-window predicates, matching the invitation-acceptance and mandate-creation notification queries.
+- [x] Extended the database-backed mandate integration test to verify current owners/admins receive revocation notices and ordinary, expired, and future-dated members do not.
+- [ ] Run full CI on the resulting commit before treating this change as validated.
+- [ ] Continue authorization review for the complete Sports Transfer opportunity lifecycle and any future document routes.
+- [ ] No production services or database were changed.
