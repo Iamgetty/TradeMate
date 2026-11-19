@@ -195,7 +195,12 @@ test('Bybit book lifecycle applies ordered deltas, ignores duplicates, and recov
     assert.equal(book.bids[0].p, '99');
     assert.equal(book.bids[0].q, '5');
   } finally {
-    try { client.close(); } catch { /* already closed */ }
+    if (client.readyState !== WebSocket.CLOSED) {
+      await new Promise((resolve) => {
+        client.once('close', resolve);
+        client.terminate();
+      });
+    }
     lifecycleDetach();
     if (lifecycleServer.listening) await new Promise((resolve) => lifecycleServer.close(resolve));
   }
