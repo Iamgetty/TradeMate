@@ -98,18 +98,22 @@ test('CoinGecko metadata helper loads before the app and reports a successful re
   )).toBe('fresh');
 });
 
-test('the core app still renders when the optional market metadata helper is unavailable', async ({ page }) => {
+test('the core app remains available and skips CoinGecko when its metadata helper is unavailable', async ({ page }) => {
   await isolateApi(page);
+  let metadataRequests = 0;
   await page.route('**/tm/market-metadata.js*', route => route.abort());
-  await page.route('https://api.coingecko.com/**', route => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: '[]',
-  }));
+  await page.route('https://api.coingecko.com/**', route => {
+    metadataRequests += 1;
+    return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
 
   await page.goto('/app');
   await expectPublicLanding(page);
   await expect(page.locator('main[role="alert"]')).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() =>
+    (window as Window & { tmMarketMetadataStatus?: { state: string } }).tmMarketMetadataStatus?.state,
+  )).toBe('unavailable');
+  expect(metadataRequests, 'the unguarded legacy provider fallback must not run').toBe(0);
 });
 
 test('the core app still renders when the optional exchange-feed browser helper is unavailable', async ({ page }) => {
