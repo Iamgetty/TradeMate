@@ -74,7 +74,7 @@ test('Bybit order-book deltas require consecutive documented update IDs', () => 
   assert.equal(marketFeedSequenceAction(100, 101, undefined, 'incremental'), 'apply');
   assert.equal(marketFeedSequenceAction(100, 102, undefined, 'incremental'), 'resync');
   assert.equal(marketFeedSequenceAction(100, 100, undefined, 'incremental'), 'ignore');
-  assert.equal(marketFeedSequenceAction(100, 1, undefined, 'incremental'), 'resync');
+  assert.equal(marketFeedSequenceAction(100, 1, undefined, 'incremental'), 'ignore'); // handler separately treats Bybit's documented reset marker as resync
   assert.equal(marketFeedSequenceAction(null, 101, undefined, 'incremental'), 'resync');
 });
 
