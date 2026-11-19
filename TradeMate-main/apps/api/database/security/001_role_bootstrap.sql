@@ -110,6 +110,8 @@ GRANT SELECT (user_id) ON TABLE public.user_sessions, public.user_credentials,
   public.user_preferences, public.user_notifications TO trademate_worker;
 GRANT UPDATE (sender_user_id, sender_type) ON TABLE public.support_ticket_messages TO trademate_worker;
 GRANT SELECT (sender_user_id) ON TABLE public.support_ticket_messages TO trademate_worker;
+-- sender_type is read by the anonymisation CASE expression as well as updated.
+GRANT SELECT (sender_type) ON TABLE public.support_ticket_messages TO trademate_worker;
 GRANT UPDATE (accepted_by_user_id) ON TABLE public.marketplace_contracts TO trademate_worker;
 GRANT SELECT (accepted_by_user_id) ON TABLE public.marketplace_contracts TO trademate_worker;
 GRANT INSERT ON TABLE public.audit_events TO trademate_worker;
