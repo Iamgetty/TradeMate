@@ -64,11 +64,16 @@ This checklist records the source/configuration audit findings. Items are not co
 
 ## 7. Pull-request and branch reconciliation
 
-- [ ] Reconcile PR #216 with section 1 before considering merge.
-- [ ] Reconcile Sports Transfer PR #213 with stacked PRs #171, #172, and #173; do not merge the chain blindly.
-- [ ] Reassess PRs #176, #147, #146, #142, #134, #131, #130 against current `main`; identify superseded or conflicting work.
-- [ ] Keep already-merged PRs #209, #214, #215, and #218 closed/merged; do not recreate their changes unnecessarily.
-- [ ] Confirm each remaining PR's base, head, changed files, conflicts, and current CI status before action.
+- [x] Refresh open-PR inventory on 2026-11-19 (GitHub mergeability snapshot; mergeability can change):
+  - #216 open, mergeable, overlaps migration/profile changes; #219 supersets the migration manifest guard and RLS fixture fix. Keep #216 unmerged pending explicit housekeeping approval.
+  - #213 open, mergeable, targets `main`; review its governance reconciliation before any Sports Transfer merge.
+  - #171 open, not mergeable, targets `main`; #172 and #173 remain stacked on #171/#172 respectively. Do not merge the chain blindly.
+  - #176, #147, #142, #131, and #130 open, not mergeable.
+  - #146 and #134 open, mergeable; still require content/overlap/CI review before merge.
+  - #209, #214, #215, and #218 remain previously merged.
+- [ ] Inspect the changed files and current checks for #213, #146, and #134; determine whether any are superseded by newer work.
+- [ ] Reassess non-mergeable PRs #176, #147, #171, #172, #173, #142, #131, and #130; decide rebase, retarget, close, or retain only after explicit approval.
+- [ ] No PR merge, close, retarget, or branch deletion without explicit approval.
 
 ## 8. AWS/Cloudflare migration readiness — no cutover yet
 
