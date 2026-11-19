@@ -710,3 +710,102 @@ See [`sports-transfer-guardian-safeguarding.md`](sports-transfer-guardian-safegu
 8. Complete football and basketball-specific validation, minors safeguarding, privacy/security threat modelling, penetration testing, delivery failure testing, legal review and staged live acceptance.
 
 **Release gate:** no player may be described as personally available/consenting or represented solely because an external source lists them; no private contact details are exposed to clubs; no unverified contact route is treated as a successful notification; no agent receives authority without a verified, active player mandate; no minor is exposed to unapproved direct contact.
+
+
+---
+
+## Global technology and security standard — mandatory cross-stack roadmap
+
+**Strategic direction:** TradeMate is being built for a global standard. Every stack and subsystem must be selected and engineered for best-in-class security, resilience, performance, scalability, interoperability, privacy, accessibility, observability and maintainability. Choose technologies based on independently supportable capability, threat fit, regional coverage, integration, data residency, lifecycle cost and exit strategy—not familiarity or lowest initial price. Keep provider-neutral interfaces where practical.
+
+This is a roadmap commitment and target architecture, not a claim that products have been purchased, configured, deployed or certified. Vendor names are evaluation candidates only. This entry does not change production configuration, services, secrets, databases, deployments, subscriptions or integrations.
+
+### Governance, standards and assurance
+- [ ] Establish a complete asset inventory, data classification, data-flow maps, trust boundaries, threat models and risk register covering web/mobile, APIs, identity, trading/MT5, payments, data, cloud, workforce, CI/CD, vendors and support operations.
+- [ ] Adopt NIST Cybersecurity Framework 2.0 for governance; CIS Controls v8.1 for prioritized safeguards; OWASP ASVS Level 2 baseline with selected Level 3 controls for critical trading/admin functions; OWASP API Security Top 10; MITRE ATT&CK; and Zero Trust principles.
+- [ ] Establish secure SDLC, privacy impact reviews, security architecture reviews, vulnerability disclosure/response, incident command, tabletop exercises, remediation SLAs and evidence-based release gates.
+- [ ] Map applicable financial, privacy, consumer, AML/KYC, sanctions and data-residency obligations by operating jurisdiction with qualified legal/compliance review. Do not claim certification or regulatory approval without independent evidence.
+
+### Edge, firewall, network and API protection
+- [ ] Evaluate Cloudflare Enterprise WAAP capabilities (WAF/managed rules, DDoS, bot management, API discovery/protection, rate limiting, abuse controls, client-side security and Zero Trust access) against leading alternatives and measured requirements.
+- [ ] Protect every intended public endpoint; prevent direct-origin bypass with restricted ingress and authenticated origin connectivity/mTLS or equivalent where supported.
+- [ ] Apply deny-by-default ingress/egress, least-privilege service networking, private data services, strong identity-aware administrative access and strict environment separation.
+- [ ] Maintain API inventory/schema contracts; enforce authentication, object/function/property-level authorization, quotas, payload limits, idempotency/replay protection, safe errors and data minimization.
+- [ ] Harden registrar/DNS accounts, DNSSEC where supported, TLS/certificate lifecycle, HSTS and certificate-expiry monitoring.
+- [ ] Adversarially test DDoS, bot abuse, credential stuffing, scraping, injection, SSRF, request smuggling and origin bypass.
+
+### Identity, phishing, account and privileged-access protection
+- [ ] Require phishing-resistant MFA/passkeys or hardware security keys for privileged users and developers; evaluate YubiKey/FIDO2 and equivalent options.
+- [ ] Evaluate Microsoft Entra ID or equivalent workforce identity, conditional access, device posture, just-in-time privilege and privileged identity management.
+- [ ] Evaluate Proofpoint or equivalent email security for phishing, impersonation/BEC, malicious links and attachments.
+- [ ] Enforce SPF, DKIM and DMARC with monitored staged enforcement; protect registrar, DNS, email administration and account recovery channels.
+- [ ] Harden customer authentication: strong password hashing, breached-password checks, MFA/passkeys, anti-enumeration, credential-stuffing protection, session rotation/revocation, device/session visibility, risk-based step-up and safe recovery.
+- [ ] Require dual control and out-of-band verification for high-impact admin, payout, credential rotation and account-recovery actions. Never rely on email alone for high-impact recovery.
+- [ ] Evaluate enterprise password/secrets vaults such as 1Password Business or equivalent; prohibit secrets in source, tickets, logs, chat and build artifacts.
+
+### Endpoint, malware, ransomware and workforce security
+- [ ] Evaluate CrowdStrike Falcon against Microsoft Defender XDR/Endpoint and equivalent EDR for endpoint coverage, malware/ransomware prevention, threat hunting, containment, forensic retention, OS support and total cost. Select a coherent primary platform; avoid ungoverned overlapping agents.
+- [ ] Require managed-device baselines, disk encryption, secure boot, timely patching, endpoint firewall, EDR health monitoring, least privilege, application control and secure remote access.
+- [ ] Protect developer endpoints, CI runners, build agents, support workstations and machines with production/trading credentials.
+- [ ] Establish role-specific phishing training, reporting and rapid credential/session revocation.
+- [ ] Scan and quarantine uploaded files; isolate risky document/archive processing and never execute untrusted content on application hosts.
+
+### Application, database, data and cryptographic security
+- [ ] Complete PostgreSQL least-privilege roles and RLS remediation. Prove identity integrity against caller-settable context, bootstrap access, worker paths, anonymous/pre-session flows and cross-tenant access with adversarial real-PostgreSQL tests. Keep production RLS disabled until design and staged rollout are validated.
+- [ ] Classify/minimize sensitive data; encrypt in transit and at rest; separate key management, rotate keys and audit access. Evaluate managed KMS/HSM and envelope encryption for high-value keys.
+- [ ] Review password, session, reset, verification, TOTP, API-token, MT5 and provider credential storage; use purpose-specific secrets, least privilege, short lifetimes, rotation and revocation. Never expose broker credentials to browsers or general logs.
+- [ ] Enforce ownership/tenant authorization at every sensitive boundary; test horizontal/vertical privilege escalation and IDOR.
+- [ ] Defend against SQL/command injection, XSS, CSRF, SSRF, deserialization, path traversal, prototype pollution, race conditions, upload abuse and business-logic fraud.
+- [ ] Protect audit records from alteration/deletion; log security-sensitive actions with trusted timestamps, restricted access and privacy-aware retention.
+- [ ] Establish DLP/export controls, retention/deletion rules, encrypted immutable/offline backups, restore drills and documented RPO/RTO.
+- [ ] Redact passwords, tokens, keys, payment credentials and MT5 secrets from logs, traces, analytics and error reports.
+
+### Trading, MT5 and financial transaction security
+- [ ] Threat-model broker/MT5 connectivity, terminal/bridge services, account linking, credential storage, order routing, market data and webhooks.
+- [ ] Isolate trading connectors and credentials by user/account/environment; enforce least privilege, encryption, rotation, revocation and broker-side permission limits where available.
+- [ ] Enforce server-side order authorization, ownership, trading permissions, exposure/position and order-size limits, market/price validation, idempotency, replay protection, rate limits and circuit breakers.
+- [ ] Separate read-only market access from order execution and administrative override privileges; require explicit intent and step-up verification for high-impact actions.
+- [ ] Maintain tamper-evident order, risk-check, broker-response and operator audit trails; reconcile internal and broker state and alert on divergence.
+- [ ] Build kill switches, safe degradation, duplicate-order prevention, stale-price controls and tested recovery. Fail closed when execution safety cannot be established.
+- [ ] Test credential theft, account substitution, order manipulation, replay, duplicate execution, authorization bypass and compromised connectors.
+
+### Cloud, containers, infrastructure and resilience
+- [ ] Review Render, Cloudflare and any AWS target under one security baseline; verify live configuration rather than inferring it from repository declarations.
+- [ ] Separate dev/test/staging/production identities, projects, networks, secrets, data and deployment permissions.
+- [ ] Evaluate cloud security posture/workload protection, private networking, egress controls, audit logs, backup isolation and policy-as-code.
+- [ ] Harden containers: minimal pinned images, non-root execution, least capabilities, read-only filesystems where possible, resource limits, image scanning, signatures and provenance.
+- [ ] Restrict admin panels, databases, metrics, debug routes and internal services; remove unnecessary public exposure.
+- [ ] Define availability, regional failure handling, tested rollback, disaster recovery, capacity controls and resilience exercises. No provider cutover until security, migration, observability and rollback are proven.
+
+### Secure software supply chain and developer workflow
+- [ ] Evaluate GitHub Advanced Security/CodeQL or equivalent SAST, secret scanning/push protection, dependency/SCA, license and vulnerability controls.
+- [ ] Add container, IaC, workflow and artifact scanning; generate/retain SBOMs and build provenance.
+- [ ] Require protected branches, mandatory reviews, signed release provenance, least-privilege CI identities, short-lived OIDC credentials and protected deployment environments.
+- [ ] Isolate untrusted PR execution from secrets/privileged runners; pin third-party actions and review workflow permissions.
+- [ ] Require deterministic builds, lockfiles, artifact integrity verification and promotion of tested immutable artifacts.
+- [ ] Define severity-based vulnerability SLAs, patch windows, exception expiry and emergency response.
+
+### Security operations, threat detection and incident response
+- [ ] Evaluate Microsoft Sentinel, Splunk Enterprise Security, Datadog Security Monitoring or equivalent SIEM/security analytics based on coverage, detection quality, response workflows, data residency, scale and cost.
+- [ ] Centralize relevant edge, identity, endpoint, cloud, API, database, CI/CD and trading events with synchronized time, restricted access, retention and tamper resistance.
+- [ ] Detect account takeover, risky logins, privilege escalation, leaked secrets, unusual database access, API abuse, malware, suspicious deployments, MT5 credential misuse and anomalous trading.
+- [ ] Define severity-based alerting, escalation/on-call ownership, evidence preservation and tested containment playbooks.
+- [ ] Maintain incident runbooks for ransomware, phishing/BEC, leaked secrets, database/cloud compromise, DDoS, insider threats, supply-chain compromise and trading abuse; exercise them regularly.
+
+### Independent validation and release gates
+- [ ] Perform recurring independent penetration tests for perimeter, web/API, identity, cloud, database, trading/MT5 and business logic.
+- [ ] Add SAST, SCA, secret scanning, IaC/container scanning, DAST, API tests, fuzzing and adversarial authorization tests to CI/CD where appropriate.
+- [ ] Track every finding with evidence, severity, owner, remediation, retest and closure approval.
+- [ ] Block releases for unresolved critical/high-risk exploitable findings, broken tenant isolation, exposed secrets, unsafe trading authorization or unproven recovery. Exceptions require documented risk acceptance, compensating controls, owner and expiry.
+- [ ] Assess ISO 27001 and SOC 2 readiness when control scope and evidence support it; assess PCI DSS only if actual payment-data scope requires it.
+
+### Technology selection and implementation rules
+1. Inventory current controls and threats before procurement; do not buy tools before requirements and gaps are known.
+2. Compare leading providers on efficacy, independent evidence, regional coverage, integration, privacy/data residency, resilience, support, contractual terms, portability and lifecycle cost.
+3. Choose the best fit per capability; no vendor is presumed best at every layer and more products do not automatically mean more security.
+4. Prefer managed capabilities where they demonstrably improve protection and response, while retaining independent controls and tested exit plans.
+5. Roll out through design review, isolated proof of concept, adversarial tests, staging validation and controlled production change with rollback.
+6. Record decisions, rationale, owner, dependencies, costs, runbooks, evidence and review dates.
+7. No production firewall/DNS/identity setting, endpoint agent, database role/policy, secret, vendor subscription, deployment or cutover is changed by this roadmap entry; each requires its own reviewed implementation and authorization.
+
+**Completion criterion:** TradeMate does not claim global security because it uses named products. Material threats must have layered preventive, detective, responsive and recovery controls, tested under realistic adversarial conditions, continuously monitored and independently assessed where appropriate.
