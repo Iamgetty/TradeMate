@@ -105,8 +105,13 @@ GRANT UPDATE (email, phone_e164, display_name, preferred_locale, country_code, t
 GRANT UPDATE (cancellation_token_hash) ON TABLE public.user_deletion_requests TO trademate_worker;
 GRANT DELETE ON TABLE public.user_sessions, public.user_credentials,
   public.user_preferences, public.user_notifications TO trademate_worker;
+-- PostgreSQL also requires SELECT on columns referenced by DELETE/UPDATE predicates.
+GRANT SELECT (user_id) ON TABLE public.user_sessions, public.user_credentials,
+  public.user_preferences, public.user_notifications TO trademate_worker;
 GRANT UPDATE (sender_user_id, sender_type) ON TABLE public.support_ticket_messages TO trademate_worker;
+GRANT SELECT (sender_user_id) ON TABLE public.support_ticket_messages TO trademate_worker;
 GRANT UPDATE (accepted_by_user_id) ON TABLE public.marketplace_contracts TO trademate_worker;
+GRANT SELECT (accepted_by_user_id) ON TABLE public.marketplace_contracts TO trademate_worker;
 GRANT INSERT ON TABLE public.audit_events TO trademate_worker;
 
 DO $$
