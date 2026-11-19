@@ -672,3 +672,35 @@ Sources rechecked on the remediation branch: apps/api/src/module.ts (authenticat
 - [ ] Add an adversarial test proving that setting or changing `app.user_id` alone cannot access another user's rows; include token-A/user-B mismatch, expired/revoked sessions, pooled requests and explicit transaction boundaries.
 - [ ] Review function ownership, fixed safe `search_path`, PUBLIC EXECUTE revocation, role grants, secret exposure and SECURITY DEFINER risks before adopting any capability function.
 - [x] No policy, migration, role, production database, service, deployment or application behavior was changed in this review.
+
+
+## 54. Candidate transaction-bound identity bootstrap design (2026-11-19)
+
+### Observed integration constraints
+
+- [x] The API request middleware currently retains only the SHA-256 digest of the presented session cookie in AsyncLocalStorage. The pool wrapper opens a transaction for each ordinary query and initializes context after BEGIN for explicit transactions.
+- [x] The existing session lookup validates the digest against an unexpired session joined to an active user. It is performed before setting app.user_id.
+- [x] The existing database-context unit test checks transaction-local setup, explicit transaction reuse, concurrent request isolation, and malformed-cookie fail-closed behavior. Its mock does not establish database-side resistance to caller-settable identity values.
+- [x] The API has a separate unwrapped health-check pool in DatabaseService; do not assume that it has the same request context or should gain access to protected user rows.
+
+### Preferred design to prototype (not yet implemented)
+
+1. Create a dedicated non-login, non-superuser owner for a private authorization schema and its context table. The runtime role receives no direct schema/table access; the migration owner creates and owns the objects. Do not reuse the broad application role as the function owner.
+2. Expose one narrowly scoped SECURITY DEFINER bootstrap function. It accepts only the presented high-entropy session-token digest (never a user_id), validates that digest against user_sessions and an active users row, and records the derived user ID in the private context table for the current backend and current transaction. Empty/invalid/expired/revoked proof records an anonymous context or fails closed. The function must not return credentials, hashes, or arbitrary user records.
+3. Key the protected context by backend PID plus the current transaction ID (and include postmaster-start identity if needed to make backend PID reuse unambiguous). Upsert the current backend's row on each transaction; policy lookup must require an exact current-transaction match. Stale rows must never authorize a later transaction. Define bounded cleanup for abandoned backend rows.
+4. Expose a second narrowly scoped SECURITY DEFINER helper used by RLS policies. It reads only the private context row for the current backend and transaction. Policies compare row ownership against this helper, not app.user_id or app.session_token_hash. Directly setting either GUC must have no authorization effect.
+5. Call bootstrap immediately after BEGIN in both ordinary-query and checked-out-client transaction paths. Preserve the existing single-transaction semantics and ensure COMMIT, ROLLBACK, release-on-error, and pool reuse cannot carry identity into another transaction. The digest must be supplied from AsyncLocalStorage as a bound parameter, never copied into a caller-settable GUC.
+6. Restrict function EXECUTE grants to the runtime role as required; revoke PUBLIC execution. Fix search_path to trusted schemas, fully qualify referenced objects, audit every function owner and grant, and ensure the private schema/table cannot be read or mutated by the runtime role. No dynamic SQL or caller-controlled object names.
+
+### Important limits and required proof
+
+- [ ] This is a candidate design, not a security certification. Verify PostgreSQL version support for transaction-ID and backend identity functions on the target database before choosing exact SQL.
+- [ ] Confirm SECURITY DEFINER ownership and grants cannot be reached through role membership, object ownership, PUBLIC privileges, or writable schemas. Verify the helper cannot be shadowed and that function volatility/parallel-safety declarations are correct.
+- [ ] Confirm session-token digests are treated as bearer-equivalent proof if exposed; do not log bootstrap parameters. Review PostgreSQL statement/parameter logging and error paths before implementation.
+- [ ] Test direct forged app.user_id and app.session_token_hash values, wrong/unknown digest, expired/revoked session, suspended user, token A with attempted user B, anonymous access, concurrent pooled requests, explicit transactions, rollback, failed bootstrap, connection release and backend PID reuse.
+- [ ] Prove a caller cannot insert/update/delete private context rows or invoke any helper to select an arbitrary principal. A known valid session proof may authorize only its associated active user.
+- [ ] Keep pre-session auth operations separate from authenticated row context. Login, registration, verification, password reset, 2FA challenge and deletion cancellation must retain their existing narrow proof/transaction boundaries; do not grant broad table access to make them work under RLS.
+- [ ] Reconcile the private context function's own lookup privileges with RLS on user_sessions/users before enabling any policy; avoid a circular bootstrap dependency.
+- [ ] Add real PostgreSQL integration tests under SET ROLE trademate_app. The existing mock-only database-context tests are insufficient for this boundary.
+
+- [x] No implementation, migration, policy, role, production database, service, deployment or application behavior was changed in this design pass.
