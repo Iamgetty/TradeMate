@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, randomInt, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { Pool } from 'pg';
 import type { PoolClient } from 'pg';
-import { createRlsAwarePool } from './database-context';
+import { createRlsAwarePool, sessionTokenFromCookieHeader } from './database-context';
 import { decodeProfileImageDataUrl, hasMatchingUploadSignature } from './upload-validation';
 import { decimalToUnits, fiatCentsToQuantityUnits, productToFiatCents, unitsToDecimal } from './p2p-decimal';
 import { renderTradeMateEmail } from './email-templates';
@@ -123,10 +123,7 @@ const sendTransactionalEmail = async (to: string, subject: string, html: string)
 };
 
 const cookieOptions = () => ({ httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/', maxAge: SESSION_DAYS * 24 * 60 * 60 * 1000 });
-const sessionTokenFrom = (request: Request) => {
-  const cookie = request.headers.cookie?.split(';').map((part) => part.trim()).find((part) => part.startsWith(SESSION_COOKIE + '='));
-  return cookie ? decodeURIComponent(cookie.slice(SESSION_COOKIE.length + 1)) : '';
-};
+const sessionTokenFrom = (request: Request) => sessionTokenFromCookieHeader(request.headers.cookie);
 const databasePool = process.env.DATABASE_URL
   ? createRlsAwarePool(new Pool({
       connectionString: process.env.DATABASE_URL,
