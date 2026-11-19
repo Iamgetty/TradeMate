@@ -10,7 +10,7 @@ This checklist records the source/configuration audit findings. Items are not co
 - [x] Update `updateMyProfile()` in `apps/api/src/module.ts` so every profile-row insert satisfies the username NOT NULL constraint and username uniqueness rules.
 - [x] Update the `test-rls-pilot.js` fixture to provide a valid username after migration 024.
 - [x] Add a regression test that compares migration files with the runner's applied migration list, so future migrations cannot silently be skipped (runner fails fast on manifest mismatch).
-- [x] Run clean-database migration integration tests and profile create/update tests (CI run `44409164204`, all 8 jobs passed, including the full database integration and browser acceptance jobs).
+- [x] Run clean-database migration integration tests and profile create/update tests (CI run `44425744634`, all 8 jobs passed, including the full database integration and browser acceptance jobs).
 - [x] Review PR #216 against this branch's fix: it overlaps the migration registration and profile username insert, but omits the manifest guard and RLS fixture update. PR #219 contains the superset; leave #216 open and unmerged pending explicit PR housekeeping approval.
 
 ## 2. Database backup and restore verification — urgent operational item
@@ -43,7 +43,7 @@ This checklist records the source/configuration audit findings. Items are not co
 
 - [x] Create the initial source-level feature-to-endpoint acceptance matrix at `TradeMate-main/docs/feature-endpoint-acceptance-matrix-2026-11-19.md`; detailed workflow tests and provider/runtime acceptance remain open.
 - [ ] Test each claimed server-backed workflow against the real API contract and persisted state.
-- [ ] Verify the new NFT provider timeout/resilience tests in CI; `/api/nfts` and `/api/nft-collections` now apply 8-second abort timeouts to all OpenSea requests, with route-level tests added.
+- [x] Verify the new NFT provider timeout/resilience tests in CI; all five route-level tests passed in CI run `44425744634` browser acceptance job (39 E2E tests passed total). `/api/nfts` and `/api/nft-collections` apply 8-second abort timeouts to all OpenSea requests.
 - [ ] Clearly label or disable incomplete flows until their backend/provider and security controls exist: KYC submission, crypto/fiat deposits, transfers/withdrawals, wallet funding, B2B subaccounts, social OAuth linking, referral rewards, promotion participation, advertising request submission, TradeMate Card, and unconfigured fee rates.
 - [ ] Ensure sample Portfolio Manager values and synthetic Contract Scout sparklines are not presented as real user balances or suitability recommendations.
 - [ ] Test on representative desktop and mobile viewports; record failures with reproducible steps.
