@@ -1,7 +1,8 @@
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, HttpCode, HttpException, HttpStatus, Module, NotFoundException, OnModuleDestroy, Param, Post, Patch, Delete, Query, Req, Res, UnauthorizedException } from '@nestjs/common';
-import type { Request, Response } from 'express';
+import type { Request } from 'express';
 import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, randomInt, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { Pool } from 'pg';
+import type { PoolClient } from 'pg';
 import { createRlsAwarePool } from './database-context';
 import { decimalToUnits, fiatCentsToQuantityUnits, productToFiatCents, unitsToDecimal } from './p2p-decimal';
 import { renderTradeMateEmail } from './email-templates';
@@ -168,7 +169,7 @@ class HealthController {
 @Controller('auth')
 class AuthController {
   @Post('register')
-  async register(@Body() body: { email?: string; password?: string; displayName?: string }, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+  async register(@Body() body: { email?: string; password?: string; displayName?: string }, @Req() request: Request, @Res({ passthrough: true })) {
     parseBody(registerBodySchema, body);
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
@@ -2411,7 +2412,7 @@ class MarketplaceTradesController {
 
 @Controller('p2p')
 class P2PMarketController {
-  private async writeP2PAudit(client: any, actorId: string, eventType: string, entityType: string, entityId: string, metadata: Record<string, unknown> = {}) {
+  private async writeP2PAudit(client: PoolClient, actorId: string, eventType: string, entityType: string, entityId: string, metadata: Record<string, unknown> = {}) {
     await client.query(
       'INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, $2, $3, $4, $5::jsonb)',
       [actorId, eventType, entityType, entityId, JSON.stringify(metadata)],
@@ -2474,18 +2475,18 @@ class P2PMarketController {
   }
 
   @Post('ads')
-  async createAd(@Req() request: Request, @Body() body: any) {
-    parseBody(p2pAdBodySchema, body);
+  async createAd(@Req() request: Request, @Body() body: unknown) {
+    const input = parseBody(p2pAdBodySchema, body);
     const userId = await this.authenticatedUser(request);
-    const side = String(body?.side || '').toLowerCase(), asset = String(body?.asset || '').trim().toUpperCase(), fiat = String(body?.fiat || '').trim().toUpperCase();
+    const side = String(input?.side || '').toLowerCase(), asset = String(input?.asset || '').trim().toUpperCase(), fiat = String(input?.fiat || '').trim().toUpperCase();
     let priceUnits: bigint, quantityUnits: bigint, minCents: bigint, maxCents: bigint;
     try {
-      priceUnits = decimalToUnits(body.price, 10, 'Price');
-      quantityUnits = decimalToUnits(body.quantity, 12, 'Quantity');
-      minCents = decimalToUnits(body.minFiatAmount ?? '0', 2, 'Minimum fiat amount');
-      maxCents = body.maxFiatAmount === undefined ? productToFiatCents(priceUnits, quantityUnits) : decimalToUnits(body.maxFiatAmount, 2, 'Maximum fiat amount');
+      priceUnits = decimalToUnits(input.price, 10, 'Price');
+      quantityUnits = decimalToUnits(input.quantity, 12, 'Quantity');
+      minCents = decimalToUnits(input.minFiatAmount ?? '0', 2, 'Minimum fiat amount');
+      maxCents = input.maxFiatAmount === undefined ? productToFiatCents(priceUnits, quantityUnits) : decimalToUnits(input.maxFiatAmount, 2, 'Maximum fiat amount');
     } catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Enter valid P2P amounts.'); }
-    const methods = Array.isArray(body?.paymentMethods) ? body.paymentMethods.map((v: unknown) => String(v).trim()).filter(Boolean) : [];
+    const methods = Array.isArray(input?.paymentMethods) ? input.paymentMethods.map((v: unknown) => String(v).trim()).filter(Boolean) : [];
     if (!['buy','sell'].includes(side) || !/^[A-Z0-9]{2,16}$/.test(asset) || !/^[A-Z]{3}$/.test(fiat)) throw new BadRequestException('Choose a valid side, asset and fiat currency.');
     const totalCents = productToFiatCents(priceUnits, quantityUnits);
     if (priceUnits <= 0n || quantityUnits <= 0n || minCents < 0n || maxCents < minCents || maxCents <= 0n || maxCents > totalCents) throw new BadRequestException('Enter valid price, quantity and fiat limits.');
@@ -2535,9 +2536,9 @@ class P2PMarketController {
   @Post('orders')
   async placeOrder(@Req() request: Request, @Body() body: any) {
     parseBody(p2pOrderBodySchema, body);
-    const userId = await this.authenticatedUser(request), adId = String(body?.adId || '');
+    const userId = await this.authenticatedUser(request), adId = String(input?.adId || '');
     let fiatCents: bigint;
-    try { fiatCents = decimalToUnits(body.fiatAmount, 2, 'Fiat amount'); }
+    try { fiatCents = decimalToUnits(input.fiatAmount, 2, 'Fiat amount'); }
     catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Enter a valid fiat amount.'); }
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(adId) || fiatCents <= 0n) throw new BadRequestException('Choose an offer and enter a valid fiat amount.');
     const client = await databasePool!.connect();
@@ -2577,7 +2578,7 @@ class P2PMarketController {
   async paymentSent(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
     parseUuidParam(id);
     parseBody(p2pPaymentSentBodySchema, body);
-    const userId = await this.authenticatedUser(request), ref = typeof body?.reference === 'string' ? body.reference.trim() : '';
+    const userId = await this.authenticatedUser(request), ref = typeof input?.reference === 'string' ? input.reference.trim() : '';
     if (ref.length > 160) throw new BadRequestException('Reference is too long.');
     const client = await databasePool!.connect();
     try {
@@ -2647,7 +2648,7 @@ class P2PMarketController {
   async dispute(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
     parseUuidParam(id);
     parseBody(p2pDisputeBodySchema, body);
-    const userId = await this.authenticatedUser(request), reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
+    const userId = await this.authenticatedUser(request), reason = typeof input?.reason === 'string' ? input.reason.trim() : '';
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('id must be a valid order UUID.');
     if (reason.length < 5 || reason.length > 1000) throw new BadRequestException('Dispute reason must be 5 to 1,000 characters.');
     const client = await databasePool!.connect();
@@ -3300,9 +3301,8 @@ class SportsTransferIdentityController {
   async createProfile(@Req() request: Request, @Body() body: any) {
     const input = parseBody(sportsProfileCreateBodySchema, body);
     const userId = await this.currentUser(request);
+    const client = await databasePool!.connect();
     try {
-      const client = await databasePool!.connect();
-      try {
         await client.query('BEGIN');
         const result = await client.query(
           `INSERT INTO sports_profiles (user_id, sport, display_name, biography, primary_position, country_code)
@@ -3317,15 +3317,12 @@ class SportsTransferIdentityController {
         );
         await client.query('COMMIT');
         return { profile: result.rows[0], message: 'Your private Sports Transfer profile has been created.' };
-      } catch (error) {
-        await client.query('ROLLBACK').catch(() => undefined);
-        if ((error as { code?: string })?.code === '23505') throw new ConflictException('You already have a profile for this sport.');
-        throw error;
-      } finally {
-        client.release();
-      }
     } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      if ((error as { code?: string })?.code === '23505') throw new ConflictException('You already have a profile for this sport.');
       throw error;
+    } finally {
+      client.release();
     }
   }
 
@@ -3732,7 +3729,7 @@ class SportsTransferMandatesController {
     return result.rows[0].id as string;
   }
 
-  private async canRespond(client: any, mandate: any, userId: string) {
+  private async canRespond(client: any, mandate: Record<string, unknown>, userId: string) {
     if (mandate.representative_user_id) return mandate.representative_user_id === userId;
     const membership = await client.query(
       `SELECT role FROM sports_org_memberships
