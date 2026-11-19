@@ -595,3 +595,40 @@ Source reviewed: `apps/api/src/module.ts` authentication controller, including r
 - [ ] Catalog assertions for function owner, fixed safe `search_path`, `EXECUTE` grants, revoked `PUBLIC` access, no runtime secret/key reads, and no `BYPASSRLS` privilege.
 
 - [x] This section records observed SQL dependencies only. No application behavior, SQL policy, migration, role, production config, production data, service or deployment was changed.
+
+## 49. Authentication permission-matrix reconciliation against SQL statements (2026-11-19)
+
+Sources rechecked on the remediation branch: apps/api/src/module.ts (authentication controller, lines 130–850), migrations 001, 002, 003, 012, 015, 017, 020, 021, 022, and 023.
+
+### Confirmed schema facts
+
+- users has nullable email with a partial unique index on lower(email); status includes pending, active, suspended, closed, and deletion_pending.
+- user_credentials is one row per user and stores the password hash.
+- user_sessions stores a unique token digest, expiry, last-seen timestamp, and client metadata; session rows cascade on user deletion.
+- auth_rate_limits is keyed by key_hash, with a single mutable window/attempt/block row per key.
+- user_auth_security stores encrypted TOTP material, enabled/confirmation state, setup expiry, and monotonic last_totp_counter; its enabled-state constraint requires encrypted secret and confirmation timestamp.
+- auth_login_challenges, email_verification_codes, and password_reset_tokens store token/code digests, expiry and consumption/attempt state. Email verification and TOTP challenge attempts are capped at five by schema checks; reset tokens have no schema-level attempt column.
+- user_deletion_requests is one row per user, with a unique cancellation-token digest, scheduled time and cancellation timestamp.
+- audit_events is append-only: migration 020 installs ALWAYS-enabled mutation/truncate rejection triggers. Auth capabilities need INSERT, not UPDATE/DELETE/TRUNCATE.
+- user_notifications is a separate user-owned inbox table. organization_members is the source for the account-deletion owner check.
+
+### Reconciliation findings
+
+1. **Verification resend currently contains a cross-account cleanup predicate.** The resend transaction executes DELETE FROM email_verification_codes WHERE user_id = $1 OR expires_at <= now() OR used_at IS NOT NULL. The final two disjuncts delete expired/used codes belonging to every account, not just the account being resent. This is broader than the section 48 capability (rotate one-time code) and conflicts with a future owner-scoped operation boundary. The safe intended scope is the target user's rows; global cleanup should be a separate maintenance operation with its own explicit authority. This is a source-level finding; no behavior has been changed in this section.
+
+2. **Password-reset completion has an additional rate-limit dependency.** Before opening its transaction it upserts a token-digest-derived key in auth_rate_limits; section 48's password-reset completion row must include that operation. Within the transaction it updates the credential, deletes all user sessions, marks outstanding login challenges consumed, consumes the reset token, and appends an audit event. Those operations must remain atomic and user-scoped.
+
+3. **TOTP enable/disable consume rate-limit rows.** Both successful authenticated TOTP operations delete their own derived auth_rate_limits key after the locked security-row/counter operation. The TOTP capability therefore needs scoped deletion of the exact caller-derived key as well as the atomic upsert; it must not imply table-wide DELETE.
+
+4. **2FA completion also performs scoped rate-limit cleanup.** On success it deletes the TOTP-action key and password-stage key, then creates the session, notification and audit event in the same transaction. The operation boundary must not expose arbitrary rate-limit key deletion.
+
+5. **Session list/revoke and deletion request need distinct SQL scopes.** Session listing first resolves the presented session and then lists only unexpired sessions for that user; revocation locks the current session, deletes a target session constrained by both session ID and owner ID, and audits the returned row. Deletion request checks the user's password and organization-owner membership, upserts the user's cancellation request, deletes that user's sessions and audits in one transaction.
+
+### Required follow-up
+
+- [ ] Correct verification-resend cleanup so it cannot delete another user's verification rows; add a regression test with an unrelated user's expired/used code that must survive resend.
+- [ ] Amend section 48 to explicitly include reset-completion rate limiting, TOTP exact-key rate-limit deletion, 2FA exact-key cleanup, and separate session list/revoke SQL constraints.
+- [ ] Treat global expiry cleanup as a separate maintenance capability; do not hide it inside an anonymous account-specific operation.
+- [ ] Keep immutable audit table insert-only in all proposed auth grants/functions.
+
+- [x] This reconciliation pass was documentation-only. No application SQL, migration, database role, policy, production data, service, configuration, or deployment was changed.
