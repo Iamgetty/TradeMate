@@ -52,14 +52,16 @@
   css.id = 'tm-cs-css';
   css.textContent = [
     '.tm-cs{margin:0 16px 14px}',
-    '.tm-cs .tbn-s{min-height:0;grid-template-columns:1fr;align-content:start;align-items:start;gap:12px;padding:16px}',
-    '@media(min-width:700px){.tm-cs .tbn-s{padding:22px 28px;gap:14px}}',
+    /* extra bottom padding leaves room for the dots so they never sit on the chips */
+    '.tm-cs .tbn-s{min-height:0;grid-template-columns:1fr;align-content:start;align-items:start;gap:12px;padding:16px 16px 38px}',
+    '@media(min-width:700px){.tm-cs .tbn-s{padding:22px 28px 42px;gap:14px}}',
     '.tm-cs .tbn-list{flex-wrap:wrap}',
     '.tm-cs .tbn-chip b{font-weight:800}',
     '.tm-cs-tagrow{display:flex;align-items:center;justify-content:space-between;gap:10px}',
     '.tm-cs-chart svg{display:block;width:100%;height:84px;overflow:visible}',
     '.tm-cs-cap{display:flex;justify-content:space-between;gap:10px;margin-top:4px;font:500 10px "DM Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}',
     '.tm-cs .gl{stroke:var(--line);stroke-width:1;stroke-dasharray:3 4}',
+    '.tm-cs .zl{stroke:var(--mut);stroke-width:1;opacity:.55}',
     '.tm-cs .ln{fill:none;stroke:var(--am);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:var(--len);stroke-dashoffset:var(--len)}',
     '.tm-cs .ln.flat{stroke-dasharray:4 5;stroke-dashoffset:0;opacity:.55}',
     '.tm-cs .dot{fill:var(--am);opacity:0}',
@@ -127,7 +129,7 @@
   }
   // values: numbers; fromZero: scale from 0 (activity counts) instead of min..max (changes)
   function chart(values, fromZero, captionL, captionR) {
-    var W = 320, H = 84, T = 8, B = 6;
+    var W = 320, H = 84, T = 8, B = 6, X0 = 6;
     var wrap = el('div', 'tm-cs-chart');
     var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, preserveAspectRatio: 'none', 'aria-hidden': 'true' });
     [0.25, 0.6, 0.95].forEach(function (f) {
@@ -144,9 +146,13 @@
     for (var i = 0; i < m; i++) {
       var v = values[i];
       var y = flat ? (fromZero ? H - B : H / 2) : H - B - ((v - lo) / (hi - lo)) * (H - T - B);
-      pts.push([(i * W) / (m - 1), y]);
+      pts.push([X0 + (i * (W - 2 * X0)) / (m - 1), y]);
     }
     var d = smoothPath(pts);
+    if (!fromZero && !flat && lo < 0 && hi > 0) {
+      var zy = (H - B - ((0 - lo) / (hi - lo)) * (H - T - B)).toFixed(1);
+      svg.appendChild(sv('line', { x1: 0, x2: W, y1: zy, y2: zy, 'class': 'zl' }));
+    }
     var id = 'tmcs' + (++gid);
     var len = 0;
     for (var j = 1; j < pts.length; j++) len += Math.hypot(pts[j][0] - pts[j - 1][0], pts[j][1] - pts[j - 1][1]);
@@ -154,12 +160,11 @@
     if (!flat) {
       var defs = sv('defs', {});
       var g = sv('linearGradient', { id: id, x1: 0, y1: 0, x2: 0, y2: 1 });
-      g.appendChild(sv('stop', { offset: '0%', 'stop-color': 'currentColor', 'stop-opacity': '0.32' }));
-      g.appendChild(sv('stop', { offset: '100%', 'stop-color': 'currentColor', 'stop-opacity': '0' }));
+      g.appendChild(sv('stop', { offset: '0%', style: 'stop-color:var(--am)', 'stop-opacity': '0.32' }));
+      g.appendChild(sv('stop', { offset: '100%', style: 'stop-color:var(--am)', 'stop-opacity': '0' }));
       defs.appendChild(g);
       svg.appendChild(defs);
-      var area = sv('path', { d: d + ' L' + W + ',' + H + ' L0,' + H + ' Z', 'class': 'ar', fill: 'url(#' + id + ')' });
-      area.style.color = 'var(--am)';
+      var area = sv('path', { d: d + ' L' + (W - X0) + ',' + H + ' L' + X0 + ',' + H + ' Z', 'class': 'ar', fill: 'url(#' + id + ')' });
       svg.appendChild(area);
     }
     var line = sv('path', { d: d, 'class': 'ln' + (flat ? ' flat' : '') });
@@ -173,7 +178,7 @@
     wrap.appendChild(svg);
     var cap = el('div', 'tm-cs-cap');
     cap.appendChild(el('span', null, captionL));
-    cap.appendChild(el('span', null, flat ? 'No activity yet' : captionR));
+    cap.appendChild(el('span', null, captionR ? (flat ? 'No activity yet' : captionR) : ''));
     wrap.appendChild(cap);
     return wrap;
   }
@@ -291,9 +296,9 @@
           statChip(rows.length, 0, inst.cfg.word),
           statChip(up, 0, 'up'),
           statChip(rows.length - up, 0, 'down'),
-          statChip(Math.round(avg * 100) / 100, 2, 'avg 24h', true)
+          statChip(Math.round(avg * 100) / 100, 2, '% avg 24h', true)
         ];
-      } else capL = 'Waiting for prices\u2026';
+      } else { capL = 'Waiting for prices\u2026'; capR = ''; }
     } else {
       if (d && d !== 'error') {
         var vols = d.collections.map(function (c) { return Number(c.volume24h) || 0; }).filter(function (v) { return v > 0; }).sort(function (a, b) { return b - a; });
@@ -421,7 +426,7 @@
   function render(inst, settled) {
     var keep = inst.track.scrollLeft;
     inst.track.textContent = '';
-    [slideCategory(inst), slideTop(inst), slidePromo(inst)].forEach(function (s, i) {
+    [slideCategory(inst), slideTop(inst), slidePromo(inst)].forEach(function (s) {
       if (settled) { s.classList.add('done'); countFinal(s); }
       inst.track.appendChild(s);
     });
@@ -545,9 +550,12 @@
     if (sig === inst.sig) return;
     inst.sig = sig;
     inst.data = rows;
-    render(inst, inst.root.getAttribute('data-ready') === '1');
+    var settled = inst.root.getAttribute('data-ready') === '1';
+    render(inst, settled);
     inst.root.setAttribute('data-ready', '1');
     inst.track.scrollLeft = inst.index * inst.track.clientWidth;
+    // the slides were just rebuilt: play the active one now (the next redraw may be seconds away)
+    if (!settled) setActive(inst, inst.index);
   }
 
   // Auto-advance every 5s; pauses while the person is interacting or the tab is hidden.
