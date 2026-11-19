@@ -8,6 +8,7 @@ on:
       - "infra/aws/**"
       - ".github/workflows/aws-infrastructure-validation.yml"
       - ".github/workflows/aws-staging-foundation-change-set.yml"
+      - ".github/workflows/aws-staging-migration-task.yml"
   workflow_dispatch:
 
 permissions:
