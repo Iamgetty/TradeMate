@@ -451,3 +451,12 @@ This checklist records the source/configuration audit findings. Items are not co
 - [ ] Delivery-policy follow-up: the feed endpoint deliberately uses `Content-Disposition: inline` for every allowed format, including PDF and audio. Decide explicitly whether PDFs/audio should remain inline or use attachment download behavior; add HTTP response-header tests for each allowed type and ensure the product's preview/download UX matches the policy. Do not change behavior without confirming the intended feed experience.
 - [ ] Defense-in-depth follow-up: signature checks are header/container checks, not full media decoding or malware scanning. Consider image decode/re-encode and isolated PDF inspection before treating uploaded bytes as fully trusted. Keep this separate from MIME spoofing prevention already implemented.
 - [x] No further upload write paths were found in the inspected API module. No production data, services, deployments, or infrastructure were changed.
+
+
+## 42. API request-body limit and upload-route isolation review (2026-11-19)
+
+- [x] Inspected the API bootstrap in `apps/api/src/main.ts`: Nest's default body parser is disabled and one Express JSON parser is mounted globally with a `28mb` limit before the API controllers and market-feed attachment handler are registered.
+- [x] The large limit is intentional for the current feed contract: up to four attachments are Base64-encoded inside JSON, so their encoded representation plus JSON metadata can approach the global limit. The same 28 MiB allowance currently applies to unrelated JSON endpoints, not only feed uploads.
+- [ ] Hardening follow-up: isolate the larger parser allowance to the exact feed-upload route and apply a substantially smaller default JSON limit to all other API routes. Preserve the four-file and per-file limits, account for Base64 expansion and metadata, and ensure the feed route is parsed exactly once. Add HTTP tests proving an oversized ordinary API request is rejected while a maximum-valid feed upload still succeeds.
+- [ ] Before changing parser order, trace the raw HTTP market-feed handler and Nest route registration/middleware ordering; a parser mounted globally before route dispatch cannot be safely narrowed by simply adding another parser later. Do not reduce the global limit until route-specific parsing and the max-valid upload case are covered.
+- [x] No source behavior changed in this review. No runtime tests were run. No production data, services, deployments, or infrastructure were changed.
