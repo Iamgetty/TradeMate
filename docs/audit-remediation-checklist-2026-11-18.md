@@ -10,7 +10,7 @@ This checklist records the source/configuration audit findings. Items are not co
 - [x] Update `updateMyProfile()` in `apps/api/src/module.ts` so every profile-row insert satisfies the username NOT NULL constraint and username uniqueness rules.
 - [x] Update the `test-rls-pilot.js` fixture to provide a valid username after migration 024.
 - [x] Add a regression test that compares migration files with the runner's applied migration list, so future migrations cannot silently be skipped (runner fails fast on manifest mismatch).
-- [x] Run clean-database migration integration tests and profile create/update tests (CI run `44425744634`, all 8 jobs passed, including the full database integration and browser acceptance jobs).
+- [x] Run clean-database migration integration tests and profile create/update tests (CI run `44425744634`, all 8 jobs passed). Revalidated the complete migration integration and browser acceptance jobs on latest branch commit `218c9d0b02f76aa0880d8f80380019f075255fe1` in CI run `44429637981` (8/8 jobs passed).
 - [x] Review PR #216 against this branch's fix: it overlaps the migration registration and profile username insert, but omits the manifest guard and RLS fixture update. PR #219 contains the superset; leave #216 open and unmerged pending explicit PR housekeeping approval.
 
 ## 2. Database backup and restore verification — urgent operational item
@@ -29,7 +29,7 @@ This checklist records the source/configuration audit findings. Items are not co
 - [ ] Review whether web health checks should use a lightweight web liveness endpoint; do not point web at the API health endpoint without confirming service boundaries.
 - [x] Verify API health route mapping: Nest applies the `/api` global prefix, so Render's `/api/health` maps to the liveness-only `HealthController.health()` route. `/api/health/database` separately performs `SELECT 1`; it is database readiness/diagnostics, not the configured liveness check.
 - [ ] Decide whether API deployment readiness should depend on database connectivity; assess startup/migration behavior and outage policy before changing health checks.
-- [x] Close the production migration-role fallback: source audit found the migration runner could fall back to the runtime `DATABASE_URL`, while production validation did not require `MIGRATION_DATABASE_URL`. The runner now requires the dedicated migration URL in production; API environment validation also requires it, and a regression test verifies production refuses the fallback. Validated by CI run `44427485813`: API build/security, database integration, browser acceptance (39 E2E tests), security scanning, Cloudflare Workers, web, exchange-feed/MT5, and container builds all passed.
+- [x] Close the production migration-role fallback: source audit found the migration runner could fall back to the runtime `DATABASE_URL`, while production validation did not require `MIGRATION_DATABASE_URL`. The runner now requires the dedicated migration URL in production; API environment validation also requires it, and a regression test verifies production refuses the fallback. Validated by CI run `44427485813`; revalidated on latest branch commit `218c9d0b02f76aa0880d8f80380019f075255fe1` in run `44429637981` (8/8 jobs passed), with Cloudflare compatibility passing in run `44429638060`.
 - [ ] Add a lightweight web-service liveness endpoint only if the web runtime/platform requires one; no dedicated web health endpoint was found in the inspected app routes.
 - [x] Update the Render Blueprint to declare `DATABASE_URL` for the API runtime separately from `MIGRATION_DATABASE_URL` for migrations; both remain `sync: false`, and no secret values are stored in the repository.
 - [ ] Verify the live API service has both variables configured and that they point to the intended roles/database, without exposing secret values. The Render service-details response does not expose environment-variable names, so presence/role assignment remains unverified; do not infer it from Blueprint declarations.
@@ -41,7 +41,7 @@ This checklist records the source/configuration audit findings. Items are not co
 - [x] Remove the unwanted legacy `.view.enter > *` entrance animation and its redundant override. The shared `@keyframes in` remains because other non-homepage screens (`.pgw`, `.lg`, and `#out`) still use it.
 - [x] Preserve the existing boot-gate loader in `app/layout.tsx`; the homepage entrance selector is removed. Runtime refresh/navigation verification remains open.
 - [x] Remove the remaining `.view.enter .mk-card` animation: those `.mk-card` elements are the Home marketplace shortcut tiles. Keep `.view.enter` animations scoped to market-page components that do not form the Home shortcuts.
-- [x] Add and pass a browser regression test that checks the served app bundle on initial load and refresh for both the broad legacy selector and the Home shortcut selector (CI run `44412507433`, browser acceptance job passed).
+- [x] Add and pass a browser regression test that checks the served app bundle on initial load and refresh for both the broad legacy selector and the Home shortcut selector (CI run `44412507433`); browser acceptance also passed on latest branch commit in run `44429637981`.
 - [ ] Verify refresh, direct navigation, back/forward navigation, mobile layout, and reduced-motion behavior.
 - [ ] Regression-test homepage carousel and Explore category interactions; distinguish the active homepage carousel from the currently unloaded `category-ads.js`.
 
@@ -49,7 +49,7 @@ This checklist records the source/configuration audit findings. Items are not co
 
 - [x] Create the initial source-level feature-to-endpoint acceptance matrix at `TradeMate-main/docs/feature-endpoint-acceptance-matrix-2026-11-19.md`; detailed workflow tests and provider/runtime acceptance remain open.
 - [ ] Test each claimed server-backed workflow against the real API contract and persisted state.
-- [x] Verify the new NFT provider timeout/resilience tests in CI; all five route-level tests passed in CI run `44425744634` browser acceptance job (39 E2E tests passed total). `/api/nfts` and `/api/nft-collections` apply 8-second abort timeouts to all OpenSea requests.
+- [x] Verify the new NFT provider timeout/resilience tests in CI; all five route-level tests passed in CI run `44425744634` browser acceptance job (39 E2E tests passed total). The latest branch commit's browser acceptance job also passed in run `44429637981`. `/api/nfts` and `/api/nft-collections` apply 8-second abort timeouts to all OpenSea requests.
 - [ ] Clearly label or disable incomplete flows until their backend/provider and security controls exist: KYC submission, crypto/fiat deposits, transfers/withdrawals, wallet funding, B2B subaccounts, social OAuth linking, referral rewards, promotion participation, advertising request submission, TradeMate Card, and unconfigured fee rates.
 - [ ] Ensure sample Portfolio Manager values and synthetic Contract Scout sparklines are not presented as real user balances or suitability recommendations.
 - [ ] Test on representative desktop and mobile viewports; record failures with reproducible steps.
