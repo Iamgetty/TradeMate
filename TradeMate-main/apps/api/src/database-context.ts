@@ -6,8 +6,8 @@ import type { Pool, PoolClient } from 'pg';
 type DatabaseRequestContext = { sessionTokenHash: string; userId: string; userResolved: boolean };
 const requestContext = new AsyncLocalStorage<DatabaseRequestContext>();
 
-const sessionCookieToken = (request: Request): string => {
-  const cookie = request.headers.cookie?.split(';')
+export const sessionTokenFromCookieHeader = (cookieHeader?: string): string => {
+  const cookie = cookieHeader?.split(';')
     .map((part) => part.trim())
     .find((part) => part.startsWith('trademate_session='));
   if (!cookie) return '';
@@ -19,7 +19,7 @@ const sessionCookieToken = (request: Request): string => {
 };
 
 export const databaseRequestContextMiddleware = (request: Request, _response: Response, next: NextFunction) => {
-  const token = sessionCookieToken(request);
+  const token = sessionTokenFromCookieHeader(request.headers.cookie);
   const sessionTokenHash = token ? createHash('sha256').update(token).digest('hex') : '';
   requestContext.run({ sessionTokenHash, userId: '', userResolved: false }, next);
 };
