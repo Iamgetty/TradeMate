@@ -236,3 +236,12 @@ This checklist records the source/configuration audit findings. Items are not co
 - [ ] Validate the Render edge proxy's actual `X-Forwarded-For` behavior before rollout. The current per-IP quota assumes the one trusted proxy hop configured in `main.ts` appends the connecting client IP as the right-most value.
 - [ ] Capacity values are conservative initial per-instance ceilings, not production load-test results. Revisit after observing real concurrent-client and upstream-connection metrics.
 - [ ] No production deployment, Render setting, or live service was changed.
+
+
+## 22. Sports Transfer mandate confidentiality — organization membership scope (2026-11-19)
+
+- [x] Reviewed player profile consent ownership, mandate creation, representative acceptance/rejection, mandate revocation, organization membership management, and opportunity ownership checks.
+- [x] Found that `GET /api/sports-transfer/mandates/mine` exposed organization-represented mandates to any membership marked active, although mandate acceptance is restricted to active owners/admins. The list query also needed to enforce the same role boundary as the response action.
+- [x] Restricted organization-side mandate visibility to active owner/admin memberships with valid `starts_at` and `expires_at` windows, matching the existing `canRespond` authorization rule. Directly appointed individual representatives retain access to their own mandates.
+- [ ] Add database-backed regression coverage for ordinary member, expired member, future-dated membership, owner, and admin access cases; execute API build/tests on the review branch.
+- [ ] Continue auditing other Sports Transfer reads for equivalent role/date-scope mismatches. This is a targeted source finding, not a certification of the entire Sports Transfer module.
