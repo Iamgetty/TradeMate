@@ -138,31 +138,30 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 
 ### Phase S1 — Secure development foundations
 
-**Implementation status (2026-11-01): in progress.** The first code and process tranche is implemented and CI-verified:
+**Implementation status (2026-11-19): in progress.** The first code and process tranche is implemented and CI-verified:
 
 - API TypeScript uses `strict: true`; API build passes with strict checks.
-- Zod runtime schemas cover every current `@Body` request body, all current `@Query` inputs and UUID route parameters in the API module. Schemas reject unknown object keys and validate formats, limits, enumerations and numeric inputs. Critical startup environment values are also schema-validated before the API starts.
+- Zod runtime schemas cover every current `@Body` request body, all current `@Query` inputs and UUID route parameters in the API module. Schemas reject unknown object keys and validate formats, limits, enumerations and numeric inputs. Critical startup environment values are schema-validated before the API starts.
 - API Zod schema tests cover authentication, TOTP, deletion, profiles, feed, support, organization documents, listings, enquiries, contracts, P2P, moderation, query filters and environment configuration.
 - NIST SSDF policy: `docs/security/ssdf-policy.md`.
-- PostgreSQL roles/RLS architecture: `docs/security/database-rls-design.md`. Least-privilege `trademate_app`, `trademate_migrator` and scoped `trademate_worker` bootstrap grants are implemented and passed on a clean PostgreSQL database in CI. The deletion worker uses its own production credential slot and no longer edits historical audit events. Transaction-local `app.session_token_hash` and DB-resolved `app.user_id` context is implemented and tested. Production roles have not yet been created or switched; RLS is not enabled.
+- PostgreSQL roles/RLS architecture: `docs/security/database-rls-design.md`. Least-privilege `trademate_app`, `trademate_migrator` and scoped `trademate_worker` bootstrap grants are implemented and passed on a clean PostgreSQL database in CI. Production roles have not yet been created or switched; RLS is not enabled.
 - Pull-request security checklist: `.github/PULL_REQUEST_TEMPLATE.md`.
-- CI security job runs Semgrep SAST, npm dependency audits for API/web/exchange-feed, and Gitleaks secret scanning. The high-severity audit threshold and all three scanners passed in CI run 41324646848.
-- Next.js/React and NestJS/Zod dependency upgrades are applied. The API dependency tree still has lower-severity development-tool advisories below the current high-severity gate; these remain tracked for remediation.
-- PostgreSQL TLS certificate verification is enabled for SSL connections. External Render DB migration workflow succeeded with verification enabled.
+- CI security job runs Semgrep SAST, npm dependency audits for API/web/exchange-feed, and Gitleaks secret scanning.
+- PostgreSQL TLS certificate verification is enabled for SSL connections. External Render DB migration workflow previously succeeded with verification enabled.
 - AES-256-GCM TOTP encryption and decryption explicitly require a 16-byte authentication tag.
-- Migration runner now prefers `MIGRATION_DATABASE_URL`, falling back to `DATABASE_URL` during the transition. Render Blueprint exposes the new secret slot.
+- The migration runner requires `MIGRATION_DATABASE_URL` in production and permits the ordinary `DATABASE_URL` fallback only outside production. This protects the migration runner from silently using the runtime role; it does **not** isolate the elevated credential from the API process when both commands share one Render service environment.
 
 **Still open before S1 is complete:**
 
-1. **API integration tests:** authenticated/unauthenticated requests are now exercised against a running Nest HTTP server in CI; expand these tests as endpoints and policies change.
+1. **API integration tests:** authenticated/unauthenticated requests are exercised against a running Nest HTTP server in CI; expand these tests as endpoints and policies change.
 2. Create separate Render-managed runtime, migration and worker credentials, run the tested role bootstrap on Render, grant least-privilege access, and verify deployment using the split URLs.
-3. Complete organization-membership context and auth-bootstrap policy design. Session hash and database-resolved user ID are now applied transaction-locally to ordinary pool queries and explicit transactions; concurrent-request and connection-context tests are in CI.
+3. Complete organization-membership context and auth-bootstrap policy design. Session hash and database-resolved user ID are applied transaction-locally to ordinary pool queries and explicit transactions; concurrent-request and connection-context tests are in CI.
 4. Expand the CI-only RLS pilot to the complete sensitive-table inventory, including login/registration/TOTP bootstrap and organization membership. Only then promote RLS and FORCE RLS to production after auth-bootstrap, cross-user, cross-organization and pool-reuse tests pass.
-5. **RLS pilot test-target protection — implemented in this branch; CI pending:** `scripts/test-rls-pilot.js` now requires the dedicated `RLS_PILOT_TEST_DATABASE_URL`, rejects generic `DATABASE_URL` fallback, requires a loopback PostgreSQL host and an explicitly test/CI-named database, and has five regression cases. The CI job supplies the dedicated URL for its disposable `trademate_test` database. This protects the test harness; it does not enable RLS or complete production role/policy rollout.
-- [ ] Add regression-test invocation and reject URL query/fragment overrides in RLS pilot harness — implemented in repository in this increment; CI execution pending.
-5. Add database-role/RLS integration tests and verify audit-event append-only permissions under the actual runtime role.
-6. Set GitHub main-branch protection so required CI checks and independent review cannot be bypassed. The repository currently has no GitHub rulesets visible to the connected integration; branch-protection settings require owner-level dashboard access.
-7. Review and remediate the remaining moderate/low dependency advisories, then decide whether to raise the SCA gate to moderate.
+5. **RLS pilot test-target protection — repository implementation and CI verified:** `scripts/test-rls-pilot.js` requires the dedicated `RLS_PILOT_TEST_DATABASE_URL`, rejects generic `DATABASE_URL` fallback, requires a loopback PostgreSQL host and an explicitly test/CI-named database, rejects query/fragment overrides, and has regression coverage invoked by CI. This protects the test harness; it does not enable RLS or complete production role/policy rollout.
+6. Add database-role/RLS integration tests and verify audit-event append-only permissions under the actual runtime role.
+7. Set GitHub main-branch protection so required CI checks and independent review cannot be bypassed. The repository currently has no GitHub rulesets visible to the connected integration; branch-protection settings require owner-level dashboard access.
+8. Review and remediate the remaining moderate/low dependency advisories, then decide whether to raise the SCA gate to moderate.
+9. **Isolate migration execution from the API runtime:** resolve the design in `docs/security/migration-execution-isolation.md`. The current Render API service receives `MIGRATION_DATABASE_URL` and its startup command runs migrations before the API; the API inherits that secret. The existing GitHub migration workflow also permits fallback to `TRADEMATE_DATABASE_URL` and can trigger on migration-related pushes to `main`. Do not remove startup migrations or change production workflow triggers until a separately credentialed, approval-gated migration path and exact-release deployment ordering are implemented and rehearsed.
 
 ### Phase S2 — Identity, verification and financial crime controls
 
@@ -170,9 +169,9 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 2. Validate provider coverage and accuracy for every launch jurisdiction before selection, with explicit Nigerian testing for supported identity documents and verification methods (including NIN-linked checks only where the provider, lawful basis and applicable regulator requirements support them). Compare document authenticity, selfie/face match, passive/active liveness, spoof/deepfake resistance, duplicate identity detection, fraud signals, manual-review quality, appeals, accessibility, completion/conversion, latency, uptime, pricing and support.
 3. Complete legal, privacy and security due diligence: data-controller/processor roles, lawful basis and consent where required, data minimization, retention/deletion, data residency and cross-border transfers, sub-processors, encryption, access controls, breach notification, independent assurance and audit rights. Do not collect or retain raw identity/biometric data beyond the approved necessity.
 4. Implement verified webhook handling, signature validation, replay protection, idempotency, status reconciliation and auditable case outcomes; keep provider status separate from TradeMate's own risk decision and provide secure manual review and user appeal paths.
-3. Add risk-based AML/sanctions screening and ongoing monitoring appropriate to the supported jurisdictions and product scope.
-4. Evaluate Chainalysis, Elliptic or TRM Labs for blockchain address and transaction screening before any crypto transfer feature.
-5. Evaluate verifiable credentials/attestations only where they add a clear privacy and compliance benefit.
+5. Add risk-based AML/sanctions screening and ongoing monitoring appropriate to the supported jurisdictions and product scope.
+6. Evaluate Chainalysis, Elliptic or TRM Labs for blockchain address and transaction screening before any crypto transfer feature.
+7. Evaluate verifiable credentials/attestations only where they add a clear privacy and compliance benefit.
 
 ### Phase S3 — Database, financial and transaction safety
 
