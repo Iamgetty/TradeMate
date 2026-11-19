@@ -2,7 +2,41 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createMarketMetadataRefresher } = require('../public/tm/market-metadata');
+const { createMarketMetadataRefresher, applyCoinGeckoMarketMetadata } = require('../public/tm/market-metadata');
+
+test('CoinGecko metadata never becomes the displayed spot price', () => {
+  const bitcoin = { p: 64250, c: null, cap: 0, vol: 0 };
+  const embeddedLogo = { p: 3200, c: null };
+  const logos = {};
+  applyCoinGeckoMarketMetadata([
+    {
+      id: 'bitcoin', current_price: 64000,
+      price_change_percentage_24h_in_currency: 2.5,
+      price_change_percentage_24h: 2.4,
+      market_cap: 1200000000000, total_volume: 25000000000,
+      image: 'https://images.example/bitcoin.png',
+    },
+    {
+      id: 'ethereum', current_price: 3100,
+      price_change_percentage_24h: -1.25,
+      market_cap: 400000000000, total_volume: 10000000000,
+      image: 'https://images.example/ethereum.png',
+    },
+  ], {
+    coinIds: { BTC: 'bitcoin', ETH: 'ethereum' },
+    findMarketItem: (name) => name === 'BTC/USDT' ? bitcoin : name === 'ETH/USDT' ? embeddedLogo : null,
+    isEmbedded: (symbol) => symbol === 'ETH',
+    setLogo: (symbol, url) => { logos[symbol] = url; },
+  });
+
+  assert.equal(bitcoin.p, 64250, 'exchange-feed spot price remains authoritative');
+  assert.equal(bitcoin.c, 2.5);
+  assert.equal(bitcoin.cap, 1200000000000);
+  assert.equal(bitcoin.vol, 25000000000);
+  assert.equal(embeddedLogo.p, 3200);
+  assert.equal(embeddedLogo.c, -1.25);
+  assert.deepEqual(logos, { BTC: 'https://images.example/bitcoin.png' });
+});
 
 function deferred() {
   let resolve;
