@@ -195,3 +195,26 @@ This checklist records the source/configuration audit findings. Items are not co
 - [ ] Implement a pinned ESLint 9 + typescript-eslint flat-config setup only after it can be installed and executed against the full API source tree. Select rules deliberately; do not enable broad type-aware or stylistic rules without checking compatibility and existing code findings.
 - [ ] Run lint against all ten source files, resolve or explicitly justify findings, then add the lint command to CI. The GitHub file-editing connection does not provide a repository checkout or Node/npm execution, so no lint package/config changes are claimed as validated in this audit.
 - [ ] Keep the existing API TypeScript build and security tests as separate gates; passing them does not mean ESLint is configured or passing.
+
+
+## 19. API security source review — public market WebSocket resource controls (2026-11-19)
+
+- [x] Inspected the market-feed upgrade handler and subscription lifecycle in `apps/api/src/market-feed.ts`.
+- [x] Confirmed the WebSocket endpoint is intentionally public market data, but the upgrade path currently has no explicit Origin allowlist, authentication, per-IP connection cap, global session cap, subscription rate limit, or idle-client timeout.
+- [x] A single accepted subscription opens multiple upstream venue WebSockets (two or three depending on the symbol) and emits a snapshot every second. There is no explicit `bufferedAmount` backpressure guard before sending snapshots. Consequently, a high number of clients or slow-reading clients can amplify resource consumption on the API and upstream connections.
+- [x] Client message size is bounded (`maxPayload: 16 KiB`) and symbol syntax is constrained, but these controls do not cap the number of accepted clients or upstream subscriptions.
+- [ ] Add a documented public-feed capacity policy: per-IP and global connection limits, per-connection subscription limit, handshake Origin validation for browser clients (as a CSWSH defense, not as authentication), idle/heartbeat handling, upstream connection budget, and `bufferedAmount` backpressure/drop behavior.
+- [ ] Add regression tests for rejected origins, connection/session caps, reconnect cleanup, slow-client backpressure, and bounded upstream sockets; verify legitimate browser market-feed subscriptions still work.
+- [ ] Do not make the endpoint private merely to mitigate abuse: market data is public functionality. Apply explicit limits and monitor connection counts instead.
+- [ ] No runtime WebSocket behavior was changed during this source-only audit; these are confirmed code-level hardening gaps requiring implementation and executable validation.
+
+## 20. API security source review — authentication and query boundaries (2026-11-19)
+
+- [x] Reviewed password hashing (scrypt), constant-time password/TOTP comparisons, hashed opaque session/reset tokens, short-lived one-use verification/reset challenges, login/password-reset rate-limit records, and server-side session revocation flows.
+- [x] Confirmed API SQL values in inspected authentication and market activity queries are parameterized; dynamic market activity filters are selected from fixed allowlists and the limit placeholder is generated from the number of bound values.
+- [x] Confirmed login rate limiting is keyed by IP plus normalized email, and the second-factor challenge has both a per-challenge attempt ceiling and a per-IP/user rate-limit record.
+- [x] Confirmed the account-deletion worker is guarded by separate execution and legal-approval flags; its production database URL cannot fall back to the API runtime URL.
+- [ ] Review all remaining 4,000+ lines of `module.ts` route-by-route for authorization/ownership checks, moderation boundaries, mass assignment, and transaction consistency. The sampled review is not a full endpoint security certification.
+- [ ] Review WebSocket Origin behavior against the actual production web origin and reverse-proxy configuration; ensure trusted proxy settings cannot permit client spoofing of `request.ip` for rate limiting.
+- [ ] Verify all login, password reset, email verification, 2FA and deletion cancellation rate-limit paths under concurrency and confirm expired `auth_rate_limits`/challenge rows are cleaned up safely.
+- [ ] No authentication or endpoint code was changed as part of this review entry.
