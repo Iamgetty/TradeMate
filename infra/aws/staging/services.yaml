@@ -27,7 +27,13 @@ Parameters:
   ApiImageUri:
     Type: String
     Description: Immutable ECR image URI pinned by sha256 digest; use the exact API artifact tested for this release.
-    AllowedPattern: '^\\d{12}\\.dkr\\.ecr\\.[a-z0-9-]+\\.amazonaws\\.com\\/[a-zA-Z0-9._/-]+@sha256:[a-f0-9]{64}
+    AllowedPattern: '^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com/.+@sha256:[a-f0-9]{64}$'
+    ConstraintDescription: "Provide an ECR image URI ending in @sha256: followed by 64 lowercase hexadecimal characters."
+  ExchangeFeedImageUri:
+    Type: String
+    Description: Immutable ECR image URI pinned by sha256 digest.
+    AllowedPattern: '^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com/.+@sha256:[a-f0-9]{64}$'
+    ConstraintDescription: "Provide an ECR image URI ending in @sha256: followed by 64 lowercase hexadecimal characters."
   ApiDatabaseUrlSecretArn:
     Type: String
     Description: Secrets Manager ARN whose SecretString is the complete staging DATABASE_URL.
