@@ -263,13 +263,13 @@ function attachMarketFeed(server: Server) {
     };
     client.on('pong', () => aliveClients.set(client, true));
     client.on('message', (raw) => {
-      let message: any;
+      let message: unknown;
       try { message = JSON.parse(raw.toString()); } catch { return; }
-      if (message.type !== 'subscribe' || !validSymbol(message.symbol)) {
+      if (!isRecord(message) || message.type !== 'subscribe' || !validSymbol(message.symbol)) {
         if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify({ type: 'error', message: 'Choose a supported market symbol.' }));
         return;
       }
-      const requestedSymbol = message.symbol.toUpperCase();
+      const requestedSymbol = String(message.symbol).toUpperCase();
       if (session) {
         if (session.symbol !== requestedSymbol && client.readyState === WebSocket.OPEN) client.close(1008, 'One market symbol is allowed per connection.');
         return;
