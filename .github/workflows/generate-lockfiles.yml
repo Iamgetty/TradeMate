@@ -1,8 +1,14 @@
-
 name: Generate and validate npm lockfiles
 
 on:
-  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/generate-lockfiles.yml"
+      - "TradeMate-main/apps/api/package.json"
+      - "TradeMate-main/apps/web/package.json"
+      - "TradeMate-main/exchange-feed/package.json"
   push:
     branches:
       - fix/audit-remediation-2026-11-18
@@ -11,21 +17,27 @@ on:
 
 permissions:
   contents: write
+  pull-requests: read
 
 concurrency:
-  group: trademate-lockfiles-${{ github.ref }}
+  group: trademate-lockfiles-${{ github.event.pull_request.head.ref || github.ref }}
   cancel-in-progress: false
 
 jobs:
   generate-and-validate:
     name: Generate and validate lockfiles
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    if: github.ref == 'refs/heads/fix/audit-remediation-2026-11-18'
+    timeout-minutes: 40
+    if: >-
+      github.ref == 'refs/heads/fix/audit-remediation-2026-11-18' ||
+      (
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.ref == 'fix/audit-remediation-2026-11-18' &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
 
     steps:
-      - name: Check out TradeMate
+      - name: Check out PR branch
         uses: actions/checkout@v4
         with:
           ref: fix/audit-remediation-2026-11-18
@@ -36,81 +48,60 @@ jobs:
         with:
           node-version: 24.22.1
           check-latest: true
-          cache: npm
-          cache-dependency-path: |
-            TradeMate-main/apps/api/package.json
-            TradeMate-main/apps/web/package.json
-            TradeMate-main/exchange-feed/package.json
 
       - name: Verify toolchain
         shell: bash
         run: |
           set -euo pipefail
+          test "$(node --version)" = "v24.22.1"
           node --version
           npm --version
-          node -e "
-            const major = Number(process.versions.node.split('.')[0]);
-            if (major !== 24) {
-              throw new Error('Expected Node.js 24');
-            }
-          "
 
       - name: Generate and validate API lockfile
         working-directory: TradeMate-main/apps/api
         run: |
           set -euo pipefail
-          npm install --package-lock-only --ignore-scripts
-          npm ci
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --no-audit --no-fund
           npm run build --if-present
 
       - name: Generate and validate Web lockfile
         working-directory: TradeMate-main/apps/web
         run: |
           set -euo pipefail
-          npm install --package-lock-only --ignore-scripts
-          npm ci
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --no-audit --no-fund
           npm run build --if-present
 
       - name: Generate and validate Exchange Feed lockfile
         working-directory: TradeMate-main/exchange-feed
         run: |
           set -euo pipefail
-          npm install --package-lock-only --ignore-scripts
-          npm ci
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --no-audit --no-fund
           npm run build --if-present
 
-      - name: Confirm lockfiles exist
+      - name: Confirm lockfiles and whitespace
         shell: bash
         run: |
           set -euo pipefail
-
           for file in \
             TradeMate-main/apps/api/package-lock.json \
             TradeMate-main/apps/web/package-lock.json \
             TradeMate-main/exchange-feed/package-lock.json
           do
             test -s "$file"
-            echo "Validated: $file"
+            node -e "JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8'))" "$file"
+            echo "Valid JSON lockfile: $file"
           done
-
-      - name: Check generated changes
-        shell: bash
-        run: |
-          set -euo pipefail
-          git status --short
           git diff --check
 
-      - name: Commit validated lockfiles
+      - name: Commit validated lockfiles to PR branch
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-
           git config user.name "github-actions[bot]"
-          git config user.email \
-            "41898282+github-actions[bot]@users.noreply.github.com"
-
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add \
             TradeMate-main/apps/api/package-lock.json \
             TradeMate-main/apps/web/package-lock.json \
@@ -122,5 +113,4 @@ jobs:
           fi
 
           git commit -m "build: add validated npm lockfiles"
-
           git push origin HEAD:fix/audit-remediation-2026-11-18
