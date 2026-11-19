@@ -140,8 +140,9 @@ This checklist records the source/configuration audit findings. Items are not co
 
 ## 13. Latest PR-head CI confirmation (2026-11-19)
 
-- [x] Rechecked exact latest PR head `a5176fa2aa8d8d829869c64be50cbda7dc0df309`: TradeMate CI run 1528 (ID `44436119126`) completed with all 8/8 jobs successful. This includes API TypeScript build/security validation, clean PostgreSQL migration integration and role/RLS tests, exchange-feed/MT5 tests, web build/runtime checks, browser app-shell plus mocked and live two-account API acceptance, isolated Cloudflare Workers build/runtime, SAST/SCA/secret scanning, and AWS API/exchange-feed container builds.
-- [x] Confirmed browser acceptance job `135265325849` completed successfully; the previously pending job is no longer outstanding.
+- [x] Rechecked exact latest PR head `74100949d1aac560484dc3e6bdd95a708215462c`: TradeMate CI run 1529 (ID `44436629596`) completed with all 8/8 jobs successful. This includes API TypeScript build/security validation, clean PostgreSQL migration integration and role/RLS tests, exchange-feed/MT5 tests, web build/runtime checks, browser app-shell plus mocked and live two-account API acceptance, isolated Cloudflare Workers build/runtime, SAST/SCA/secret scanning, and AWS API/exchange-feed container builds.
+- [x] Confirmed browser acceptance job `135267006668` completed successfully; the migration integration job `135267006888` and security scan job `135267006723` also passed.
+- [x] Cloudflare frontend compatibility run 345 (ID `44436629633`) completed successfully on the same latest PR head.
 - [ ] API lint remains unconfigured and is not run by CI. ESLint is absent from API dependencies and no API ESLint config exists.
 - [ ] API, web, and exchange-feed lockfiles remain absent; deterministic `npm ci` validation remains outstanding. Do not adopt PR #213's stale API lockfile.
-- [ ] This CI result validates the current checked-in CI suite, not production Render configuration, production PostgreSQL roles/RLS, or deployment readiness. No production changes were made.
+- [ ] This CI result validates the checked-in CI suite, not production Render configuration, production PostgreSQL roles/RLS, or deployment readiness. No production changes were made.
