@@ -85,19 +85,42 @@ BEGIN
     RAISE EXCEPTION 'trademate_worker must not create schema objects.';
   END IF;
 
-  IF NOT has_table_privilege('trademate_worker', 'public.user_deletion_requests', 'SELECT')
+  IF NOT has_table_privilege('trademate_worker', 'public.users', 'SELECT')
+     OR NOT has_table_privilege('trademate_worker', 'public.user_deletion_requests', 'SELECT')
+     OR NOT has_column_privilege('trademate_worker', 'public.users', 'email', 'UPDATE')
+     OR NOT has_column_privilege('trademate_worker', 'public.users', 'phone_e164', 'UPDATE')
+     OR NOT has_column_privilege('trademate_worker', 'public.users', 'display_name', 'UPDATE')
+     OR NOT has_column_privilege('trademate_worker', 'public.users', 'preferred_locale', 'UPDATE')
+     OR NOT has_column_privilege('trademate_worker', 'public.users', 'country_code', 'UPDATE')
+     OR NOT has_column_privilege('trademate_worker', 'public.users', 'time_zone', 'UPDATE')
      OR NOT has_column_privilege('trademate_worker', 'public.users', 'status', 'UPDATE')
+     OR NOT has_column_privilege('trademate_worker', 'public.users', 'updated_at', 'UPDATE')
      OR NOT has_column_privilege('trademate_worker', 'public.user_deletion_requests', 'cancellation_token_hash', 'UPDATE')
      OR NOT has_table_privilege('trademate_worker', 'public.user_sessions', 'DELETE')
+     OR NOT has_table_privilege('trademate_worker', 'public.user_credentials', 'DELETE')
+     OR NOT has_table_privilege('trademate_worker', 'public.user_preferences', 'DELETE')
+     OR NOT has_table_privilege('trademate_worker', 'public.user_notifications', 'DELETE')
      OR NOT has_column_privilege('trademate_worker', 'public.user_sessions', 'user_id', 'SELECT')
      OR NOT has_column_privilege('trademate_worker', 'public.user_credentials', 'user_id', 'SELECT')
      OR NOT has_column_privilege('trademate_worker', 'public.user_preferences', 'user_id', 'SELECT')
      OR NOT has_column_privilege('trademate_worker', 'public.user_notifications', 'user_id', 'SELECT')
      OR NOT has_column_privilege('trademate_worker', 'public.support_ticket_messages', 'sender_user_id', 'SELECT')
      OR NOT has_column_privilege('trademate_worker', 'public.support_ticket_messages', 'sender_type', 'SELECT')
+     OR NOT has_column_privilege('trademate_worker', 'public.support_ticket_messages', 'sender_user_id', 'UPDATE')
+     OR NOT has_column_privilege('trademate_worker', 'public.support_ticket_messages', 'sender_type', 'UPDATE')
      OR NOT has_column_privilege('trademate_worker', 'public.marketplace_contracts', 'accepted_by_user_id', 'SELECT')
+     OR NOT has_column_privilege('trademate_worker', 'public.marketplace_contracts', 'accepted_by_user_id', 'UPDATE')
      OR NOT has_table_privilege('trademate_worker', 'public.audit_events', 'INSERT') THEN
     RAISE EXCEPTION 'trademate_worker is missing required account-deletion privileges.';
+  END IF;
+
+  IF pg_get_serial_sequence('public.audit_events', 'id') IS NOT NULL
+     AND NOT has_sequence_privilege(
+       'trademate_worker',
+       pg_get_serial_sequence('public.audit_events', 'id'),
+       'USAGE'
+     ) THEN
+    RAISE EXCEPTION 'trademate_worker cannot allocate audit_events identifiers.';
   END IF;
 
   IF has_table_privilege('trademate_worker', 'public.audit_events', 'UPDATE')
