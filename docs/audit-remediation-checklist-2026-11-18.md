@@ -82,6 +82,27 @@ This checklist records the source/configuration audit findings. Items are not co
 - [ ] Add and commit package lockfiles for the API, web, and exchange-feed workspaces, then use deterministic `npm ci` installs in CI and deployment builds. The current repository tree contains no `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, or `yarn.lock`; CI and Render currently use `npm install`.
 - [ ] Resolve API lint configuration: `apps/api/package.json` declares a lint script invoking ESLint, but ESLint is not declared in API devDependencies and the current CI workflow does not run that lint script.
 
+
+## 10. Live Render PostgreSQL security audit — read-only findings (2026-11-19)
+
+- [x] Confirm the current Render database record: `trademate-db`, PostgreSQL 18, free plan, Oregon, expires `2026-11-25T21:52:06.818364Z`; IP allowlist remains `0.0.0.0/0`. No database changes were made.
+- [x] Inspect non-system PostgreSQL roles without retrieving credentials. The live database has the Render default database owner `trademate_db_jzjt_user` (LOGIN, CREATEDB, CREATEROLE, not superuser), `trademate_deletion_worker_ro` (LOGIN, not superuser), plus Render-managed roles. No dedicated `trademate_app` runtime role or `trademate_migrator` role exists.
+- [x] Verify live ownership and grants: the default database user owns the public schema and all 50 application tables. It has broad table privileges and CREATEDB/CREATEROLE. The deletion worker role has SELECT grants only. Its membership is granted to the database owner with ADMIN OPTION. No migration-role split is deployed in the live database.
+- [x] Verify production RLS state read-only: all 50 application tables have RLS disabled, RLS not forced, and zero policies. CI's disposable-database RLS pilot does not imply production RLS is enabled.
+- [ ] Plan and approve a controlled production role migration: create a dedicated least-privilege application role, a separate migration owner/role, and an appropriately scoped deletion-worker role; grant only required schema/table/sequence/function privileges; rotate service connection strings securely; test on a staging clone; then separately plan RLS policy rollout. Do not attempt ad hoc live SQL changes.
+- [ ] Verify live Render environment-variable names/role assignments. Render's available service metadata does not expose environment-variable names, so `DATABASE_URL`, `MIGRATION_DATABASE_URL`, and `WORKER_DATABASE_URL` values/role targets remain unverified. Never retrieve or print secret values.
+- [x] Inspect the scheduled `trademate-account-deletion-dry-run` cron source: permanent processing requires both `ACCOUNT_DELETION_EXECUTE=true` and `ACCOUNT_DELETION_LEGAL_APPROVAL=true`; otherwise it is dry-run only. The production script requires `WORKER_DATABASE_URL`. The live worker role currently has SELECT-only grants, so it cannot perform the script's delete/update/insert operations if that is the configured URL.
+- [ ] Verify the cron job's live environment-variable names and confirm both execution flags are not enabled; current Render service metadata does not expose env var names. Confirm the configured worker URL targets a deliberately scoped role. Do not trigger the cron job during this audit.
+- [ ] Decide and test whether the deletion worker should remain permanently read-only/dry-run or receive a separate, narrowly scoped write role after legal/privacy/records-retention approval. Do not broaden the existing read-only role ad hoc.
+
+## 11. Live Render deployment configuration — refreshed read-only check (2026-11-19)
+
+- [x] Confirmed current service metadata: API and web remain `autoDeployTrigger=commit`; exchange-feed remains `checksPass`. All three target `main`; no preview services are enabled.
+- [x] Confirmed web health path is empty; API health path is `/api/health`; exchange-feed health path is `/health`.
+- [x] Confirmed API, web, exchange-feed, and the database all currently allow inbound IPv4 `0.0.0.0/0`. This is broad exposure; do not change without an approved access/availability plan.
+- [ ] Reconcile live deployment triggers with the checked-in Blueprint after reviewing the risk of changing deployment behavior. No Render settings were changed.
+- [ ] Add a web liveness endpoint only if required by the chosen platform health policy; validate it in staging before changing Render.
+
 ## Working rules
 
 - Work on `fix/audit-remediation-2026-11-18`; keep `main` untouched.
