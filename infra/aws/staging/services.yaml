@@ -597,6 +597,12 @@ Outputs:
     Value: !Ref FeedTaskDefinition
   MigrationTaskDefinitionArn:
     Value: !Ref MigrationTaskDefinition
+  MigrationDatabaseUrlSecretArn:
+    Value: !Ref MigrationDatabaseUrlSecretArn
+  MigrationEcsExecutionRoleArn:
+    Value: !GetAtt MigrationEcsExecutionRole.Arn
+  MigrationTaskRoleArn:
+    Value: !GetAtt MigrationTaskRole.Arn
   CloudflareTunnelTaskDefinitionArn:
     Value: !Ref CloudflareTunnelTaskDefinition
   CloudflareTunnelServiceName:
