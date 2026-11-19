@@ -58,7 +58,7 @@ function marketFeedClientIp(request: IncomingMessage): string {
   // main.ts configures exactly one trusted proxy hop. The edge proxy appends
   // the connecting client address as the right-most X-Forwarded-For value.
   const forwarded = request.headers['x-forwarded-for'];
-  const candidate = (Array.isArray(forwarded) ? forwarded.join(',') : forwarded || '').split(',').map((value) => value.trim()).filter(Boolean);
+  const forwardedValues = (Array.isArray(forwarded) ? forwarded.join(',') : forwarded || '').split(',').map((value) => value.trim()).filter(Boolean);
   const candidate = forwardedValues.length ? forwardedValues[forwardedValues.length - 1] : undefined;
   if (candidate && isIP(candidate)) return candidate;
   return request.socket.remoteAddress || 'unknown';
@@ -84,13 +84,13 @@ function attachMarketFeed(server: Server) {
     try { pathname = new URL(request.url || '/', 'http://localhost').pathname; } catch { return; }
     if (pathname !== '/api/market-feed') return;
     if (!isAllowedMarketFeedOrigin(request.headers.origin)) {
-      socket.write('HTTP/1.1 403 Forbidden\r\\nConnection: close\r\\n\r\\n');
+      socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
       socket.destroy();
       return;
     }
     const ip = marketFeedClientIp(request);
     if (wss.clients.size >= MARKET_FEED_LIMITS.maxConnections || (connectionsByIp.get(ip) || 0) >= MARKET_FEED_LIMITS.maxConnectionsPerIp) {
-      socket.write('HTTP/1.1 429 Too Many Requests\r\\nConnection: close\r\\n\r\\n');
+      socket.write('HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\n\r\n');
       socket.destroy();
       return;
     }
