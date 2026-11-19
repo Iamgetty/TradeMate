@@ -19,7 +19,7 @@ async function main() {
   try {
     const suffix = randomUUID();
     const actors = {};
-    for (const role of ['player', 'representative', 'representative2', 'representative3', 'organizationOwner', 'outsider']) {
+    for (const role of ['player', 'representative', 'representative2', 'representative3', 'organizationOwner', 'organizationAdmin', 'organizationMember', 'expiredAdmin', 'futureAdmin', 'outsider']) {
       const user = await pool.query(
         "INSERT INTO users (email, display_name, status) VALUES ($1, $2, 'active') RETURNING id",
         [role + '-' + suffix + '@example.invalid', 'Mandate test ' + role],
@@ -40,6 +40,22 @@ async function main() {
     await pool.query(
       "INSERT INTO sports_org_memberships (sports_organization_id, user_id, role, permission_scope, status, invited_by_user_id, starts_at) VALUES ($1, $2, 'owner', 'workspace', 'active', $2, now())",
       [organizationId, actors.organizationOwner.userId],
+    );
+    await pool.query(
+      "INSERT INTO sports_org_memberships (sports_organization_id, user_id, role, permission_scope, status, invited_by_user_id, starts_at) VALUES ($1, $2, 'admin', 'workspace', 'active', $3, now())",
+      [organizationId, actors.organizationAdmin.userId, actors.organizationOwner.userId],
+    );
+    await pool.query(
+      "INSERT INTO sports_org_memberships (sports_organization_id, user_id, role, permission_scope, status, invited_by_user_id, starts_at) VALUES ($1, $2, 'member', 'workspace', 'active', $3, now())",
+      [organizationId, actors.organizationMember.userId, actors.organizationOwner.userId],
+    );
+    await pool.query(
+      "INSERT INTO sports_org_memberships (sports_organization_id, user_id, role, permission_scope, status, invited_by_user_id, starts_at, expires_at) VALUES ($1, $2, 'admin', 'workspace', 'active', $3, now() - interval '2 days', now() - interval '1 day')",
+      [organizationId, actors.expiredAdmin.userId, actors.organizationOwner.userId],
+    );
+    await pool.query(
+      "INSERT INTO sports_org_memberships (sports_organization_id, user_id, role, permission_scope, status, invited_by_user_id, starts_at) VALUES ($1, $2, 'admin', 'workspace', 'active', $3, now() + interval '1 day')",
+      [organizationId, actors.futureAdmin.userId, actors.organizationOwner.userId],
     );
 
     app = await NestFactory.create(AppModule, { logger: false, bodyParser: false });
@@ -131,6 +147,16 @@ async function main() {
     const orgAccepted = await call('organizationOwner', 'POST', '/api/sports-transfer/mandates/' + orgMandate.id + '/accept', {});
     assert.equal(orgAccepted.status, 201);
     assert.equal((await orgAccepted.json()).mandate.representative_response, 'accepted');
+    for (const actor of ['organizationOwner', 'organizationAdmin']) {
+      const inbox = await call(actor, 'GET', '/api/sports-transfer/mandates/mine');
+      assert.equal(inbox.status, 200);
+      assert.ok((await inbox.json()).mandates.some((mandate) => mandate.id === orgMandate.id), actor + ' can see an organization mandate');
+    }
+    for (const actor of ['organizationMember', 'expiredAdmin', 'futureAdmin', 'outsider']) {
+      const inbox = await call(actor, 'GET', '/api/sports-transfer/mandates/mine');
+      assert.equal(inbox.status, 200);
+      assert.ok(!(await inbox.json()).mandates.some((mandate) => mandate.id === orgMandate.id), actor + ' cannot see an organization mandate');
+    }
 
     await grantConsent(basketball.id, { targetUserId: actors.representative2.userId });
     const rejectedMandateResponse = await createMandate(basketball.id, { representativeUserId: actors.representative2.userId });
