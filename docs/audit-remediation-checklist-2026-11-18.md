@@ -155,3 +155,13 @@ This checklist records the source/configuration audit findings. Items are not co
 - [ ] API lint remains unconfigured and is not run by CI. ESLint is absent from API dependencies and no API ESLint config exists.
 - [ ] API, web, and exchange-feed lockfiles remain absent; deterministic `npm ci` validation remains outstanding. Do not adopt PR #213's stale API lockfile.
 - [ ] These CI results validate the checked-in CI suite, not production Render configuration, production PostgreSQL roles/RLS, or deployment readiness. No production changes were made.
+
+
+## 15. Reproducibility toolchain alignment — source inspection (2026-11-19)
+
+- [x] Re-inspected the three package manifests on the current review branch. API uses TypeScript 5.7.2, NestJS 11.2.8, CommonJS, and has an ESLint script but no ESLint dependency. Web uses Next 16.4.3, React 19.3.1, TypeScript 5.7.2, and Playwright 1.56.1; its `lint` script is `tsc --noEmit`. Exchange-feed has only `ws` as a runtime dependency and uses Node's built-in test runner.
+- [x] Compared execution runtimes: the primary CI jobs install with Node 20; the API and exchange-feed Dockerfiles build/run on Node 22; the isolated Cloudflare compatibility job uses Node 22. The lockfile/toolchain plan must explicitly choose and test supported Node/npm versions rather than assume these environments are interchangeable.
+- [x] Confirmed API and exchange-feed Dockerfiles copy `package*.json` and run `npm install`; adding a lockfile alone will not make builds deterministic until Docker install commands and CI install commands are deliberately switched to `npm ci` and validated.
+- [ ] Decide and document a supported Node/npm matrix for API, web, exchange-feed, CI, Docker, and Render before generating lockfiles. Check framework and dependency engine requirements against that matrix.
+- [ ] Generate each lockfile using the selected npm version, then validate clean `npm ci`, build/tests, security audit, and container builds in the corresponding Node runtime. Do not mark complete based on a lockfile being present.
+- [ ] Only after clean validation, update CI and Docker install commands to `npm ci`; preserve separate production `--omit=dev` install behavior where required and test the resulting images.
