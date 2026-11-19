@@ -86,8 +86,10 @@ jobs:
             fi
           done
 
-          echo "image_uri=$EXPECTED_API_IMAGE_URI" >> "$GITHUB_OUTPUT"
-          echo "source_sha=$RELEASE_SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          {
+            echo "image_uri=$EXPECTED_API_IMAGE_URI"
+            echo "source_sha=$RELEASE_SOURCE_SHA"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Validate AWS staging role configuration
         env:
@@ -249,9 +251,11 @@ jobs:
             exit 1
           fi
 
-          echo "cluster=$CLUSTER_NAME" >> "$GITHUB_OUTPUT"
-          echo "task_definition=$REGISTERED_TASK_ARN" >> "$GITHUB_OUTPUT"
-          echo "network_configuration=$NETWORK_CONFIGURATION" >> "$GITHUB_OUTPUT"
+          {
+            echo "cluster=$CLUSTER_NAME"
+            echo "task_definition=$REGISTERED_TASK_ARN"
+            echo "network_configuration=$NETWORK_CONFIGURATION"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Start the one-off migration task
         id: run
@@ -290,7 +294,7 @@ jobs:
           set -euo pipefail
           TASK_STATUS=""
           TASK=""
-          for attempt in {1..150}; do
+          for _ in {1..150}; do
             TASK="$(aws ecs describe-tasks --cluster "$CLUSTER_NAME" --tasks "$TASK_ARN" --output json)"
             TASK_STATUS="$(jq -r '.tasks[0].lastStatus // "MISSING"' <<< "$TASK")"
             if [[ "$TASK_STATUS" == "STOPPED" ]]; then
@@ -318,11 +322,11 @@ jobs:
             echo "## AWS staging database migration"
             echo
             echo "- Result: successful (container exit code 0)"
-            echo "- Source commit: `$RELEASE_SOURCE_SHA`"
-            echo "- API image: `$EXPECTED_API_IMAGE_URI`"
-            echo "- Migration task definition: `$TASK_DEFINITION_ARN`"
-            echo "- ECS task: `$TASK_ARN`"
-            echo "- Stop code: `$STOP_CODE`"
+            echo "- Source commit: $RELEASE_SOURCE_SHA"
+            echo "- API image: $EXPECTED_API_IMAGE_URI"
+            echo "- Migration task definition: $TASK_DEFINITION_ARN"
+            echo "- ECS task: $TASK_ARN"
+            echo "- Stop code: $STOP_CODE"
             echo
             echo "This workflow runs the migration task only. It does not update or promote the API service."
           } >> "$GITHUB_STEP_SUMMARY"
