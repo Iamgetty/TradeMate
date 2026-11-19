@@ -308,3 +308,15 @@ This checklist records the source/configuration audit findings. Items are not co
 - [ ] Continue the separate audit of document authorization and any negotiation/offer endpoints outside this controller before declaring Sports Transfer authorization fully reviewed.
 - [x] Latest head `1103d188e2915ba08dc643b88c7bcfb2f3feb711` passed TradeMate CI #1570 and Cloudflare compatibility #386.
 - [x] No production services, deployments, or databases were changed.
+
+
+## 29. Organization verification documents and Sports Transfer document-surface review (2026-11-19)
+
+- [x] Reviewed the legacy `/api/organizations/:id/documents` upload/list routes and migration 011. These are business-organization verification documents, not Sports Transfer negotiation or player-identity documents.
+- [x] Upload and metadata-list operations require an authenticated organization owner/admin; ordinary organization members are denied. The database-backed HTTP integration test covers owner/admin allow, member deny, and transaction rollback when the audit insert fails.
+- [x] Upload validation restricts names, declared MIME types, base64 input size, decoded file size (5 MiB), and document count (1–4); document bytes are not returned by the list endpoint.
+- [x] No API read/download route for `organization_documents.file_data` or reviewer document-review route was found in the reviewed API controller/search results. This is a document workflow completeness gap; no new retrieval/review route was invented during a security audit.
+- [ ] Before adding any document retrieval/review workflow, verify file signatures rather than trusting declared MIME type, enforce safe download headers/content disposition, authorize reviewers explicitly, audit every read/review, and test cross-organization denial.
+- [x] No dedicated Sports Transfer document, negotiation-room, offer, or transaction-document route was found in the reviewed Sports Transfer controller. The current Sports Transfer API remains profiles, consents, organizations/memberships, mandates, quotes, and private opportunity drafts/listing.
+- [x] No production data or services changed.
+- [ ] Continue repository-wide review of any frontend document access assumptions and other controllers that may handle sports-related records before closing the authorization audit.
