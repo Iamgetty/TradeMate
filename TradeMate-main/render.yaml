@@ -10,6 +10,8 @@ services:
     healthCheckPath: /api/health
     autoDeployTrigger: checksPass
     envVars:
+      - key: NODE_VERSION
+        value: 24.22.1
       - key: NODE_ENV
         value: production
       - key: WEB_ORIGIN
@@ -37,6 +39,9 @@ services:
     startCommand: npm start
     healthCheckPath: /health
     autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_VERSION
+        value: 24.22.1
   - type: web
     name: trademate-web
     runtime: node
@@ -46,5 +51,7 @@ services:
     startCommand: node .next/standalone/server.js
     autoDeployTrigger: checksPass
     envVars:
+      - key: NODE_VERSION
+        value: 24.22.1
       - key: TRADEMATE_API_ORIGIN
         value: https://trademate-api-toip.onrender.com
