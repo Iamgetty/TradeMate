@@ -35,7 +35,7 @@ test('ordinary API JSON requests retain the 1 MiB body limit', async () => {
   }
 });
 
-test('feed-post creation accepts the encoded-size envelope for four 5 MiB attachments', async () => {
+test('feed posts and organization documents accept four 5 MiB Base64 uploads', async () => {
   const server = await startParserServer();
   try {
     const fiveMiBImage = Buffer.alloc(5 * 1024 * 1024);
@@ -48,24 +48,39 @@ test('feed-post creation accepts the encoded-size envelope for four 5 MiB attach
     }));
     const body = JSON.stringify({ type: 'post', title: 'Test', body: 'Maximum attachment envelope', attachments });
     assert.ok(Buffer.byteLength(body) < 28 * 1024 * 1024);
-    const response = await postJson(server.url, '/api/feed/posts', body);
-    assert.equal(response.status, 200);
+    const feedResponse = await postJson(server.url, '/api/feed/posts', body);
+    assert.equal(feedResponse.status, 200);
+
+    const organizationBody = JSON.stringify({ files: attachments.map((file) => ({
+      fileName: file.name,
+      mimeType: file.type,
+      dataBase64: file.data,
+    })) });
+    assert.ok(Buffer.byteLength(organizationBody) < 28 * 1024 * 1024);
+    const organizationResponse = await postJson(
+      server.url,
+      '/api/organizations/123e4567-e89b-12d3-a456-426614174000/documents',
+      organizationBody,
+    );
+    assert.equal(organizationResponse.status, 200);
   } finally {
     await server.close();
   }
 });
 
-test('the larger JSON allowance is not granted to other feed routes or methods', async () => {
+test('the larger JSON allowance is not granted to unrelated routes, malformed organization IDs, or other methods', async () => {
   const server = await startParserServer();
   try {
     const body = JSON.stringify({ payload: 'x'.repeat(1024 * 1024) });
     const otherFeedRoute = await postJson(server.url, '/api/feed/posts/123/comments', body);
+    const malformedOrganizationPath = await postJson(server.url, '/api/organizations/not-a-uuid/documents', body);
     const wrongMethod = await fetch(server.url + '/api/feed/posts', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body,
     });
     assert.equal(otherFeedRoute.status, 413);
+    assert.equal(malformedOrganizationPath.status, 413);
     assert.equal(wrongMethod.status, 413);
   } finally {
     await server.close();
