@@ -1,5 +1,5 @@
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, HttpCode, HttpException, HttpStatus, Module, NotFoundException, OnModuleDestroy, Param, Post, Patch, Delete, Query, Req, Res, UnauthorizedException } from '@nestjs/common';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, randomInt, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { Pool } from 'pg';
 import type { PoolClient } from 'pg';
@@ -172,7 +172,7 @@ class HealthController {
 @Controller('auth')
 class AuthController {
   @Post('register')
-  async register(@Body() body: { email?: string; password?: string; displayName?: string }, @Req() request: Request, @Res({ passthrough: true })) {
+  async register(@Body() body: { email?: string; password?: string; displayName?: string }, @Req() request: Request) {
     parseBody(registerBodySchema, body);
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
