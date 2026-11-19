@@ -4,6 +4,7 @@ const {
   isAllowedMarketFeedOrigin,
   marketFeedClientIp,
   marketFeedBookFreshness,
+  marketFeedSequenceAction,
   MARKET_FEED_LIMITS,
 } = require('../dist/market-feed');
 
@@ -67,4 +68,22 @@ test('market feed book freshness expires data older than the configured threshol
 
 test('market feed book freshness clamps small future clock skew to zero age', () => {
   assert.deepEqual(marketFeedBookFreshness(20_100, 20_000), { stale: false, ageMs: 0 });
+});
+
+test('Bybit order-book deltas require an exact previous update ID', () => {
+  assert.equal(marketFeedSequenceAction(100, 101, 100, 'previous'), 'apply');
+  assert.equal(marketFeedSequenceAction(100, 102, 100, 'previous'), 'apply');
+  assert.equal(marketFeedSequenceAction(100, 101, 99, 'previous'), 'resync');
+  assert.equal(marketFeedSequenceAction(null, 101, 100, 'previous'), 'resync');
+});
+
+test('Coinbase level2 updates require contiguous sequence numbers', () => {
+  assert.equal(marketFeedSequenceAction(200, 201, undefined, 'incremental'), 'apply');
+  assert.equal(marketFeedSequenceAction(200, 202, undefined, 'incremental'), 'resync');
+  assert.equal(marketFeedSequenceAction(200, 200, undefined, 'incremental'), 'ignore');
+});
+
+test('sequence validation rejects unsafe and malformed sequence values', () => {
+  assert.equal(marketFeedSequenceAction(1, 'not-a-sequence', 1, 'previous'), 'resync');
+  assert.equal(marketFeedSequenceAction(1, Number.MAX_SAFE_INTEGER + 1, 1, 'previous'), 'resync');
 });
