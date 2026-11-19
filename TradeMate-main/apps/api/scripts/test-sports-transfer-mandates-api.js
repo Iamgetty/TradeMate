@@ -83,7 +83,7 @@ async function main() {
     };
     const grantConsent = async (profileId, target, scope) => {
       const response = await call('player', 'POST', '/api/sports-transfer/profiles/' + profileId + '/consents', {
-        ...target, purpose: 'representative_access', scope, expiresAt: expiresAt(),
+        ...target, purpose: 'representative_access', scope: scope ?? { territoryCodes: ['NG'] }, expiresAt: expiresAt(),
       });
       assert.equal(response.status, 201, 'player must be able to grant purpose-specific representative access consent');
       return (await response.json()).consent;
@@ -198,6 +198,9 @@ async function main() {
     assert.equal(rejected.status, 201);
     assert.equal((await rejected.json()).mandate.status, 'rejected');
 
+    await grantConsent(basketball.id, { targetUserId: actors.representative3.userId }, { territoryCodes: [], competitionIds: [] });
+    const emptyScopeMandate = await createMandate(basketball.id, { representativeUserId: actors.representative3.userId });
+    assert.equal(emptyScopeMandate.status, 403, 'an empty consent scope must not grant unrestricted territory access');
     await grantConsent(basketball.id, { targetUserId: actors.representative3.userId }, { territoryCodes: ['NG'] });
     const revokeMandateResponse = await createMandate(basketball.id, { representativeUserId: actors.representative3.userId });
     assert.equal(revokeMandateResponse.status, 201);
