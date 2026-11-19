@@ -4111,7 +4111,7 @@ class PublicMarketQuotesController {
         if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(timestamp) || timestamp <= 0) {
           throw new Error('Upstream returned no current quote');
         }
-        const value = {
+        const value: MarketQuote = {
           symbol, price, previousClose: Number.isFinite(previous) && previous > 0 ? previous : null,
           changePercent: Number.isFinite(previous) && previous > 0 ? ((price - previous) / previous) * 100 : null,
           currency: typeof meta.currency === 'string' ? meta.currency : null,
