@@ -235,7 +235,7 @@ class AuthController {
         const stillPending = await client.query("SELECT id FROM users WHERE id = $1 AND email_verified_at IS NULL AND status = 'pending' FOR UPDATE", [account.rows[0].id]);
         if (stillPending.rowCount) {
           code = String(randomInt(0, 1000000)).padStart(6, '0');
-          await client.query('DELETE FROM email_verification_codes WHERE user_id = $1 OR expires_at <= now() OR used_at IS NOT NULL', [account.rows[0].id]);
+          await client.query('DELETE FROM email_verification_codes WHERE user_id = $1', [account.rows[0].id]);
           await client.query("INSERT INTO email_verification_codes (user_id, code_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes')", [account.rows[0].id, tokenDigest(code)]);
           await client.query("INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.email_verification_requested', 'user', $1, '{}'::jsonb)", [account.rows[0].id]);
         }
