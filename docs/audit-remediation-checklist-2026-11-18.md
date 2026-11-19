@@ -641,3 +641,12 @@ Sources rechecked on the remediation branch: apps/api/src/module.ts (authenticat
 - [x] Retained the existing assertions that the replacement digest is persisted and receives a fresh attempt budget.
 - [ ] Await CI for the resulting PR head. No local build or integration-test execution is claimed.
 - [x] The change is limited to the resend cleanup predicate and its integration regression coverage. It does not introduce global cleanup, alter code expiry/attempt semantics, or change database roles, RLS, migrations, production configuration, data, services or deployments.
+
+
+## 51. Scope password-reset resend cleanup to the requested account (2026-11-19)
+
+- [x] Corrected password-reset request cleanup from `DELETE FROM password_reset_tokens WHERE user_id = $1 OR expires_at <= now() OR used_at IS NOT NULL` to `DELETE FROM password_reset_tokens WHERE user_id = $1`. An account-specific reset request can no longer delete expired or consumed reset tokens belonging to unrelated users.
+- [x] Extended `apps/api/scripts/test-auth-audit.js` to create a separate active account with an expired reset token and a used reset token, request a reset for a different active account, and assert both unrelated rows remain unchanged.
+- [x] Adjusted the test email stub to accept the password-reset email while retaining the six-digit verification-code capture for email-verification cases.
+- [ ] Await CI for the resulting PR head. No local build or integration-test execution is claimed.
+- [x] The fix preserves the existing account row lock, transaction, token rotation, audit insert, generic response and email-delivery behavior. No global cleanup, migration, database role, RLS, production data/configuration, service or deployment was changed.
