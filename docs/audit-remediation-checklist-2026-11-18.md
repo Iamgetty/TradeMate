@@ -246,3 +246,12 @@ This checklist records the source/configuration audit findings. Items are not co
 - [x] Extended the database-backed Sports Transfer mandate HTTP integration test to verify active owner/admin visibility and denial for ordinary members, expired admins, future-dated admins, and outsiders.
 - [x] Latest review-branch commit `c2fb08c473c2e263703205785f46ed93c94cbd30`: TradeMate CI run 1552 (`44439610122`) passed all 8/8 jobs, including the updated database-backed Sports Transfer mandate integration cases; Cloudflare compatibility run 368 (`44439610108`) passed.
 - [ ] Continue auditing other Sports Transfer reads for equivalent role/date-scope mismatches. This is a targeted source finding, not a certification of the entire Sports Transfer module.
+
+
+## 23. Sports Transfer organization owner-role escalation — authorization fix (2026-11-19)
+
+- [x] Route review found that an organization admin was prevented from inviting another admin but could still invite a user with the `owner` role, granting owner-level authority without the existing owner's approval.
+- [x] Updated the membership-invitation authorization guard so admins cannot assign either `owner` or `admin`; owners retain the ability to invite either role.
+- [x] Extended the database-backed organization HTTP integration test to assert that an admin's attempt to invite an owner is rejected with HTTP 403.
+- [ ] Run the API build and full database-backed organization/Sports Transfer integration suite against the updated commit; do not treat source edits as runtime validation.
+- [ ] Continue auditing organization-role changes, membership reactivation, and all organization-scoped opportunity/document actions for equivalent privilege escalation paths.
