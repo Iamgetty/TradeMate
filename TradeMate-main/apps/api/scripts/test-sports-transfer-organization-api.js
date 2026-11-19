@@ -125,6 +125,13 @@ async function main() {
       [actors.owner.userId],
     );
     assert.equal(ownerNotification.rowCount, 1, 'organization owners are notified when an invite is accepted');
+    for (const actor of ['expiredAdmin', 'futureAdmin']) {
+      const inactiveManagerNotification = await rawPool.query(
+        "SELECT id FROM user_notifications WHERE user_id = $1 AND title = 'New sporting organization member'",
+        [actors[actor].userId],
+      );
+      assert.equal(inactiveManagerNotification.rowCount, 0, actor + ' is not notified outside the active membership date window');
+    }
     const repeatedAccept = await call('member', 'POST', '/api/sports-transfer/memberships/' + membership.id + '/accept');
     assert.equal(repeatedAccept.status, 404);
 
