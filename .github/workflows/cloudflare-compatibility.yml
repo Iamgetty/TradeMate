@@ -32,7 +32,7 @@ jobs:
         with:
           node-version: 24.22.1
       - name: Install existing frontend dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Scan Next.js application for vinext compatibility
         run: npx --yes vinext@1.4.0 check
 
