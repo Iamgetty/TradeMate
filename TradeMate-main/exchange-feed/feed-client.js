@@ -93,8 +93,12 @@
         last: trades.length ? trades[0].price : mid,
         trades,                                       // [{ exchange, market, ts, price, qty, side }] newest first
         booksCombined: fresh.length,                  // "N exchange books combined"
-        feedsLive: msg.feeds.live,                    // "N/M FEEDS LIVE"
-        feedsTotal: msg.feeds.total,
+        feedsLive: Array.isArray(msg.feeds)
+          ? msg.feeds.filter((feed) => feed && feed.status === 'live' && feed.stale !== true).length
+          : Number.isFinite(msg.feeds.live) ? msg.feeds.live : 0,
+        feedsTotal: Array.isArray(msg.feeds)
+          ? msg.feeds.length
+          : Number.isFinite(msg.feeds.total) ? msg.feeds.total : 0,
         fxQuotes: Array.isArray(msg.fxQuotes) ? msg.fxQuotes : [],
         // Expose every fresh spot ticker to the marketplace list, not just
         // the currently watched coin's order book.
