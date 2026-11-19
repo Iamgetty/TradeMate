@@ -85,7 +85,12 @@ function marketFeedClientIp(request: IncomingMessage): string {
   return request.socket.remoteAddress || 'unknown';
 }
 
-function attachMarketFeed(server: Server) {
+type MarketFeedOptions = {
+  createUpstreamSocket?: (url: string, options: { handshakeTimeout: number }) => WebSocket;
+};
+
+function attachMarketFeed(server: Server, options: MarketFeedOptions = {}) {
+  const createUpstreamSocket = options.createUpstreamSocket ?? ((url, socketOptions) => new WebSocket(url, socketOptions));
   const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
   const sessions = new Set<Session>();
   const connectionsByIp = new Map<string, number>();
@@ -163,7 +168,7 @@ function attachMarketFeed(server: Server) {
     if (session.closed) return;
     feed.status = 'connecting';
     let ws: WebSocket;
-    try { ws = new WebSocket(url, { handshakeTimeout: 10_000 }); } catch {
+    try { ws = createUpstreamSocket(url, { handshakeTimeout: 10_000 }); } catch {
       feed.status = 'unavailable';
       return;
     }
@@ -189,7 +194,7 @@ function attachMarketFeed(server: Server) {
       feed.asks.clear();
       feed.bookAt = 0;
       feed.sequence = null;
-      if (feed.sequenceStatus !== 'unsupported') feed.sequenceStatus = 'awaiting_snapshot';
+      if (feed.sequenceStatus !== 'unsupported' && feed.sequenceStatus !== 'gap') feed.sequenceStatus = 'awaiting_snapshot';
       const attempts = feed.reconnectAttempts || 0;
       const backoffMs = Math.min(30_000, 1_000 * (2 ** Math.min(attempts, 5)));
       const jitterMs = Math.floor(Math.random() * 500);
