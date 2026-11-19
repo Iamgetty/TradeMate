@@ -90,9 +90,9 @@ test.describe('OpenSea NFT route resilience', () => {
 
   test('collection discovery bounds the OpenSea request with an abort signal', async () => {
     process.env.OPENSEA_API_KEY = 'test-key';
-    let capturedSignal: AbortSignal | null = null;
+    const capturedSignals: AbortSignal[] = [];
     globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
-      capturedSignal = init?.signal as AbortSignal;
+      if (init?.signal) capturedSignals.push(init.signal as AbortSignal);
       return new Response(JSON.stringify({ collections: [] }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -101,7 +101,8 @@ test.describe('OpenSea NFT route resilience', () => {
 
     const response = await listCollections(new Request('https://web.example/api/nft-collections'));
     expect(response.status).toBe(200);
-    expect(capturedSignal).toBeInstanceOf(AbortSignal);
-    expect(capturedSignal?.aborted).toBe(false);
+    expect(capturedSignals).toHaveLength(1);
+    expect(capturedSignals[0]).toBeInstanceOf(AbortSignal);
+    expect(capturedSignals[0].aborted).toBe(false);
   });
 });
