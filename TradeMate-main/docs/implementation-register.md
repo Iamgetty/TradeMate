@@ -1,6 +1,6 @@
 # TradeMate implementation register
 
-**Canonical cross-stack status ledger.** Updated: 2026-11-19  
+**Canonical cross-stack status ledger.** Updated: 2026-11-19 (CI evidence refreshed)  
 **Branch baseline:** `fix/audit-remediation-2026-11-18`  
 **Rule:** no domain is complete merely because its first component exists. Repository implementation, CI verification, staging validation and production acceptance are tracked separately.
 
@@ -41,7 +41,7 @@
 | RLS pilot refuses generic `DATABASE_URL` and requires a dedicated test URL | Commit `2ea5d8ce467e7fb6996de186c9af6dec8efd85f0`; `TradeMate-main/apps/api/scripts/test-rls-pilot.js` | ✓ Implemented in repository; CI result pending |
 | CI supplies dedicated disposable RLS test database URL | Commit `3b7072f75f388b80967c122d6eec5736cc485709`; `.github/workflows/ci.yml` | ✓ Implemented in repository; CI result pending |
 | Regression tests for RLS pilot connection guard | Commit `7a02a33e11c91380be98055b942bb0711adb0529`; `TradeMate-main/apps/api/test/test-rls-pilot-safety.test.cjs` | ✓ Test cases added; execution not yet verified |
-| CI validation of the above increment | Workflow run `44481915364` was cancelled before the database job/RLS step completed | ◐ Pending; do not mark passed |
+| CI validation of the above increment | Current PR-head workflow run [44482164593](https://github.com/Iamgetty/TradeMate/actions/runs/44482164593): API build + security validation, web build/runtime, exchange-feed + MT5 tests, and both container builds have completed successfully. Database integration, browser acceptance, security scanning and isolated Cloudflare runtime jobs were still running at last check; the RLS pilot step has not yet executed. | ◐ In progress; RLS guard regression and pilot execution remain unverified |
 | Production RLS enablement | Not performed; live audit found RLS disabled on all 50 application tables with zero policies | ☐ Not implemented; intentionally blocked pending safe design and adversarial tests |
 
 ## Update template
