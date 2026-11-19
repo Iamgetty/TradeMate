@@ -809,3 +809,151 @@ This is a roadmap commitment and target architecture, not a claim that products 
 7. No production firewall/DNS/identity setting, endpoint agent, database role/policy, secret, vendor subscription, deployment or cutover is changed by this roadmap entry; each requires its own reviewed implementation and authorization.
 
 **Completion criterion:** TradeMate does not claim global security because it uses named products. Material threats must have layered preventive, detective, responsive and recovery controls, tested under realistic adversarial conditions, continuously monitored and independently assessed where appropriate.
+
+
+## Global technology excellence standard — all stacks
+
+### Objective and governing principle
+
+Establish TradeMate as a globally competitive, best-in-class financial technology platform across **every technology stack and operating discipline**, not security alone. “Best” means demonstrably fit for TradeMate's product, users, markets, regulatory obligations and risk profile—not simply the newest, most expensive or most fashionable technology. The standard applies to existing systems, new capabilities, vendor choices, architecture decisions and future migrations.
+
+This section is a roadmap and evaluation mandate. It does not assert that any capability is already implemented, certified or production-ready. Adding an item here does not authorize a purchase, subscription, migration, production configuration change, deployment, data movement or cutover. Existing production controls and approval requirements remain in force.
+
+### Global decision and engineering standard
+
+For every material stack or platform decision:
+
+1. Inventory the current implementation, versions, dependencies, data flows, owners, operational constraints, technical debt and known risks. Verify repository and deployed state separately; do not assume they match.
+2. Define user and business outcomes, workload profiles, target markets, threat model, regulatory constraints, availability needs and measurable acceptance criteria.
+3. Benchmark credible leading options, including proven open standards and build-versus-buy alternatives. Use current primary documentation, independent evidence, realistic proof-of-concepts and relevant production references.
+4. Compare options consistently across security and privacy, correctness, performance, scalability, reliability, recoverability, interoperability, accessibility, developer productivity, operational maturity, support, regional availability, compliance fit, total cost of ownership, portability and vendor lock-in.
+5. Record the decision, alternatives rejected, assumptions, risks, lifecycle costs, exit strategy, owner and review date in an architecture decision record (ADR).
+6. Define target architecture and a staged implementation/migration plan with compatibility, rollback, observability, data integrity and operational-readiness requirements.
+7. Prove the result with automated tests and representative workload or user validation before release. Define measurable SLOs, SLIs, KPIs, error budgets where appropriate, alerts, dashboards, runbooks and accountable operational ownership.
+8. Reassess material decisions periodically and when scale, threat landscape, regulation, vendor lifecycle or product requirements change.
+
+Prefer composable, standards-based and portable designs where they improve resilience and bargaining power. Avoid unnecessary complexity, premature microservices, speculative rewrites and technology churn. Select the simplest architecture that meets the verified global requirements with adequate headroom.
+
+### Technology domains and roadmap requirements
+
+#### 1. Web frontend, product experience and design systems
+- Evaluate modern, maintainable frontend architecture, rendering strategy, component systems, state/data-fetching patterns, forms, routing and error handling against actual product needs.
+- Set measurable standards for usability, responsive behavior, interaction latency, Core Web Vitals, bundle size, resilience on weak networks and browser/device compatibility.
+- Make accessibility a release requirement, targeting WCAG 2.2 AA where applicable; include keyboard, screen-reader, contrast, reduced-motion and localization validation.
+- Establish a coherent design system, reusable components, visual regression coverage, product analytics with privacy controls, and consistent loading/empty/error states.
+
+#### 2. Backend architecture, APIs and distributed systems
+- Evaluate service boundaries, modularity, synchronous/asynchronous communication, event-driven patterns, queues, idempotency, consistency, retries, timeouts, back-pressure and graceful degradation.
+- Standardize API design, versioning, schema contracts, validation, pagination, rate limits, error semantics, authentication/authorization boundaries and machine-readable documentation.
+- Require explicit capacity models, latency budgets, concurrency limits, dependency isolation and safe failure behavior for critical workflows.
+- Prefer well-defined modular architecture over splitting services without evidence that independent scaling, deployment or ownership justifies the added distributed-systems cost.
+
+#### 3. Databases, storage and data engineering
+- Assess relational and other storage technologies against transactional correctness, query patterns, growth, durability, consistency, availability, recovery objectives, encryption, access control and operational burden.
+- Establish schema/migration governance, indexing and query-performance budgets, connection-pool limits, backup/restore drills, point-in-time recovery validation, retention and archival policies.
+- Define data ownership, lineage, quality checks, classification, minimization, retention, deletion, auditability and controlled access across operational and analytical data.
+- For streaming, caching, search and analytical platforms, validate ordering, replay, deduplication, freshness, failure recovery and source-of-truth rules.
+- Require representative load tests and restore evidence; a successful backup job or restore exit code alone is not proof of recoverability or data equivalence.
+
+#### 4. Trading, market data, broker and MT5 infrastructure
+- Treat trading and execution systems as safety-critical financial workflows. Define explicit boundaries between signal generation, risk checks, order management, broker connectivity, execution, reconciliation and portfolio/account state.
+- Evaluate market-data quality, provenance, timestamps, clock synchronization, stale/out-of-order detection, symbol mapping, session calendars, corporate actions where relevant and feed failover.
+- Specify order lifecycle state machines, idempotent submission, duplicate prevention, partial fills, rejects, timeouts, reconnect behavior, reconciliation and deterministic audit trails.
+- Require pre-trade and runtime risk controls, exposure/position limits, kill switches, market/session safeguards, strategy isolation and fail-closed behavior where appropriate.
+- Validate MT5 terminal/manager or broker integrations with contract tests, sandbox/demo environments, failure injection and reconciliation tests. Never infer broker execution guarantees from a successful API response alone.
+- Separate research/backtesting from live execution; address look-ahead and survivorship bias, realistic spreads/slippage/fees, latency assumptions, reproducibility and independent strategy validation.
+- No live-trading enablement, broker cutover or changes to production execution/risk settings without explicit authorization and completed release gates.
+
+#### 5. AI, machine learning and quantitative intelligence
+- Establish a governed model lifecycle covering data provenance, consent and rights, feature/label quality, reproducibility, evaluation, versioning, deployment, monitoring, rollback and retirement.
+- Benchmark models against task-specific baselines and out-of-sample datasets; measure calibration, robustness, drift, latency, cost and failure modes—not headline accuracy alone.
+- Apply human oversight and explicit permission boundaries to consequential financial actions. Models must not bypass authorization, risk limits, suitability rules or deterministic controls.
+- Evaluate prompt injection, data leakage, model supply-chain risk, insecure tool use, privacy, explainability and abuse resistance for AI-enabled features.
+- Keep model outputs distinguishable from verified facts; provide audit records and safe fallback behavior. Do not introduce autonomous live trading or other high-impact automation without separately approved controls and validation.
+
+#### 6. Cloud, infrastructure, networking and compute
+- Compare cloud and hosting architectures for regional coverage, service maturity, resilience, latency, security controls, support, compliance, portability and full lifecycle cost.
+- Standardize infrastructure as code, immutable/repeatable environments, least-privilege identities, network segmentation, private connectivity where appropriate, managed secrets and controlled configuration.
+- Define container/runtime standards, resource requests and limits, patching, image provenance, artifact retention, autoscaling and capacity planning.
+- Design for regional failure and dependency outages where business impact warrants it; document data residency, cross-region replication and recovery trade-offs.
+- Avoid provider-specific commitments without an explicit portability and exit assessment. No cloud migration or production infrastructure change is authorized by this roadmap entry.
+
+#### 7. Mobile and cross-platform applications
+- Determine native, cross-platform or progressive-web approaches from user needs, device capabilities, security, performance, accessibility and maintenance cost.
+- Define secure local storage, session lifecycle, device compromise considerations, network trust, offline behavior, push-notification privacy and app update strategy.
+- Establish supported OS/device matrices, crash-free and startup targets, accessibility checks, automated device testing and release-channel controls.
+
+#### 8. Integrations and interoperability
+- Maintain an inventory and ownership map for payment, identity, market-data, broker, email, messaging, analytics and other third-party integrations.
+- Require documented contracts, scoped credentials, rotation, rate-limit handling, retries, idempotency, webhook signature validation, replay protection, timeouts and circuit breakers.
+- Assess vendor resilience, incident history, support SLAs, data processing terms, geographic availability, regulatory fit, exit rights and substitution cost.
+- Prefer open protocols and stable interfaces; isolate vendor-specific logic behind adapters and test contract compatibility continuously.
+
+#### 9. DevOps, platform engineering and release engineering
+- Improve reproducible builds, dependency management, CI/CD integrity, artifact signing/provenance, environment parity, deployment safety and rollback.
+- Standardize infrastructure and application configuration, secret injection, policy-as-code, branch protections, review requirements and auditable change approvals.
+- Evaluate progressive delivery (feature flags, canaries and controlled rollouts) according to service criticality and available telemetry.
+- Establish developer self-service and paved paths without weakening security, auditability or production controls.
+
+#### 10. Testing, quality and performance engineering
+- Define a risk-based quality strategy spanning unit, component, integration, contract, end-to-end, migration, accessibility, security, load, stress, soak, resilience and recovery testing.
+- Require tests for critical financial invariants, authorization boundaries, concurrency, idempotency, rounding/precision, time zones, market sessions and failure recovery.
+- Use representative datasets and workload profiles; establish performance budgets and regression thresholds for critical user and trading paths.
+- Use fault injection and chaos experiments only in controlled, authorized environments with blast-radius limits and abort criteria.
+- Treat flaky tests, skipped checks and unverified manual steps as tracked quality risks, not successful evidence.
+
+#### 11. Observability, analytics and operational intelligence
+- Establish structured, correlated logs, metrics and distributed traces with consistent service, environment and request identifiers.
+- Define actionable dashboards, alert thresholds, on-call ownership, incident severity, escalation paths and runbooks for critical services.
+- Measure user experience, API latency/error rates, data freshness, market-feed health, order lifecycle health, database saturation, queue lag, infrastructure cost and recovery performance.
+- Apply privacy-aware telemetry, data minimization, access controls and retention limits; never log credentials, session tokens or sensitive financial data unnecessarily.
+- Use analytics and experimentation with clear event definitions, data quality checks and safeguards against misleading metrics.
+
+#### 12. Security, identity and privacy
+- Apply the detailed **Global technology and security standard — mandatory cross-stack roadmap** section in this roadmap as the security baseline for every domain.
+- Integrate secure-by-design threat modeling, identity and access management, privacy engineering, encryption, secure SDLC, supply-chain controls, vulnerability management, incident response and independent assurance throughout architecture and delivery.
+- Security and privacy are release gates, not optional specialist add-ons. Do not duplicate the detailed security workstream; maintain traceability between domain-specific work and its controls.
+
+#### 13. Reliability, resilience and business continuity
+- Classify services and workflows by criticality; define service-level objectives, availability targets, latency targets, recovery time objectives (RTOs) and recovery point objectives (RPOs).
+- Design and test graceful degradation, dependency isolation, queue recovery, failover, backups, restore, disaster recovery and business continuity.
+- Ensure critical trading, account, payment and identity workflows have explicit safe-state behavior and operational ownership.
+- Conduct periodic recovery exercises and record evidence, gaps, remediation owners and completion dates.
+
+#### 14. Compliance, localization and global readiness
+- Maintain a jurisdiction and product-feature matrix covering applicable financial-services, privacy, consumer-protection, records, accessibility, tax and data-residency obligations, with qualified legal/compliance review.
+- Design for localization of language, number/date formats, currencies, time zones, calendars, regional payment methods and market trading sessions.
+- Define controls for data subject rights, consent, retention, export, deletion, audit records and cross-border transfers where applicable.
+- Do not claim regulatory approval, certification or legal compliance solely from technical implementation; require documented assessment by qualified owners.
+
+#### 15. Developer experience, architecture governance and maintainability
+- Establish coding standards, type safety, linting/formatting, documentation, dependency hygiene, code ownership and review expectations across repositories.
+- Track complexity, duplication, dependency health, technical debt, maintainability and upgrade lifecycle; prioritize remediation by risk and business impact.
+- Maintain architecture diagrams, data-flow diagrams, service catalogues, ADRs, ownership records and operational documentation.
+- Evaluate developer tooling by measurable improvements in delivery quality, cycle time and reliability while protecting source code and sensitive data.
+- Defer broad file/folder restructuring and large-scale code movement until the designated end-of-roadmap cleanup phase, unless a specific safety or correctness issue requires earlier targeted action.
+
+### Global acceptance gates
+
+A material technology initiative is not complete until its owner can demonstrate:
+
+- A verified current-state inventory and documented problem statement.
+- An approved ADR and target architecture, including alternatives, risks, cost and exit strategy.
+- Security, privacy, compliance and data-governance review appropriate to the system's risk.
+- Automated functional, integration, contract and relevant non-functional tests with recorded evidence.
+- Measured performance, capacity and reliability against agreed targets using representative conditions.
+- Monitoring, alerts, runbooks, support ownership, backup/recovery and incident procedures appropriate to criticality.
+- A staged rollout and rollback plan, compatibility assessment and explicit authorization for any production-impacting action.
+- Updated technical documentation, service ownership and a scheduled reassessment date.
+
+### Delivery sequence and controls
+
+1. **Discover and baseline:** inventory all stacks, services, integrations, versions, owners, data flows, costs, SLOs and known gaps.
+2. **Prioritize:** rank work by user impact, financial/trading risk, security/privacy exposure, reliability, regulatory urgency, scale constraints and cost of delay.
+3. **Set target standards:** publish domain-specific reference architectures, engineering standards, decision records and measurable quality gates.
+4. **Prove before adopting:** run isolated prototypes and benchmarks; validate migration, portability, vendor exit and operational assumptions.
+5. **Implement incrementally:** sequence low-risk foundations before dependent migrations; preserve compatibility and provide rollback.
+6. **Verify and operate:** collect acceptance evidence, establish operational ownership and monitor real outcomes.
+7. **Continuously improve:** review architecture, technology lifecycle, incidents, costs, performance and market-leading alternatives on a defined cadence.
+
+The technology inventory, baseline and prioritization are prerequisites to selecting specific upgrades. Vendor and product names in other roadmap material are evaluation candidates only unless a separate decision record and approval explicitly select them. No tool purchase, vendor commitment, production change, deployment, merge, infrastructure migration, database change or trading cutover is authorized merely by this roadmap section.
