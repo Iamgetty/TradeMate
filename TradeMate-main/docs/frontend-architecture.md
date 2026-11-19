@@ -94,7 +94,18 @@ Treat the web asset as the source of truth for the currently deployed TradeMate 
 
 
 
-### Exchange-feed order-book freshness
+### Exchange-feed sequence integrity and resynchronisation
+
+Order-book freshness and sequence continuity are separate safety properties. A recently received update is not sufficient evidence that no intermediate updates were missed.
+
+- Bybit spot and linear order books now accept a snapshot only when its update ID is a safe integer. Delta frames are applied only when their `pu` previous-update ID equals the last accepted `u` update ID. Duplicate/older updates are ignored; a missing or discontinuous sequence invalidates the local book, marks it unavailable, closes the upstream socket and relies on the venue's reconnect subscription to deliver a new snapshot before deltas resume.
+- Coinbase Exchange level2 books now seed from a sequenced snapshot and accept only contiguous `sequence_num` updates. Duplicate/older frames are ignored. A gap or malformed sequence invalidates the book and forces a reconnect/resubscription; the book remains unavailable until a new snapshot is received.
+- Published venue snapshots expose `sequenceStatus` and the last accepted `sequence`. Books awaiting a new snapshot or marked with a gap remain stale and are excluded from downstream aggregation.
+- Binance currently uses the partial-depth `depth20@100ms` stream, which does not provide the diff-depth snapshot/update-ID continuity contract needed for equivalent gap detection. Its sequence status is explicitly `unsupported`; do not represent Binance books as sequence-verified. A future Binance implementation must use the documented REST snapshot plus diff-depth stream bridge, including the snapshot `lastUpdateId`, buffered event replay, update-range continuity checks, and restart on gaps.
+
+The current automated tests cover the protocol sequence decision rules (Bybit previous-update linkage, Coinbase contiguous sequence numbers, duplicates/older frames, missing/unsafe values) as well as prior freshness and stale-book exclusion. These tests validate the sequence decision primitive, not live venue protocol conformance or end-to-end reconnect timing. Production acceptance still requires recorded fixtures from each venue, integration tests that drive the actual websocket handlers through snapshot/delta/gap/reconnect, venue documentation review, and a safe staging soak.
+
+## Exchange-feed order-book freshness
 
 The NestJS market-feed publisher timestamps each venue's latest order-book update. A connected upstream socket is not, by itself, evidence that its last book is still current.
 
