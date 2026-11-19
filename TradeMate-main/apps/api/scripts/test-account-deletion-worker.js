@@ -67,7 +67,7 @@ async function main() {
     );
     await client.query(
       `INSERT INTO public.user_sessions (user_id, token_hash, expires_at)
-       VALUES ($1, 'fixture-session-' || $1::text, now() + interval '1 day')`,
+       VALUES ($1::uuid, 'fixture-session-' || $1::text, now() + interval '1 day')`,
       [userId],
     );
     await client.query(
