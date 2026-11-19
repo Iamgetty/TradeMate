@@ -291,27 +291,16 @@ function attachMarketFeed(server: Server) {
       const feed = addFeed(session, 'coinbase', 'spot');
       connect(session, feed, 'wss://ws-feed.exchange.coinbase.com', (d) => {
         if (d.type === 'snapshot' && d.product_id === product) {
-          const sequence = Number(d.sequence_num);
-          if (!Number.isSafeInteger(sequence) || sequence < 0) {
-            feed.sequenceStatus = 'gap';
-            feed.bids.clear(); feed.asks.clear(); feed.bookAt = 0;
-            feed.socket?.close();
-            return;
-          }
+          // Coinbase Exchange classic level2 snapshots contain the full book but
+          // do not define a sequence_num field in this feed contract.
           feed.bids.clear(); feed.asks.clear();
           putLevels(feed.bids, d.bids); putLevels(feed.asks, d.asks);
-          feed.sequence = sequence;
-          feed.sequenceStatus = 'synchronized';
+          feed.sequence = null;
+          feed.sequenceStatus = 'unsupported';
           feed.bookAt = Date.now();
         } else if (d.type === 'l2update' && d.product_id === product) {
-          const action = marketFeedSequenceAction(feed.sequence, d.sequence_num, undefined, 'incremental');
-          if (action === 'ignore') return;
-          if (action === 'resync') {
-            feed.sequenceStatus = 'gap';
-            feed.bids.clear(); feed.asks.clear(); feed.bookAt = 0;
-            feed.socket?.close();
-            return;
-          }
+          // The classic Exchange level2 channel guarantees delivery. Do not apply
+          // Advanced Trade's sequence_num schema to this different endpoint.
           const changes = Array.isArray(d.changes) ? d.changes as unknown[] : [];
           for (const change of changes) {
             if (!Array.isArray(change) || change.length < 3) continue;
