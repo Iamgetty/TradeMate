@@ -5,7 +5,7 @@ services:
     runtime: node
     plan: free
     rootDir: TradeMate-main/apps/api
-    buildCommand: npm install --include=dev && npm run build
+    buildCommand: npm ci --include=dev --no-audit --no-fund && npm run build
     startCommand: npm run db:migrate && npm run start:prod
     healthCheckPath: /api/health
     autoDeployTrigger: checksPass
@@ -35,7 +35,7 @@ services:
     runtime: node
     plan: free
     rootDir: TradeMate-main/exchange-feed
-    buildCommand: npm install
+    buildCommand: npm ci --no-audit --no-fund
     startCommand: npm start
     healthCheckPath: /health
     autoDeployTrigger: checksPass
@@ -47,7 +47,7 @@ services:
     runtime: node
     plan: free
     rootDir: TradeMate-main/apps/web
-    buildCommand: npm install && npm run build && mkdir -p .next/standalone/public .next/standalone/.next && cp -R public/. .next/standalone/public/ && cp -R .next/static .next/standalone/.next/
+    buildCommand: npm ci --no-audit --no-fund && npm run build && mkdir -p .next/standalone/public .next/standalone/.next && cp -R public/. .next/standalone/public/ && cp -R .next/static .next/standalone/.next/
     startCommand: node .next/standalone/server.js
     autoDeployTrigger: checksPass
     envVars:
