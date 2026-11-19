@@ -165,3 +165,12 @@ This checklist records the source/configuration audit findings. Items are not co
 - [ ] Decide and document a supported Node/npm matrix for API, web, exchange-feed, CI, Docker, and Render before generating lockfiles. Check framework and dependency engine requirements against that matrix.
 - [ ] Generate each lockfile using the selected npm version, then validate clean `npm ci`, build/tests, security audit, and container builds in the corresponding Node runtime. Do not mark complete based on a lockfile being present.
 - [ ] Only after clean validation, update CI and Docker install commands to `npm ci`; preserve separate production `--omit=dev` install behavior where required and test the resulting images.
+
+
+## 16. Render Node runtime pinning — deployment source audit (2026-11-19)
+
+- [x] Re-inspected the review-branch `TradeMate-main/render.yaml`: all three Render services declare `runtime: node` but do not pin a Node version in the Blueprint or a checked-in `.node-version`/`.nvmrc` file at the inspected locations.
+- [x] Confirmed the Blueprint build commands use `npm install` for API, web, and exchange-feed. The API and exchange-feed Dockerfiles use Node 22, while primary CI jobs currently use Node 20 and the isolated Cloudflare compatibility job uses Node 22.
+- [ ] Select one supported Node major for all three services and CI. Node 22 is the leading alignment candidate because both runtime Dockerfiles and the Cloudflare compatibility job already use it; verify framework engine constraints and Render's supported Node version mechanism before pinning.
+- [ ] Pin the selected Node version for Render and local development (for example, a repository `.node-version` plus an explicit Render `NODE_VERSION` setting if supported), then validate all builds/tests and production startup on that exact major before deployment.
+- [ ] Keep the live Render services unchanged until this has been validated and separately approved. This is a source configuration finding only; no live Render settings were changed.
