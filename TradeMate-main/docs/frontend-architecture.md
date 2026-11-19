@@ -107,6 +107,8 @@ The NestJS market-feed publisher timestamps each venue's latest order-book updat
 
 The 10-second threshold is an initial engineering policy, not a measured universal optimum. Before production acceptance, validate it against each venue's update cadence, instrument liquidity, market sessions, network latency and user-facing quote requirements. Do not use this threshold as a substitute for provider sequence-gap detection, snapshot resynchronization, cross-venue divergence checks or operational alerting.
 
+Validation evidence: the API TypeScript build and API security test suite passed; the exchange-feed/MT5 test job passed all 28 tests, including stale venue exclusion, feed-array health counts and numeric depth aggregation against both maintained client copies. Full TradeMate CI run 1736 passed all 8/8 jobs on head `19a91443d51af261bd5f1932bc65d86371ad4305` ([run 1736](https://github.com/Iamgetty/TradeMate/actions/runs/44577177274)); Cloudflare compatibility run 548 also passed on that head ([run 548](https://github.com/Iamgetty/TradeMate/actions/runs/44577177026)). This verifies repository behavior in CI only; it does not establish live-venue performance or production acceptance.
+
 ## CoinGecko refresh: field-level ownership verified
 
 A direct inspection of the current `liveRefresh()` implementation confirms a narrower contract than a generic “market refresh” description suggests:
