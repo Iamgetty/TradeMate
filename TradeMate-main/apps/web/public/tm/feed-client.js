@@ -53,9 +53,12 @@
 
     function aggregate(levels, side) {
       const m = new Map();
-      for (const [p, s] of levels) {
-        const k = bucket(p, side);
-        m.set(k, (m.get(k) || 0) + s);
+      for (const [rawPrice, rawSize] of levels) {
+        const price = Number(rawPrice);
+        const size = Number(rawSize);
+        if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(size) || size <= 0) continue;
+        const k = bucket(price, side);
+        m.set(k, (m.get(k) || 0) + size);
       }
       const rows = [...m.entries()]
         .sort((a, b) => (side === 'bid' ? b[0] - a[0] : a[0] - b[0]))
