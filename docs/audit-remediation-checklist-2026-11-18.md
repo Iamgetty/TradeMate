@@ -419,3 +419,14 @@ This checklist records the source/configuration audit findings. Items are not co
 - [x] No cross-user ticket, notification, preference or feedback access path was identified in these controller methods. No unauthenticated support write route was found.
 - [ ] Operational follow-up: the reviewed customer-facing controller contains no staff support-ticket queue, staff reply, assignment, or resolution endpoint. Confirm whether support operations are handled by a separate trusted system; otherwise the in-app ticket workflow currently supports user submission and reply but not staff handling through this API. This is a workflow-completeness question, not an authorization bypass.
 - [x] No source behavior changed. No runtime tests were run in this source-review pass. No production data, services, deployments, or infrastructure were changed.
+
+
+## 39. Upload content signature hardening (2026-11-19)
+
+- [x] Added shared upload-signature validation for JPEG, PNG, WebP, GIF, PDF, WebM, Ogg, MP4, MPEG audio, and WAV content.
+- [x] Applied signature checks to community-feed attachments after canonical Base64 and size validation; a client-supplied MIME label or matching data-URL MIME is no longer sufficient by itself.
+- [x] Applied decoded-byte signature validation to profile and cover image data URLs, with canonical Base64 enforcement and a 650 KiB decoded-byte ceiling per image.
+- [x] Added unit regression coverage for valid signatures, MIME spoofing, truncated/unsupported payloads, malformed Base64, and oversized profile images.
+- [ ] GitHub Actions for commit 8eb6123527d4d97bdf21c3b0eedea774efbd812d were queued/in progress at review time. Do not mark the changes CI-verified until both TradeMate CI and Cloudflare compatibility finish successfully.
+- [ ] Signature checks establish file-type correspondence at the container/header level; they are not a full malware scan or a guarantee that every image/audio/document decoder will accept the entire payload. Consider safe image decode/re-encode and isolated document inspection as separate defense-in-depth work.
+- [x] No production data, services, deployments, or infrastructure were changed.
