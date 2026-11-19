@@ -19,10 +19,11 @@ const listing = {
 };
 
 async function login(page: import('@playwright/test').Page) {
-  await expect(page.getByRole('button', { name: /Sign in/ })).toBeVisible();
+  const submit = page.locator('form.auth-form button.auth-submit');
+  await expect(submit).toHaveText(/Sign in/);
   await page.getByLabel('Email address').fill('buyer@example.test');
   await page.getByLabel('Password').fill('example-password');
-  await page.getByRole('button', { name: /Sign in/ }).click();
+  await submit.click();
 }
 
 test('marketplace enquiry draft survives login and returns to its offer', async ({ page }) => {
