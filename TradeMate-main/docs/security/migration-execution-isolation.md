@@ -16,7 +16,7 @@ The migration runner correctly refuses to fall back to `DATABASE_URL` when `NODE
 
 A second path exists in `.github/workflows/database-migrations.yml`. It can run on migration-related pushes to `main` as well as manually, and its secret check accepts either `TRADEMATE_MIGRATION_DATABASE_URL` or the ordinary `TRADEMATE_DATABASE_URL`. The workflow does not currently establish a reviewed production-environment approval gate or prove that GitHub-hosted runners have safe, stable network access to the production database. It must not be treated as an approved production migration path.
 
-Render documents that pre-deploy commands execute on a separate instance from the running service, but they use the service's configured environment. Moving the command to `preDeployCommand` alone therefore does not remove the migration credential from the API service configuration. Render one-off jobs inherit the environment of their base service, so they also require a dedicated migration-only base service rather than the API service.
+Render documents that pre-deploy commands execute on a separate instance from the running service, but they use the service's configured environment. Moving the command to `preDeployCommand` alone therefore does not remove the migration credential from the API service configuration. In addition, the current `trademate-api` Blueprint plan is `free`, while Render documents pre-deploy commands as available only for paid web services, private services and background workers; this is not an immediately available option without a plan change. Render one-off jobs inherit the environment of their base service, so they also require a dedicated migration-only base service rather than the API service.
 
 ## Security and release requirements
 
