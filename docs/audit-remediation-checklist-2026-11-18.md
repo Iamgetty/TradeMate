@@ -243,5 +243,6 @@ This checklist records the source/configuration audit findings. Items are not co
 - [x] Reviewed player profile consent ownership, mandate creation, representative acceptance/rejection, mandate revocation, organization membership management, and opportunity ownership checks.
 - [x] Found that `GET /api/sports-transfer/mandates/mine` exposed organization-represented mandates to any membership marked active, although mandate acceptance is restricted to active owners/admins. The list query also needed to enforce the same role boundary as the response action.
 - [x] Restricted organization-side mandate visibility to active owner/admin memberships with valid `starts_at` and `expires_at` windows, matching the existing `canRespond` authorization rule. Directly appointed individual representatives retain access to their own mandates.
-- [ ] Add database-backed regression coverage for ordinary member, expired member, future-dated membership, owner, and admin access cases; execute API build/tests on the review branch.
+- [x] Extended the database-backed Sports Transfer mandate HTTP integration test to verify active owner/admin visibility and denial for ordinary members, expired admins, future-dated admins, and outsiders.
+- [ ] Execute the updated mandate integration test and full API build/test suite on the latest review-branch commit.
 - [ ] Continue auditing other Sports Transfer reads for equivalent role/date-scope mismatches. This is a targeted source finding, not a certification of the entire Sports Transfer module.
