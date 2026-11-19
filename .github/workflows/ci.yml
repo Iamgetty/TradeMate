@@ -379,6 +379,23 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/trademate-web"
           cp -a TradeMate-main/apps/web/. "$RUNNER_TEMP/trademate-web/"
+      # npm currently advertises an unpublished webpack 5.113.0 tarball in peer resolution.
+      # Pin the disposable adapter install to the latest published compatible webpack release.
+      # This affects only the CI copy; the Node/Next.js application manifest is unchanged.
+      - name: Stabilize webpack peer resolution in disposable adapter copy
+        working-directory: ${{ runner.temp }}/trademate-web
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'package.json';
+          const manifest = JSON.parse(fs.readFileSync(path, 'utf8'));
+          manifest.overrides ??= {};
+          if (manifest.overrides.webpack && manifest.overrides.webpack !== '5.112.2') {
+            throw new Error('Unexpected existing webpack override; refusing to replace it.');
+          }
+          manifest.overrides.webpack = '5.112.2';
+          fs.writeFileSync(path, JSON.stringify(manifest, null, 2) + '\\n');
+          NODE
       - name: Initialize Cloudflare Workers adapter in disposable copy
         working-directory: ${{ runner.temp }}/trademate-web
         run: |
