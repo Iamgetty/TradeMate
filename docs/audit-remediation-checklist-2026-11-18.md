@@ -273,3 +273,15 @@ This checklist records the source/configuration audit findings. Items are not co
 - [x] Extended the database-backed organization HTTP integration test with active-status admin rows whose membership windows are expired or future-dated.
 - [x] Added assertions that both expired and future-dated admins receive HTTP 403 for member listing and membership invitations; this exercises the shared manager-role date-window guard.
 - [ ] Run the updated organization integration test and full CI on this commit before treating the new regression cases as verified.
+
+
+## 26. Sports Transfer organization notification audience — membership date-window enforcement (2026-11-19)
+
+- [x] Reviewed organization-member acceptance and organization-representative mandate notification recipient queries.
+- [x] Found two notification queries that selected active owner/admin rows without checking `starts_at`; one also omitted an expiry check. This could send organization activity notices to future-dated or expired managers even though those memberships cannot currently manage the organization or access its mandate inbox.
+- [x] Added both `starts_at IS NULL OR starts_at <= now()` and `expires_at IS NULL OR expires_at > now()` predicates to each manager-notification recipient query.
+- [x] Extended the database-backed organization integration test to assert that expired and future-dated admins do not receive new-member notifications.
+- [x] Extended the database-backed mandate integration test to assert that active owner/admin members receive organization mandate notices while ordinary members, expired admins, and future-dated admins do not.
+- [ ] Run full CI on the resulting commit before treating these changes as validated.
+- [ ] Continue the separate audit of Sports Transfer document access and all remaining organization-scoped actions. This notification fix does not certify document authorization.
+- [ ] No production database, service, or deployment was changed.
