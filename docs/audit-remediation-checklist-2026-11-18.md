@@ -557,3 +557,41 @@ This is a design inventory, not an approved SQL/API implementation. Each operati
 - [x] Extended database-context.test.cjs to cover valid percent-decoding, malformed UTF-8 percent sequences, invalid percent escapes, absent cookies and unrelated cookies. Existing middleware integration test continues to assert malformed input establishes anonymous context and does not pass raw cookie text into SQL context.
 - [ ] Await CI on the resulting PR head. No local test execution is claimed.
 - [x] This change only normalizes malformed-cookie handling; it does not alter session validity, token hashing, authentication policy, database roles, RLS policies, migrations, production configuration, data, services, or deployments.
+## 48. Authentication bootstrap database-operation matrix (2026-11-19)
+
+Source reviewed: `apps/api/src/module.ts` authentication controller, including registration, verification, login, session resolution, password reset, TOTP, account deletion and logout handlers. This is a source-level permission matrix, not an implemented grant set.
+
+| Operation | Authentication state | Database objects observed | Required narrow capability |
+|---|---|---|---|
+| Registration | No session | `auth_rate_limits`, `users`, `user_credentials`, `email_verification_codes`, `audit_events` | IP rate-limit upsert; create pending user and credential; create hashed verification code; append scoped audit event |
+| Verification resend | No session | `auth_rate_limits`, `users`, `email_verification_codes`, `audit_events` | Rate-limit upserts; non-enumerating pending-account lookup; lock pending user; rotate one-time code; append audit event |
+| Verification confirm | No session; valid one-time code | `users`, `email_verification_codes`, `user_sessions`, `audit_events` | Lock pending account and current code; bounded attempt accounting; consume code; activate account; create first session atomically; audit |
+| Password login | No session | `auth_rate_limits`, `users`, `user_credentials`, `user_auth_security`, `auth_login_challenges`, `user_sessions`, `user_notifications`, `audit_events` | Rate-limit upsert; credential lookup by normalized email; read TOTP-enabled flag; create short-lived challenge or session; scoped notification and audit writes |
+| 2FA login completion | No session; valid challenge | `auth_login_challenges`, `users`, `auth_rate_limits`, `user_auth_security`, `user_sessions`, `user_notifications`, `audit_events` | Lock and validate challenge; increment attempts; rate-limit; read encrypted TOTP material for challenge user; atomically consume counter/challenge and create session |
+| Session bootstrap / `me` | Cookie supplied, identity unresolved | `user_sessions`, `users` | Validate only the presented token hash, expiry and active status; no session enumeration; update only that session's last-seen timestamp |
+| Password reset request | No session | `auth_rate_limits`, `users`, `password_reset_tokens`, `audit_events` | Rate-limit; generic response; account lookup; replace scoped reset tokens; append audit event |
+| Password reset completion | No session; valid one-time token | `password_reset_tokens`, `users`, `user_credentials`, `user_sessions`, `audit_events` | Lock and validate token/account; consume token; replace password hash; revoke all sessions; clean sibling reset tokens; audit atomically |
+| Authenticated TOTP setup/confirm/disable | Existing session | `user_sessions`, `users`, `user_auth_security`, `auth_rate_limits`, `audit_events` | Validate presented session; owner-scoped security-row read/write; enforce rate limit; lock row and monotonic counter; audit |
+| Account deletion request | Existing session plus password recheck | `user_sessions`, `users`, `user_credentials`, `organization_members`, `user_deletion_requests`, `audit_events` | Validate session and password; check ownership constraint; transition account and create cancellation token; revoke sessions; audit atomically |
+| Account deletion cancellation | No session; valid one-time token | `user_deletion_requests`, `users`, `audit_events` | Single atomic token-hash compare-and-consume with expiry/grace-period checks; restore account; audit |
+| Logout | Cookie supplied; may be expired | `user_sessions`, `audit_events` | Delete only the presented token hash and append audit event only for the returned user ID |
+
+### Boundary conclusions
+
+- The anonymous bootstrap surface is not one generic capability. It contains distinct proof types: normalized email plus password, verification code, reset token, TOTP challenge plus code, deletion-cancellation token, and presented session cookie.
+- Several handlers use multi-statement transactions with row locks and conditional updates. Replacing them with broad table grants or independent functions that split atomicity would weaken replay and race protections.
+- Rate limiting is shared across anonymous flows through `auth_rate_limits`; its upsert must be atomic and narrowly parameterized. Do not grant unrestricted SELECT/UPDATE/DELETE on the table merely to support these flows.
+- Login must read `user_auth_security` before a session exists. A policy that returns no row for anonymous `app.user_id` would silently bypass the TOTP challenge branch; this remains a release-blocking positive test case.
+- Verification, reset and deletion-cancellation functions must not reveal whether arbitrary email addresses or token hashes exist. Preserve generic external responses and bounded attempt/expiry behavior.
+- Session bootstrap must validate only the supplied token hash and return the associated active identity. A function accepting arbitrary user IDs, or a policy permitting broad reads of `user_sessions`, is not an acceptable substitute.
+- The matrix does not yet define exact SQL signatures, ownership, role grants, secret storage, proof format, or `SECURITY DEFINER` implementation. Those remain design work; no migration or permission change is authorized by this review.
+
+### Required test gates before any bootstrap/RLS implementation
+
+- [ ] Positive tests for each operation above, including pending registration, resend, successful and failed verification, password login with and without TOTP, TOTP challenge replay/expiry/attempt limits, reset token replay/expiry, deletion cancellation replay/expiry, and logout of expired sessions.
+- [ ] Negative tests using `trademate_app`: no arbitrary user lookup by ID/email beyond the narrowly allowed operation; no cross-user credential/security/session reads; no rate-limit table browsing or mutation outside scoped operations.
+- [ ] Identity-integrity tests: forged `app.user_id` alone grants no access; proof for token A cannot authorize token B or user B; expired/revoked sessions fail closed; concurrent pooled requests and explicit transactions cannot cross-contaminate identity.
+- [ ] Atomicity/race tests for one-time code consumption, reset completion, challenge consumption, TOTP counter advancement and deletion cancellation.
+- [ ] Catalog assertions for function owner, fixed safe `search_path`, `EXECUTE` grants, revoked `PUBLIC` access, no runtime secret/key reads, and no `BYPASSRLS` privilege.
+
+- [x] This section records observed SQL dependencies only. No application behavior, SQL policy, migration, role, production config, production data, service or deployment was changed.
