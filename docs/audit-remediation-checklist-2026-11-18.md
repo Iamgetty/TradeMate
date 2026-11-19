@@ -356,3 +356,13 @@ This checklist records the source/configuration audit findings. Items are not co
 - [ ] The shared review key remains a service-level identity rather than named staff accounts with per-reviewer roles, revocation, or separation of duties; retain the documented product/security decision before expanding sensitive reviewer workflows.
 - [ ] No changes to source code were required by this pass. No runtime tests were run as part of this source review; existing test/CI evidence remains scoped to the commits and runs documented above.
 - [x] No production data, services, deployments, or infrastructure were changed.
+
+
+## 33. Sports Transfer permission-scope enforcement review (2026-11-19)
+
+- [x] Compared membership scope values in the API schema and migration: `workspace`, `recruitment`, `negotiation`, `documents`, `signing`, and `read_only`.
+- [x] Confirmed opportunity creation and organization opportunity listing explicitly require active, in-window memberships with `workspace` or `recruitment` scope, in addition to permitted roles.
+- [x] Found that `SportsTransferOrganizationsController.managerRole()` checks active status, start/expiry dates, and `owner`/`admin` role, but does not inspect `permission_scope`. This helper gates member listing, invitations, and membership revocation. Consequently a narrow-scope or `read_only` owner/admin membership currently passes these management checks.
+- [ ] Treat this as a scope-enforcement inconsistency requiring a product/security decision, not yet a confirmed privilege vulnerability: the technical foundation describes membership role and permission scope as distinct fields but does not define a complete permission matrix for management actions. Define which scope grants member administration before changing the helper or existing memberships.
+- [ ] Add database-backed tests covering owner/admin memberships with `read_only`, `documents`, `recruitment`, and `workspace` scopes once the authorization matrix is approved.
+- [x] No source behavior changed in this pass. No runtime tests were run. No production data, services, deployments, or infrastructure were changed.
