@@ -60,6 +60,18 @@
       return rows.map(([price, size]) => ({ price, size, total: (running += size) }));
     }
 
+    function clearMarketData() {
+      trades = [];
+      o.onUpdate({
+        symbol: `${o.base}/${o.quote}`,
+        bids: [], asks: [], bestBid: null, bestAsk: null, mid: null, spread: null,
+        last: null, trades: [], booksCombined: 0,
+        feedsLive: 0, feedsTotal: 0, fxQuotes: [], marketQuotes: [],
+        fxStatus: { state: 'unavailable', provider: 'OANDA' },
+        ts: Date.now(),
+      });
+    }
+
     function handle(msg) {
       const fresh = msg.books.filter((b) => matches(b) && !b.stale);
       const bids = aggregate(fresh.flatMap((b) => b.bids || []), 'bid');
@@ -151,6 +163,7 @@
         }
       };
       socket.onclose = () => {
+        clearMarketData();
         o.onStatus(false);
         clearStableTimer();
         scheduleReconnect();
@@ -167,7 +180,13 @@
         clearStableTimer();
         if (ws) ws.close();
       },
-      setSymbol(base, quote) { o.base = base; o.quote = quote; trades = []; watch(); },   // call when the user switches pair
+      setSymbol(base, quote) {
+        if (o.base === base && o.quote === quote) return;
+        o.base = base;
+        o.quote = quote;
+        clearMarketData();
+        watch();
+      },   // call when the user switches pair
     };
   }
 
