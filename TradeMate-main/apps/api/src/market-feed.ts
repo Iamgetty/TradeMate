@@ -37,7 +37,16 @@ const MARKET_FEED_LIMITS = Object.freeze({
   heartbeatIntervalMs: 30_000,
   maxBufferedBytes: 1_048_576,
   maxBackpressureStrikes: 3,
+  bookFreshnessMs: 10_000,
 });
+
+function marketFeedBookFreshness(bookAt: number, now = Date.now(), maxAgeMs = MARKET_FEED_LIMITS.bookFreshnessMs) {
+  const timestamp = Number(bookAt);
+  const ageMs = Number.isFinite(timestamp) && timestamp > 0
+    ? Math.max(0, now - timestamp)
+    : null;
+  return { stale: ageMs === null || ageMs > maxAgeMs, ageMs };
+}
 
 const DEFAULT_MARKET_FEED_ORIGINS = ['https://trademate-web.onrender.com', 'http://localhost:3000'];
 
@@ -298,16 +307,26 @@ function attachMarketFeed(server: Server) {
       startFeeds(session);
       clearInterval(session.timer);
       session.timer = setInterval(() => {
-        const books = [...session!.feeds.values()].map((feed) => ({
-          venue: feed.venue, market: feed.market, status: feed.status,
-          bids: snapshotLevels(feed.bids).sort((a, b) => Number(b.p) - Number(a.p)).slice(0, 20),
-          asks: snapshotLevels(feed.asks).slice(0, 20),
-          bookAt: feed.bookAt, tradeAt: feed.tradeAt,
-        }));
+        const snapshotAt = Date.now();
+        const books = [...session!.feeds.values()].map((feed) => {
+          const freshness = marketFeedBookFreshness(feed.bookAt, snapshotAt);
+          const status = freshness.stale && (feed.status === 'live' || feed.status === 'connected')
+            ? 'stale'
+            : feed.status;
+          return {
+            venue: feed.venue, market: feed.market, status,
+            stale: freshness.stale, bookAgeMs: freshness.ageMs,
+            bids: snapshotLevels(feed.bids).sort((a, b) => Number(b.p) - Number(a.p)).slice(0, 20),
+            asks: snapshotLevels(feed.asks).slice(0, 20),
+            bookAt: feed.bookAt, tradeAt: feed.tradeAt,
+          };
+        });
         send(session!, {
-          type: 'snapshot', symbol: session!.symbol, ts: Date.now(), books,
+          type: 'snapshot', symbol: session!.symbol, ts: snapshotAt, books,
           trades: session!.trades.slice(0, 80),
-          feeds: books.map(({ venue, market, status, bookAt, tradeAt }) => ({ venue, market, status, bookAt, tradeAt })),
+          feeds: books.map(({ venue, market, status, stale, bookAgeMs, bookAt, tradeAt }) => ({
+            venue, market, status, stale, bookAgeMs, bookAt, tradeAt,
+          })),
         });
       }, 1000);
     });
@@ -323,4 +342,4 @@ function attachMarketFeed(server: Server) {
   };
 }
 
-export { attachMarketFeed, isAllowedMarketFeedOrigin, marketFeedClientIp, MARKET_FEED_LIMITS };
+export { attachMarketFeed, isAllowedMarketFeedOrigin, marketFeedClientIp, marketFeedBookFreshness, MARKET_FEED_LIMITS };
