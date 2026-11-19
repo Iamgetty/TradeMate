@@ -9,6 +9,9 @@
  * All styling comes from the app's own .tbn classes, so the cards match Explore
  * exactly and follow its light/dark themes. Nothing here is invented stats: a
  * category with no listings says so.
+ *
+ * The card's rendered height is remembered (localStorage "tm.slideH") so the
+ * slide cards on the category and marketplace pages can be exactly this size.
  * Runs as a DOM patch so app.js does not need to change.
  */
 (function () {
@@ -39,6 +42,7 @@
   var inflight = null;
   var current = 0;
   var pausedUntil = 0;
+  var resizeTimer = 0;
   var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function el(tag, cls, text) {
@@ -76,6 +80,17 @@
       small.textContent = n === 0 ? 'No listings yet' : (n >= 50 ? '50+' : n) + (n === 1 ? ' listing' : ' listings');
       small.className = n === 0 ? '' : 'up';
     }
+  }
+
+  // Remember how tall this card is so the category and marketplace pages can match it exactly.
+  function recordHeight() {
+    var slide = document.querySelector('#app .home-promo-tbn .tbn-s');
+    if (!slide) return;
+    var h = Math.round(slide.getBoundingClientRect().height);
+    if (h < 120 || h > 420) return;
+    try {
+      if (localStorage.getItem('tm.slideH') !== String(h)) localStorage.setItem('tm.slideH', String(h));
+    } catch (e) { /* storage unavailable: the category cards fall back to the app's own card size */ }
   }
 
   function setActive(root, i) {
@@ -167,9 +182,11 @@
     track.scrollLeft = current * track.clientWidth;
     setActive(root, current);
     paintCounts(root);                    // instant if already loaded
+    requestAnimationFrame(recordHeight);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(recordHeight);
     loadCounts().then(function () {
       var live = document.querySelector('#app .home-promo-tbn');
-      if (live) paintCounts(live);
+      if (live) { paintCounts(live); recordHeight(); }
     });
   }
 
@@ -186,6 +203,10 @@
   function start() {
     patch();
     new MutationObserver(patch).observe(document.documentElement, { childList: true, subtree: true });
+    window.addEventListener('resize', function () {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(recordHeight, 150);
+    });
   }
   start();
 })();
