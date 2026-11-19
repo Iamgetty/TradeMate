@@ -138,3 +138,10 @@ This checklist records the source/configuration audit findings. Items are not co
 - [x] Freshly inspect PR #219 CI run 1525 (run ID `44435308255`) for code commit `1f67e94f79d64609a277020e3602e7f6c1a22b0a`: Cloudflare compatibility, API TypeScript build, database migration integration, container builds, web build/runtime syntax, exchange-feed/MT5 tests, and security scanning passed. The browser app-shell/live API acceptance job ended `cancelled`, not passed; therefore this run is not a full green CI result.
 - [x] Rechecked PR #219 head `6256eb13affb660521a2abdda255b3bc6eab9c27`: TradeMate CI run 1527 (ID `44435758010`) completed successfully with all 8/8 jobs passing, including browser app-shell/live two-account API acceptance and SAST/SCA/secret scanning. Cloudflare compatibility run 343 (ID `44435757991`) also passed. This supersedes the incomplete run 1525 status for the current branch head; API lint and lockfile tasks above remain open.
 
+## 13. Latest PR-head CI confirmation (2026-11-19)
+
+- [x] Rechecked exact latest PR head `a5176fa2aa8d8d829869c64be50cbda7dc0df309`: TradeMate CI run 1528 (ID `44436119126`) completed with all 8/8 jobs successful. This includes API TypeScript build/security validation, clean PostgreSQL migration integration and role/RLS tests, exchange-feed/MT5 tests, web build/runtime checks, browser app-shell plus mocked and live two-account API acceptance, isolated Cloudflare Workers build/runtime, SAST/SCA/secret scanning, and AWS API/exchange-feed container builds.
+- [x] Confirmed browser acceptance job `135265325849` completed successfully; the previously pending job is no longer outstanding.
+- [ ] API lint remains unconfigured and is not run by CI. ESLint is absent from API dependencies and no API ESLint config exists.
+- [ ] API, web, and exchange-feed lockfiles remain absent; deterministic `npm ci` validation remains outstanding. Do not adopt PR #213's stale API lockfile.
+- [ ] This CI result validates the current checked-in CI suite, not production Render configuration, production PostgreSQL roles/RLS, or deployment readiness. No production changes were made.
