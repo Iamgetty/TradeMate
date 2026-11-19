@@ -3,16 +3,16 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './module';
 import { attachMarketFeed } from './market-feed';
 import { attachMarketHighlights } from './market-highlights';
-import { json } from 'express';
 import { validateEnvironment } from './environment';
 import { databaseRequestContextMiddleware } from './database-context';
+import { createApiJsonBodyParser } from './request-body-parser';
 
 async function bootstrap() {
   validateEnvironment();
   const app = await NestFactory.create(AppModule, { bodyParser: false });
-  // Feed attachments are base64-encoded in JSON; cap the request size while
-  // allowing four small attachments plus post metadata.
-  app.use(json({ limit: '28mb' }));
+  // Feed attachments are base64-encoded JSON; keep the larger allowance
+  // restricted to POST /api/feed/posts and use a smaller default elsewhere.
+  app.use(createApiJsonBodyParser());
   app.use(databaseRequestContextMiddleware);
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
   attachMarketFeed(app.getHttpServer());
