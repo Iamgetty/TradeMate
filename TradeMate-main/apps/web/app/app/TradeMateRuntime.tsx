@@ -27,6 +27,7 @@ export default function TradeMateRuntime() {
 
     let settled = false;
     let feedReady = false;
+    let metadataReady = false;
     let cssReady = false;
     let layoutCssReady = false;
     let patchesCssReady = false;
@@ -69,7 +70,7 @@ export default function TradeMateRuntime() {
     app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=144. Check the deployment and static asset response.');
 
     const loadApp = () => {
-      if (!feedReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !metadataReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -251,6 +252,22 @@ export default function TradeMateRuntime() {
     earnPreload.onload = () => { earnCssReady = true; loadApp(); };
     earnPreload.onerror = () => { earnCssReady = true; loadApp(); };
     document.head.appendChild(earnPreload);
+
+    // Load the independently tested market-metadata lifecycle helper before
+    // app.js. If it is unavailable, app.js retains its conservative legacy
+    // fallback so a public metadata dependency cannot block core startup.
+    const metadata = document.createElement('script');
+    metadata.src = '/tm/market-metadata.js?v=1';
+    metadata.async = false;
+    metadata.onload = () => {
+      metadataReady = true;
+      loadApp();
+    };
+    metadata.onerror = () => {
+      metadataReady = true;
+      loadApp();
+    };
+    document.body.appendChild(metadata);
 
     const feed = document.createElement('script');
     feed.src = '/tm/feed-client.js?v=2';
