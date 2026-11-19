@@ -142,6 +142,20 @@ async function main() {
     const orgMandateResponse = await createMandate(football.id, { representativeOrganizationId: organizationId });
     assert.equal(orgMandateResponse.status, 201);
     const orgMandate = (await orgMandateResponse.json()).mandate;
+    for (const actor of ['organizationOwner', 'organizationAdmin']) {
+      const activeManagerNotice = await pool.query(
+        "SELECT id FROM user_notifications WHERE user_id = $1 AND title = 'Sports Transfer representation request' AND body LIKE '%organization as a representative%'",
+        [actors[actor].userId],
+      );
+      assert.equal(activeManagerNotice.rowCount, 1, actor + ' receives an organization mandate notice');
+    }
+    for (const actor of ['expiredAdmin', 'futureAdmin', 'organizationMember']) {
+      const inactiveManagerNotice = await pool.query(
+        "SELECT id FROM user_notifications WHERE user_id = $1 AND title = 'Sports Transfer representation request' AND body LIKE '%organization as a representative%'",
+        [actors[actor].userId],
+      );
+      assert.equal(inactiveManagerNotice.rowCount, 0, actor + ' does not receive an organization mandate notice outside the active manager scope');
+    }
     const orgOutsiderAccept = await call('outsider', 'POST', '/api/sports-transfer/mandates/' + orgMandate.id + '/accept', {});
     assert.equal(orgOutsiderAccept.status, 404, 'only an active organization owner/admin can accept an organization mandate');
     const orgAccepted = await call('organizationOwner', 'POST', '/api/sports-transfer/mandates/' + orgMandate.id + '/accept', {});
