@@ -142,7 +142,7 @@ async function main() {
       permissionScope: 'workspace',
       expiresAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
     });
-    assert.equal(adminOwnerEscalation.status, 403, 'admins cannot promote another account to organization owner');
+    assert.equal(adminOwnerEscalation.status, 400, 'the invitation schema rejects owner assignment because ownership can only be established at organization creation');
 
     const adminInviteMember = await call('admin', 'POST', '/api/sports-transfer/organizations/' + organizationId + '/memberships', {
       userId: actors.secondMember.userId,
