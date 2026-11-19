@@ -366,3 +366,12 @@ This checklist records the source/configuration audit findings. Items are not co
 - [ ] Treat this as a scope-enforcement inconsistency requiring a product/security decision, not yet a confirmed privilege vulnerability: the technical foundation describes membership role and permission scope as distinct fields but does not define a complete permission matrix for management actions. Define which scope grants member administration before changing the helper or existing memberships.
 - [ ] Add database-backed tests covering owner/admin memberships with `read_only`, `documents`, `recruitment`, and `workspace` scopes once the authorization matrix is approved.
 - [x] No source behavior changed in this pass. No runtime tests were run. No production data, services, deployments, or infrastructure were changed.
+
+
+## 34. Sports Transfer player-consent lifecycle review (2026-11-19)
+
+- [x] Reviewed player-profile ownership checks for consent listing, granting, and revocation. All three operations require the authenticated user to own the referenced profile; revocation additionally updates only a currently granted, not-yet-revoked consent.
+- [x] Consent grants require exactly one recipient (user or sporting organization), an existing active user when targeting a person, an existing organization when targeting an organization, a supported purpose, a strictly shaped scope object, and an expiry within 12 months. Grant/revoke operations are audited transactionally.
+- [x] A player can grant consent to an existing sporting organization without being a member of that organization. This is consistent with recipient-directed consent, not an authorization bypass by itself; no API route was found that consumes these consent rows to grant access.
+- [ ] Consent enforcement remains incomplete at the API surface reviewed: no recipient-side endpoint was found that demonstrates purpose, recipient identity, expiry, revocation, and territory/competition scope being enforced before access to private profile or documents. Do not expose private data based solely on the existence of a consent row; any future consumer must enforce every applicable field and have recipient authentication.
+- [ ] No source behavior changed in this pass. No runtime tests were run. No production data, services, deployments, or infrastructure were changed.
