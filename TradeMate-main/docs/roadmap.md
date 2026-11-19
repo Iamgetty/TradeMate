@@ -166,8 +166,10 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 
 ### Phase S2 — Identity, verification and financial crime controls
 
-1. Select and integrate a third-party KYC/KYB identity-verification provider (evaluate Sumsub and Onfido/Entrust); TradeMate will not build document verification itself.
-2. Implement verified webhook handling, signature validation, replay protection, status reconciliation and auditable case outcomes.
+1. Select and integrate a third-party KYC/KYB identity-verification provider; TradeMate will not build document-authenticity or biometric verification itself. Run a documented, evidence-based comparison of Sumsub, Jumio, Entrust Identity Verification (formerly Onfido) and Veriff. Treat Binance only as a product/process benchmark: do not claim it uses any named provider unless independently verified from a reliable public source.
+2. Validate provider coverage and accuracy for every launch jurisdiction before selection, with explicit Nigerian testing for supported identity documents and verification methods (including NIN-linked checks only where the provider, lawful basis and applicable regulator requirements support them). Compare document authenticity, selfie/face match, passive/active liveness, spoof/deepfake resistance, duplicate identity detection, fraud signals, manual-review quality, appeals, accessibility, completion/conversion, latency, uptime, pricing and support.
+3. Complete legal, privacy and security due diligence: data-controller/processor roles, lawful basis and consent where required, data minimization, retention/deletion, data residency and cross-border transfers, sub-processors, encryption, access controls, breach notification, independent assurance and audit rights. Do not collect or retain raw identity/biometric data beyond the approved necessity.
+4. Implement verified webhook handling, signature validation, replay protection, idempotency, status reconciliation and auditable case outcomes; keep provider status separate from TradeMate's own risk decision and provide secure manual review and user appeal paths.
 3. Add risk-based AML/sanctions screening and ongoing monitoring appropriate to the supported jurisdictions and product scope.
 4. Evaluate Chainalysis, Elliptic or TRM Labs for blockchain address and transaction screening before any crypto transfer feature.
 5. Evaluate verifiable credentials/attestations only where they add a clear privacy and compliance benefit.
