@@ -68,6 +68,18 @@ No cloud resources, environment secrets, routes or deployment settings were chan
 6. **Acceptance:** test auth/session/TOTP, contracts, enquiries, feed/WebSockets, uploads, scheduled jobs, email/provider integrations, frontend rendering/routing, CORS/CSRF, database recovery, load, security and rollback.
 7. **Production migration:** separate change plan and explicit approval required for production data transfer, Cloudflare production route/DNS changes, secret rotation, service shutdown or traffic cutover.
 
+### Gated staging migration execution
+
+The repository includes `.github/workflows/aws-staging-migration-task.yml` as a manual, staging-only execution path. It is deliberately separate from service deployment and does not promote or update the API service.
+
+Before enabling it, configure the GitHub Environment named `aws-staging-migrations` with required reviewers, prevent self-review where supported, restrict deployment branches to `main`, and add the non-secret environment variables `AWS_STAGING_DEPLOY_ROLE_ARN` and `AWS_STAGING_ACCOUNT_ID`. The OIDC trust policy for that role must be restricted to this repository, the `aws-staging-migrations` environment subject, and the expected GitHub Actions audience. Do not use long-lived AWS access keys.
+
+The workflow requires an explicit `yes` confirmation, the full ECR API image URI pinned by SHA-256 digest, and the source commit SHA. It verifies that the source commit is in the checked-out `main` history, that the assumed AWS account matches the configured account, and that the deployed migration task definition uses the exact approved API image digest, the expected `node scripts/migrate.js` command, and only the `MIGRATION_DATABASE_URL` secret. It resolves the ECS cluster, private subnets, migration-only security group and task definition from the two CloudFormation stacks; it launches one Fargate task without a public IP and requires a successful container exit code. It does not print secret values or migration logs into the GitHub job summary.
+
+Scope the GitHub OIDC role to the staging account and minimum required actions: read outputs from the two named CloudFormation stacks; describe the named ECS migration task definition; run exactly that task definition in the named cluster; describe/wait for the resulting task; and pass only the task execution and task roles to ECS. Constrain `ecs:RunTask` to the intended cluster/task definition and constrain `iam:PassRole` to the exact ECS task roles with `iam:PassedToService=ecs-tasks.amazonaws.com`. The ECS task execution role—not the GitHub role—reads the migration secret. The task's dedicated migration security group is the only security group attached by the workflow.
+
+This workflow is not an end-to-end release orchestrator: API promotion, traffic shifting, post-migration acceptance, rollback and release-record creation remain separate work. Do not infer that a successful migration task makes the API release safe to promote. The workflow has not been executed against AWS; environment protection, OIDC trust, IAM policy, stack outputs, database connectivity and migration-task behavior remain unverified until a separately approved staging rehearsal succeeds.
+
 ## Blocking inputs for provisioning
 
 - AWS account ID and confirmation that the account is ready for TradeMate.
