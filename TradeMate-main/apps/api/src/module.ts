@@ -15,6 +15,9 @@ const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options
       else resolve(derivedKey);
     });
   });
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 const SESSION_COOKIE = 'trademate_session';
 const SESSION_DAYS = 7;
 const passwordHash = async (password: string) => {
@@ -2534,8 +2537,8 @@ class P2PMarketController {
   }
 
   @Post('orders')
-  async placeOrder(@Req() request: Request, @Body() body: any) {
-    parseBody(p2pOrderBodySchema, body);
+  async placeOrder(@Req() request: Request, @Body() body: unknown) {
+    const input = parseBody(p2pOrderBodySchema, body);
     const userId = await this.authenticatedUser(request), adId = String(input?.adId || '');
     let fiatCents: bigint;
     try { fiatCents = decimalToUnits(input.fiatAmount, 2, 'Fiat amount'); }
@@ -2575,9 +2578,9 @@ class P2PMarketController {
   }
 
   @Post('orders/:id/payment-sent')
-  async paymentSent(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+  async paymentSent(@Param('id') id: string, @Req() request: Request, @Body() body: unknown) {
     parseUuidParam(id);
-    parseBody(p2pPaymentSentBodySchema, body);
+    const input = parseBody(p2pPaymentSentBodySchema, body);
     const userId = await this.authenticatedUser(request), ref = typeof input?.reference === 'string' ? input.reference.trim() : '';
     if (ref.length > 160) throw new BadRequestException('Reference is too long.');
     const client = await databasePool!.connect();
@@ -2645,9 +2648,9 @@ class P2PMarketController {
   }
 
   @Post('orders/:id/dispute')
-  async dispute(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+  async dispute(@Param('id') id: string, @Req() request: Request, @Body() body: unknown) {
     parseUuidParam(id);
-    parseBody(p2pDisputeBodySchema, body);
+    const input = parseBody(p2pDisputeBodySchema, body);
     const userId = await this.authenticatedUser(request), reason = typeof input?.reason === 'string' ? input.reason.trim() : '';
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('id must be a valid order UUID.');
     if (reason.length < 5 || reason.length > 1000) throw new BadRequestException('Dispute reason must be 5 to 1,000 characters.');
@@ -2721,7 +2724,7 @@ class PublicProfilesController {
     if (website && (!/^https:\/\//i.test(website) || website.length > 2048)) throw new BadRequestException('Enter a valid HTTPS website URL.');
     const validImage = (value: string) => !value || (/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value) && value.length <= 900000);
     if (!validImage(photo) || !validImage(cover)) throw new BadRequestException('Profile images must be JPEG, PNG or WebP and smaller than 650 KB each.');
-    if (highlights.length > 12 || JSON.stringify(highlights).length > 200000 || highlights.some((h) => !h || typeof h !== 'object' || typeof (h as any).id !== 'string' || typeof (h as any).title !== 'string' || (h as any).title.length > 20 || typeof (h as any).img !== 'string' || (h as any).img.length > 700000)) {
+    if (highlights.length > 12 || JSON.stringify(highlights).length > 200000 || highlights.some((h) => !h || typeof h !== 'object' || !isRecord(h) || typeof h.id !== 'string' || typeof h.title !== 'string' || h.title.length > 20 || typeof h.img !== 'string' || h.img.length > 700000)) {
       throw new BadRequestException('Highlights are invalid or exceed the profile limits.');
     }
     const client = await databasePool!.connect();
@@ -3298,7 +3301,7 @@ class SportsTransferIdentityController {
   }
 
   @Post('profiles')
-  async createProfile(@Req() request: Request, @Body() body: any) {
+  async createProfile(@Req() request: Request, @Body() body: unknown) {
     const input = parseBody(sportsProfileCreateBodySchema, body);
     const userId = await this.currentUser(request);
     const client = await databasePool!.connect();
@@ -3327,7 +3330,7 @@ class SportsTransferIdentityController {
   }
 
   @Patch('profiles/:id')
-  async updateProfile(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+  async updateProfile(@Param('id') id: string, @Req() request: Request, @Body() body: unknown) {
     parseUuidParam(id);
     const input = parseBody(sportsProfileUpdateBodySchema, body);
     const userId = await this.currentUser(request);
@@ -3370,7 +3373,7 @@ class SportsTransferIdentityController {
   }
 
   @Post('profiles/:id/consents')
-  async grantProfileConsent(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+  async grantProfileConsent(@Param('id') id: string, @Req() request: Request, @Body() body: unknown) {
     parseUuidParam(id);
     const input = parseBody(sportsConsentGrantBodySchema, body);
     const userId = await this.currentUser(request);
@@ -3466,7 +3469,7 @@ class SportsTransferOrganizationsController {
     return result.rows[0].id as string;
   }
 
-  private async managerRole(client: any, organizationId: string, userId: string) {
+  private async managerRole(client: PoolClient, organizationId: string, userId: string) {
     const result = await client.query(
       `SELECT role FROM sports_org_memberships
        WHERE sports_organization_id = $1 AND user_id = $2 AND status = 'active'
@@ -3499,7 +3502,7 @@ class SportsTransferOrganizationsController {
   }
 
   @Post('organizations')
-  async createOrganization(@Req() request: Request, @Body() body: any) {
+  async createOrganization(@Req() request: Request, @Body() body: unknown) {
     const input = parseBody(sportsOrganizationCreateBodySchema, body);
     const userId = await this.currentUser(request);
     const client = await databasePool!.connect();
@@ -3554,7 +3557,7 @@ class SportsTransferOrganizationsController {
   }
 
   @Post('organizations/:id/memberships')
-  async inviteMember(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+  async inviteMember(@Param('id') id: string, @Req() request: Request, @Body() body: unknown) {
     parseUuidParam(id);
     const input = parseBody(sportsOrganizationMembershipInviteBodySchema, body);
     const userId = await this.currentUser(request);
@@ -3729,7 +3732,7 @@ class SportsTransferMandatesController {
     return result.rows[0].id as string;
   }
 
-  private async canRespond(client: any, mandate: Record<string, unknown>, userId: string) {
+  private async canRespond(client: PoolClient, mandate: Record<string, unknown>, userId: string) {
     if (mandate.representative_user_id) return mandate.representative_user_id === userId;
     const membership = await client.query(
       `SELECT role FROM sports_org_memberships
@@ -3799,7 +3802,7 @@ class SportsTransferMandatesController {
   }
 
   @Post('profiles/:id/mandates')
-  async createMandate(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+  async createMandate(@Param('id') id: string, @Req() request: Request, @Body() body: unknown) {
     parseUuidParam(id);
     const input = parseBody(sportsRepresentativeMandateCreateBodySchema, body);
     const userId = await this.currentUser(request);
@@ -3920,7 +3923,7 @@ class SportsTransferMandatesController {
   }
 
   @Post('mandates/:id/accept')
-  async acceptMandate(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+  async acceptMandate(@Param('id') id: string, @Req() request: Request, @Body() body: unknown) {
     parseUuidParam(id);
     const input = parseBody(sportsRepresentativeMandateResponseBodySchema, body || {});
     const userId = await this.currentUser(request);
@@ -3971,7 +3974,7 @@ class SportsTransferMandatesController {
   }
 
   @Post('mandates/:id/reject')
-  async rejectMandate(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+  async rejectMandate(@Param('id') id: string, @Req() request: Request, @Body() body: unknown) {
     parseUuidParam(id);
     const input = parseBody(sportsRepresentativeMandateResponseBodySchema, body || {});
     const userId = await this.currentUser(request);
@@ -4016,7 +4019,7 @@ class SportsTransferMandatesController {
   }
 
   @Post('mandates/:id/revoke')
-  async revokeMandate(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+  async revokeMandate(@Param('id') id: string, @Req() request: Request, @Body() body: unknown) {
     parseUuidParam(id);
     const input = parseBody(sportsRepresentativeMandateResponseBodySchema, body || {});
     const userId = await this.currentUser(request);
@@ -4073,7 +4076,8 @@ const MARKET_SYMBOLS = new Set([
   'AAPL','MSFT','NVDA','AMZN','GOOGL','META','TSLA','BRK-B','JPM','AVGO',
   '^IRX','^FVX','^TNX','^TYX','TLT','IEF','SHY','GOVT','TIP','VGIT',
 ]);
-const marketQuoteCache = new Map<string, { expiresAt: number; value: any }>();
+type MarketQuote = { symbol: string; price: number; previousClose: number | null; changePercent: number | null; currency: string | null; marketTime: string; exchange: string | null; status: 'live' | 'delayed' };
+const marketQuoteCache = new Map<string, { expiresAt: number; value: MarketQuote }>();
 
 @Controller('market')
 class PublicMarketQuotesController {
@@ -4095,9 +4099,12 @@ class PublicMarketQuotesController {
           signal: AbortSignal.timeout(7000),
         });
         if (!response.ok) throw new Error('Upstream quote unavailable');
-        const payload: any = await response.json();
-        const result = payload?.chart?.result?.[0];
-        const meta = result?.meta;
+        const payload: unknown = await response.json();
+        const chart = isRecord(payload) && isRecord(payload.chart) ? payload.chart : null;
+        const resultRows = chart?.result;
+        const result = Array.isArray(resultRows) && isRecord(resultRows[0]) ? resultRows[0] : null;
+        const meta = result && isRecord(result.meta) ? result.meta : null;
+        if (!meta) throw new Error('Upstream returned an invalid quote payload');
         const price = Number(meta?.regularMarketPrice);
         const previous = Number(meta?.chartPreviousClose ?? meta?.previousClose);
         const timestamp = Number(meta?.regularMarketTime) * 1000;
@@ -4167,7 +4174,7 @@ class SportsTransferOpportunitiesController {
   }
 
   @Post('opportunities')
-  async create(@Req() request: Request, @Body() body: any) {
+  async create(@Req() request: Request, @Body() body: unknown) {
     const input = parseBody(sportsTransferOpportunityCreateBodySchema, body);
     const userId = await this.currentUser(request);
     const client = await databasePool!.connect();
