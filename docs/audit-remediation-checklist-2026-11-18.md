@@ -650,3 +650,12 @@ Sources rechecked on the remediation branch: apps/api/src/module.ts (authenticat
 - [x] Adjusted the test email stub to accept the password-reset email while retaining the six-digit verification-code capture for email-verification cases.
 - [ ] Await CI for the resulting PR head. No local build or integration-test execution is claimed.
 - [x] The fix preserves the existing account row lock, transaction, token rotation, audit insert, generic response and email-delivery behavior. No global cleanup, migration, database role, RLS, production data/configuration, service or deployment was changed.
+
+
+## 52. Make failed account-deletion email recovery atomic (2026-11-19)
+
+- [x] Replaced the two independent recovery updates after cancellation-email failure with one explicit transaction.
+- [x] Recovery now restores the user only while the matching deletion request still carries the exact cancellation-token digest created by this request; it invalidates only that same matching request. This prevents a delayed email failure from cancelling a newer request or undoing a completed cancellation.
+- [x] Added an auth integration regression case that simulates the transactional email provider returning HTTP 503 and verifies the account returns to `active`, the cancellation digest is cleared, and the request is marked cancelled.
+- [ ] Await CI for the resulting PR head. No local build or integration-test execution is claimed.
+- [x] The original deletion-request transaction, session revocation, generic failure response and normal successful email path remain unchanged. No schema, migration, role, RLS, production data/configuration, service or deployment was changed.
