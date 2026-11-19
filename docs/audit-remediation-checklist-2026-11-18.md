@@ -29,9 +29,10 @@ This checklist records the source/configuration audit findings. Items are not co
 - [ ] Review whether web health checks should use a lightweight web liveness endpoint; do not point web at the API health endpoint without confirming service boundaries.
 - [x] Verify API health route mapping: Nest applies the `/api` global prefix, so Render's `/api/health` maps to the liveness-only `HealthController.health()` route. `/api/health/database` separately performs `SELECT 1`; it is database readiness/diagnostics, not the configured liveness check.
 - [ ] Decide whether API deployment readiness should depend on database connectivity; assess startup/migration behavior and outage policy before changing health checks.
+- [x] Close the production migration-role fallback: source audit found the migration runner could fall back to the runtime `DATABASE_URL`, while production validation did not require `MIGRATION_DATABASE_URL`. The runner now requires the dedicated migration URL in production; API environment validation also requires it, and a regression test verifies production refuses the fallback. CI validation for this new change is pending.
 - [ ] Add a lightweight web-service liveness endpoint only if the web runtime/platform requires one; no dedicated web health endpoint was found in the inspected app routes.
 - [x] Update the Render Blueprint to declare `DATABASE_URL` for the API runtime separately from `MIGRATION_DATABASE_URL` for migrations; both remain `sync: false`, and no secret values are stored in the repository.
-- [ ] Verify the live API service has both variables configured and that they point to the intended roles/database, without exposing secret values.
+- [ ] Verify the live API service has both variables configured and that they point to the intended roles/database, without exposing secret values. The Render service-details response does not expose environment-variable names, so presence/role assignment remains unverified; do not infer it from Blueprint declarations.
 - [ ] Measure web/API-to-exchange-feed cross-region latency and decide whether region alignment is warranted.
 - [ ] Verify deployment commit SHAs and check results before treating a service as current or healthy.
 
@@ -75,6 +76,11 @@ This checklist records the source/configuration audit findings. Items are not co
 - [ ] Verify Cloudflare Workers adapter compatibility, including the API proxy route currently declaring `runtime = 'nodejs'`.
 - [ ] Validate AWS staging, secrets, database migrations, backups, observability, rollback, and end-to-end acceptance before any production cutover.
 - [ ] Keep Render production in place until migration is explicitly approved and rollback is proven.
+
+## 9. Build reproducibility and static checks
+
+- [ ] Add and commit package lockfiles for the API, web, and exchange-feed workspaces, then use deterministic `npm ci` installs in CI and deployment builds. The current repository tree contains no `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, or `yarn.lock`; CI and Render currently use `npm install`.
+- [ ] Resolve API lint configuration: `apps/api/package.json` declares a lint script invoking ESLint, but ESLint is not declared in API devDependencies and the current CI workflow does not run that lint script.
 
 ## Working rules
 
