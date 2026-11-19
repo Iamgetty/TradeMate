@@ -228,6 +228,7 @@ This checklist records the source/configuration audit findings. Items are not co
 - [x] Added a 10-second subscription deadline, one symbol per connection, and a 30-second ping/pong heartbeat that terminates unresponsive clients.
 - [x] Added snapshot backpressure handling: skip sends while buffered output exceeds 1 MiB and close a client after 3 consecutive over-limit snapshots.
 - [x] Added cleanup for upstream connection timeouts and Bybit ping intervals when sessions stop, preventing timers from surviving client disconnects.
+- [x] Added a 10-second upstream WebSocket handshake timeout and exponential reconnect backoff (1–30 seconds, with jitter), resetting the backoff after a successful connection to reduce venue reconnect storms.
 - [x] Added `market-feed.test.cjs` coverage for allowed/blocked origins, configured-origin normalization, trusted proxy client-IP selection, and explicit resource ceilings.
 - [x] Added `market-feed.integration.test.cjs` coverage that opens real local WebSocket connections and verifies rejection of an untrusted Origin and the fifth-to-sixth per-IP connection boundary.
 - [ ] Execute the API TypeScript build and API test suite on the review branch; this GitHub-only editing environment cannot run Node/npm, so compilation and test execution are not yet verified.
