@@ -164,6 +164,7 @@ async function main() {
       [userId],
     );
 
+    await client.query('RESET ROLE');
     const result = await client.query(
       `SELECT u.status, u.email, u.display_name,
               d.cancellation_token_hash,
@@ -196,7 +197,6 @@ async function main() {
       throw new Error(`Worker transaction produced an unexpected fixture state: ${JSON.stringify(state)}`);
     }
 
-    await client.query('RESET ROLE');
     await client.query('ROLLBACK TO SAVEPOINT deletion_worker_execution');
     await client.query('ROLLBACK');
     transactionOpen = false;
