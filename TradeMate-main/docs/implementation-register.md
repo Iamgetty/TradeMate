@@ -1,6 +1,6 @@
 # TradeMate implementation register
 
-**Canonical cross-stack status ledger.** Updated: 2026-11-19 (PR #219 head `9589c823f4fff35ab6612ca95c0d3db73d408ae2`; Node.js runtime alignment CI verified)  
+**Canonical cross-stack status ledger.** Updated: 2026-11-19 (PR #219 head `aaf3606d25fd97fbd2822f8ae8adadfcce2650ae`; Node.js runtime alignment CI verified on code-bearing parent `9589c823`)  
 **Branch baseline:** `fix/audit-remediation-2026-11-18`  
 **Rule:** no domain is complete merely because its first component exists. Repository implementation, CI verification, staging validation and production acceptance are tracked separately.
 
