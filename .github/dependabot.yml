@@ -1,0 +1,52 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /TradeMate-main/apps/api
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    groups:
+      npm-patch-and-minor:
+        update-types:
+          - patch
+          - minor
+
+  - package-ecosystem: npm
+    directory: /TradeMate-main/apps/web
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:15"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    groups:
+      npm-patch-and-minor:
+        update-types:
+          - patch
+          - minor
+
+  - package-ecosystem: npm
+    directory: /TradeMate-main/exchange-feed
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:30"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    groups:
+      npm-patch-and-minor:
+        update-types:
+          - patch
+          - minor
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
