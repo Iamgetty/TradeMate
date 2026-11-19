@@ -3859,10 +3859,10 @@ class SportsTransferMandatesController {
       const consentScope = consent.rows[0].scope || {};
       const allowedTerritories = Array.isArray(consentScope.territoryCodes) ? consentScope.territoryCodes : [];
       const allowedCompetitions = Array.isArray(consentScope.competitionIds) ? consentScope.competitionIds : [];
-      if (allowedTerritories.length && (input.territoryCodes || []).some((code: string) => !allowedTerritories.includes(code))) {
+      if ((input.territoryCodes || []).some((code: string) => !allowedTerritories.includes(code))) {
         throw new ForbiddenException('The mandate territory exceeds the territory in your representative-access consent.');
       }
-      if (allowedCompetitions.length && (input.competitionIds || []).some((competitionId: string) => !allowedCompetitions.includes(competitionId))) {
+      if ((input.competitionIds || []).some((competitionId: string) => !allowedCompetitions.includes(competitionId))) {
         throw new ForbiddenException('The mandate competition scope exceeds your representative-access consent.');
       }
 
