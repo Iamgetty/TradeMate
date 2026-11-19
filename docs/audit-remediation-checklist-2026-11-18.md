@@ -88,8 +88,8 @@ This checklist records the source/configuration audit findings. Items are not co
 
 ## 9. Build reproducibility and static checks
 
-- [ ] Add and commit package lockfiles for the API, web, and exchange-feed workspaces, then use deterministic `npm ci` installs in CI and deployment builds. The current review branch contains no lockfiles; CI and Render currently use `npm install`. Do not copy PR #213's API lockfile as-is: its root devDependency set does not match the current API `package.json`.
-- [ ] Resolve API lint configuration: `apps/api/package.json` declares a lint script invoking ESLint, but ESLint is not declared in API devDependencies and the current CI workflow does not run that lint script.
+- [ ] Add and commit package lockfiles for the API, web, and exchange-feed workspaces, then use deterministic `npm ci` installs in CI and deployment builds. Rechecked the full review-branch Git tree on 2026-11-19: no `package-lock.json` files are present. CI and Render currently use `npm install`. Do not copy PR #213's API lockfile as-is: its root devDependency set does not match the current API `package.json`.
+- [ ] Resolve API lint configuration: `TradeMate-main/apps/api/package.json` declares `"lint": "eslint ..."`, but ESLint is not declared in its dependencies/devDependencies, no ESLint config file is present in the review-branch tree, and the current CI workflow does not run that lint script. The web `lint` script is TypeScript no-emit checking; exchange-feed uses Node's built-in test runner. Add a deliberate lint toolchain and validate it before marking this complete.
 
 
 ## 10. Live Render PostgreSQL security audit — read-only findings (2026-11-19)
