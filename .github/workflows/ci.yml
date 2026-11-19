@@ -422,7 +422,7 @@ jobs:
           PY
       - name: Install isolated adapter dependencies
         working-directory: ${{ runner.temp }}/trademate-web
-        run: npm ci --no-audit --no-fund
+        run: npm install --no-audit --no-fund
       - name: Build Cloudflare Workers output
         working-directory: ${{ runner.temp }}/trademate-web
         run: npm run build:vinext
