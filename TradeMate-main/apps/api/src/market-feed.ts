@@ -54,7 +54,7 @@ function marketFeedSequenceAction(
   previous: unknown,
   mode: 'previous' | 'incremental',
 ): 'apply' | 'ignore' | 'resync' {
-  const next = Number(incoming);
+  const next = typeof incoming === 'number' ? incoming : Number.NaN;
   if (!Number.isSafeInteger(next) || next < 0 || current === null) return 'resync';
   if (next <= current) return 'ignore';
   if (mode === 'previous') return Number(previous) === current ? 'apply' : 'resync';
@@ -256,7 +256,10 @@ function attachMarketFeed(server: Server) {
             feed.sequenceStatus = 'synchronized';
             feed.bookAt = Date.now();
           } else if (d.type === 'delta') {
-            const action = marketFeedSequenceAction(feed.sequence, data.u, data.pu, 'previous');
+            // Bybit's standard orderbook stream documents consecutive `u` update IDs;
+            // `pu` is not part of this message contract. `seq` is cross-level metadata,
+            // not a consecutive per-book update counter.
+            const action = marketFeedSequenceAction(feed.sequence, data.u, undefined, 'incremental');
             if (action === 'ignore') return;
             if (action === 'resync') {
               feed.sequenceStatus = 'gap';
@@ -315,7 +318,6 @@ function attachMarketFeed(server: Server) {
             const [side, price, qty] = change as unknown[];
             putLevels(side === 'buy' ? feed.bids : feed.asks, [[price, qty]]);
           }
-          feed.sequence = Number(d.sequence_num);
           feed.bookAt = Date.now();
         } else if (d.type === 'match' && d.product_id === product) {
           addTrade(session, feed, d.trade_id, d.price, d.size, typeof d.time === 'string' ? Date.parse(d.time) : Date.now(), d.side);
