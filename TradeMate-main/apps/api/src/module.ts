@@ -3469,7 +3469,7 @@ class SportsTransferOrganizationsController {
     return result.rows[0].id as string;
   }
 
-  private async managerRole(client: PoolClient, organizationId: string, userId: string) {
+  private async managerRole(client: Pool | PoolClient, organizationId: string, userId: string) {
     const result = await client.query(
       `SELECT role FROM sports_org_memberships
        WHERE sports_organization_id = $1 AND user_id = $2 AND status = 'active'
