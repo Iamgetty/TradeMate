@@ -49,7 +49,7 @@ jobs:
           node-version: 24.22.1
       - name: Install API dependencies
         working-directory: TradeMate-main/apps/api
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Build API for database context integration tests
         working-directory: TradeMate-main/apps/api
         run: npm run build
@@ -160,7 +160,7 @@ jobs:
         run: node --test TradeMate-main/apps/web/scripts/market-metadata.test.cjs
       - name: Install web dependencies
         working-directory: TradeMate-main/apps/web
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Build web application
         working-directory: TradeMate-main/apps/web
         run: npm run build
@@ -178,7 +178,7 @@ jobs:
           node-version: 24.22.1
       - name: Install exchange-feed dependencies
         working-directory: TradeMate-main/exchange-feed
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Run exchange-feed and MT5 quote tests
         working-directory: TradeMate-main/exchange-feed
         run: npm test
@@ -196,7 +196,7 @@ jobs:
           node-version: 24.22.1
       - name: Install API dependencies
         working-directory: TradeMate-main/apps/api
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Lint API TypeScript source
         working-directory: TradeMate-main/apps/api
         run: npm run lint
@@ -256,19 +256,19 @@ jobs:
       - name: API dependency audit
         working-directory: TradeMate-main/apps/api
         run: |
-          npm install --no-audit --no-fund
+          npm ci --no-audit --no-fund
           npm audit --audit-level=high
 
       - name: Web dependency audit
         working-directory: TradeMate-main/apps/web
         run: |
-          npm install --no-audit --no-fund
+          npm ci --no-audit --no-fund
           npm audit --audit-level=high
 
       - name: Exchange feed dependency audit
         working-directory: TradeMate-main/exchange-feed
         run: |
-          npm install --no-audit --no-fund
+          npm ci --no-audit --no-fund
           npm audit --audit-level=high
 
       - name: Install Semgrep
@@ -313,7 +313,7 @@ jobs:
           node-version: 24.22.1
       - name: Install API dependencies
         working-directory: TradeMate-main/apps/api
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Build API for live browser acceptance
         working-directory: TradeMate-main/apps/api
         run: npm run build
@@ -347,7 +347,7 @@ jobs:
           exit 1
       - name: Install web and browser-test dependencies
         working-directory: TradeMate-main/apps/web
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Install Chromium and system dependencies
         working-directory: TradeMate-main/apps/web
         run: npx playwright install --with-deps chromium
@@ -422,7 +422,7 @@ jobs:
           PY
       - name: Install isolated adapter dependencies
         working-directory: ${{ runner.temp }}/trademate-web
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Build Cloudflare Workers output
         working-directory: ${{ runner.temp }}/trademate-web
         run: npm run build:vinext
