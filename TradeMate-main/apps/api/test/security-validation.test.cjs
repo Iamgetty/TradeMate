@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
 const { validateEnvironment } = require('../dist/environment');
 
 const {
@@ -246,4 +248,15 @@ test('P2P decimal inputs enforce database precision and fiat scale', () => {
   assert.equal(p2pAdBodySchema.safeParse({ ...ad, maxFiatAmount: '1.001' }).success, false);
   assert.equal(p2pOrderBodySchema.safeParse({ adId: '123e4567-e89b-42d3-a456-426614174000', fiatAmount: '12.34' }).success, true);
   assert.equal(p2pOrderBodySchema.safeParse({ adId: '123e4567-e89b-42d3-a456-426614174000', fiatAmount: '12.345' }).success, false);
+});
+
+
+test('production migration runner refuses to fall back to the runtime database role', () => {
+  const migrationScript = path.join(__dirname, '..', 'scripts', 'migrate.js');
+  const env = { ...process.env, NODE_ENV: 'production', DATABASE_URL: 'postgres://runtime:placeholder@localhost:5432/trademate' };
+  delete env.MIGRATION_DATABASE_URL;
+  const result = spawnSync(process.execPath, [migrationScript], { env, encoding: 'utf8' });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /MIGRATION_DATABASE_URL is required in production/);
+  assert.doesNotMatch(result.stderr, /ECONNREFUSED|password authentication failed/);
 });
