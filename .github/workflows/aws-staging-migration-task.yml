@@ -305,7 +305,7 @@ jobs:
             echo "- Source commit: `$RELEASE_SOURCE_SHA`"
             echo "- API image: `$EXPECTED_API_IMAGE_URI`"
             echo "- Migration task definition: `$TASK_DEFINITION_ARN`"
-            echo "- ECS task: `$TASK_ARN`
+            echo "- ECS task: `$TASK_ARN`"
             echo "- Stop code: `$STOP_CODE`"
             echo
             echo "This workflow runs the migration task only. It does not update or promote the API service."
