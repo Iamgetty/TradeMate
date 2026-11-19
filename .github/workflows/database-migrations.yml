@@ -46,7 +46,7 @@ jobs:
 
       - name: Install API dependencies
         working-directory: TradeMate-main/apps/api
-        run: npm install
+        run: npm ci --no-audit --no-fund
 
       - name: Run database migrations
         working-directory: TradeMate-main/apps/api
