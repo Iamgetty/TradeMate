@@ -10,8 +10,8 @@ import { createApiJsonBodyParser } from './request-body-parser';
 async function bootstrap() {
   validateEnvironment();
   const app = await NestFactory.create(AppModule, { bodyParser: false });
-  // Feed attachments are base64-encoded JSON; keep the larger allowance
-  // restricted to POST /api/feed/posts and use a smaller default elsewhere.
+  // Feed and organization verification uploads use Base64 JSON; keep the larger
+  // allowance restricted to those exact upload routes and use a smaller default elsewhere.
   app.use(createApiJsonBodyParser());
   app.use(databaseRequestContextMiddleware);
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
