@@ -126,3 +126,14 @@ This checklist records the source/configuration audit findings. Items are not co
 - Update this checklist as evidence is produced; never mark an item complete based only on code being written.
 - No production database changes, deployment, merge, PR closure, secret changes, infrastructure provisioning, or AWS cutover without explicit approval.
 - Never request or commit database URLs, passwords, API keys, or other secrets.
+
+
+## 12. API lint and dependency reproducibility — follow-up audit (2026-11-19)
+
+- [x] Re-inspect `TradeMate-main/apps/api/package.json` on the review branch: the `lint` script invokes ESLint, but `eslint` is not declared in either `dependencies` or `devDependencies`.
+- [x] Check the expected API ESLint configuration paths (`.eslintrc.js` and `eslint.config.js`); neither exists at the API root. The lint script is therefore not a validated quality gate and may fail before checking source files.
+- [x] Confirm `TradeMate-main/apps/api/package-lock.json` is absent on the review branch. Do not copy PR #213's stale lockfile: its root dependency declarations do not match the current API manifest. A lockfile must be generated from the reviewed manifest and validated with a clean `npm ci` install before adoption.
+- [ ] Select and pin a compatible ESLint/tooling configuration for the API's TypeScript version and module format; add the required parser/plugin/config dependencies and a repository-owned config, or remove the misleading lint script until a real lint gate is implemented. Validate against the actual source tree and CI runner.
+- [ ] Generate and commit an API lockfile from the final manifest using the intended Node/npm versions; prove clean install and build using `npm ci`. Repeat separately for web and exchange-feed if those workspaces are intended to be reproducible.
+- [x] Freshly inspect PR #219 CI run 1525 (run ID `44435308255`) for head commit `1f67e94f79d64609a277020e3602e7f6c1a22b0a`: Cloudflare compatibility passed; API TypeScript build, database migration integration, container builds, web build/runtime syntax, and exchange-feed/MT5 tests passed. Browser acceptance and security scanning were still in progress at the time of inspection. Do not report the latest head as fully green until those jobs complete.
+
