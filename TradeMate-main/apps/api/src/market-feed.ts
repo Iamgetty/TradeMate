@@ -1,4 +1,4 @@
-import WebSocket, { WebSocketServer } from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 import type { IncomingMessage, Server } from 'node:http';
 import { isIP } from 'node:net';
 
