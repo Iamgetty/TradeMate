@@ -440,3 +440,14 @@ This checklist records the source/configuration audit findings. Items are not co
 - [x] Added an HTTP integration regression case for non-canonical Base64. The existing integration suite also covers spoofed PDF content, data-URL MIME mismatch, role restrictions, cross-organization denial, and transaction rollback.
 - [ ] CI for this follow-up commit is pending; do not treat the new regression as verified until the new head's API and complete workflow checks pass.
 - [x] No production data, services, deployments, or infrastructure were changed.
+
+
+## 41. Uploaded attachment delivery and inline-content policy review (2026-11-19)
+
+- [x] Traced every upload/storage path in the API module: community-feed attachments, organization verification documents, and profile/cover image data URLs. No additional multipart or arbitrary file-upload handler was found in this module.
+- [x] Rechecked the public feed attachment read query: it binds the attachment ID to the requested post ID and requires the post to remain published; it returns not-found for a missing/unpublished attachment.
+- [x] Confirmed response headers include the stored validated content type, `X-Content-Type-Options: nosniff`, a CR/LF/quote-sanitized inline filename, exact stored byte length, and one-hour public caching.
+- [x] The upload allowlist excludes HTML, SVG, and other active web content, and MIME/signature correspondence is now checked before feed storage. Organization verification documents are not served through this public feed route.
+- [ ] Delivery-policy follow-up: the feed endpoint deliberately uses `Content-Disposition: inline` for every allowed format, including PDF and audio. Decide explicitly whether PDFs/audio should remain inline or use attachment download behavior; add HTTP response-header tests for each allowed type and ensure the product's preview/download UX matches the policy. Do not change behavior without confirming the intended feed experience.
+- [ ] Defense-in-depth follow-up: signature checks are header/container checks, not full media decoding or malware scanning. Consider image decode/re-encode and isolated PDF inspection before treating uploaded bytes as fully trusted. Keep this separate from MIME spoofing prevention already implemented.
+- [x] No further upload write paths were found in the inspected API module. No production data, services, deployments, or infrastructure were changed.
