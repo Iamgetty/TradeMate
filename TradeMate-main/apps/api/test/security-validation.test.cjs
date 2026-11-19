@@ -205,6 +205,7 @@ test('production environment validation requires PostgreSQL and a 256-bit TOTP k
   const valid = validateEnvironment({
     NODE_ENV: 'production',
     DATABASE_URL: 'postgres://trade_user:placeholder@localhost:5432/trademate',
+    MIGRATION_DATABASE_URL: 'postgres://trade_migrator:placeholder@localhost:5432/trademate',
     TOTP_ENCRYPTION_KEY: 'a'.repeat(64),
     WEB_ORIGIN: 'https://trademate-web.onrender.com',
   });
@@ -213,6 +214,11 @@ test('production environment validation requires PostgreSQL and a 256-bit TOTP k
     NODE_ENV: 'production',
     TOTP_ENCRYPTION_KEY: 'a'.repeat(64),
   }), /DATABASE_URL/);
+  assert.throws(() => validateEnvironment({
+    NODE_ENV: 'production',
+    DATABASE_URL: 'postgres://trade_user:placeholder@localhost:5432/trademate',
+    TOTP_ENCRYPTION_KEY: 'a'.repeat(64),
+  }), /MIGRATION_DATABASE_URL/);
   assert.throws(() => validateEnvironment({
     NODE_ENV: 'production',
     DATABASE_URL: 'postgres://trade_user:placeholder@localhost:5432/trademate',
