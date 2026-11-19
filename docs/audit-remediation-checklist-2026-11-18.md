@@ -218,3 +218,19 @@ This checklist records the source/configuration audit findings. Items are not co
 - [ ] Review WebSocket Origin behavior against the actual production web origin and reverse-proxy configuration; ensure trusted proxy settings cannot permit client spoofing of `request.ip` for rate limiting.
 - [ ] Verify all login, password reset, email verification, 2FA and deletion cancellation rate-limit paths under concurrency and confirm expired `auth_rate_limits`/challenge rows are cleaned up safely.
 - [ ] No authentication or endpoint code was changed as part of this review entry.
+
+
+## 21. Public market-feed WebSocket capacity controls — implementation added (2026-11-19)
+
+- [x] Added an explicit per-instance ceiling of 100 concurrent WebSocket clients and a per-client-IP ceiling of 5.
+- [x] Added browser Origin allowlisting for the deployed TradeMate web origin, localhost development, and normalized comma-separated `WEB_ORIGIN` values. Requests without an Origin remain permitted for non-browser clients; an unexpected or malformed browser Origin is rejected before upgrade.
+- [x] Per-IP accounting uses the right-most valid `X-Forwarded-For` address, consistent with the API's existing one-hop trusted-proxy setting in `main.ts`; invalid forwarding data falls back to the transport peer address.
+- [x] Added a 10-second subscription deadline, one symbol per connection, and a 30-second ping/pong heartbeat that terminates unresponsive clients.
+- [x] Added snapshot backpressure handling: skip sends while buffered output exceeds 1 MiB and close a client after 3 consecutive over-limit snapshots.
+- [x] Added cleanup for upstream connection timeouts and Bybit ping intervals when sessions stop, preventing timers from surviving client disconnects.
+- [x] Added `market-feed.test.cjs` coverage for allowed/blocked origins, configured-origin normalization, trusted proxy client-IP selection, and explicit resource ceilings.
+- [ ] Execute the API TypeScript build and API test suite on the review branch; this GitHub-only editing environment cannot run Node/npm, so compilation and test execution are not yet verified.
+- [ ] Add live WebSocket integration tests for handshake rejection, actual connection-cap enforcement, slow-client closure, and upstream cleanup; the current added tests exercise exported policy helpers rather than opening real sockets.
+- [ ] Validate the Render edge proxy's actual `X-Forwarded-For` behavior before rollout. The current per-IP quota assumes the one trusted proxy hop configured in `main.ts` appends the connecting client IP as the right-most value.
+- [ ] Capacity values are conservative initial per-instance ceilings, not production load-test results. Revisit after observing real concurrent-client and upstream-connection metrics.
+- [ ] No production deployment, Render setting, or live service was changed.
