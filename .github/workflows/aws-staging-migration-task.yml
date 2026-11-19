@@ -114,8 +114,11 @@ jobs:
           PRIVATE_SUBNETS="$(jq -r '.[] | select(.OutputKey=="PrivateAppSubnetIds") | .OutputValue' <<< "$FOUNDATION_OUTPUTS")"
           MIGRATION_SECURITY_GROUP="$(jq -r '.[] | select(.OutputKey=="MigrationSecurityGroupId") | .OutputValue' <<< "$FOUNDATION_OUTPUTS")"
           TASK_DEFINITION_ARN="$(jq -r '.[] | select(.OutputKey=="MigrationTaskDefinitionArn") | .OutputValue' <<< "$SERVICES_OUTPUTS")"
+          MIGRATION_SECRET_ARN="$(jq -r '.[] | select(.OutputKey=="MigrationDatabaseUrlSecretArn") | .OutputValue' <<< "$SERVICES_OUTPUTS")"
+          MIGRATION_EXECUTION_ROLE_ARN="$(jq -r '.[] | select(.OutputKey=="MigrationEcsExecutionRoleArn") | .OutputValue' <<< "$SERVICES_OUTPUTS")"
+          MIGRATION_TASK_ROLE_ARN="$(jq -r '.[] | select(.OutputKey=="MigrationTaskRoleArn") | .OutputValue' <<< "$SERVICES_OUTPUTS")"
 
-          for value in "$CLUSTER_NAME" "$PRIVATE_SUBNETS" "$MIGRATION_SECURITY_GROUP" "$TASK_DEFINITION_ARN"; do
+          for value in "$CLUSTER_NAME" "$PRIVATE_SUBNETS" "$MIGRATION_SECURITY_GROUP" "$TASK_DEFINITION_ARN" "$MIGRATION_SECRET_ARN" "$MIGRATION_EXECUTION_ROLE_ARN" "$MIGRATION_TASK_ROLE_ARN"; do
             if [[ -z "$value" || "$value" == "null" ]]; then
               echo "::error::A required foundation/services CloudFormation output is missing."
               exit 1
@@ -131,13 +134,20 @@ jobs:
           TASK_IMAGE="$(jq -r '.containerDefinitions[0].image' <<< "$TASK_DEFINITION")"
           TASK_COMMAND="$(jq -r '.containerDefinitions[0].command | join(" ")' <<< "$TASK_DEFINITION")"
           TASK_SECRET_NAMES="$(jq -r '.containerDefinitions[0].secrets | map(.name) | sort | join(",")' <<< "$TASK_DEFINITION")"
+          TASK_SECRET_ARN="$(jq -r '.containerDefinitions[0].secrets[] | select(.name=="MIGRATION_DATABASE_URL") | .valueFrom' <<< "$TASK_DEFINITION")"
+          TASK_EXECUTION_ROLE_ARN="$(jq -r '.executionRoleArn' <<< "$TASK_DEFINITION")"
+          TASK_ROLE_ARN="$(jq -r '.taskRoleArn' <<< "$TASK_DEFINITION")"
 
           if [[ "$TASK_FAMILY" != "trademate-staging-database-migration" || "$NETWORK_MODE" != "awsvpc" || "$COMPATIBILITIES" != *FARGATE* || "$CONTAINER_COUNT" != "1" || "$CONTAINER_NAME" != "database-migration" ]]; then
             echo "::error::The deployed task definition does not match the expected single-container Fargate migration task."
             exit 1
           fi
-          if [[ "$TASK_COMMAND" != "node scripts/migrate.js" || "$TASK_SECRET_NAMES" != "MIGRATION_DATABASE_URL" ]]; then
-            echo "::error::The migration task command or secret boundary does not match the reviewed template."
+          if [[ "$TASK_COMMAND" != "node scripts/migrate.js" || "$TASK_SECRET_NAMES" != "MIGRATION_DATABASE_URL" || "$TASK_SECRET_ARN" != "$MIGRATION_SECRET_ARN" ]]; then
+            echo "::error::The migration task command or secret reference does not match the reviewed CloudFormation stack output."
+            exit 1
+          fi
+          if [[ "$TASK_EXECUTION_ROLE_ARN" != "$MIGRATION_EXECUTION_ROLE_ARN" || "$TASK_ROLE_ARN" != "$MIGRATION_TASK_ROLE_ARN" ]]; then
+            echo "::error::The migration task IAM roles do not match the reviewed CloudFormation stack outputs."
             exit 1
           fi
           if [[ "$TASK_IMAGE" != "$EXPECTED_API_IMAGE_URI" ]]; then
