@@ -231,7 +231,7 @@ This checklist records the source/configuration audit findings. Items are not co
 - [x] Added a 10-second upstream WebSocket handshake timeout and exponential reconnect backoff (1–30 seconds, with jitter), resetting the backoff after a successful connection to reduce venue reconnect storms.
 - [x] Added `market-feed.test.cjs` coverage for allowed/blocked origins, configured-origin normalization, trusted proxy client-IP selection, and explicit resource ceilings.
 - [x] Added `market-feed.integration.test.cjs` coverage that opens real local WebSocket connections and verifies rejection of an untrusted Origin and the fifth-to-sixth per-IP connection boundary.
-- [ ] Execute the API TypeScript build and API test suite on the review branch; this GitHub-only editing environment cannot run Node/npm, so compilation and test execution are not yet verified.
+- [x] API TypeScript build and database-backed API integration suite completed successfully on commit `e8dc171c8d233b752aab1b57968f7309e4a62b97` in TradeMate CI run 1560 (all 8/8 jobs passed).
 - [ ] Add live WebSocket integration tests for slow-client closure, heartbeat termination, subscription timeout, and upstream cleanup; those behaviors currently have implementation but not dedicated socket-level regression coverage.
 - [ ] Validate the Render edge proxy's actual `X-Forwarded-For` behavior before rollout. The current per-IP quota assumes the one trusted proxy hop configured in `main.ts` appends the connecting client IP as the right-most value.
 - [ ] Capacity values are conservative initial per-instance ceilings, not production load-test results. Revisit after observing real concurrent-client and upstream-connection metrics.
@@ -253,5 +253,16 @@ This checklist records the source/configuration audit findings. Items are not co
 - [x] Reviewed the organization membership invitation schema and confirmed it explicitly excludes the `owner` role; ownership can only be established when an organization is created. The route separately restricts admin invitations to owners.
 - [x] The first added test incorrectly expected HTTP 403 for an owner-role invitation. TradeMate CI run 1556 reached the organization integration test and correctly returned HTTP 400 because Zod rejects the role before route authorization. The source guard was restored to its original, schema-aligned behavior; no owner-escalation vulnerability was established by this test.
 - [x] Updated the regression assertion to require HTTP 400 and document that owner assignment is rejected by the invitation schema.
-- [ ] Re-run the full database-backed organization/Sports Transfer integration suite and full CI on the corrected commit.
+- [x] Corrected schema-boundary assertion and checklist passed full TradeMate CI run 1560 on commit `e8dc171c8d233b752aab1b57968f7309e4a62b97` (8/8 jobs), including database migration integration; Cloudflare compatibility run 376 passed.
 - [ ] Continue auditing organization-role changes, membership reactivation, and all organization-scoped opportunity/document actions for independent privilege escalation paths.
+
+
+## 24. Latest review-branch verification and continued Sports Transfer access review (2026-11-19)
+
+- [x] Verified PR #219 head commit `e8dc171c8d233b752aab1b57968f7309e4a62b97` remains open, draft, unmerged, and mergeable.
+- [x] TradeMate CI run 1560 (`44440391941`) completed successfully: all 8/8 jobs passed, including API TypeScript build, database migration integration, web build/runtime, security scanning, container builds, exchange-feed/MT5 tests, and browser app-shell/live API acceptance.
+- [x] Cloudflare frontend compatibility run 376 (`44440391933`) completed successfully.
+- [x] Re-reviewed Sports Transfer organization membership routes, mandate inbox visibility, private opportunity creation/listing, and organization-scoped role/date checks. Opportunity creation requires active, in-window membership with a recruitment-capable role and workspace/recruitment scope; organization opportunity listing applies active membership, role, scope, and date-window predicates.
+- [x] Existing opportunity integration test covers player-owned versus organization-owned drafts, outsider denial, and access removal after membership revocation. Mandate integration test covers owner/admin visibility and denial for ordinary, expired, future-dated, and outsider memberships.
+- [ ] Continue a separate review of all read and write paths for organization documents, negotiation, offer, and opportunity lifecycle actions before treating Sports Transfer authorization as fully audited. Current opportunity API exposes private draft creation and owner-scoped listing; it does not provide publish/edit/delete routes in this controller.
+- [ ] Add socket-level WebSocket tests for slow-client closure, heartbeat termination, subscription timeout, and upstream cleanup; CI passing does not replace these missing targeted tests or a Render proxy/load validation.
