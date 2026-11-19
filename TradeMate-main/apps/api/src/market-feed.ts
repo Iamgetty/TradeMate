@@ -1,14 +1,14 @@
 import WebSocket, { WebSocketServer } from 'ws';
-import type { Server } from 'node:http';
+import type { IncomingMessage, Server } from 'node:http';
 
 type Level = { p: string; q: string };
 type Trade = { id: string; venue: string; market: string; price: string; quantity: string; time: number; side: 'buy' | 'sell' };
 type Feed = {
   venue: string; market: string; status: string;
   bids: Map<string, string>; asks: Map<string, string>;
-  bookAt: number; tradeAt: number; socket?: WebSocket; reconnect?: NodeJS.Timeout;
+  bookAt: number; tradeAt: number; socket?: WebSocket; reconnect?: NodeJS.Timeout; connectionTimeout?: NodeJS.Timeout; pingInterval?: NodeJS.Timeout;
 };
-type Session = { client: WebSocket; symbol: string; feeds: Map<string, Feed>; trades: Trade[]; timer: NodeJS.Timeout; closed: boolean };
+type Session = { client: WebSocket; symbol: string; feeds: Map<string, Feed>; trades: Trade[]; timer: NodeJS.Timeout; closed: boolean; backpressureStrikes: number };
 
 const validSymbol = (value: unknown) => typeof value === 'string' && /^[A-Z0-9]{5,24}$/.test(value);
 const keyOf = (venue: string, market: string) => venue + ':' + market;
@@ -30,22 +30,80 @@ const snapshotLevels = (map: Map<string, string>, count = 50): Level[] =>
     .sort((a, b) => Number(a.p) - Number(b.p))
     .slice(0, count);
 
+const MARKET_FEED_LIMITS = Object.freeze({
+  maxConnections: 100,
+  maxConnectionsPerIp: 5,
+  subscriptionTimeoutMs: 10_000,
+  heartbeatIntervalMs: 30_000,
+  maxBufferedBytes: 1_048_576,
+  maxBackpressureStrikes: 3,
+});
+
+const DEFAULT_MARKET_FEED_ORIGINS = ['https://trademate-web.onrender.com', 'http://localhost:3000'];
+
+function isAllowedMarketFeedOrigin(origin: string | undefined, configuredOrigins = process.env.WEB_ORIGIN || ''): boolean {
+  if (!origin) return true;
+  let normalized: string;
+  try { normalized = new URL(origin).origin; } catch { return false; }
+  const allowed = new Set([
+    ...DEFAULT_MARKET_FEED_ORIGINS,
+    ...configuredOrigins.split(',').map((value) => value.trim()).filter(Boolean),
+  ]);
+  return allowed.has(normalized);
+}
+
+function marketFeedClientIp(request: IncomingMessage): string {
+  // Do not trust caller-controlled X-Forwarded-For values for connection quotas.
+  return request.socket.remoteAddress || 'unknown';
+}
+
 function attachMarketFeed(server: Server) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
   const sessions = new Set<Session>();
+  const connectionsByIp = new Map<string, number>();
+  const aliveClients = new WeakMap<WebSocket, boolean>();
+
+  const heartbeat = setInterval(() => {
+    for (const client of wss.clients) {
+      if (aliveClients.get(client) === false) { client.terminate(); continue; }
+      aliveClients.set(client, false);
+      if (client.readyState === WebSocket.OPEN) client.ping();
+    }
+  }, MARKET_FEED_LIMITS.heartbeatIntervalMs);
+  heartbeat.unref?.();
 
   server.on('upgrade', (request, socket, head) => {
     let pathname = '';
     try { pathname = new URL(request.url || '/', 'http://localhost').pathname; } catch { return; }
     if (pathname !== '/api/market-feed') return;
+    if (!isAllowedMarketFeedOrigin(request.headers.origin)) {
+      socket.write('HTTP/1.1 403 Forbidden\\r\\nConnection: close\\r\\n\\r\\n');
+      socket.destroy();
+      return;
+    }
+    const ip = marketFeedClientIp(request);
+    if (wss.clients.size >= MARKET_FEED_LIMITS.maxConnections || (connectionsByIp.get(ip) || 0) >= MARKET_FEED_LIMITS.maxConnectionsPerIp) {
+      socket.write('HTTP/1.1 429 Too Many Requests\\r\\nConnection: close\\r\\n\\r\\n');
+      socket.destroy();
+      return;
+    }
     wss.handleUpgrade(request, socket, head, (client) => wss.emit('connection', client, request));
   });
 
   const send = (session: Session, payload: unknown) => {
-    if (session.client.readyState === WebSocket.OPEN) session.client.send(JSON.stringify(payload));
+    if (session.client.readyState !== WebSocket.OPEN) return;
+    if (session.client.bufferedAmount > MARKET_FEED_LIMITS.maxBufferedBytes) {
+      session.backpressureStrikes += 1;
+      if (session.backpressureStrikes >= MARKET_FEED_LIMITS.maxBackpressureStrikes) session.client.close(1013, 'Market feed client is too slow.');
+      return;
+    }
+    session.backpressureStrikes = 0;
+    session.client.send(JSON.stringify(payload));
   };
   const stopFeed = (feed: Feed) => {
     if (feed.reconnect) clearTimeout(feed.reconnect);
+    if (feed.connectionTimeout) clearTimeout(feed.connectionTimeout);
+    if (feed.pingInterval) clearInterval(feed.pingInterval);
     if (feed.socket) {
       feed.socket.removeAllListeners();
       try { feed.socket.close(); } catch { /* already closed */ }
@@ -85,13 +143,15 @@ function attachMarketFeed(server: Server) {
     const timeout = setTimeout(() => {
       if (!feed.bookAt && !feed.tradeAt && feed.status === 'connecting') feed.status = 'stale';
     }, 12000);
-    ws.on('open', () => { feed.status = 'connected'; onOpen?.(ws); });
+    feed.connectionTimeout = timeout;
+    ws.on('open', () => { clearTimeout(timeout); feed.connectionTimeout = undefined; feed.status = 'connected'; onOpen?.(ws); });
     ws.on('message', (raw) => {
       try { onMessage(JSON.parse(raw.toString())); } catch { /* ignore malformed upstream frames */ }
     });
     ws.on('error', () => { try { ws.close(); } catch { /* noop */ } });
     ws.on('close', () => {
       clearTimeout(timeout);
+      if (feed.connectionTimeout === timeout) feed.connectionTimeout = undefined;
       if (session.closed || feed.socket !== ws) return;
       feed.status = 'reconnecting';
       feed.reconnect = setTimeout(() => {
@@ -152,8 +212,7 @@ function attachMarketFeed(server: Server) {
         if (feed.bookAt || feed.tradeAt) feed.status = 'live';
       }, (ws) => {
         ws.send(JSON.stringify({ op: 'subscribe', args: ['orderbook.50.' + session.symbol, 'publicTrade.' + session.symbol] }));
-        const ping = setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ op: 'ping' })); }, 20000);
-        ws.once('close', () => clearInterval(ping));
+        feed.pingInterval = setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ op: 'ping' })); }, 20000);
       });
     }
 
@@ -177,8 +236,24 @@ function attachMarketFeed(server: Server) {
     }
   };
 
-  wss.on('connection', (client) => {
+  wss.on('connection', (client, request) => {
+    const ip = marketFeedClientIp(request as IncomingMessage);
+    aliveClients.set(client, true);
+    connectionsByIp.set(ip, (connectionsByIp.get(ip) || 0) + 1);
     let session: Session | null = null;
+    let released = false;
+    const subscriptionTimeout = setTimeout(() => {
+      if (!session && client.readyState === WebSocket.OPEN) client.close(1008, 'Subscribe to a market feed to continue.');
+    }, MARKET_FEED_LIMITS.subscriptionTimeoutMs);
+    const releaseConnection = () => {
+      if (released) return;
+      released = true;
+      clearTimeout(subscriptionTimeout);
+      if (session) stopSession(session);
+      const count = (connectionsByIp.get(ip) || 1) - 1;
+      if (count <= 0) connectionsByIp.delete(ip); else connectionsByIp.set(ip, count);
+    };
+    client.on('pong', () => aliveClients.set(client, true));
     client.on('message', (raw) => {
       let message: any;
       try { message = JSON.parse(raw.toString()); } catch { return; }
@@ -186,10 +261,15 @@ function attachMarketFeed(server: Server) {
         if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify({ type: 'error', message: 'Choose a supported market symbol.' }));
         return;
       }
-      if (session) stopSession(session);
+      const requestedSymbol = message.symbol.toUpperCase();
+      if (session) {
+        if (session.symbol !== requestedSymbol && client.readyState === WebSocket.OPEN) client.close(1008, 'One market symbol is allowed per connection.');
+        return;
+      }
+      clearTimeout(subscriptionTimeout);
       session = {
-        client, symbol: message.symbol.toUpperCase(), feeds: new Map(), trades: [],
-        timer: setInterval(() => undefined, 60000), closed: false,
+        client, symbol: requestedSymbol, feeds: new Map(), trades: [],
+        timer: setInterval(() => undefined, 60000), closed: false, backpressureStrikes: 0,
       };
       sessions.add(session);
       startFeeds(session);
@@ -208,11 +288,16 @@ function attachMarketFeed(server: Server) {
         });
       }, 1000);
     });
-    client.on('close', () => { if (session) stopSession(session); });
-    client.on('error', () => { if (session) stopSession(session); });
+    client.on('close', releaseConnection);
+    client.on('error', releaseConnection);
   });
 
-  return () => { for (const session of sessions) stopSession(session); wss.close(); };
+  return () => {
+    clearInterval(heartbeat);
+    for (const session of sessions) stopSession(session);
+    for (const client of wss.clients) client.close(1001, 'Market feed server is shutting down.');
+    wss.close();
+  };
 }
 
-export { attachMarketFeed };
+export { attachMarketFeed, isAllowedMarketFeedOrigin, marketFeedClientIp, MARKET_FEED_LIMITS };
