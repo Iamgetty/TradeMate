@@ -6,6 +6,12 @@ declare global {
   interface Window {
     TM_CONFIG?: { api: string };
     __tradeMateBooted?: boolean;
+    tmMarketMetadataStatus?: {
+      state: 'fresh' | 'stale' | 'unavailable';
+      lastAttemptAt: number | null;
+      lastSuccessAt: number | null;
+      error: string | null;
+    };
   }
 }
 
@@ -264,6 +270,14 @@ export default function TradeMateRuntime() {
       loadApp();
     };
     metadata.onerror = () => {
+      // Market metadata is secondary to the exchange-feed spot quote. Fail
+      // closed for this optional source while keeping the core app available.
+      window.tmMarketMetadataStatus = {
+        state: 'unavailable',
+        lastAttemptAt: null,
+        lastSuccessAt: null,
+        error: 'Market metadata helper could not be loaded',
+      };
       metadataReady = true;
       loadApp();
     };
