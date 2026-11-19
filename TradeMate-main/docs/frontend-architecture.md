@@ -94,7 +94,18 @@ Treat the web asset as the source of truth for the currently deployed TradeMate 
 
 
 
-### CoinGecko refresh: field-level ownership verified
+### Exchange-feed order-book freshness
+
+The NestJS market-feed publisher timestamps each venue's latest order-book update. A connected upstream socket is not, by itself, evidence that its last book is still current.
+
+- The publisher now applies a 10-second order-book freshness threshold using the server-side `bookAt` timestamp. Missing timestamps are stale; data exactly at the threshold remains fresh; older data is stale. Small future clock skew is clamped to zero age.
+- Each published venue book and feed summary includes `stale` and `bookAgeMs`. A formerly live/connected venue transitions to `stale` when its book ages out; reconnecting/unavailable transport states remain separately visible.
+- The browser feed client excludes stale books from aggregated depth and from catalogue spot quotes. A stale venue cannot continue contributing its last-known bid/ask to the combined live book.
+- API unit tests cover missing timestamps, the freshness boundary, expiry and clock skew. Exchange-feed client tests exercise both the package and deployed browser copy and prove stale books do not contribute to depth or catalogue quotes.
+
+The 10-second threshold is an initial engineering policy, not a measured universal optimum. Before production acceptance, validate it against each venue's update cadence, instrument liquidity, market sessions, network latency and user-facing quote requirements. Do not use this threshold as a substitute for provider sequence-gap detection, snapshot resynchronization, cross-venue divergence checks or operational alerting.
+
+## CoinGecko refresh: field-level ownership verified
 
 A direct inspection of the current `liveRefresh()` implementation confirms a narrower contract than a generic “market refresh” description suggests:
 
