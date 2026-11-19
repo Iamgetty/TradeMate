@@ -1,6 +1,6 @@
 # TradeMate implementation register
 
-**Canonical cross-stack status ledger.** Updated: 2026-11-19 (latest recorded TradeMate CI and Cloudflare compatibility evidence is linked in the relevant capability rows)  
+**Canonical cross-stack status ledger.** Updated: 2026-11-19 (PR #219 head `14ed88c8f1558295fe1b0477d89a8b13e902ebbf` passed TradeMate CI, Cloudflare compatibility and lockfile validation)  
 **Branch baseline:** `fix/audit-remediation-2026-11-18`  
 **Rule:** no domain is complete merely because its first component exists. Repository implementation, CI verification, staging validation and production acceptance are tracked separately.
 
@@ -61,13 +61,15 @@
 
 | Node.js runtime lifecycle alignment | Node.js 20 had reached EOL while CI still used it; API and exchange-feed Docker images used Node 22; the Render Blueprint had no explicit Node version. PR #219 pins Node.js 24.22.1 in `TradeMate-main/.node-version`, package `engines` constraints (`>=24.22.1 <25`) for API/web/exchange-feed, all active root CI setup steps, Cloudflare compatibility and database migration workflows, both Docker images (`node:24-bookworm-slim`), and all three Render services via `NODE_VERSION`. Exact PR head `9589c823f4fff35ab6612ca95c0d3db73d408ae2` passed TradeMate CI run [44607210438](https://github.com/Iamgetty/TradeMate/actions/runs/44607210438), all 8/8 jobs, and Cloudflare compatibility run [44607210444](https://github.com/Iamgetty/TradeMate/actions/runs/44607210444). The current documentation-only PR head `738de5ab20e6cef511e2a5072c05b977a55e631d` also passed all 8/8 jobs in TradeMate CI run [44609144668](https://github.com/Iamgetty/TradeMate/actions/runs/44609144668) and Cloudflare compatibility run [44609144652](https://github.com/Iamgetty/TradeMate/actions/runs/44609144652); runtime code was unchanged in the documentation commits. | ◐ Repository configuration aligned and exact-head CI verified; deployed runtime verification remains outstanding. Render Blueprint changes have not been applied to production. |
 
-## Dependency reproducibility gate (rechecked 19 Nov 2026)
+## Dependency reproducibility gate (verified 19 Nov 2026)
 
-- The tracked repository tree at PR #219 head `fc094efa2fe69d15fdfc4fa647d4bccafa651f28` contains no npm lockfile (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml` or `yarn.lock`) for `TradeMate-main/apps/api`, `TradeMate-main/apps/web` or `TradeMate-main/exchange-feed`.
-- The three package manifests declare semver ranges. The current CI, database, web, API, exchange-feed and Cloudflare compatibility workflows install with `npm install --no-audit --no-fund`; they do not enforce a committed dependency graph with `npm ci`.
-- Therefore current green CI proves those workflows succeeded against the dependency graph resolved during that run, not that a future install will reproduce the same graph.
-- Next implementation task: generate each lockfile from its own package manifest using a supported npm version and registry resolution, inspect the resolved tree for security/compatibility, then verify clean `npm ci` installs and all affected tests/builds. Do not copy the stale API lockfile from PR #213 or hand-author lockfile contents. This repository review did not generate or commit lockfiles because a trustworthy npm resolver/install run was not available in this GitHub-only editing session.
-- Status: ◐ dependency management partially implemented; lockfile reproducibility and frozen-install CI remain outstanding. No dependency versions or production environments changed in this review.
+- The API, web and exchange-feed packages each have a committed `package-lock.json`, generated on a GitHub-hosted runner using Node.js 24.22.1 and the package's own manifest. The stale API lockfile from PR #213 was not reused.
+- Lockfile workflow [run 44630984045](https://github.com/Iamgetty/TradeMate/actions/runs/44630984045) passed on exact PR head `14ed88c8f1558295fe1b0477d89a8b13e902ebbf`; it performed clean `npm ci` installs and available build validation for all three packages.
+- TradeMate CI [run 44630983984](https://github.com/Iamgetty/TradeMate/actions/runs/44630983984) passed all 8/8 jobs on the same exact head, including the API and exchange-feed Docker image builds. Those Dockerfiles now use `npm ci` in the API build and runtime stages and exchange-feed runtime stage.
+- All three Render Blueprint service build commands now use `npm ci`; API explicitly includes dev dependencies for TypeScript compilation. This is repository configuration only; the Blueprint has not been applied to production and deployed Render build behavior remains unverified.
+- Standard CI, database migration, web, API, exchange-feed, security audit and Cloudflare compatibility installs use committed lockfiles with `npm ci`. The one deliberate exception is the disposable Cloudflare adapter copy, whose package manifest is rewritten in the runner temp directory to pin an adapter peer dependency; it retains `npm install` because its copied lockfile no longer matches that modified manifest.
+- Cloudflare compatibility [run 44630984030](https://github.com/Iamgetty/TradeMate/actions/runs/44630984030) passed on the same exact head.
+- Status: ✓ repository-level lockfile reproducibility and CI/Docker validation verified on exact PR head; production Render adoption, deployed runtime verification, dependency update automation and artifact provenance remain outstanding. No production environment was changed.
 
 ## Update template
 
