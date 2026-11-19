@@ -171,6 +171,22 @@ async function main() {
       assert.equal(inbox.status, 200);
       assert.ok(!(await inbox.json()).mandates.some((mandate) => mandate.id === orgMandate.id), actor + ' cannot see an organization mandate');
     }
+    const orgRevoked = await call('player', 'POST', '/api/sports-transfer/mandates/' + orgMandate.id + '/revoke', {});
+    assert.equal(orgRevoked.status, 201);
+    for (const actor of ['organizationOwner', 'organizationAdmin']) {
+      const notice = await pool.query(
+        "SELECT id FROM user_notifications WHERE user_id = $1 AND title = 'Sports Transfer mandate revoked'",
+        [actors[actor].userId],
+      );
+      assert.equal(notice.rowCount, 1, actor + ' receives the organization mandate revocation notice');
+    }
+    for (const actor of ['organizationMember', 'expiredAdmin', 'futureAdmin']) {
+      const notice = await pool.query(
+        "SELECT id FROM user_notifications WHERE user_id = $1 AND title = 'Sports Transfer mandate revoked'",
+        [actors[actor].userId],
+      );
+      assert.equal(notice.rowCount, 0, actor + ' does not receive the organization mandate revocation notice');
+    }
 
     await grantConsent(basketball.id, { targetUserId: actors.representative2.userId });
     const rejectedMandateResponse = await createMandate(basketball.id, { representativeUserId: actors.representative2.userId });
