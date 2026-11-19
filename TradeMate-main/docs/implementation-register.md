@@ -1,6 +1,6 @@
 # TradeMate implementation register
 
-**Canonical cross-stack status ledger.** Updated: 2026-11-19 (CI evidence refreshed)  
+**Canonical cross-stack status ledger.** Updated: 2026-11-19 (full CI run 1671 recorded; RLS security limitation documented)  
 **Branch baseline:** `fix/audit-remediation-2026-11-18`  
 **Rule:** no domain is complete merely because its first component exists. Repository implementation, CI verification, staging validation and production acceptance are tracked separately.
 
@@ -34,22 +34,23 @@
 
 **Important:** These are conservative initial domain-level assessments based on the currently available project audit context. They are not individual feature-level checkmarks and do not constitute production acceptance. Revalidate each row against the exact current branch and deployed environment before upgrading its status.
 
-## Current engineering increment (verification pending)
+## Current engineering increment (CI verified; production acceptance not implied)
 
 | Item | Evidence | Status |
 |---|---|---|
 | RLS pilot refuses generic `DATABASE_URL` and requires a dedicated test URL | Commit `2ea5d8ce467e7fb6996de186c9af6dec8efd85f0`; `TradeMate-main/apps/api/scripts/test-rls-pilot.js` | ✓ Implemented in repository; CI result pending |
 | CI supplies dedicated disposable RLS test database URL | Commit `3b7072f75f388b80967c122d6eec5736cc485709`; `.github/workflows/ci.yml` | ✓ Implemented in repository; CI result pending |
-| Regression tests for RLS pilot connection guard | Current increment adds rejection of URL query parameters/fragments and wires `node --test test/test-rls-pilot-safety.test.cjs` into the database CI job | ◐ Test cases and CI invocation added; execution pending a completed run |
-| CI validation of prior increment | Workflow run [44482164593](https://github.com/Iamgetty/TradeMate/actions/runs/44482164593) tested implementation commit `b98731550e7452e5eef9f5fc802b189fd0ef0721`. API lint/build/security validation, web runtime/cache isolation/build, exchange-feed + MT5 tests, and API/exchange-feed container builds passed. The overall run was later cancelled before database migration integration reached the RLS pilot step, before browser acceptance completed, and before SAST/secret scanning and isolated Cloudflare runtime completed. | ◐ Cancelled/incomplete; not a full CI pass |
+| Regression tests for RLS pilot connection guard | Current branch includes query-parameter/fragment rejection tests and invokes `node --test test/test-rls-pilot-safety.test.cjs` in the database CI job; full database job passed in run [44482623584](https://github.com/Iamgetty/TradeMate/actions/runs/44482623584), commit `e4d3fea0e79b5124b1d4d274665539da95f93750` | ✓ Repository implementation and CI execution verified; not production acceptance |
+| Full CI validation on current PR head | TradeMate CI run [1671](https://github.com/Iamgetty/TradeMate/actions/runs/44482623584) tested exact PR head `e4d3fea0e79b5124b1d4d274665539da95f93750`; all 8 jobs passed: web build/runtime, database migration integration, isolated Cloudflare Workers build/runtime, API TypeScript build, exchange-feed/MT5 tests, browser app-shell/live API acceptance, AWS API/exchange-feed container builds, and SAST/SCA/secret scanning. Cloudflare compatibility run [483](https://github.com/Iamgetty/TradeMate/actions/runs/44482623560) also passed on the same head. | ✓ CI verified on exact PR head; no production acceptance claim |
 | Production RLS enablement | Not performed; live audit found RLS disabled on all 50 application tables with zero policies | ☐ Not implemented; intentionally blocked pending safe design and adversarial tests |
 
-## Current RLS test-harness hardening increment (repository change; CI pending)
+## Current RLS test-harness hardening increment (repository change; CI verified)
 
 - Rejects URL query parameters and fragments so alternate connection parameters cannot silently override the validated loopback target.
 - Adds two regression cases for those rejected URL forms.
 - Adds an explicit Node test-runner step to CI before the RLS pilot database script; previously the standalone test file was not invoked by the workflow.
 - No database schema, production role, RLS policy or production setting is changed by this increment.
+- **Security limitation identified during review:** `app.user_id` is a caller-settable PostgreSQL custom setting for the runtime role. The pilot verifies policy behavior when the context is correctly populated; it does not prove protection against arbitrary SQL executed as `trademate_app` or a compromised application session. Session-derived context in `database-context.ts` is application-side groundwork, not an unforgeable database identity assertion. Do not describe this pilot as a complete authorization boundary. An independent trusted-context design and adversarial impersonation test are still required before production RLS approval.
 
 ## Update template
 
