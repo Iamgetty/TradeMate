@@ -3788,6 +3788,7 @@ class SportsTransferMandatesController {
             SELECT 1 FROM sports_org_memberships om
             WHERE om.sports_organization_id = m.representative_organization_id
               AND om.user_id = $1 AND om.status = 'active'
+              AND om.role IN ('owner', 'admin')
               AND (om.starts_at IS NULL OR om.starts_at <= now())
               AND (om.expires_at IS NULL OR om.expires_at > now())
           )
