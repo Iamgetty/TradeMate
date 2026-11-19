@@ -1,6 +1,6 @@
 # Build from the repository root:
 # docker build -f TradeMate-main/exchange-feed/Dockerfile -t trademate-exchange-feed:local .
-FROM node:22-bookworm-slim AS runtime
+FROM node:24-bookworm-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY TradeMate-main/exchange-feed/package*.json ./
