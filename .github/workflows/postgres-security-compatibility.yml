@@ -131,5 +131,4 @@ jobs:
         working-directory: TradeMate-main/apps/api
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-          RLS_CONTEXT_HMAC_KEY: ${{ env.RLS_CONTEXT_HMAC_KEY }}
         run: node scripts/test-database-context.js
