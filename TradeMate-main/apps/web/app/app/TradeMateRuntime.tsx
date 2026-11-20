@@ -81,12 +81,22 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=152';
+    app.src = '/tm/app.js?v=153';
     app.async = false;
     app.dataset.trademateApp = 'true';
     app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=150. Check the deployment and static asset response.');
     app.onload = () => {
       const postAppModules = [
+        'pm-fix-css-loader',
+        'runtime-patch-13-loader',
+        'pm-ring-css-loader',
+        'pm-final-css-loader',
+        'pm-final2-css-loader',
+        'pm-tiles-css-loader',
+        'pm-contract-card-loader',
+        'pm-final3-css-loader',
+        'tm-top-redesign-loader',
+        'tm-unify-loader',
         'tm-consistency-css-loader',
         'pm-mobile-size-css-loader',
         'pm-calm-css-loader',
