@@ -17,8 +17,8 @@ jobs:
     name: Apply database migrations
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Configure required reviewers and the migration-only secret in this
-    # GitHub Environment before enabling any production use.
+    # Configure required reviewers, the migrator URL, and the same RLS HMAC
+    # secret used by the API in this GitHub Environment before production use.
     environment:
       name: production-migrations
     env:
