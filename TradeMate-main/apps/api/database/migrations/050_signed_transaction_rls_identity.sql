@@ -41,7 +41,10 @@ DECLARE
   presented_signature TEXT;
   verifier_key BYTEA;
   signed_payload TEXT;
-  expected_signature TEXT;
+  expected_signature_bytes BYTEA;
+  presented_signature_bytes BYTEA;
+  comparison_difference INTEGER := 0;
+  byte_index INTEGER;
 BEGIN
   presented_hash := NULLIF(pg_catalog.current_setting('app.session_token_hash', true), '');
   presented_xid := NULLIF(pg_catalog.current_setting('app.session_transaction_id', true), '');
@@ -71,12 +74,22 @@ BEGIN
 
   signed_payload := 'trademate-rls-context:v1|' || presented_xid || '|' ||
     presented_pid || '|' || presented_hash;
-  expected_signature := pg_catalog.encode(
-    public.hmac(pg_catalog.convert_to(signed_payload, 'UTF8'), verifier_key, 'sha256'),
-    'hex'
+  expected_signature_bytes := public.hmac(
+    pg_catalog.convert_to(signed_payload, 'UTF8'), verifier_key, 'sha256'
   );
+  presented_signature_bytes := pg_catalog.decode(presented_signature, 'hex');
 
-  IF expected_signature <> presented_signature THEN
+  -- Compare all 32 MAC bytes without an early exit on the first mismatch.
+  IF pg_catalog.octet_length(expected_signature_bytes) <> 32
+     OR pg_catalog.octet_length(presented_signature_bytes) <> 32 THEN
+    RETURN NULL;
+  END IF;
+  FOR byte_index IN 0..31 LOOP
+    comparison_difference := comparison_difference |
+      (pg_catalog.get_byte(expected_signature_bytes, byte_index) #
+       pg_catalog.get_byte(presented_signature_bytes, byte_index));
+  END LOOP;
+  IF comparison_difference <> 0 THEN
     RETURN NULL;
   END IF;
 
