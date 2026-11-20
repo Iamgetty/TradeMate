@@ -356,7 +356,7 @@ class AuthController {
     if (!token) throw new UnauthorizedException('Please sign in.');
     const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
-    await databasePool.query('UPDATE user_sessions SET last_seen_at=now() WHERE token_hash=$1', [tokenDigest(token)]);
+    await databasePool.query('SELECT touched_user_id FROM trademate_private.touch_presented_session($1)', [tokenDigest(token)]);
     const result = await databasePool.query(
       'SELECT id, email, display_name, country_code FROM users WHERE id = $1 AND status = \'active\' LIMIT 1',
       [session.rows[0].id],
@@ -745,7 +745,7 @@ class AuthController {
     const digest = tokenDigest(token);
     const current = await resolvePresentedSessionUserDigest(digest);
     if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
-    await databasePool.query('UPDATE user_sessions SET last_seen_at=now() WHERE token_hash=$1', [digest]);
+    await databasePool.query('SELECT touched_user_id FROM trademate_private.touch_presented_session($1)', [digest]);
     const result = await databasePool.query(
       'SELECT id, created_at, last_seen_at, expires_at, ip_address, user_agent, (token_hash = $2) AS is_current FROM user_sessions WHERE user_id = $1 AND expires_at > now() ORDER BY is_current DESC, last_seen_at DESC LIMIT 50',
       [current.rows[0].id, digest],
