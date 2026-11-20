@@ -324,3 +324,12 @@ Additional transaction and data-flow constraints identified:
 **Implementation gate:** produce an explicit operation-to-function matrix and test each operation through an actual `trademate_app` LOGIN. Positive coverage must include register, email verification, password login, TOTP login/enrollment/disable, password change/reset, session list/revoke/logout and deletion request/cancel. Negative coverage must prove that the runtime login cannot SELECT any credential digest/verifier/ciphertext column, cannot resolve another user's session, cannot enumerate session hashes, and cannot bypass attempt/expiry/replay limits. Keep the current expected-vulnerability probes until replacement behavior and grants land together; then invert them in the same change set.
 
 No code, migration, grants, roles, production settings or RLS policies were changed by this inventory.
+
+
+## First narrow session resolver primitive (2026-11-20)
+
+Migration 031 introduces `trademate_private.resolve_presented_session(text)` as the first narrow operation in the credential-access refactor. The function accepts a SHA-256 digest (not a raw bearer token), rejects malformed digests, checks that the session is unexpired and the account is active, and returns at most one user UUID. It returns no token hash. It is `SECURITY DEFINER` with `search_path=pg_catalog`, fully qualified application-table references, PUBLIC EXECUTE revoked, and explicit EXECUTE granted to `trademate_app`.
+
+This is deliberately not yet a complete identity boundary. The API request-context middleware still performs its legacy direct lookup and sets caller-settable `app.session_token_hash` / `app.user_id` GUCs; broad runtime table grants remain in place. Do not enable RLS or revoke direct grants until request-context and all session lifecycle/credential callers have been migrated and tested under the real runtime LOGIN. HMAC feasibility remains a separate trust-design decision; this resolver does not sign or attest caller identity.
+
+CI must verify migration application and grants on PostgreSQL 16 and 18, then exercise valid, expired, inactive and malformed digests using the actual `trademate_app` LOGIN. Follow-on work must add negative tests proving the runtime role cannot enumerate or read token hashes after grant reduction, while preserving login, session activity, listing, revoke, logout, password reset/change, TOTP and deletion transaction semantics. No production grants, roles, RLS policies, database or deployment were changed by this migration source change.
