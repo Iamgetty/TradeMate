@@ -63,6 +63,49 @@ async function main() {
     assert.equal(identity.rows[0].session_user, 'trademate_app');
     assert.equal(identity.rows[0].current_user, 'trademate_app');
 
+    const verifiedPasswordHash = 'argon2id$verified-login-test-password-hash';
+    await admin.query(
+      "UPDATE public.users SET email_verified_at = now() WHERE id = $1",
+      [userIds[1]],
+    );
+    await admin.query(
+      'INSERT INTO public.user_credentials (user_id, password_hash) VALUES ($1, $2)',
+      [userIds[1], verifiedPasswordHash],
+    );
+
+    const wrongCredentialSession = await appClient.query(
+      'SELECT trademate_private.issue_password_login_session($1, $2, $3, now() + interval \'10 minutes\', $4, $5) AS session_id',
+      [userIds[1], 'argon2id$not-the-verified-password-hash', createHash('sha256').update(randomBytes(32)).digest('hex'), '192.0.2.10', 'TradeMate security integration test'],
+    );
+    assert.equal(wrongCredentialSession.rows[0].session_id, null, 'A stale or incorrect verified hash must not issue a session.');
+
+    const crossAccountLoginTokenHash = createHash('sha256').update(randomBytes(32)).digest('hex');
+    const crossAccountLogin = await appClient.query(
+      'SELECT trademate_private.issue_password_login_session($1, $2, $3, now() + interval \'10 minutes\', $4, $5) AS session_id',
+      [userIds[0], verifiedPasswordHash, crossAccountLoginTokenHash, '192.0.2.10', 'TradeMate security integration test'],
+    );
+    assert.equal(crossAccountLogin.rows[0].session_id, null, 'A verified password hash must never authorize a different account.');
+
+    const issuedLoginTokenHash = createHash('sha256').update(randomBytes(32)).digest('hex');
+    const issuedLogin = await appClient.query(
+      'SELECT trademate_private.issue_password_login_session($1, $2, $3, now() + interval \'10 minutes\', $4, $5) AS session_id',
+      [userIds[1], verifiedPasswordHash, issuedLoginTokenHash, '192.0.2.10', 'TradeMate security integration test'],
+    );
+    assert.ok(issuedLogin.rows[0].session_id, 'A matching verified credential must issue a session.');
+    sessionIds.push(issuedLogin.rows[0].session_id);
+    sessionHashes.push(issuedLoginTokenHash);
+    const issuedLoginAudit = await admin.query(
+      "SELECT actor_user_id::text AS actor_id FROM public.audit_events WHERE event_type = 'auth.login_succeeded' AND entity_id = $1",
+      [userIds[1]],
+    );
+    assert.equal(issuedLoginAudit.rowCount, 1, 'Session issuance must append its login audit event atomically.');
+    assert.equal(issuedLoginAudit.rows[0].actor_id, userIds[1]);
+    const issuedLoginNotification = await admin.query(
+      "SELECT id FROM public.user_notifications WHERE user_id = $1 AND title = 'New sign-in'",
+      [userIds[1]],
+    );
+    assert.equal(issuedLoginNotification.rowCount, 1, 'Session issuance must append its sign-in notification atomically.');
+
     // The new narrow resolver can resolve only a caller-presented digest and
     // returns an identity, never the credential itself. This does not yet
     // remove the legacy direct grants or migrate API call sites.
@@ -308,7 +351,7 @@ async function main() {
     }
 
     await admin.query(
-      'INSERT INTO public.user_credentials (user_id, password_hash) VALUES ($1, $2)',
+      'UPDATE public.user_credentials SET password_hash = $2 WHERE user_id = $1',
       [userIds[1], 'previous-test-password-hash-value'],
     );
     const resetToken = randomBytes(32).toString('base64url');
