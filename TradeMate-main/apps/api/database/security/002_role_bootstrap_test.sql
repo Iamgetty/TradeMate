@@ -158,16 +158,17 @@ BEGIN
     RAISE EXCEPTION 'PUBLIC must not execute the presented-session resolver.';
   END IF;
 
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_proc p
+  IF (
+    SELECT count(*)
+    FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname = 'trademate_private'
       AND p.proname IN ('resolve_presented_session', 'touch_presented_session')
       AND p.prosecdef
       AND p.proconfig @> ARRAY['search_path=pg_catalog']
       AND pg_get_userbyid(p.proowner) <> 'trademate_app'
-  ) THEN
-    RAISE EXCEPTION 'Private session operations must be SECURITY DEFINER with a fixed safe search_path and non-runtime owner.';
+  ) <> 2 THEN
+    RAISE EXCEPTION 'Every private session operation must be SECURITY DEFINER with a fixed safe search_path and non-runtime owner.';
   END IF;
 END
 $$;
