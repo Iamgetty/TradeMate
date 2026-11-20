@@ -202,11 +202,8 @@ class AuthController {
     const client = await databasePool.connect();
     try {
       await client.query('BEGIN');
-      const created = await client.query("INSERT INTO users (email, display_name, status) VALUES ($1, $2, 'pending') RETURNING id, email, display_name, country_code, created_at", [email, displayName]);
-      await client.query('INSERT INTO user_credentials (user_id, password_hash) VALUES ($1, $2)', [created.rows[0].id, hash]);
       const code = String(randomInt(0, 1000000)).padStart(6, '0');
-      await client.query("INSERT INTO email_verification_codes (user_id, code_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes')", [created.rows[0].id, tokenDigest(code)]);
-      await client.query("INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.email_verification_requested', 'user', $1, '{}'::jsonb)", [created.rows[0].id]);
+      await client.query('SELECT trademate_private.register_password_account($1, $2, $3, $4)', [email, displayName, hash, tokenDigest(code)]);
       await client.query('COMMIT');
       const delivered = await sendTransactionalEmail(email, 'Verify your TradeMate email', '<p>Your TradeMate verification code is:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">' + code + '</p><p>This code expires in 10 minutes and can only be used once.</p>');
       if (!delivered) throw new HttpException('Your account was created, but the verification email could not be sent. Use Resend to try again.', HttpStatus.SERVICE_UNAVAILABLE);
@@ -409,7 +406,6 @@ class AuthController {
     if (!currentPassword || currentPassword.length > 128) throw new BadRequestException('Enter your current password.');
     if (newPassword.length < 12 || newPassword.length > 128) throw new BadRequestException('Use a new password between 12 and 128 characters.');
     if (currentPassword === newPassword) throw new BadRequestException('Choose a password you have not used for this change.');
-    const userId = session.rows[0].id as string;
     const credentials = await databasePool.query(
       'SELECT password_hash FROM trademate_private.resolve_presented_password_credentials($1)',
       [tokenDigest(token)],
@@ -418,25 +414,15 @@ class AuthController {
       throw new UnauthorizedException('Your current password is incorrect.');
     }
     const nextHash = await passwordHash(newPassword);
-    const client = await databasePool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query('UPDATE user_credentials SET password_hash = $1, updated_at = now() WHERE user_id = $2', [nextHash, userId]);
-      await client.query('SELECT trademate_private.revoke_other_presented_sessions($1)', [tokenDigest(token)]);
-      await client.query(
-        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.password_changed', 'user', $1, '{}'::jsonb)",
-        [userId],
-      );
-      await client.query('COMMIT');
-      const account = await databasePool.query('SELECT email FROM users WHERE id = $1', [userId]);
-      if (account.rows[0]?.email) void sendTransactionalEmail(account.rows[0].email, 'Your TradeMate password was changed', '<p>Your TradeMate password was changed successfully.</p><p>If you did not make this change, contact TradeMate support immediately.</p>');
-      return { success: true, message: 'Password updated. Other active sessions have been signed out.' };
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally {
-      client.release();
-    }
+    // The credential write, other-session revocation and audit event happen atomically in one scoped
+    // database operation. It compares against the hash verified above, so a concurrent change fails closed.
+    const changed = await databasePool.query(
+      'SELECT changed_email FROM trademate_private.change_presented_password($1, $2, $3)',
+      [tokenDigest(token), credentials.rows[0].password_hash, nextHash],
+    );
+    if (!changed.rowCount) throw new UnauthorizedException('Your session or password changed. Please sign in again.');
+    if (changed.rows[0].changed_email) void sendTransactionalEmail(changed.rows[0].changed_email, 'Your TradeMate password was changed', '<p>Your TradeMate password was changed successfully.</p><p>If you did not make this change, contact TradeMate support immediately.</p>');
+    return { success: true, message: 'Password updated. Other active sessions have been signed out.' };
   }
 
 
