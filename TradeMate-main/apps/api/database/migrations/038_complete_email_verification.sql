@@ -113,7 +113,7 @@ BEGIN
 
   RETURN QUERY
   SELECT target_user.id, target_user.email,
-         target_user.display_name, target_user.country_code;
+         target_user.display_name, target_user.country_code::TEXT;
 END;
 $$;
 
