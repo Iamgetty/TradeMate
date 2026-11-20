@@ -526,7 +526,6 @@ class AuthController {
       [tokenDigest(rawToken), nextHash],
     );
     if (!reset.rowCount) throw new BadRequestException('This password reset link is invalid, expired, or already used.');
-    const userId = reset.rows[0].user_id as string;
     const email = reset.rows[0].email as string;
     if (email) void sendTransactionalEmail(email, 'Your TradeMate password was reset', '<p>Your TradeMate password was reset successfully. All existing sessions have been signed out.</p><p>If you did not make this change, contact TradeMate support immediately.</p>');
     return { success: true, message: 'Your password has been reset. Sign in again with your new password.' };
