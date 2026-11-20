@@ -14,6 +14,7 @@ on:
       - 'TradeMate-main/apps/api/scripts/test-credential-write-lockdown.js'
       - 'TradeMate-main/apps/api/scripts/test-auth-lifecycle-operations.js'
       - 'TradeMate-main/apps/api/scripts/test-rls-hmac-compatibility.js'
+      - 'TradeMate-main/apps/api/scripts/test-migration-hmac-key-immutability.js'
       - 'TradeMate-main/apps/api/scripts/test-database-context.js'
       - 'TradeMate-main/apps/api/src/database-context.ts'
       - 'TradeMate-main/apps/api/src/environment.ts'
@@ -95,6 +96,11 @@ jobs:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
           NODE_ENV: test
         run: npm run db:migrate
+      - name: Verify routine migrations cannot rotate the RLS HMAC verifier key
+        working-directory: TradeMate-main/apps/api
+        env:
+          RLS_PILOT_TEST_DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-migration-hmac-key-immutability.js
       - name: Verify pgcrypto HMAC-SHA-256 compatibility and tamper rejection
         working-directory: TradeMate-main/apps/api
         env:
