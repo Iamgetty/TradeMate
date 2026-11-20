@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { randomBytes, randomUUID } = require('node:crypto');
+const { createHash, randomBytes, randomUUID } = require('node:crypto');
 const { Pool } = require('pg');
 
 async function main() {
@@ -11,6 +11,7 @@ async function main() {
   const admin = new Pool({ connectionString: adminConnectionString, max: 1 });
   const suffix = randomUUID();
   const userIds = [];
+  const sessionIds = [];
   const appPassword = randomBytes(32).toString('hex');
   let appPool;
   let appClient;
@@ -41,6 +42,13 @@ async function main() {
         'INSERT INTO public.user_preferences (user_id, preferences) VALUES ($1, $2::jsonb)',
         [userId, JSON.stringify({ fixture: label })],
       );
+      const sessionToken = randomBytes(32).toString('hex');
+      const sessionHash = createHash('sha256').update(sessionToken).digest('hex');
+      const session = await admin.query(
+        "INSERT INTO public.user_sessions (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes') RETURNING id::text AS id",
+        [userId, sessionHash],
+      );
+      sessionIds.push(session.rows[0].id);
     }
 
     const appUrl = new URL(adminConnectionString);
@@ -66,6 +74,22 @@ async function main() {
       assert.equal(visible.rowCount, 1);
       assert.equal(visible.rows[0].user_id, userIds[1]);
       assert.deepEqual(visible.rows[0].preferences, { fixture: 'other' });
+
+      // The role bootstrap currently grants broad SELECT on user_sessions.
+      // Prove the real runtime login can disclose another user's bearer-token
+      // digest, then place that digest in the caller-settable session context.
+      const stolenSession = await appClient.query(
+        'SELECT user_id::text AS user_id, token_hash FROM public.user_sessions WHERE user_id = $1',
+        [userIds[1]],
+      );
+      assert.equal(stolenSession.rowCount, 1, 'The current broad grants expose the victim session hash.');
+      assert.equal(stolenSession.rows[0].user_id, userIds[1]);
+      await appClient.query("SELECT set_config('app.session_token_hash', $1, true)", [stolenSession.rows[0].token_hash]);
+      const sessionLookup = await appClient.query(
+        'SELECT user_id::text AS user_id FROM public.user_sessions WHERE token_hash = current_setting(\'app.session_token_hash\', true)',
+      );
+      assert.equal(sessionLookup.rowCount, 1);
+      assert.equal(sessionLookup.rows[0].user_id, userIds[1]);
       await appClient.query('COMMIT');
     } catch (error) {
       await appClient.query('ROLLBACK').catch(() => undefined);
@@ -73,11 +97,14 @@ async function main() {
     }
 
     console.log(
-      'EXPECTED SECURITY LIMITATION CONFIRMED: direct trademate_app LOGIN can forge app.user_id and read another fixture user under the current pilot policy. Production RLS remains blocked.',
+      'EXPECTED SECURITY LIMITATIONS CONFIRMED: direct trademate_app LOGIN can forge app.user_id, read another fixture user under the current pilot policy, disclose another user session token hash, and use that digest as app.session_token_hash. Production RLS remains blocked.',
     );
   } finally {
     if (appClient) appClient.release();
     if (appPool) await appPool.end();
+    for (const sessionId of sessionIds) {
+      await admin.query('DELETE FROM public.user_sessions WHERE id = $1', [sessionId]).catch(() => undefined);
+    }
     for (const userId of userIds) {
       await admin.query('DELETE FROM public.users WHERE id = $1', [userId]).catch(() => undefined);
     }
