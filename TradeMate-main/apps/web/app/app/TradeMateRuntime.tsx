@@ -88,7 +88,7 @@ export default function TradeMateRuntime() {
     app.onload = () => {
       const postAppModules = [
         'pm-fix-css-loader',
-        'runtime-patch-13-loader',
+        'pm-card-height-sync',
         'pm-ring-css-loader',
         'pm-final-css-loader',
         'pm-final2-css-loader',
