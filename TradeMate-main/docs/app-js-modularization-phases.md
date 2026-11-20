@@ -16,9 +16,11 @@ Branch: `refactor/split-web-app-runtime`
 
 **Additional completed extraction:** NFT and market-quote snapshot storage factories moved to `public/tm/snapshot-utils.js`. Existing localStorage key formats, payload shapes, chain scoping and cache expiry windows are preserved. Runtime startup now waits for this dependency before loading `app.js`.
 
+**Completed:** extracted the FX reference-rate snapshot store into `public/tm/fx-snapshot-utils.js`. It receives the market item array through an explicit factory option and preserves the legacy localStorage key, payload, 14-day expiry and cached/live quote mutation rules. Runtime startup now verifies this module before `app.js` runs. The app cache version is now `v=156`.
+
 **Completed:** extracted five pure quote helpers (`quoteTimestampMs`, `mt5SymbolKey`, `mt5QuoteIsFresh`, `mt5QuotePrice`, `mt5NameForQuote`) and their MT5 metadata constants into `public/tm/market-quote-utils.js`. The runtime loads this dependency before `app.js`; the legacy names are bound to the exported helpers to preserve existing call sites. `app.js` cache version is now `v=154`.
 
-**Next safe boundaries:** audit NFT snapshot storage, market quote snapshots, then the stateful feed managers. The latter remain coupled to socket/timer state and must not be extracted until a context interface is defined.
+**Next safe boundaries:** audit NFT loading boundaries and market quote loading; the stateful feed managers remain coupled to socket/timer state. The latter remain coupled to socket/timer state and must not be extracted until a context interface is defined.
 
 **Remaining targets:**
 Target groups identified in the remaining `app.js`:
