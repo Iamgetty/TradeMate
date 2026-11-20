@@ -179,7 +179,12 @@ BEGIN
      OR NOT has_function_privilege('trademate_app', 'trademate_private.complete_totp_enrollment(text,bigint)', 'EXECUTE')
      OR NOT has_function_privilege('trademate_app', 'trademate_private.resolve_enabled_totp(text)', 'EXECUTE')
      OR NOT has_function_privilege('trademate_app', 'trademate_private.disable_totp(text,bigint)', 'EXECUTE')
-     OR NOT has_function_privilege('trademate_app', 'trademate_private.current_presented_user_id()', 'EXECUTE') THEN
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.current_presented_user_id()', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.resolve_password_login_credentials(text)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.resolve_presented_password_credentials(text)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.complete_account_deletion_cancellation(text)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.discard_password_reset_token(text)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.rollback_account_deletion_request(text)', 'EXECUTE') THEN
     RAISE EXCEPTION 'trademate_app must have the reviewed narrow session operations.';
   END IF;
 
