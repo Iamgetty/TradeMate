@@ -27,13 +27,13 @@ export const databaseRequestContextMiddleware = (request: Request, _response: Re
 const establishTransactionContext = async (client: PoolClient, context: DatabaseRequestContext) => {
   await client.query("SELECT set_config('app.session_token_hash', $1, true)", [context.sessionTokenHash]);
 
-  // Resolve identity from the hashed, unexpired server-side session. The initial
-  // lookup is allowed by the future session-hash RLS policy; user_id itself is
-  // never accepted from the browser or request body.
+  // Resolve the presented digest through the narrow SECURITY DEFINER entry
+  // point. The API runtime receives the subject only; it cannot read or
+  // enumerate user_sessions.token_hash directly.
   if (!context.userResolved) {
     if (context.sessionTokenHash) {
       const session = await client.query(
-        "SELECT s.user_id::text AS user_id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+        'SELECT resolved_user_id::text AS user_id FROM trademate_private.resolve_presented_session($1)',
         [context.sessionTokenHash],
       );
       context.userId = session.rows[0]?.user_id || '';
