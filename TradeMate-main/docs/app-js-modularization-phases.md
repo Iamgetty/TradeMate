@@ -22,6 +22,8 @@ Branch: `refactor/split-web-app-runtime`
 
 **Completed:** extracted the pure NFT collection-result interleaving algorithm into `public/tm/nft-item-utils.js` and reused it in both NFT explore merge passes. This removes duplicate ordering loops while preserving the round-robin ordering of collection results. The same edit corrected a malformed `returnwindow` token in the collection fetch normalizer call. The NFT utility cache is `v=2`; app runtime cache is `v=158`.
 
+**Completed:** moved NFT result sorting (price and 24-hour sales, including the existing missing-value fallbacks) and NFT favorite-key generation into the pure NFT utility module. The renderer now calls these shared helpers without changing the sorting defaults or favorite key format. NFT utility cache is `v=3`; app runtime cache is `v=159`.
+
 **Next safe boundaries:** extract cohesive NFT request orchestration and market quote loading behind explicit context objects. Their request counters, chain selection, caches, UI refreshes and retry timers must move together; do not extract individual callbacks or functions while leaving their mutable state behind. Stateful market-feed managers remain coupled to socket/timer state and must not be extracted until a context interface is defined.
 
 **Remaining targets:**
