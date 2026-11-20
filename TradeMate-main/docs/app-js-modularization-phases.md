@@ -18,7 +18,7 @@ Branch: `refactor/split-web-app-runtime`
 
 **Completed:** extracted the FX reference-rate snapshot store into `public/tm/fx-snapshot-utils.js`. It receives the market item array through an explicit factory option and preserves the legacy localStorage key, payload, 14-day expiry and cached/live quote mutation rules. Runtime startup now verifies this module before `app.js` runs. The app cache version is now `v=157`.
 
-**Completed:** extracted five pure quote helpers (`quoteTimestampMs`, `mt5SymbolKey`, `mt5QuoteIsFresh`, `mt5QuotePrice`, `mt5NameForQuote`) and their MT5 metadata constants into `public/tm/market-quote-utils.js`. The runtime loads this dependency before `app.js`; the legacy names are bound to the exported helpers to preserve existing call sites. `app.js` cache version is now `v=154`.
+**Completed:** extracted five pure quote helpers (`quoteTimestampMs`, `mt5SymbolKey`, `mt5QuoteIsFresh`, `mt5QuotePrice`, `mt5NameForQuote`) and their MT5 metadata constants into `public/tm/market-quote-utils.js`. The runtime loads this dependency before `app.js`; the legacy names are bound to the exported helpers to preserve existing call sites. `app.js` cache version is now `v=157`.
 
 **Next safe boundaries:** extract cohesive NFT request orchestration and market quote loading behind explicit context objects. Their request counters, chain selection, caches, UI refreshes and retry timers must move together; do not extract individual callbacks or functions while leaving their mutable state behind. Stateful market-feed managers remain coupled to socket/timer state and must not be extracted until a context interface is defined.
 
