@@ -673,6 +673,55 @@ async function main() {
     );
     assert.equal(malformedReset.rowCount, 0, 'Malformed reset digests must not update credentials.');
 
+    const discardedResetHash = createHash('sha256').update(randomBytes(32)).digest('hex');
+    await admin.query(
+      "INSERT INTO public.password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes')",
+      [userIds[0], discardedResetHash],
+    );
+    const discardedReset = await appClient.query(
+      'SELECT trademate_private.discard_password_reset_token($1) AS discarded',
+      [discardedResetHash],
+    );
+    assert.equal(discardedReset.rows[0].discarded, true, 'A failed-delivery reset token must be removable by its digest.');
+    const discardedResetRow = await admin.query(
+      'SELECT token_hash FROM public.password_reset_tokens WHERE token_hash = $1',
+      [discardedResetHash],
+    );
+    assert.equal(discardedResetRow.rowCount, 0);
+    const replayedDiscard = await appClient.query(
+      'SELECT trademate_private.discard_password_reset_token($1) AS discarded',
+      [discardedResetHash],
+    );
+    assert.equal(replayedDiscard.rows[0].discarded, false);
+
+    const deletionRollbackEmail = `rls-deletion-rollback-${suffix}@example.invalid`;
+    const deletionRollbackUser = await admin.query(
+      "INSERT INTO public.users (email, display_name, status) VALUES ($1, 'Deletion rollback fixture', 'deletion_pending') RETURNING id::text AS id",
+      [deletionRollbackEmail],
+    );
+    userIds.push(deletionRollbackUser.rows[0].id);
+    const rollbackTokenHash = createHash('sha256').update(randomBytes(32)).digest('hex');
+    await admin.query(
+      "INSERT INTO public.user_deletion_requests (user_id, cancellation_token_hash, requested_at, scheduled_for) VALUES ($1, $2, now(), now() + interval '30 days')",
+      [deletionRollbackUser.rows[0].id, rollbackTokenHash],
+    );
+    const rolledBackDeletion = await appClient.query(
+      'SELECT trademate_private.rollback_account_deletion_request($1) AS restored',
+      [rollbackTokenHash],
+    );
+    assert.equal(rolledBackDeletion.rows[0].restored, true, 'Failed cancellation-email delivery must roll back the pending deletion atomically.');
+    const rollbackStatus = await admin.query(
+      'SELECT status FROM public.users WHERE id = $1',
+      [deletionRollbackUser.rows[0].id],
+    );
+    assert.equal(rollbackStatus.rows[0].status, 'active');
+    const rollbackAudit = await admin.query(
+      "SELECT metadata FROM public.audit_events WHERE event_type = 'account.deletion_request_rolled_back' AND entity_id = $1",
+      [deletionRollbackUser.rows[0].id],
+    );
+    assert.equal(rollbackAudit.rowCount, 1);
+    assert.deepEqual(rollbackAudit.rows[0].metadata, { reason: 'notification_delivery_failed' });
+
     const deletionEmail = `rls-deletion-cancel-${suffix}@example.invalid`;
     const deletionUser = await admin.query(
       "INSERT INTO public.users (email, display_name, status) VALUES ($1, 'Deletion cancellation fixture', 'deletion_pending') RETURNING id::text AS id",
