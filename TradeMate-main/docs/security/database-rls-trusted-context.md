@@ -255,3 +255,45 @@ This remains evidence of the current privilege exposure, not remediation. The
 API still has direct authentication/session SQL call sites, so revoking these
 privileges before replacing those call sites would break core authentication
 and revocation flows. Production grants and RLS remain unchanged and blocked.
+
+### Session-table call-site inventory (2026-11-20)
+
+A source audit of `apps/api/src/module.ts` found 39 references to
+`user_sessions`. They are not all interchangeable reads and must not be
+replaced with one generic SECURITY DEFINER endpoint:
+
+- **Session creation:** email verification and password/TOTP sign-in create a
+  session with a server-generated bearer token digest, expiry, IP and user agent.
+- **Session authentication:** the `me` endpoint and numerous feature controllers
+  independently resolve a bearer-token digest to an active user. These lookups
+  must retain expiry and active-account checks and must be tied to the supplied
+  digest, not a caller-selected user ID.
+- **Session maintenance:** `me` and session-list endpoints update
+  `last_seen_at`; this needs a narrowly scoped operation that cannot update an
+  arbitrary digest or another user's session.
+- **Session inventory/revocation:** the sessions endpoint lists at most 50
+  non-expired sessions for the authenticated user and indicates the current
+  session; per-session deletion locks the current session, checks ownership,
+  deletes the selected row, and detects whether the current session was removed.
+- **Bulk revocation:** password change, password reset and account deletion
+  revoke sessions by user; logout revokes by the presented digest and returns
+  the associated user for audit handling.
+
+A safe migration therefore needs separate capabilities (or equivalently narrow,
+reviewed operations) for create-after-authentication, resolve-presented-token,
+update-presented-session-activity, list-own-sessions, revoke-one-own-session,
+revoke-other-sessions, revoke-all-user-sessions, and logout-by-presented-token.
+The API must not receive token hashes from list operations. Session creation and
+bulk revocation must remain transactionally coupled to their associated auth
+state changes. The current module also has a password-change query that directly
+joins `user_credentials.password_hash`, so protecting session hashes alone is
+not an adequate credential boundary.
+
+This is an implementation inventory, not authorization to add broad
+`SECURITY DEFINER` functions. Before implementation, each operation needs an
+explicit owner, fixed safe `search_path`, fully qualified object references,
+EXECUTE grants with PUBLIC revoked, input/output contract, transaction behavior,
+and real-login positive and negative tests. In particular, list-own-sessions
+must not reveal `token_hash`, and revoke operations must prove that a user cannot
+select another user's session by substituting a UUID. No production privileges
+or RLS settings were changed.
