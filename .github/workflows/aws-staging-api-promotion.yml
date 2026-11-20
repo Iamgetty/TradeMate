@@ -241,7 +241,7 @@ jobs:
           API_TASK_DEFINITION_ARN="$(aws cloudformation describe-stack-resource --stack-name "$SERVICES_STACK" --logical-resource-id ApiTaskDefinition --query 'StackResourceDetail.PhysicalResourceId' --output text)"
           API_SERVICE_NAME="$(aws cloudformation describe-stack-resource --stack-name "$SERVICES_STACK" --logical-resource-id ApiService --query 'StackResourceDetail.PhysicalResourceId' --output text)"
           API_TARGET_GROUP_ARN="$(aws cloudformation describe-stack-resource --stack-name "$SERVICES_STACK" --logical-resource-id ApiTargetGroup --query 'StackResourceDetail.PhysicalResourceId' --output text)"
-          for value in "$CLUSTER_NAME" "$API_TASK_DEFINITION_ARN" "$API_SERVICE_NAME" "$API_TARGET_GROUP_ARN"; do
+          for value in "$CLUSTER_NAME" "$RLS_HMAC_SECRET_ARN" "$API_TASK_DEFINITION_ARN" "$API_SERVICE_NAME" "$API_TARGET_GROUP_ARN"; do
             if [[ -z "$value" || "$value" == "None" || "$value" == "null" ]]; then
               echo "::error::A required staging stack resource could not be resolved."
               exit 1
