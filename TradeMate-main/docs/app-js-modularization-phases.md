@@ -27,7 +27,7 @@ Branch: `refactor/split-web-app-runtime`
 **Completed:** extracted the market-quote candidate filter and deterministic request-key builder into `public/tm/market-quote-utils.js`. The filter retains the Twelve Data exclusion and fresh Exness MT5 quote bypass; the key retains the exact `assetClass:symbol,symbol` format used by both request de-duplication and follow-up refresh checks. Market utility cache is `v=2`; app runtime cache is `v=160`.
 
 
-**Completed:** extracted six self-contained decorative SVG renderers (`prmArt`, `dpArt`, `dxArt`, `tfArt`, `tfCoin`, `cxArt`) into `public/tm/art-utils.js`. The module has no app-state, network, timer or DOM dependencies; `TradeMateRuntime.tsx` verifies it is initialized before loading `app.js`. The app cache is now `v=161`.
+**Completed:** extracted ten pure decorative SVG/coin/globe renderers (`prmArt`, `dpArt`, `dxArt`, `tfArt`, `tfCoin`, `cxArt`, `scoutArt`, `scoutGlobe`, `dxCoin`, `dpCoin`) into `public/tm/art-utils.js`. The module has no app-state, network, timer or DOM dependencies; `TradeMateRuntime.tsx` verifies it is initialized before loading `app.js`. The app cache is now `v=162`.
 
 **Next safe boundaries:** extract cohesive NFT request orchestration and market quote loading behind explicit context objects. Their request counters, chain selection, caches, UI refreshes and retry timers must move together; do not extract individual callbacks or functions while leaving their mutable state behind. Stateful market-feed managers remain coupled to socket/timer state and must not be extracted until a context interface is defined.
 
