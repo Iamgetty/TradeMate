@@ -143,7 +143,8 @@ BEGIN
      OR NOT has_function_privilege('trademate_app', 'trademate_private.resolve_presented_session(text)', 'EXECUTE')
      OR NOT has_function_privilege('trademate_app', 'trademate_private.touch_presented_session(text)', 'EXECUTE')
      OR NOT has_function_privilege('trademate_app', 'trademate_private.list_presented_user_sessions(text)', 'EXECUTE')
-     OR NOT has_function_privilege('trademate_app', 'trademate_private.revoke_presented_user_session(text,uuid)', 'EXECUTE') THEN
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.revoke_presented_user_session(text,uuid)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.logout_presented_session(text)', 'EXECUTE') THEN
     RAISE EXCEPTION 'trademate_app must have the reviewed narrow session operations.';
   END IF;
 
@@ -153,7 +154,7 @@ BEGIN
     JOIN pg_namespace n ON n.oid = p.pronamespace
     CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) AS acl
     WHERE n.nspname = 'trademate_private'
-      AND p.proname IN ('resolve_presented_session', 'touch_presented_session', 'list_presented_user_sessions', 'revoke_presented_user_session')
+      AND p.proname IN ('resolve_presented_session', 'touch_presented_session', 'list_presented_user_sessions', 'revoke_presented_user_session', 'logout_presented_session')
       AND acl.grantee = 0
       AND acl.privilege_type = 'EXECUTE'
   ) THEN
@@ -165,11 +166,11 @@ BEGIN
     FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname = 'trademate_private'
-      AND p.proname IN ('resolve_presented_session', 'touch_presented_session', 'list_presented_user_sessions', 'revoke_presented_user_session')
+      AND p.proname IN ('resolve_presented_session', 'touch_presented_session', 'list_presented_user_sessions', 'revoke_presented_user_session', 'logout_presented_session')
       AND p.prosecdef
       AND p.proconfig @> ARRAY['search_path=pg_catalog']
       AND pg_get_userbyid(p.proowner) <> 'trademate_app'
-  ) <> 4 THEN
+  ) <> 5 THEN
     RAISE EXCEPTION 'Every private session operation must be SECURITY DEFINER with a fixed safe search_path and non-runtime owner.';
   END IF;
 END
