@@ -8,8 +8,10 @@ CREATE POLICY user_preferences_owner_access ON public.user_preferences
   USING (user_id = trademate_private.current_presented_user_id())
   WITH CHECK (user_id = trademate_private.current_presented_user_id());
 
+-- Trusted SECURITY DEFINER authentication operations also create user
+-- notifications. Keep runtime row filtering enabled, while allowing the
+-- migration-owned function owner to perform its reviewed internal writes.
 ALTER TABLE public.user_notifications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_notifications FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS user_notifications_owner_access ON public.user_notifications;
 CREATE POLICY user_notifications_owner_access ON public.user_notifications
   FOR ALL TO trademate_app
