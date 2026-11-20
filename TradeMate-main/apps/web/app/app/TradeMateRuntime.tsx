@@ -42,6 +42,7 @@ export default function TradeMateRuntime() {
 
     let settled = false;
     let feedReady = false;
+    let feedMediaReady = false;
     let metadataReady = false;
     let cssReady = false;
     let layoutCssReady = false;
@@ -79,13 +80,13 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=148';
+    app.src = '/tm/app.js?v=149';
     app.async = false;
     app.dataset.trademateApp = 'true';
     app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=148. Check the deployment and static asset response.');
 
     const loadApp = () => {
-      if (!feedReady || !metadataReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !feedMediaReady || !metadataReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -313,6 +314,20 @@ export default function TradeMateRuntime() {
       loadApp();
     };
     document.body.appendChild(feed);
+
+    // Feed media lightbox is isolated from app state and is optional for core startup.
+    const feedMedia = document.createElement('script');
+    feedMedia.src = '/tm/feed-media-lightbox.js?v=1';
+    feedMedia.async = false;
+    feedMedia.onload = () => {
+      feedMediaReady = true;
+      loadApp();
+    };
+    feedMedia.onerror = () => {
+      feedMediaReady = true;
+      loadApp();
+    };
+    document.body.appendChild(feedMedia);
 
     // The Next.js /app route does not execute public/tm/index.html, so it needs
     // its own rendered-shell and landing-overlay watchdog.
