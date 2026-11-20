@@ -7,10 +7,16 @@ Branch: `refactor/split-web-app-runtime`
 ### Phase 1 — independent runtime patches
 - 41 standalone runtime modules extracted.
 - Runtime order is preserved by `TradeMateRuntime.tsx`.
-- `app.js` reduced from 705,335 to 686,023 characters (19,312 characters).
+- `app.js` reduced from 705,335 to 684,937 characters (20,398 characters).
 - CI and browser acceptance checks passed on the last verified head.
 
 ## Remaining phases
+
+### Phase 2 — market data and NFT services (in progress)
+
+**Completed in this phase:** extracted five pure quote helpers (`quoteTimestampMs`, `mt5SymbolKey`, `mt5QuoteIsFresh`, `mt5QuotePrice`, `mt5NameForQuote`) and their MT5 metadata constants into `public/tm/market-quote-utils.js`. The runtime loads this dependency before `app.js`; the legacy names are bound to the exported helpers to preserve existing call sites. `app.js` cache version is now `v=154`.
+
+**Next safe boundaries:** audit NFT snapshot storage, market quote snapshots, then the stateful feed managers. The latter remain coupled to socket/timer state and must not be extracted until a context interface is defined.
 
 ### Phase 2 — market data and NFT services (first)
 Target groups identified in the remaining `app.js`:
