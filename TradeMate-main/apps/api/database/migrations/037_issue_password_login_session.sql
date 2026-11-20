@@ -26,7 +26,7 @@ BEGIN
      OR p_token_hash !~ '^[0-9a-f]{64}$'
      OR p_expires_at IS NULL
      OR p_expires_at <= pg_catalog.now()
-     OR p_expires_at > pg_catalog.now() + INTERVAL '31 days'
+     OR p_expires_at > pg_catalog.now() + INTERVAL '8 days'
      OR (p_ip_address IS NOT NULL AND pg_catalog.length(p_ip_address) > 128)
      OR (p_user_agent IS NOT NULL AND pg_catalog.length(p_user_agent) > 500) THEN
     RETURN NULL;
