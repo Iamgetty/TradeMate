@@ -63,11 +63,15 @@ jobs:
             exit 1
           }
           RUN_HEAD_SHA="$(jq -r '.head_sha' <<< "$RUN_JSON")"
-          if [[ ! "$RUN_HEAD_SHA" =~ ^[a-f0-9]{40}$ ]]; then
-            echo "::error::The migration workflow run did not report a valid source commit."
+          RUN_ATTEMPT="$(jq -r '.run_attempt' <<< "$RUN_JSON")"
+          if [[ ! "$RUN_HEAD_SHA" =~ ^[a-f0-9]{40}$ || ! "$RUN_ATTEMPT" =~ ^[0-9]+$ ]]; then
+            echo "::error::The migration workflow run did not report a valid source commit and run attempt."
             exit 1
           fi
-          echo "head_sha=$RUN_HEAD_SHA" >> "$GITHUB_OUTPUT"
+          {
+            echo "head_sha=$RUN_HEAD_SHA"
+            echo "run_attempt=$RUN_ATTEMPT"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Download successful migration handoff artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -84,6 +88,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           MIGRATION_RUN_ID: ${{ inputs.migration_run_id }}
           MIGRATION_HEAD_SHA: ${{ steps.run.outputs.head_sha }}
+          MIGRATION_RUN_ATTEMPT: ${{ steps.run.outputs.run_attempt }}
           EXPECTED_API_IMAGE_URI: ${{ inputs.expected_api_image_uri }}
         run: |
           set -euo pipefail
@@ -99,12 +104,14 @@ jobs:
           jq -e \
             --arg repository "$GITHUB_REPOSITORY" \
             --arg run_id "$MIGRATION_RUN_ID" \
+            --arg run_attempt "$MIGRATION_RUN_ATTEMPT" \
             --arg image "$EXPECTED_API_IMAGE_URI" \
             '
               .schema_version == 1 and
               .repository == $repository and
               .workflow_path == ".github/workflows/aws-staging-migration-task.yml" and
               .migration_run_id == $run_id and
+              .migration_run_attempt == $run_attempt and
               .api_image_uri == $image and
               (.source_sha | test("^[a-f0-9]{40}$")) and
               .migration_result == "success" and
