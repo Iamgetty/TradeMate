@@ -1,0 +1,11 @@
+title = "TradeMate Gitleaks configuration"
+
+# Git commit identifiers are public source-control metadata, not credentials.
+# This exact SHA was flagged by generic-api-key entropy detection in the
+# implementation register. Keep the exception scoped to this one value/file;
+# do not allowlist arbitrary hexadecimal strings or the whole documentation tree.
+[[allowlists]]
+description = "Known public Git commit identifier in implementation register"
+regexTarget = "match"
+regexes = ['''^f95313ffdda896b376d4a7db2ca5e8e7d631ddd7$''']
+paths = ['''TradeMate-main/docs/implementation-register\.md''']
