@@ -63,6 +63,61 @@ async function main() {
     assert.equal(identity.rows[0].session_user, 'trademate_app');
     assert.equal(identity.rows[0].current_user, 'trademate_app');
 
+    const pendingEmail = `rls-email-verification-${suffix}@example.invalid`;
+    const pendingUser = await admin.query(
+      "INSERT INTO public.users (email, display_name, status) VALUES ($1, 'Email verification fixture', 'pending') RETURNING id::text AS id",
+      [pendingEmail],
+    );
+    userIds.push(pendingUser.rows[0].id);
+    const emailCodeHash = createHash('sha256').update('482913').digest('hex');
+    await admin.query(
+      "INSERT INTO public.email_verification_codes (user_id, code_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes')",
+      [pendingUser.rows[0].id, emailCodeHash],
+    );
+    const invalidEmailSession = await appClient.query(
+      'SELECT * FROM trademate_private.complete_email_verification($1, $2, $3, now() + interval \'10 minutes\', $4, $5)',
+      [pendingEmail, createHash('sha256').update('000000').digest('hex'), createHash('sha256').update(randomBytes(32)).digest('hex'), '192.0.2.11', 'TradeMate email verification test'],
+    );
+    assert.equal(invalidEmailSession.rowCount, 0, 'An incorrect email verification code must not activate an account or issue a session.');
+    const failedEmailAttempts = await admin.query(
+      'SELECT attempts FROM public.email_verification_codes WHERE user_id = $1',
+      [pendingUser.rows[0].id],
+    );
+    assert.equal(failedEmailAttempts.rows[0].attempts, 1, 'An incorrect verification code must consume one attempt.');
+
+    const emailSessionTokenHash = createHash('sha256').update(randomBytes(32)).digest('hex');
+    const completedEmailVerification = await appClient.query(
+      'SELECT verified_user_id::text AS user_id, verified_email AS email FROM trademate_private.complete_email_verification($1, $2, $3, now() + interval \'10 minutes\', $4, $5)',
+      [pendingEmail, emailCodeHash, emailSessionTokenHash, '192.0.2.11', 'TradeMate email verification test'],
+    );
+    assert.equal(completedEmailVerification.rowCount, 1, 'A valid email code must activate the account and issue a session.');
+    assert.equal(completedEmailVerification.rows[0].user_id, pendingUser.rows[0].id);
+    assert.equal(completedEmailVerification.rows[0].email, pendingEmail);
+    const emailSession = await admin.query(
+      'SELECT id::text AS id FROM public.user_sessions WHERE token_hash = $1',
+      [emailSessionTokenHash],
+    );
+    assert.equal(emailSession.rowCount, 1, 'Email verification must create exactly the presented session digest.');
+    sessionIds.push(emailSession.rows[0].id);
+    sessionHashes.push(emailSessionTokenHash);
+    const activatedEmailUser = await admin.query(
+      'SELECT status, email_verified_at FROM public.users WHERE id = $1',
+      [pendingUser.rows[0].id],
+    );
+    assert.equal(activatedEmailUser.rows[0].status, 'active');
+    assert.ok(activatedEmailUser.rows[0].email_verified_at);
+    const emailVerificationAudit = await admin.query(
+      "SELECT actor_user_id::text AS actor_id FROM public.audit_events WHERE event_type = 'auth.email_verified' AND entity_id = $1",
+      [pendingUser.rows[0].id],
+    );
+    assert.equal(emailVerificationAudit.rowCount, 1, 'Email verification must append one audit event atomically.');
+    assert.equal(emailVerificationAudit.rows[0].actor_id, pendingUser.rows[0].id);
+    const replayedEmailVerification = await appClient.query(
+      'SELECT verified_user_id FROM trademate_private.complete_email_verification($1, $2, $3, now() + interval \'10 minutes\', $4, $5)',
+      [pendingEmail, emailCodeHash, createHash('sha256').update(randomBytes(32)).digest('hex'), '192.0.2.11', 'TradeMate email verification test'],
+    );
+    assert.equal(replayedEmailVerification.rowCount, 0, 'A consumed email verification code must not be replayable.');
+
     const verifiedPasswordHash = 'argon2id$verified-login-test-password-hash';
     await admin.query(
       "UPDATE public.users SET email_verified_at = now() WHERE id = $1",
