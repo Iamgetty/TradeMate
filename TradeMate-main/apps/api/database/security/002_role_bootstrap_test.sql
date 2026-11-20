@@ -152,11 +152,11 @@ BEGIN
      OR NOT has_function_privilege('trademate_app', 'trademate_private.complete_totp_login(text,bigint,text,timestamp with time zone,text,text)', 'EXECUTE')
      OR NOT has_function_privilege('trademate_app', 'trademate_private.resolve_totp_login_challenge(text)', 'EXECUTE')
      OR NOT has_function_privilege('trademate_app', 'trademate_private.record_totp_login_failure(text)', 'EXECUTE')
-     OR NOT has_function_privilege('trademate_app', 'trademate_private.begin_totp_enrollment(uuid,text)', 'EXECUTE')
-     OR NOT has_function_privilege('trademate_app', 'trademate_private.resolve_totp_enrollment(uuid)', 'EXECUTE')
-     OR NOT has_function_privilege('trademate_app', 'trademate_private.complete_totp_enrollment(uuid,bigint)', 'EXECUTE')
-     OR NOT has_function_privilege('trademate_app', 'trademate_private.resolve_enabled_totp(uuid)', 'EXECUTE')
-     OR NOT has_function_privilege('trademate_app', 'trademate_private.disable_totp(uuid,bigint)', 'EXECUTE') THEN
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.begin_totp_enrollment(text,text)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.resolve_totp_enrollment(text)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.complete_totp_enrollment(text,bigint)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.resolve_enabled_totp(text)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.disable_totp(text,bigint)', 'EXECUTE') THEN
     RAISE EXCEPTION 'trademate_app must have the reviewed narrow session operations.';
   END IF;
 
