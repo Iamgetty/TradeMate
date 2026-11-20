@@ -52,6 +52,12 @@ BEGIN
     RAISE EXCEPTION 'trademate_app must not read session bearer-token digests; only the user_id predicate column is available.';
   END IF;
 
+  IF has_table_privilege('trademate_app', 'public.user_credentials', 'SELECT')
+     OR NOT has_column_privilege('trademate_app', 'public.user_credentials', 'user_id', 'SELECT')
+     OR has_column_privilege('trademate_app', 'public.user_credentials', 'password_hash', 'SELECT') THEN
+    RAISE EXCEPTION 'trademate_app must not read password verifiers directly; only the user_id predicate column is available.';
+  END IF;
+
   IF NOT has_table_privilege('trademate_app', 'public.audit_events', 'INSERT')
      OR has_table_privilege('trademate_app', 'public.audit_events', 'UPDATE')
      OR has_table_privilege('trademate_app', 'public.audit_events', 'DELETE') THEN
