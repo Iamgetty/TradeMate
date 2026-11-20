@@ -608,6 +608,8 @@ Outputs:
     Value: !Ref MigrationTaskDefinition
   MigrationDatabaseUrlSecretArn:
     Value: !Ref MigrationDatabaseUrlSecretArn
+  RlsContextHmacKeySecretArn:
+    Value: !Ref RlsContextHmacKeySecretArn
   MigrationEcsExecutionRoleArn:
     Value: !GetAtt MigrationEcsExecutionRole.Arn
   MigrationTaskRoleArn:
