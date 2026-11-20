@@ -81,3 +81,6 @@ Counts are estimates, not a promise to split tightly coupled code. The first pha
 
 
 **Completed:** extracted the 23,184-character Scout stylesheet installer into `public/tm/scout-styles.js`. The extracted module receives the existing `SCMAP` asset URL explicitly, preserves the `scStyles` duplicate-injection guard, and is loaded and initialization-checked by `TradeMateRuntime.tsx` before `app.js`. The legacy `scoutCss()` call sites remain intact; app cache is now `v=165`.
+
+
+**Completed:** extracted the `markets()` and `tradeCore()` renderers (11,213 source characters) into `public/tm/market-ui.js`. Their shared runtime values and callbacks are injected at call time; the legacy function signatures remain as delegates. `TradeMateRuntime.tsx` now loads and validates the module before app startup. App cache is `v=166`.
