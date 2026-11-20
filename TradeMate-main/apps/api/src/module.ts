@@ -520,38 +520,14 @@ class AuthController {
     if (rate.rows[0].attempts > 5 || (rate.rows[0].blocked_until && new Date(rate.rows[0].blocked_until).getTime() > Date.now())) {
       throw new HttpException('Too many password reset attempts. Please request a new link later.', HttpStatus.TOO_MANY_REQUESTS);
     }
-    const client = await databasePool.connect();
-    let email = '';
-    let userId = '';
-    try {
-      await client.query('BEGIN');
-      const reset = await client.query(
-        "SELECT t.id, t.user_id, u.email FROM password_reset_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = $1 AND t.used_at IS NULL AND t.expires_at > now() AND u.status = 'active' FOR UPDATE OF t, u",
-        [tokenDigest(rawToken)],
-      );
-      if (!reset.rowCount) throw new BadRequestException('This password reset link is invalid, expired, or already used.');
-      userId = reset.rows[0].user_id;
-      email = reset.rows[0].email;
-      const nextHash = await passwordHash(newPassword);
-      const consumed = await client.query(
-        'UPDATE password_reset_tokens SET used_at = now() WHERE id = $1 AND used_at IS NULL AND expires_at > now() RETURNING id',
-        [reset.rows[0].id],
-      );
-      if (!consumed.rowCount) throw new BadRequestException('This password reset link is invalid, expired, or already used.');
-      const credentialUpdate = await client.query('UPDATE user_credentials SET password_hash = $1, updated_at = now() WHERE user_id = $2', [nextHash, userId]);
-      if (!credentialUpdate.rowCount) throw new NotFoundException('Account credentials could not be updated.');
-      await client.query('DELETE FROM user_sessions WHERE user_id = $1', [userId]);
-      await client.query('UPDATE auth_login_challenges SET consumed_at = now() WHERE user_id = $1 AND consumed_at IS NULL', [userId]);
-      await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1 AND id <> $2', [userId, reset.rows[0].id]);
-      await client.query(
-        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.password_reset_completed', 'user', $1, '{}'::jsonb)",
-        [userId],
-      );
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally { client.release(); }
+    const nextHash = await passwordHash(newPassword);
+    const reset = await databasePool.query(
+      'SELECT reset_user_id::text AS user_id, reset_email AS email FROM trademate_private.complete_password_reset($1, $2)',
+      [tokenDigest(rawToken), nextHash],
+    );
+    if (!reset.rowCount) throw new BadRequestException('This password reset link is invalid, expired, or already used.');
+    const userId = reset.rows[0].user_id as string;
+    const email = reset.rows[0].email as string;
     if (email) void sendTransactionalEmail(email, 'Your TradeMate password was reset', '<p>Your TradeMate password was reset successfully. All existing sessions have been signed out.</p><p>If you did not make this change, contact TradeMate support immediately.</p>');
     return { success: true, message: 'Your password has been reset. Sign in again with your new password.' };
   }
