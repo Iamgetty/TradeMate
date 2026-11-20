@@ -32,6 +32,18 @@ BEGIN
     RAISE EXCEPTION 'trademate_worker has excessive role attributes.';
   END IF;
 
+  IF to_regclass('trademate_private.rls_context_hmac_keys') IS NOT NULL THEN
+    IF has_table_privilege('trademate_app', 'trademate_private.rls_context_hmac_keys', 'SELECT')
+       OR has_table_privilege('trademate_app', 'trademate_private.rls_context_hmac_keys', 'INSERT')
+       OR has_table_privilege('trademate_app', 'trademate_private.rls_context_hmac_keys', 'UPDATE')
+       OR has_table_privilege('trademate_app', 'trademate_private.rls_context_hmac_keys', 'DELETE') THEN
+      RAISE EXCEPTION 'trademate_app must not read or mutate the private RLS HMAC verifier key.';
+    END IF;
+    IF pg_get_userbyid((SELECT relowner FROM pg_class WHERE oid = 'trademate_private.rls_context_hmac_keys'::regclass)) <> 'trademate_migrator' THEN
+      RAISE EXCEPTION 'The private RLS HMAC verifier key table must be owned by trademate_migrator.';
+    END IF;
+  END IF;
+
   IF NOT has_schema_privilege('trademate_migrator', 'public', 'CREATE') THEN
     RAISE EXCEPTION 'trademate_migrator cannot create schema objects.';
   END IF;
