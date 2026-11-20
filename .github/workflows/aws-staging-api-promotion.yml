@@ -114,8 +114,12 @@ jobs:
             ' "$HANDOFF" >/dev/null
           SOURCE_SHA="$(jq -r '.source_sha' "$HANDOFF")"
           CURRENT_MAIN_SHA="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')"
-          if [[ "$SOURCE_SHA" != "$MIGRATION_HEAD_SHA" || "$SOURCE_SHA" != "$CURRENT_MAIN_SHA" ]]; then
-            echo "::error::The migration artifact must match both its workflow run commit and the current main head; stale releases cannot be promoted."
+          if [[ "$SOURCE_SHA" != "$MIGRATION_HEAD_SHA" ]]; then
+            echo "::error::The migration artifact source SHA does not match the commit that dispatched the migration workflow."
+            exit 1
+          fi
+          if [[ "$SOURCE_SHA" != "$CURRENT_MAIN_SHA" ]]; then
+            echo "::error::The migration artifact is stale because main has advanced since migration; rebuild and rerun the release."
             exit 1
           fi
           {
