@@ -47,55 +47,16 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24.22.1
-name: TradeMate CI
-
-# Keep only the newest validation run for a given pull request or branch.
-concurrency:
-  group: trademate-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
-on:
-  push:
-    branches:
-      - main
-      - feat/sports-transfer-private-profile-api
-      - feat/sports-transfer-organization-memberships
-      - feat/sports-transfer-representative-mandates
-      - feat/sports-transfer-opportunity-drafts
-      - feat/sports-transfer-external-player-discovery-foundation
-  pull_request:
-    branches:
-      - main
-
-permissions:
-  contents: read
-
-jobs:
-
-  database:
-    name: Database migration integration
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
+      - name: Install API dependencies
+        working-directory: TradeMate-main/apps/api
+        run: npm ci --no-audit --no-fund
+      - name: Prepare disposable pgcrypto and HMAC test key
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: trademate_test
-          POSTGRES_DB: trademate_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d trademate_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24.22.1
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: |
+          set -euo pipefail
+          echo "RLS_CONTEXT_HMAC_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;'
       - name: Build API for database context integration tests
         working-directory: TradeMate-main/apps/api
         run: npm run build
@@ -245,253 +206,9 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24.22.1
-name: TradeMate CI
-
-# Keep only the newest validation run for a given pull request or branch.
-concurrency:
-  group: trademate-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
-on:
-  push:
-    branches:
-      - main
-      - feat/sports-transfer-private-profile-api
-      - feat/sports-transfer-organization-memberships
-      - feat/sports-transfer-representative-mandates
-      - feat/sports-transfer-opportunity-drafts
-      - feat/sports-transfer-external-player-discovery-foundation
-  pull_request:
-    branches:
-      - main
-
-permissions:
-  contents: read
-
-jobs:
-
-  database:
-    name: Database migration integration
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: trademate_test
-          POSTGRES_DB: trademate_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d trademate_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24.22.1
-name: TradeMate CI
-
-# Keep only the newest validation run for a given pull request or branch.
-concurrency:
-  group: trademate-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
-on:
-  push:
-    branches:
-      - main
-      - feat/sports-transfer-private-profile-api
-      - feat/sports-transfer-organization-memberships
-      - feat/sports-transfer-representative-mandates
-      - feat/sports-transfer-opportunity-drafts
-      - feat/sports-transfer-external-player-discovery-foundation
-  pull_request:
-    branches:
-      - main
-
-permissions:
-  contents: read
-
-jobs:
-
-  database:
-    name: Database migration integration
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: trademate_test
-          POSTGRES_DB: trademate_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d trademate_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24.22.1
-      - name: Build API for database context integration tests
+      - name: Install API dependencies
         working-directory: TradeMate-main/apps/api
-        run: npm run build
-      - name: Apply all database migrations to a clean PostgreSQL database
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: npm run db:migrate
-      - name: Verify Sports Transfer identity, consent, mandate and guardian constraints
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-sports-transfer-identity.js
-      - name: Verify Sports Transfer private profile and consent HTTP authorization
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-sports-transfer-private-api.js
-      - name: Verify Sports Transfer representative mandate HTTP authorization
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-sports-transfer-mandates-api.js
-      - name: Verify Sports Transfer organization membership HTTP authorization
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-sports-transfer-organization-api.js
-      - name: Verify private Sports Transfer opportunity draft API authorization
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-sports-transfer-opportunities-api.js
-      - name: Verify source-governed Sports Transfer external player discovery schema
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-sports-transfer-external-discovery.js
-      - name: Verify organization document permissions and rollback through HTTP endpoints
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-organization-documents.js
-      - name: Verify two-party marketplace contract lifecycle and concurrency
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-marketplace-contracts.js
-      - name: Verify two-party P2P lifecycle, privacy and concurrency
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-p2p-lifecycle.js
-      - name: Verify authentication audit atomicity and rollback
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-auth-audit.js
-      - name: Verify all ten contract divisions across member roles, moderation and audit rollback
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-marketplace-listings.js
-      - name: Verify least-privilege PostgreSQL roles and grants
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-db-roles.js
-      - name: Execute account-deletion transaction as the restricted worker role
-        working-directory: TradeMate-main/apps/api
-        env:
-          ACCOUNT_DELETION_TEST_DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-account-deletion-worker.js
-      - name: Test RLS pilot connection-target guard
-        working-directory: TradeMate-main/apps/api
-        run: node --test test/test-rls-pilot-safety.test.cjs
-      - name: Verify RLS owner isolation and FORCE RLS behaviour
-        working-directory: TradeMate-main/apps/api
-        env:
-          RLS_PILOT_TEST_DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-rls-pilot.js
-      - name: Confirm runtime-login RLS identity spoofing limitation
-        working-directory: TradeMate-main/apps/api
-        env:
-          RLS_PILOT_TEST_DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-rls-runtime-login.js
-      - name: Verify immutable audit-event history
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-audit-immutability.js
-      - name: Verify transaction-local user identity and connection-pool isolation
-        working-directory: TradeMate-main/apps/api
-        env:
-          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
-        run: node scripts/test-database-context.js
-
-  web:
-    name: Web build and runtime syntax
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24.22.1
-      - name: Validate TradeMate runtime JavaScript
-        run: node --check TradeMate-main/apps/web/public/tm/app.js
-      - name: Verify connected account cache isolation
-        run: node TradeMate-main/apps/web/scripts/test-account-isolation.js
-      - name: Test market metadata refresh lifecycle
-        run: node --test TradeMate-main/apps/web/scripts/market-metadata.test.cjs
-      - name: Install web dependencies
-        working-directory: TradeMate-main/apps/web
         run: npm ci --no-audit --no-fund
-      - name: Build web application
-        working-directory: TradeMate-main/apps/web
-        run: npm run build
-
-
-  exchange-feed:
-    name: Exchange feed and MT5 tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24.22.1
-      - name: Install exchange-feed dependencies
-        working-directory: TradeMate-main/exchange-feed
-        run: npm ci --no-audit --no-fund
-      - name: Run exchange-feed and MT5 quote tests
-        working-directory: TradeMate-main/exchange-feed
-        run: npm test
-
-  api:
-    name: API TypeScript build
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24.22.1
       - name: Lint API TypeScript source
         working-directory: TradeMate-main/apps/api
         run: npm run lint
@@ -609,6 +326,13 @@ jobs:
       - name: Install API dependencies
         working-directory: TradeMate-main/apps/api
         run: npm ci --no-audit --no-fund
+      - name: Prepare disposable pgcrypto and HMAC test key
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: |
+          set -euo pipefail
+          echo "RLS_CONTEXT_HMAC_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;'
       - name: Build API for live browser acceptance
         working-directory: TradeMate-main/apps/api
         run: npm run build
