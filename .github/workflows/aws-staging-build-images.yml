@@ -1,0 +1,205 @@
+name: AWS staging build and attest images
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_publish:
+        description: Build, publish and attest the two staging images from the exact current main commit.
+        type: choice
+        required: true
+        options:
+          - "no"
+          - "yes"
+      source_sha:
+        description: Full commit SHA at the current main branch head. Must equal the workflow dispatch SHA.
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  checks: read
+  id-token: write
+  attestations: write
+  packages: write
+
+concurrency:
+  group: trademate-aws-staging-image-publish
+  cancel-in-progress: false
+
+jobs:
+  validate-release:
+    name: Validate source and required release checks
+    if: ${{ inputs.confirm_publish == 'yes' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      source_sha: ${{ steps.release.outputs.source_sha }}
+    steps:
+      - name: Validate exact main source and CI evidence
+        id: release
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$SOURCE_SHA" =~ ^[a-f0-9]{40}$ || "$SOURCE_SHA" != "$GITHUB_SHA" ]]; then
+            echo "::error::source_sha must exactly match the current main commit that dispatched this workflow."
+            exit 1
+          fi
+
+          CHECK_RUNS="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA/check-runs?per_page=100" --jq '.check_runs')"
+          REQUIRED_CHECKS=(
+            "Browser app-shell and live API acceptance tests"
+            "AWS API and exchange-feed container builds"
+            "Exchange feed and MT5 tests"
+            "Database migration integration"
+            "Security scanning (SAST, SCA and secrets)"
+            "API TypeScript build"
+            "Web build and runtime syntax"
+            "Isolated Cloudflare Workers frontend build and runtime"
+            "Lint AWS CloudFormation templates (no deployment)"
+            "Non-destructive vinext compatibility scan"
+            "Generate and validate lockfiles"
+          )
+          for required_check in "${REQUIRED_CHECKS[@]}"; do
+            conclusion="$(jq -r --arg name "$required_check" '[.[] | select(.name==$name)] | sort_by(.completed_at // .started_at) | last | .conclusion // "missing"' <<< "$CHECK_RUNS")"
+            if [[ "$conclusion" != "success" ]]; then
+              echo "::error::Required check '$required_check' is not successful for $SOURCE_SHA (conclusion: $conclusion)."
+              exit 1
+            fi
+          done
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+
+  publish:
+    name: Build, publish and attest ${{ matrix.image.name }}
+    needs: validate-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: aws-staging-image-publish
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - name: api
+            dockerfile: TradeMate-main/apps/api/Dockerfile
+            repository_output: ApiEcrRepositoryUri
+          - name: exchange-feed
+            dockerfile: TradeMate-main/exchange-feed/Dockerfile
+            repository_output: ExchangeFeedEcrRepositoryUri
+    steps:
+      - name: Check out the exact tested source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.validate-release.outputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Validate staging AWS role configuration
+        env:
+          AWS_STAGING_PUBLISH_ROLE_ARN: ${{ vars.AWS_STAGING_PUBLISH_ROLE_ARN }}
+          AWS_STAGING_ACCOUNT_ID: ${{ vars.AWS_STAGING_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$AWS_STAGING_PUBLISH_ROLE_ARN" =~ ^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$ ]]; then
+            echo "::error::Configure AWS_STAGING_PUBLISH_ROLE_ARN in the aws-staging-image-publish environment."
+            exit 1
+          fi
+          if [[ ! "$AWS_STAGING_ACCOUNT_ID" =~ ^[0-9]{12}$ || "$AWS_STAGING_PUBLISH_ROLE_ARN" != "arn:aws:iam::$AWS_STAGING_ACCOUNT_ID:role/"* ]]; then
+            echo "::error::AWS_STAGING_ACCOUNT_ID must match the account in AWS_STAGING_PUBLISH_ROLE_ARN."
+            exit 1
+          fi
+
+      - name: Configure AWS credentials through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.2.1
+        with:
+          role-to-assume: ${{ vars.AWS_STAGING_PUBLISH_ROLE_ARN }}
+          aws-region: eu-north-1
+          role-session-name: trademate-staging-image-publish
+
+      - name: Confirm AWS account and resolve immutable ECR repository
+        id: image
+        env:
+          EXPECTED_ACCOUNT_ID: ${{ vars.AWS_STAGING_ACCOUNT_ID }}
+          REPOSITORY_OUTPUT_KEY: ${{ matrix.image.repository_output }}
+          EXPECTED_REPOSITORY_NAME: trademate/${{ matrix.image.name }}
+        run: |
+          set -euo pipefail
+          ACTUAL_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          if [[ "$ACTUAL_ACCOUNT_ID" != "$EXPECTED_ACCOUNT_ID" ]]; then
+            echo "::error::The assumed AWS role belongs to an unexpected account."
+            exit 1
+          fi
+
+          STACK_STATUS="$(aws cloudformation describe-stacks --stack-name trademate-staging-foundation --query 'Stacks[0].StackStatus' --output text)"
+          if [[ "$STACK_STATUS" != "CREATE_COMPLETE" && "$STACK_STATUS" != "UPDATE_COMPLETE" ]]; then
+            echo "::error::The staging foundation stack is not stable."
+            exit 1
+          fi
+          OUTPUTS="$(aws cloudformation describe-stacks --stack-name trademate-staging-foundation --query 'Stacks[0].Outputs' --output json)"
+          REPOSITORY_URI="$(jq -r --arg key "$REPOSITORY_OUTPUT_KEY" '.[] | select(.OutputKey==$key) | .OutputValue' <<< "$OUTPUTS")"
+          EXPECTED_PREFIX="$EXPECTED_ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/$EXPECTED_REPOSITORY_NAME"
+          if [[ "$REPOSITORY_URI" != "$EXPECTED_PREFIX" ]]; then
+            echo "::error::The ECR repository output does not match the expected account, region and repository."
+            exit 1
+          fi
+          echo "repository_uri=$REPOSITORY_URI" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@7290e214a610b32bc0eef81748948b6d466a8783 # v2
+
+      - name: Build and push immutable image with BuildKit provenance and SBOM
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: ${{ matrix.image.dockerfile }}
+          push: true
+          tags: ${{ steps.image.outputs.repository_uri }}:sha-${{ needs.validate-release.outputs.source_sha }}-run-${{ github.run_id }}-${{ github.run_attempt }}
+          provenance: mode=max
+          sbom: true
+
+      - name: Generate signed GitHub build provenance attestation
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-name: ${{ steps.image.outputs.repository_uri }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+
+      - name: Verify the published image attestation and source binding
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_URI: ${{ steps.image.outputs.repository_uri }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          SOURCE_SHA: ${{ needs.validate-release.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$IMAGE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "::error::Buildx did not return a valid SHA-256 image digest."
+            exit 1
+          fi
+          gh attestation verify "oci://$IMAGE_URI@$IMAGE_DIGEST" \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/aws-staging-build-images.yml" \
+            --source-digest "$SOURCE_SHA" \
+            --source-ref "refs/heads/main"
+
+      - name: Record immutable image release metadata
+        env:
+          IMAGE_NAME: ${{ matrix.image.name }}
+          IMAGE_URI: ${{ steps.image.outputs.repository_uri }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          SOURCE_SHA: ${{ needs.validate-release.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## TradeMate staging image published"
+            echo
+            echo "- Image: $IMAGE_NAME"
+            echo "- Immutable image: $IMAGE_URI@$IMAGE_DIGEST"
+            echo "- Source commit: $SOURCE_SHA"
+            echo "- GitHub build provenance: generated and verified"
+            echo "- BuildKit provenance: mode=max"
+            echo "- SBOM: generated by BuildKit"
+          } >> "$GITHUB_STEP_SUMMARY"
