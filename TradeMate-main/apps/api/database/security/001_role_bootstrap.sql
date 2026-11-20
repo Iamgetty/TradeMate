@@ -44,6 +44,11 @@ REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC;
 GRANT USAGE, CREATE ON SCHEMA public TO trademate_migrator;
 GRANT USAGE ON SCHEMA public TO trademate_app;
 
+-- The resolver migration runs before this bootstrap creates the runtime role.
+-- Grant only the schema entry point and one narrowly scoped function here.
+GRANT USAGE ON SCHEMA trademate_private TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.resolve_presented_session(TEXT) TO trademate_app;
+
 -- Transfer application tables, sequences and views to the migration owner.
 -- The app login must never own these objects.
 DO $$
