@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 declare global {
   interface Window {
     TM_CONFIG?: { api: string };
-    TM_ART_UTILS?: { prmArt: () => string; dpArt: () => string; dxArt: () => string; tfArt: () => string; tfCoin: () => string; cxArt: () => string };
+    TM_ART_UTILS?: { prmArt: () => string; dpArt: () => string; dxArt: () => string; tfArt: () => string; tfCoin: () => string; cxArt: () => string; scoutArt: (...args: any[]) => string; scoutGlobe: (...args: any[]) => string; dxCoin: (...args: any[]) => string; dpCoin: (...args: any[]) => string };
     TM_FX_SNAPSHOT_UTILS?: {
       createFxSnapshotStore: (options: { items: Array<Record<string, any>> }) => {
         apply: (rates: Record<string, number>, mode?: string, timestamp?: string, savedAt?: number) => boolean;
@@ -125,7 +125,7 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=161';
+    app.src = '/tm/app.js?v=162';
     app.async = false;
     app.dataset.trademateApp = 'true';
     app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=161. Check the deployment and static asset response.');
@@ -377,7 +377,7 @@ export default function TradeMateRuntime() {
 
     // Static decorative SVG renderers are isolated from app state and must be ready before app.js.
     const artUtils = document.createElement('script');
-    artUtils.src = '/tm/art-utils.js?v=1';
+    artUtils.src = '/tm/art-utils.js?v=2';
     artUtils.async = false;
     artUtils.onload = () => {
       if (!window.TM_ART_UTILS) {
