@@ -78,3 +78,6 @@ Counts are estimates, not a promise to split tightly coupled code. The first pha
 
 
 **Completed:** extracted the pure marketplace API-to-view mappers (`mapListing`, `dealFromEnq`, `contractStatusLabel`) into `marketplace-mappers.js`. The module receives formatting helpers and lookup tables explicitly; legacy call sites keep their names. `TradeMateRuntime.tsx` now verifies the module before allowing `app.js` to start. App cache advanced to `v=164`.
+
+
+**Completed:** extracted the 23,184-character Scout stylesheet installer into `public/tm/scout-styles.js`. The extracted module receives the existing `SCMAP` asset URL explicitly, preserves the `scStyles` duplicate-injection guard, and is loaded and initialization-checked by `TradeMateRuntime.tsx` before `app.js`. The legacy `scoutCss()` call sites remain intact; app cache is now `v=165`.
