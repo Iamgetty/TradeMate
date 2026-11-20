@@ -110,3 +110,25 @@ Do not use blanket public-read policies for tables containing private columns or
 6. Only after full coverage and a rollback/forward-fix plan, rehearse on AWS staging and seek explicit production approval.
 
 **Do not run the role bootstrap, enable production RLS, change production grants, or switch production credentials based on this inventory.** This document records catalog facts and provisional policy intent; it is not an authorization specification.
+
+
+## 6. First source-level access-path review
+
+Reviewed the current PR-branch API source (not just the database catalog):
+
+- `apps/api/src/module.ts` contains the main SQL paths for account, support, organization, listings, enquiries, contracts and P2P workflows.
+- Support-ticket routes filter list/detail access by `support_tickets.user_id = authenticated user`; message reads are by ticket ID after the ticket-owner check. The RLS policy for `support_ticket_messages` must inherit ticket ownership rather than trust a ticket ID alone.
+- Organization document routes check `organization_members` before upload/list operations. The database policy must enforce active membership/role itself; API prechecks are not a substitute.
+- Listing write paths check seller-organization membership; published listing reads join organization status. Listing policies must preserve the intended public published read while restricting draft writes to authorized seller-organization members.
+- Enquiry list/detail/reply paths distinguish buyer from seller-organization membership and write read receipts under the current user. `enquiry_messages` and `enquiry_reads` must inherit the parent enquiry's participant access.
+- Contract reads join listing, seller organization and buyer; the policy must independently enforce buyer or seller-organization membership.
+- P2P order creation/listing filters by authenticated `user_id`; public order-book access is routed through `p2p_public_book`, so its view security must be reviewed before granting runtime access to the underlying order table.
+- `market-activity.ts` and `market-highlights.ts` aggregate listings, enquiries and contracts across organizations. These cross-organization analytics paths need an explicit authorization decision (for example, only the caller's organization scope or a deliberately public aggregate) before RLS can be enabled. Do not assume their current SQL joins constitute authorization.
+- The module has additional direct reads/writes beyond these examples. This is a first-pass mapping, not an exhaustive route-to-table certification.
+
+### Immediate design consequences
+
+1. Do not implement RLS on `marketplace_enquiries`, `enquiry_messages`, `enquiry_reads`, `marketplace_contracts`, `marketplace_contract_messages` or `support_ticket_messages` using only a direct user_id equality. Their access is inherited through parent rows and, for sellers, verified organization membership.
+2. Do not enable RLS on `listings` or `organizations` until aggregate/highlight routes and anonymous published-data routes are explicitly classified.
+3. Review `p2p_public_book`, `p2p_public_completed_trades` and `marketplace_public_completed_trades` definitions and view security options before exposing them to the runtime role.
+4. Continue mapping the remaining sports/transfer, feed moderation, audit, authentication lifecycle and worker paths before drafting production policies.
