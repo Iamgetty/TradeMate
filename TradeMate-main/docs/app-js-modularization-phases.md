@@ -73,3 +73,5 @@ Target groups identified in the remaining `app.js`:
 5. Verify the PR checks before starting the next phase. Do not merge or deploy as part of this refactor without explicit approval.
 
 Counts are estimates, not a promise to split tightly coupled code. The first phase-2 audit may narrow or reorder these boundaries if the source proves more coupled than the initial scan suggests.
+
+**Completed:** extracted the three pure shared formatting helpers (`esc`, `fmt`, `fx2`) into `public/tm/format-utils.js`. `TradeMateRuntime.tsx` verifies the module is initialized before `app.js` loads; legacy call sites retain the same helper names and formatting behavior. The app cache is now `v=163`.
