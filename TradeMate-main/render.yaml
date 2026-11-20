@@ -18,6 +18,8 @@ services:
         value: https://trademate-web.onrender.com
       - key: TOTP_ENCRYPTION_KEY
         sync: false
+      - key: RLS_CONTEXT_HMAC_KEY
+        sync: false
       # Runtime API queries use the least-privilege application database role.
       - key: DATABASE_URL
         sync: false
