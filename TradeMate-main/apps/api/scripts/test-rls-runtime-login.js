@@ -156,6 +156,13 @@ async function main() {
     );
     assert.equal(invalidLogout.rowCount, 0, 'Malformed logout digests must not revoke a session.');
 
+    const victimToken = randomBytes(32).toString('hex');
+    const victimHash = createHash('sha256').update(victimToken).digest('hex');
+    await admin.query(
+      "INSERT INTO public.user_sessions (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes')",
+      [userIds[0], victimHash],
+    );
+
     const additionalToken = randomBytes(32).toString('hex');
     const additionalHash = createHash('sha256').update(additionalToken).digest('hex');
     const additionalSession = await admin.query(
@@ -190,18 +197,18 @@ async function main() {
 
     const victimSessionBeforeBulkRevoke = await admin.query(
       'SELECT id FROM public.user_sessions WHERE token_hash = $1',
-      [sessionHashes[0]],
+      [victimHash],
     );
     assert.equal(victimSessionBeforeBulkRevoke.rowCount, 1);
 
     const crossAccountBulkRevoke = await appClient.query(
       'SELECT trademate_private.revoke_other_presented_sessions($1) AS revoked_count',
-      [sessionHashes[0]],
+      [victimHash],
     );
     assert.equal(Number(crossAccountBulkRevoke.rows[0].revoked_count), 0, 'A presented session for another account must never authorize bulk revocation.');
     const victimSessionAfterBulkRevoke = await admin.query(
       'SELECT id FROM public.user_sessions WHERE token_hash = $1',
-      [sessionHashes[0]],
+      [victimHash],
     );
     assert.equal(victimSessionAfterBulkRevoke.rowCount, 1, 'Cross-account bulk revocation must leave the victim session intact.');
 
