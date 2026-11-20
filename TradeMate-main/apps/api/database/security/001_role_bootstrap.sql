@@ -52,7 +52,7 @@ GRANT USAGE ON SCHEMA trademate_private TO trademate_app;
 -- Migrations run as trademate_migrator after this bootstrap, so close that
 -- default for the private schema; each runtime operation must be granted
 -- explicitly below after review.
-ALTER DEFAULT PRIVILEGES FOR ROLE trademate_migrator IN SCHEMA trademate_private
+ALTER DEFAULT PRIVILEGES FOR ROLE trademate_migrator
   REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION trademate_private.resolve_presented_session(TEXT) TO trademate_app;
