@@ -200,3 +200,13 @@ The exact narrow operations, transaction atomicity, expiry, attempt limits, repl
 - This is source-level design evidence only. No auth route, runtime query, role grant, migration, production setting or RLS policy was changed. The existing real-login test continues to assert the seven known credential columns are exposed under current broad grants.
 - Next code gate: implement and test the operation-to-function contract, then migrate callers and invert the real-login probes in the same reviewed change set. Do not revoke table privileges before all runtime callers and transaction semantics are migrated.
 - Status: ✓ session call-site inventory; ✓ seven-column credential schema inventory; ✓ route-level credential lifecycle inventory; ☐ narrow privileged operations; ☐ reduced runtime grants; ☐ production trusted identity and RLS acceptance. PR #219 remains open/draft and no production changes were made.
+
+
+## First narrow session capability implemented — 20 Nov 2026
+
+- Added migration `031_narrow_presented_session_resolver.sql`, registered in the migration manifest. It creates `trademate_private.resolve_presented_session(text)`: a fixed-`search_path`, `SECURITY DEFINER` function that accepts only a 64-character lowercase SHA-256 digest, checks expiry and active-account status, and returns at most one user ID without returning token material.
+- The migration revokes function execution from PUBLIC and grants it explicitly to `trademate_app`; schema USAGE is granted only to the runtime role. The function is owned by the migration execution principal (not the runtime role).
+- Extended the role-bootstrap SQL assertions for the fixed search path, SECURITY DEFINER property, non-runtime owner, explicit runtime EXECUTE and absence of PUBLIC EXECUTE. Extended the real-login integration test to call the resolver as `trademate_app` and verify valid and malformed digest behavior.
+- **Important scope limit:** this is only the first narrow database primitive. Existing broad table grants remain, the API still has direct session/credential table access, and `database-context.ts` still uses caller-settable GUCs. The new resolver is not yet wired into request handling and does not establish trusted RLS identity. No direct grants were revoked, no RLS was enabled, and no production DB was changed.
+- Validation is pending on the new exact branch head. The register must not mark this capability accepted until PostgreSQL 16/18 migration, role-grant and actual-runtime-login checks pass.
+- Next: migrate request-context resolution to this function, then independently inventory and migrate each route-level session lifecycle operation before reducing raw grants. Keep the production RLS gate blocked.
