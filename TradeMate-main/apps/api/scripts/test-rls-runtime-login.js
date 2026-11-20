@@ -106,9 +106,9 @@ async function main() {
     );
     assert.equal(issuedLoginNotification.rowCount, 1, 'Session issuance must append its sign-in notification atomically.');
 
-    // The new narrow resolver can resolve only a caller-presented digest and
-    // returns an identity, never the credential itself. This does not yet
-    // remove the legacy direct grants or migrate API call sites.
+    // The narrow resolver returns an identity, never the presented credential.
+    // Password-login session issuance now also runs through its scoped DB operation;
+    // unrelated legacy grants remain in place until every auth path is migrated.
     const resolved = await appClient.query(
       'SELECT resolved_user_id::text AS user_id FROM trademate_private.resolve_presented_session($1)',
       [sessionHashes[1]],
