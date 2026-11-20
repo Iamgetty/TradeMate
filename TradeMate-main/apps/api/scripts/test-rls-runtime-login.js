@@ -72,6 +72,23 @@ async function main() {
     );
     assert.equal(resolved.rowCount, 1);
     assert.equal(resolved.rows[0].user_id, userIds[1]);
+
+    await admin.query(
+      "UPDATE public.user_sessions SET last_seen_at = now() - interval '5 minutes' WHERE id = $1",
+      [sessionIds[1]],
+    );
+    const touched = await appClient.query(
+      'SELECT touched_user_id::text AS user_id FROM trademate_private.touch_presented_session($1)',
+      [sessionHashes[1]],
+    );
+    assert.equal(touched.rowCount, 1, 'A valid presented session can update only its activity marker.');
+    assert.equal(touched.rows[0].user_id, userIds[1]);
+    const activity = await admin.query(
+      'SELECT last_seen_at FROM public.user_sessions WHERE id = $1',
+      [sessionIds[1]],
+    );
+    assert.ok(activity.rows[0].last_seen_at.getTime() > Date.now() - 60_000);
+
     const malformed = await appClient.query(
       'SELECT resolved_user_id FROM trademate_private.resolve_presented_session($1)',
       ['not-a-sha256-digest'],
@@ -84,6 +101,11 @@ async function main() {
       [sessionHashes[1]],
     );
     assert.equal(expired.rowCount, 0, 'Expired sessions must not resolve.');
+    const expiredTouch = await appClient.query(
+      'SELECT touched_user_id FROM trademate_private.touch_presented_session($1)',
+      [sessionHashes[1]],
+    );
+    assert.equal(expiredTouch.rowCount, 0, 'Expired sessions must not be touchable.');
     await admin.query("UPDATE public.user_sessions SET expires_at = now() + interval '10 minutes' WHERE id = $1", [sessionIds[1]]);
 
     await admin.query("UPDATE public.users SET status = 'suspended' WHERE id = $1", [userIds[1]]);
