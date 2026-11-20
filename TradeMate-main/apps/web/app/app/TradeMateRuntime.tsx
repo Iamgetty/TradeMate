@@ -5,6 +5,19 @@ import { useEffect, useState } from 'react';
 declare global {
   interface Window {
     TM_CONFIG?: { api: string };
+    TM_SNAPSHOT_UTILS?: {
+      createNftSnapshotStore: (options: { prefix: string; getChain: () => string }) => {
+        key: (term: string) => string;
+        save: (term: string, items: unknown[]) => void;
+        load: (term: string) => unknown[] | null;
+      };
+      createMarketQuoteSnapshotStore: (options: { prefix: string; items: Array<Record<string, any>> }) => {
+        key: (item: Record<string, any>) => string;
+        save: (item: Record<string, any>, quote: Record<string, any>) => void;
+        restore: (item: Record<string, any>) => boolean;
+        restoreAll: () => void;
+      };
+    };
     TM_MARKET_QUOTE_UTILS?: {
       MT5_PUBLIC_QUOTE_MAX_AGE_MS: number;
       MT5_CATEGORY_BY_TYPE: Record<string, string>;
