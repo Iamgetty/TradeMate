@@ -59,11 +59,11 @@ jobs:
             echo "::error::release_source_sha must be a full 40-character Git commit SHA."
             exit 1
           fi
-          git cat-file -e "${RELEASE_SOURCE_SHA}^{commit}"
-          if ! git merge-base --is-ancestor "$RELEASE_SOURCE_SHA" HEAD; then
-            echo "::error::The image source commit must be an ancestor of the checked-out main revision."
+          if [[ "$RELEASE_SOURCE_SHA" != "$GITHUB_SHA" ]]; then
+            echo "::error::The image source commit must exactly match the main commit that dispatched this migration workflow. Rebuild and rerun from the current main head."
             exit 1
           fi
+          git cat-file -e "${RELEASE_SOURCE_SHA}^{commit}"
 
           CHECK_RUNS="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_SOURCE_SHA/check-runs?per_page=100" --jq '.check_runs')"
           REQUIRED_CHECKS=(
