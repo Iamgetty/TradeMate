@@ -155,6 +155,7 @@ REVOKE SELECT ON TABLE public.user_auth_security FROM trademate_app;
 GRANT SELECT (user_id, totp_enabled, totp_confirmed_at)
   ON TABLE public.user_auth_security TO trademate_app;
 REVOKE SELECT ON TABLE public.auth_login_challenges FROM trademate_app;
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.auth_login_challenges FROM trademate_app;
 REVOKE SELECT ON TABLE public.password_reset_tokens FROM trademate_app;
 GRANT SELECT (user_id) ON TABLE public.password_reset_tokens TO trademate_app;
 REVOKE SELECT ON TABLE public.email_verification_codes FROM trademate_app;
