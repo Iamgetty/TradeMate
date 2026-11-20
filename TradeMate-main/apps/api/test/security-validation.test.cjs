@@ -203,28 +203,37 @@ test('P2P, feed and market quote queries reject unsupported values', () => {
   assert.equal(marketQuotesQuerySchema.safeParse({ symbols: '' }).success, false);
 });
 
-test('production API environment requires only runtime PostgreSQL and a 256-bit TOTP key', () => {
+test('production API environment requires runtime PostgreSQL, TOTP key and signed RLS identity key', () => {
   const valid = validateEnvironment({
     NODE_ENV: 'production',
     DATABASE_URL: 'postgres://trade_user:placeholder@localhost:5432/trademate',
     TOTP_ENCRYPTION_KEY: 'a'.repeat(64),
+    RLS_CONTEXT_HMAC_KEY: 'b'.repeat(64),
     WEB_ORIGIN: 'https://trademate-web.onrender.com',
   });
   assert.equal(valid.NODE_ENV, 'production');
   assert.throws(() => validateEnvironment({
     NODE_ENV: 'production',
     TOTP_ENCRYPTION_KEY: 'a'.repeat(64),
+    RLS_CONTEXT_HMAC_KEY: 'b'.repeat(64),
   }), /DATABASE_URL/);
   assert.throws(() => validateEnvironment({
     NODE_ENV: 'production',
     DATABASE_URL: 'postgres://trade_user:placeholder@localhost:5432/trademate',
+    RLS_CONTEXT_HMAC_KEY: 'b'.repeat(64),
   }), /TOTP_ENCRYPTION_KEY/);
+  assert.throws(() => validateEnvironment({
+    NODE_ENV: 'production',
+    DATABASE_URL: 'postgres://trade_user:placeholder@localhost:5432/trademate',
+    TOTP_ENCRYPTION_KEY: 'a'.repeat(64),
+  }), /RLS_CONTEXT_HMAC_KEY/);
 });
 
 test('environment validation rejects malformed URLs, origins and key formats', () => {
   assert.throws(() => validateEnvironment({
     NODE_ENV: 'production', DATABASE_URL: 'https://example.com',
     TOTP_ENCRYPTION_KEY: 'a'.repeat(64),
+    RLS_CONTEXT_HMAC_KEY: 'b'.repeat(64),
   }), /DATABASE_URL/);
   assert.throws(() => validateEnvironment({
     NODE_ENV: 'development', WEB_ORIGIN: 'javascript:alert(1)',
@@ -232,6 +241,9 @@ test('environment validation rejects malformed URLs, origins and key formats', (
   assert.throws(() => validateEnvironment({
     NODE_ENV: 'development', TOTP_ENCRYPTION_KEY: 'not-a-key',
   }), /TOTP_ENCRYPTION_KEY/);
+  assert.throws(() => validateEnvironment({
+    NODE_ENV: 'development', RLS_CONTEXT_HMAC_KEY: 'not-a-key',
+  }), /RLS_CONTEXT_HMAC_KEY/);
 });
 
 test('P2P decimal inputs enforce database precision and fiat scale', () => {
