@@ -33,6 +33,9 @@ jobs:
   validate-migration-handoff:
     name: Validate successful migration handoff
     if: ${{ inputs.confirm_promotion == 'yes' && github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: read
+      actions: read
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -139,6 +142,10 @@ jobs:
     name: Promote attested API image to staging
     needs: validate-migration-handoff
     if: ${{ needs.validate-migration-handoff.result == 'success' }}
+    permissions:
+      contents: read
+      attestations: read
+      id-token: write
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment:
