@@ -236,3 +236,22 @@ The following columns/tables are confirmed in checked-in migrations and must be 
 The application also holds `TOTP_ENCRYPTION_KEY` outside PostgreSQL. This key must remain exclusively in the API secret manager/runtime boundary; it must never be placed in SQL, GUCs, logs, migrations or database rows. Encrypted TOTP rows remain sensitive because the API process can decrypt them.
 
 This inventory is grounded in migrations 002, 015, 022 and 023 plus the role bootstrap. It is not yet a complete assertion that no other secret-bearing columns exist: continue reviewing all migrations, JSON payloads, support/admin tables and future schema changes before finalizing the grant manifest.
+
+### Seven-column runtime credential probe (2026-11-20)
+
+The real-login test now also probes SELECT authorization for the seven confirmed
+credential-bearing columns: `user_credentials.password_hash`,
+`user_sessions.token_hash`, `user_auth_security.totp_secret_encrypted`,
+`auth_login_challenges.token_hash`, `password_reset_tokens.token_hash`,
+`email_verification_codes.code_hash`, and
+`user_deletion_requests.cancellation_token_hash`. Each probe uses a static
+column/table identifier and `LIMIT 0`: PostgreSQL enforces the column privilege
+without returning credential values to the test process. The current expected-
+vulnerability test asserts that the broad grants expose all seven, so the test
+must be deliberately inverted alongside a reviewed grant manifest and positive
+authentication-flow tests when least-privilege remediation is implemented.
+
+This remains evidence of the current privilege exposure, not remediation. The
+API still has direct authentication/session SQL call sites, so revoking these
+privileges before replacing those call sites would break core authentication
+and revocation flows. Production grants and RLS remain unchanged and blocked.
