@@ -159,7 +159,7 @@ export default function TradeMateRuntime() {
     const polishPreload = document.createElement('link');
     polishPreload.rel = 'preload';
     polishPreload.as = 'style';
-    polishPreload.href = '/tm/runtime-polish.css?v=2';
+    polishPreload.href = '/tm/runtime-polish.css?v=3';
     polishPreload.onload = () => {
       polishCssReady = true;
       loadApp();
