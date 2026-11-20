@@ -148,7 +148,8 @@ BEGIN
      OR NOT has_function_privilege('trademate_app', 'trademate_private.revoke_other_presented_sessions(text)', 'EXECUTE')
      OR NOT has_function_privilege('trademate_app', 'trademate_private.complete_password_reset(text,text)', 'EXECUTE')
      OR NOT has_function_privilege('trademate_app', 'trademate_private.issue_password_login_session(uuid,text,text,timestamp with time zone,text,text)', 'EXECUTE')
-     OR NOT has_function_privilege('trademate_app', 'trademate_private.complete_email_verification(text,text,text,timestamp with time zone,text,text)', 'EXECUTE') THEN
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.complete_email_verification(text,text,text,timestamp with time zone,text,text)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.complete_totp_login(text,bigint,text,timestamp with time zone,text,text)', 'EXECUTE') THEN
     RAISE EXCEPTION 'trademate_app must have the reviewed narrow session operations.';
   END IF;
 
@@ -158,7 +159,7 @@ BEGIN
     JOIN pg_namespace n ON n.oid = p.pronamespace
     CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) AS acl
     WHERE n.nspname = 'trademate_private'
-      AND p.proname IN ('resolve_presented_session', 'touch_presented_session', 'list_presented_user_sessions', 'revoke_presented_user_session', 'logout_presented_session', 'revoke_other_presented_sessions', 'complete_password_reset', 'issue_password_login_session', 'complete_email_verification')
+      AND p.proname IN ('resolve_presented_session', 'touch_presented_session', 'list_presented_user_sessions', 'revoke_presented_user_session', 'logout_presented_session', 'revoke_other_presented_sessions', 'complete_password_reset', 'issue_password_login_session', 'complete_email_verification', 'complete_totp_login')
       AND acl.grantee = 0
       AND acl.privilege_type = 'EXECUTE'
   ) THEN
@@ -170,11 +171,11 @@ BEGIN
     FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname = 'trademate_private'
-      AND p.proname IN ('resolve_presented_session', 'touch_presented_session', 'list_presented_user_sessions', 'revoke_presented_user_session', 'logout_presented_session', 'revoke_other_presented_sessions', 'complete_password_reset', 'issue_password_login_session', 'complete_email_verification')
+      AND p.proname IN ('resolve_presented_session', 'touch_presented_session', 'list_presented_user_sessions', 'revoke_presented_user_session', 'logout_presented_session', 'revoke_other_presented_sessions', 'complete_password_reset', 'issue_password_login_session', 'complete_email_verification', 'complete_totp_login')
       AND p.prosecdef
       AND p.proconfig @> ARRAY['search_path=pg_catalog']
       AND pg_get_userbyid(p.proowner) <> 'trademate_app'
-  ) <> 9 THEN
+  ) <> 10 THEN
     RAISE EXCEPTION 'Every private session operation must be SECURITY DEFINER with a fixed safe search_path and non-runtime owner.';
   END IF;
 END
