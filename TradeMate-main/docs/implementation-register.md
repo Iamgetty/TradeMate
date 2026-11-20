@@ -1,6 +1,6 @@
 # TradeMate implementation register
 
-**Canonical cross-stack status ledger.** Updated: 2026-11-19 (latest PR #219 head `a957842659d17fd9a44bc8cc0069e20a9869fd88` passed TradeMate CI, Cloudflare compatibility and lockfile validation)  
+**Canonical cross-stack status ledger.** Updated: 2026-11-20 (latest PR #219 head `022d661a767bff6a20d644ca188d1b111a64564d` passed TradeMate CI, PostgreSQL 16/18 security compatibility, Cloudflare compatibility, lockfile validation and AWS infrastructure validation)  
 **Branch baseline:** `fix/audit-remediation-2026-11-18`  
 **Rule:** no domain is complete merely because its first component exists. Repository implementation, CI verification, staging validation and production acceptance are tracked separately.
 
@@ -122,3 +122,14 @@ Only use **★ Production accepted** when the exact deployed release has passed 
 - Exact PR head `5615d0aefd495533a5739ef2beaaa609d8b823bf` passed TradeMate CI run [44615114965](https://github.com/Iamgetty/TradeMate/actions/runs/44615114965), all 8/8 jobs. The API job ran lint, TypeScript build and API security tests; database integration, live two-account browser acceptance, web build, exchange-feed/MT5 tests, isolated Cloudflare Workers build/runtime, AWS container builds and SAST/SCA/secret scanning also passed. Cloudflare frontend compatibility run [44615115020](https://github.com/Iamgetty/TradeMate/actions/runs/44615115020) passed on the same head.
 - Scope limitation: this is deterministic mock-based regression coverage for a one-time rollback error. It does not prove behavior under a real network partition, a permanently failed rollback, or PostgreSQL connection termination. No production database, role, policy, deployment or credential was changed.
 - Status: ✓ repository behavior and exact-head CI verified; staging and production acceptance not run.
+
+
+## PostgreSQL 16/18 security compatibility matrix (CI verified; production acceptance not implied)
+
+- Added `.github/workflows/postgres-security-compatibility.yml` on PR branch `fix/audit-remediation-2026-11-18`. It provisions clean PostgreSQL 16 and 18 services independently, installs API dependencies with Node.js 24.22.1 and `npm ci`, applies migrations, checks role bootstrap/grants, exercises the CI-only RLS pilot, builds the API database-context module and runs request-context/connection-pool isolation tests.
+- The first execution exposed a missing API build before the database-context test. The workflow was corrected to build the API before invoking that test; the corrected run passed both matrix legs.
+- Exact tested source head: `022d661a767bff6a20d644ca188d1b111a64564d`.
+- PostgreSQL security compatibility run [44685139149](https://github.com/Iamgetty/TradeMate/actions/runs/44685139149): PostgreSQL 16 and PostgreSQL 18 jobs both completed successfully, including migrations, least-privilege role checks, CI-only RLS pilot checks, API build and database-context/connection-pool tests.
+- The same exact head passed TradeMate CI [44685139168](https://github.com/Iamgetty/TradeMate/actions/runs/44685139168), Cloudflare frontend compatibility [44685139147](https://github.com/Iamgetty/TradeMate/actions/runs/44685139147), npm lockfile validation [44685139164](https://github.com/Iamgetty/TradeMate/actions/runs/44685139164), and AWS infrastructure template validation [44685139180](https://github.com/Iamgetty/TradeMate/actions/runs/44685139180).
+- **Security boundary remains unresolved:** current RLS pilot uses a caller-settable `app.user_id` custom setting and does not establish an unforgeable database identity assertion. The existing pilot/context checks are not adversarial tests using an actual runtime login capable of arbitrary SQL. Production RLS remains disabled and must not be enabled based on this matrix.
+- Status: ✓ PostgreSQL 16/18 compatibility workflow and exact-head CI are verified at repository level; ◐ trusted identity, real-login impersonation resistance, verifier privilege isolation, production role setup, staging execution and production acceptance remain outstanding. No production database, roles, grants, policies, credentials or deployments were changed.
