@@ -44,6 +44,7 @@ const MIGRATIONS = [
   '035_revoke_other_presented_sessions.sql',
   '036_complete_password_reset.sql',
   '037_issue_password_login_session.sql',
+  '038_complete_email_verification.sql',
 ];
 
 async function main() {
