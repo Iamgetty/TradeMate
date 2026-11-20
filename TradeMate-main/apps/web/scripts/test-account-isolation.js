@@ -188,11 +188,19 @@ function section(startMark, endMark) {
     "numeric inventory must be removed from description text when sent separately");
   assert.match(publish, /listingType:"B2B"===[\w$]+\?"b2b":"service",division:DIVISION_SLUG\[[\w$]+\][^}]*quantityAvailable:[\w$]+/,
     "all contract divisions must send their category while B2B retains its API listing type and inventory field");
-  const browse = section("function mapListing(", "function loadMarket(");
+  const mapperPath = path.join(scriptDirectory, "../public/tm/marketplace-mappers.js");
+  const mapperSource = fs.readFileSync(mapperPath, "utf8");
+  const browseStart = mapperSource.indexOf("function mapListing(");
+  const browseEnd = mapperSource.indexOf("function dealFromEnq(", browseStart + 1);
+  assert.ok(browseStart !== -1 && browseEnd !== -1,
+    "marketplace mapper module must expose the listing response mapper");
+  const browse = mapperSource.slice(browseStart, browseEnd);
   assert.match(browse, /DIVISION_LABEL\[[\w$]+\.division\]\|\|\("b2b"===[\w$]+\.listing_type\?"B2B":"Services"\)/,
     "public listings must be mapped to their saved Contract Category");
   assert.match(browse, /[\w$]+\+" opportunity"/,
     "public listing details must identify the saved Contract Category");
+  assert.match(source, /mapListing=TM_MARKETPLACE_MAPPERS\.create/,
+    "app.js must bind the extracted mapper without changing its legacy call site");
   assert.match(source, /SELL=\{Services:\["contract"\],B2B:\["contract"\]\}/,
     "B2B listings must use contract proposal actions");
 })();
