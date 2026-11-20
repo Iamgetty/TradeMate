@@ -163,3 +163,12 @@ Only use **★ Production accepted** when the exact deployed release has passed 
 - This confirms the current direct `database-context.ts` session lookup design cannot be treated as a trusted DB identity boundary while the runtime role has broad SELECT on `user_sessions`.
 - Required remediation: remove raw session-hash visibility from `trademate_app`, provide a narrow reviewed session-resolution path, and add negative real-login tests for session enumeration and GUC forgery. Audit all password/reset/TOTP/verification/API credential tables as well.
 - No production grants, credentials, database, roles, policies or deployment were changed. Production RLS remains blocked.
+
+
+## Authentication-data least-privilege audit (2026-11-20)
+
+- Repository evidence reviewed on PR branch `fix/audit-remediation-2026-11-18`: `apps/api/database/security/001_role_bootstrap.sql`, `apps/api/database/security/002_role_bootstrap_test.sql`, `apps/api/src/database-context.ts`, `apps/api/src/module.ts`, `apps/api/database/migrations/002_authentication.sql`, and `apps/api/scripts/test-rls-runtime-login.js`.
+- Confirmed grant defect: the bootstrap gives `trademate_app` CRUD on every public table and repeats broad CRUD in default privileges for future migrator-created tables. It explicitly revokes only audit mutation and migration-history access. The session-hash test confirms the actual runtime LOGIN can disclose another fixture user's `user_sessions.token_hash`; broad SELECT also creates a likely exposure surface for password hashes, encrypted TOTP material and verification/reset challenge data unless separately revoked.
+- Confirmed direct dependencies: `database-context.ts` reads `user_sessions.token_hash` to resolve request identity; `module.ts` has additional session-validation and token-based deletion/revocation paths. A blanket revoke now would break authentication and account-security flows.
+- Next implementation gate: inventory all credential-bearing tables/columns and every read/write call site; design narrowly scoped, non-enumerating database operations with fixed ownership/search_path and explicit EXECUTE grants; refactor all callers; replace blanket default privileges with reviewed grants; then prove both negative access and positive authentication/session lifecycle behavior using the actual runtime LOGIN on PostgreSQL 16/18.
+- Status: ◐ repository-level access-path audit completed; remediation not yet implemented; no migration, grant, role, credential or production change made. Production RLS remains blocked.
