@@ -2,7 +2,7 @@
 
 **Status:** Inventory baseline only; no policies approved and no production changes.
 **Source:** Render PostgreSQL catalog inspection on 2026-11-20. The query was read-only.
-**Scope:** 50 public relations: 47 application base tables, `schema_migrations`, and 3 public views.
+**Scope:** 53 public relations: 49 application base tables, `schema_migrations`, and 3 public views.
 
 ## 1. Relation inventory
 
@@ -69,8 +69,8 @@ Views need a separate review of their definitions, underlying-table permissions,
 
 ## 2. Baseline findings
 
-- Catalog reports 50 public relations: 47 base application tables, `schema_migrations`, and 3 views.
-- All 47 application base tables currently have RLS disabled and not forced.
+- Catalog reports 53 public relations: 49 application base tables, `schema_migrations`, and 3 views.
+- All 49 application base tables currently have RLS disabled and not forced.
 - The existing CI pilot covers only `user_preferences`, `user_notifications`, `user_auth_security`, `user_profiles` and `user_follows`; it is not a production migration.
 - Existing role bootstrap grants broad CRUD on public tables and future tables, then selectively revokes privileges on authentication/audit objects. This is not a completed per-domain least-privilege grant matrix.
 - Production catalog inspection showed all existing base-table owners are the Render-managed database owner. No role bootstrap or ownership changes were performed.
