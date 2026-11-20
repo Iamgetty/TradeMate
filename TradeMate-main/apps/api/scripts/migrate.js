@@ -53,6 +53,7 @@ const MIGRATIONS = [
   '044_complete_account_deletion_cancellation.sql',
   '045_restrict_runtime_auth_secret_reads.sql',
   '046_trusted_session_identity_for_rls.sql',
+  '047_issue_totp_login_challenge.sql',
 ];
 
 async function main() {
