@@ -596,6 +596,21 @@ async function main() {
       // session digest or permit cross-account reads.
       await appClient.query("SELECT set_config('app.session_token_hash', $1, true)", [sessionHashes[0]]);
       await appClient.query("SELECT set_config('app.user_id', $1, true)", [userIds[1]]);
+      const activePresentedSession = await admin.query(
+        'SELECT user_id::text AS user_id, expires_at > now() AS active FROM public.user_sessions WHERE token_hash = $1',
+        [sessionHashes[0]],
+      );
+      assert.equal(activePresentedSession.rowCount, 1);
+      assert.equal(activePresentedSession.rows[0].user_id, userIds[0]);
+      assert.equal(activePresentedSession.rows[0].active, true);
+      const sessionContext = await appClient.query(
+        "SELECT pg_catalog.length(pg_catalog.current_setting('app.session_token_hash', true)) AS digest_length",
+      );
+      assert.equal(sessionContext.rows[0].digest_length, 64);
+      const directResolution = await appClient.query(
+        'SELECT resolved_user_id::text AS user_id FROM trademate_private.resolve_presented_session(pg_catalog.current_setting(\'app.session_token_hash\', true))',
+      );
+      assert.equal(directResolution.rows[0].user_id, userIds[0]);
       const forgedIdentity = await appClient.query(
         'SELECT trademate_private.current_presented_user_id()::text AS user_id',
       );
