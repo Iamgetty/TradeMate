@@ -30,6 +30,9 @@ jobs:
   validate-release:
     name: Validate source and required release checks
     if: ${{ inputs.confirm_publish == 'yes' && github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: read
+      checks: read
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -72,6 +75,11 @@ jobs:
   publish:
     name: Build, publish and attest ${{ matrix.image.name }}
     needs: validate-release
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      packages: write
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment:
