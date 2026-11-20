@@ -16,8 +16,10 @@ CREATE POLICY user_notifications_owner_access ON public.user_notifications
   USING (user_id = trademate_private.current_presented_user_id())
   WITH CHECK (user_id = trademate_private.current_presented_user_id());
 
+-- Keep RLS enabled for direct runtime access, but do not FORCE it for the
+-- migration-owned SECURITY DEFINER TOTP operations. The runtime login is not
+-- the table owner, so its reads/writes remain subject to this owner policy.
 ALTER TABLE public.user_auth_security ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_auth_security FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS user_auth_security_owner_access ON public.user_auth_security;
 CREATE POLICY user_auth_security_owner_access ON public.user_auth_security
   FOR ALL TO trademate_app
