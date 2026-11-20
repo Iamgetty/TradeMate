@@ -591,21 +591,28 @@ async function main() {
 
     await appClient.query('BEGIN');
     try {
-      // Adversarial proof of the known limitation: the actual LOGIN role,
-      // without SET ROLE or an application-mediated identity setter, can
-      // choose another user's custom GUC and satisfy the current RLS policy.
+      // The real LOGIN role can set arbitrary custom GUCs. A conflicting
+      // app.user_id must not change the identity derived from its presented
+      // session digest or permit cross-account reads.
+      await appClient.query("SELECT set_config('app.session_token_hash', $1, true)", [sessionHashes[0]]);
       await appClient.query("SELECT set_config('app.user_id', $1, true)", [userIds[1]]);
-      const visible = await appClient.query(
-        'SELECT user_id::text AS user_id, preferences FROM public.user_preferences WHERE user_id = $1',
+      const forgedIdentity = await appClient.query(
+        'SELECT trademate_private.current_presented_user_id()::text AS user_id',
+      );
+      assert.equal(forgedIdentity.rows[0].user_id, userIds[0]);
+      const crossAccountRows = await appClient.query(
+        'SELECT user_id::text AS user_id FROM public.user_preferences WHERE user_id = $1',
         [userIds[1]],
       );
-      assert.equal(visible.rowCount, 1);
-      assert.equal(visible.rows[0].user_id, userIds[1]);
-      assert.deepEqual(visible.rows[0].preferences, { fixture: 'other' });
+      assert.equal(crossAccountRows.rowCount, 0, 'Forged app.user_id must not grant access to another account.');
+      const ownAccountRows = await appClient.query(
+        'SELECT user_id::text AS user_id, preferences FROM public.user_preferences WHERE user_id = $1',
+        [userIds[0]],
+      );
+      assert.equal(ownAccountRows.rowCount, 1, 'The presented session must retain access to its own private rows.');
+      assert.deepEqual(ownAccountRows.rows[0].preferences, { fixture: 'owner' });
 
-      // Session bearer-token digests are now inaccessible to the runtime
-      // login. The account's identity must be obtained through the presented
-      // session resolver, not by reading the backing credential column.
+      // Session bearer-token digests remain inaccessible to the runtime login.
       await appClient.query('SAVEPOINT session_token_read_probe');
       await assert.rejects(
         appClient.query('SELECT token_hash FROM public.user_sessions WHERE user_id = $1', [userIds[1]]),
@@ -613,11 +620,6 @@ async function main() {
         'The runtime login must not disclose another account session digest.',
       );
       await appClient.query('ROLLBACK TO SAVEPOINT session_token_read_probe');
-      const presentedIdentity = await appClient.query(
-        'SELECT resolved_user_id::text AS user_id FROM trademate_private.resolve_presented_session($1)',
-        [sessionHashes[1]],
-      );
-      assert.equal(presentedIdentity.rows[0].user_id, userIds[1]);
       await appClient.query('COMMIT');
     } catch (error) {
       await appClient.query('ROLLBACK').catch(() => undefined);
@@ -763,7 +765,7 @@ async function main() {
     assert.equal(replayedCancellation.rowCount, 0, 'A consumed account deletion cancellation token must not be reusable.');
 
     console.log(
-      'EXPECTED SECURITY LIMITATIONS CONFIRMED: direct trademate_app LOGIN can forge app.user_id and read another fixture user under the current pilot policy. All seven inventoried credential-bearing columns are now blocked from direct runtime reads; access is mediated by scoped database operations. Account-deletion cancellation now consumes its token through an atomic scoped operation. Production RLS remains blocked.',
+      'RUNTIME IDENTITY SPOOFING BLOCKED: a direct trademate_app LOGIN cannot use a forged app.user_id to read another account; RLS identity is derived from the presented session digest. All seven inventoried credential-bearing columns are blocked from direct runtime reads. Account-deletion cancellation uses an atomic scoped operation. Production RLS remains blocked.',
     );
   } finally {
     if (appClient) appClient.release();
