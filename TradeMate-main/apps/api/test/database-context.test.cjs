@@ -1,12 +1,14 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createHash } = require('node:crypto');
+const { createHash, createHmac } = require('node:crypto');
+process.env.RLS_CONTEXT_HMAC_KEY = 'a'.repeat(64);
 const { createRlsAwarePool, databaseRequestContextMiddleware, sessionTokenFromCookieHeader } = require('../dist/database-context');
 
 const hash = (token) => createHash('sha256').update(token).digest('hex');
 const createMockPool = ({ failOnSql, failOnceOnSql } = {}) => {
   let failOnceTriggered = false;
   const clients = [];
+  let transactionSequence = 40;
   const pool = {
     async connect() {
       const client = {
@@ -15,6 +17,10 @@ const createMockPool = ({ failOnSql, failOnceOnSql } = {}) => {
         sessionHash: '',
         async query(sql, values) {
           this.calls.push({ sql, values });
+          if (sql.includes('SELECT txid_current()::text AS transaction_id, pg_backend_pid()::text AS backend_pid')) {
+            transactionSequence += 1;
+            return { rows: [{ transaction_id: String(transactionSequence), backend_pid: String(1000 + clients.length) }], rowCount: 1 };
+          }
           if (failOnSql && sql.includes(failOnSql)) throw new Error('simulated database context setup failure');
           if (failOnceOnSql && !failOnceTriggered && sql.includes(failOnceOnSql)) {
             failOnceTriggered = true;
@@ -43,18 +49,24 @@ const runRequest = (cookie, action) => new Promise((resolve, reject) => {
   });
 });
 
-test('pool queries set only the opaque session digest transaction-locally', async () => {
+test('pool queries sign the opaque session digest for the current transaction and backend', async () => {
   const { pool, clients } = createMockPool();
   const database = createRlsAwarePool(pool);
   await runRequest('trademate_session=raw-session-token', () => database.query('SELECT 1'));
   assert.equal(clients.length, 1);
   assert.deepEqual(clients[0].calls.map((call) => call.sql), [
     'BEGIN',
-    "SELECT set_config('app.session_token_hash', $1, true)",
+    'SELECT txid_current()::text AS transaction_id, pg_backend_pid()::text AS backend_pid',
+    "SELECT set_config('app.session_token_hash', $1, true), set_config('app.session_transaction_id', $2, true), set_config('app.session_backend_pid', $3, true), set_config('app.session_signature', $4, true)",
     'SELECT 1',
     'COMMIT',
   ]);
-  assert.equal(clients[0].calls[1].values[0], hash('raw-session-token'));
+  const contextValues = clients[0].calls[2].values;
+  assert.equal(contextValues[0], hash('raw-session-token'));
+  assert.equal(contextValues[1], '41');
+  assert.equal(contextValues[2], '1001');
+  const payload = 'trademate-rls-context:v1|' + contextValues[1] + '|' + contextValues[2] + '|' + contextValues[0];
+  assert.equal(contextValues[3], createHmac('sha256', Buffer.from(process.env.RLS_CONTEXT_HMAC_KEY, 'hex')).update(payload, 'utf8').digest('hex'));
   assert.equal(clients[0].released, true);
 });
 
@@ -70,7 +82,8 @@ test('explicit transactions keep the presented session digest until commit', asy
   });
   assert.deepEqual(clients[0].calls.map((call) => call.sql), [
     'BEGIN',
-    "SELECT set_config('app.session_token_hash', $1, true)",
+    'SELECT txid_current()::text AS transaction_id, pg_backend_pid()::text AS backend_pid',
+    "SELECT set_config('app.session_token_hash', $1, true), set_config('app.session_transaction_id', $2, true), set_config('app.session_backend_pid', $3, true), set_config('app.session_signature', $4, true)",
     'UPDATE user_preferences SET language=$1',
     'COMMIT',
   ]);
@@ -94,7 +107,7 @@ test('malformed cookie encoding produces anonymous context without leaking raw i
   const { pool, clients } = createMockPool();
   const database = createRlsAwarePool(pool);
   await runRequest('trademate_session=%E0%A4%A', () => database.query('SELECT 1'));
-  assert.equal(clients[0].calls[1].values[0], '');
+  assert.equal(clients[0].calls[2].values[0], '');
   assert.ok(!clients[0].calls.some((call) => call.values?.includes('%E0%A4%A')));
 });
 
@@ -120,7 +133,8 @@ test('explicit transaction is rolled back when request session context setup fai
   }), /simulated database context setup failure/);
   assert.deepEqual(clients[0].calls.map((call) => call.sql), [
     'BEGIN',
-    "SELECT set_config('app.session_token_hash', $1, true)",
+    'SELECT txid_current()::text AS transaction_id, pg_backend_pid()::text AS backend_pid',
+    "SELECT set_config('app.session_token_hash', $1, true), set_config('app.session_transaction_id', $2, true), set_config('app.session_backend_pid', $3, true), set_config('app.session_signature', $4, true)",
     'ROLLBACK',
   ]);
   assert.equal(clients[0].released, true);
@@ -147,7 +161,8 @@ test('release retries rollback when the setup-failure rollback also fails', asyn
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(clients[0].calls.map((call) => call.sql), [
     'BEGIN',
-    "SELECT set_config('app.session_token_hash', $1, true)",
+    'SELECT txid_current()::text AS transaction_id, pg_backend_pid()::text AS backend_pid',
+    "SELECT set_config('app.session_token_hash', $1, true), set_config('app.session_transaction_id', $2, true), set_config('app.session_backend_pid', $3, true), set_config('app.session_signature', $4, true)",
     'ROLLBACK',
     'ROLLBACK',
   ]);
