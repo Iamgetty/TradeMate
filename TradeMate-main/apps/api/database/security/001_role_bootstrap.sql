@@ -59,11 +59,11 @@ GRANT EXECUTE ON FUNCTION trademate_private.complete_email_verification(TEXT, TE
 GRANT EXECUTE ON FUNCTION trademate_private.complete_totp_login(TEXT, BIGINT, TEXT, TIMESTAMPTZ, TEXT, TEXT) TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.resolve_totp_login_challenge(TEXT) TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.record_totp_login_failure(TEXT) TO trademate_app;
-GRANT EXECUTE ON FUNCTION trademate_private.begin_totp_enrollment(UUID, TEXT) TO trademate_app;
-GRANT EXECUTE ON FUNCTION trademate_private.resolve_totp_enrollment(UUID) TO trademate_app;
-GRANT EXECUTE ON FUNCTION trademate_private.complete_totp_enrollment(UUID, BIGINT) TO trademate_app;
-GRANT EXECUTE ON FUNCTION trademate_private.resolve_enabled_totp(UUID) TO trademate_app;
-GRANT EXECUTE ON FUNCTION trademate_private.disable_totp(UUID, BIGINT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.begin_totp_enrollment(TEXT, TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.resolve_totp_enrollment(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.complete_totp_enrollment(TEXT, BIGINT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.resolve_enabled_totp(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.disable_totp(TEXT, BIGINT) TO trademate_app;
 
 -- Transfer application tables, sequences and views to the migration owner.
 -- The app login must never own these objects.
