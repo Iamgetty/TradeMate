@@ -172,3 +172,19 @@ No verifier function, key, private schema, migration or production setting is in
 The corrected test passed on PostgreSQL 16 and 18 in [run 44688695316](https://github.com/Iamgetty/TradeMate/actions/runs/44688695316). The same code-bearing head `37550648a9ab71468ba58079c438eea8c20d0f99` passed all five workflow suites: TradeMate CI [44688695305](https://github.com/Iamgetty/TradeMate/actions/runs/44688695305) (8/8 jobs, including browser two-account acceptance), Cloudflare compatibility [44688695300](https://github.com/Iamgetty/TradeMate/actions/runs/44688695300), npm lockfile validation [44688695352](https://github.com/Iamgetty/TradeMate/actions/runs/44688695352), and AWS infrastructure validation [44688695344](https://github.com/Iamgetty/TradeMate/actions/runs/44688695344).
 
 The first HMAC test iteration failed because it hard-coded the requested extension schema even when PostgreSQL had already installed `pgcrypto` elsewhere. The test now discovers the extension's actual namespace from `pg_extension`/`pg_namespace` and quotes that trusted catalog value before calling `hmac`. Both major versions now pass the byte-for-byte Node/PostgreSQL comparison, altered-message rejection and wrong-key rejection.
+
+
+## Additional authentication boundary finding: session-hash disclosure (2026-11-20)
+
+The real-login test has been extended to check the session lookup path, not only the `app.user_id` pilot. The role bootstrap grants `SELECT` on all public tables to `trademate_app`; `user_sessions` is a public table containing `token_hash`. Consequently, the actual runtime login can read another fixture user's session token digest and set `app.session_token_hash` to that digest. This is a second identity-context weakness: the session-hash GUC is caller-settable, and its underlying digest is currently readable by the runtime SQL role.
+
+The test now creates two disposable session rows, connects as the actual `trademate_app` LOGIN, reads the other user's `token_hash`, sets the session-hash GUC to the disclosed digest, and confirms the lookup resolves to that user. It cleans up the session rows and fixture users. This is expected-vulnerability coverage; it does not mean the session-token digest is a usable browser bearer token, but it does prove the runtime SQL role can use it to forge the database session context.
+
+Required remediation before any session-based RLS policy is enabled:
+- Revoke broad runtime SELECT access to `user_sessions` and review all auth/session tables and columns for equivalent credential material.
+- Expose only a narrow, audited session-resolution operation to the API runtime, with fixed safe ownership/search-path/grants; do not make the raw token digest table readable to arbitrary SQL under `trademate_app`.
+- Preserve server-side session revocation/expiry checks and ensure the function cannot be used as a general session enumeration oracle.
+- Add real-login tests proving the runtime role cannot enumerate session hashes or forge `app.session_token_hash`, while the approved API auth path can still resolve the caller's own session.
+- Review password hashes, reset/verification tokens, TOTP secrets, API keys and other credential-bearing tables under the same least-privilege inventory.
+
+The existing `database-context.ts` sets `app.session_token_hash` and then directly queries `user_sessions`; this must be refactored to the reviewed narrow lookup path before production RLS. Do not solve this by granting the API process elevated migrator ownership or by exposing a SECURITY DEFINER helper with broad arbitrary-hash enumeration.
