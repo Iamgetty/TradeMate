@@ -20,8 +20,9 @@ const putLevels = (target: Map<string, string>, rows: unknown) => {
   for (const row of rows as unknown[]) {
     if (!Array.isArray(row)) continue;
     const price = String(row[0]);
+    const numericPrice = Number(price);
     const qty = Number(row[1]);
-    if (!(Number(price) > 0) || !Number.isFinite(qty) || qty < 0) continue;
+    if (!Number.isFinite(numericPrice) || numericPrice <= 0 || !Number.isFinite(qty) || qty < 0) continue;
     if (qty === 0) target.delete(price); else target.set(price, String(row[1]));
   }
 };
@@ -152,13 +153,15 @@ function attachMarketFeed(server: Server, options: MarketFeedOptions = {}) {
   };
   const addTrade = (session: Session, feed: Feed, id: unknown, price: unknown, quantity: unknown, time: unknown, side: unknown) => {
     const p = String(price ?? ''), q = String(quantity ?? '');
-    if (!(Number(p) > 0 && Number(q) > 0)) return;
+    const numericPrice = Number(p), numericQuantity = Number(q);
+    if (!Number.isFinite(numericPrice) || numericPrice <= 0 ||
+        !Number.isFinite(numericQuantity) || numericQuantity <= 0) return;
     const tradeId = String(id ?? (String(time) + ':' + p + ':' + q));
     if (session.trades.some((trade) => trade.id === keyOf(feed.venue, feed.market) + ':' + tradeId)) return;
     session.trades.unshift({
       id: keyOf(feed.venue, feed.market) + ':' + tradeId,
       venue: feed.venue, market: feed.market, price: p, quantity: q,
-      time: Number(time) > 0 ? Number(time) : Date.now(),
+      time: Number.isFinite(Number(time)) && Number(time) > 0 ? Number(time) : Date.now(),
       side: side === 'sell' ? 'sell' : 'buy',
     });
     session.trades = session.trades.slice(0, 100);
