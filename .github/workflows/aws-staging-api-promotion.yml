@@ -235,6 +235,8 @@ jobs:
             --image-ids "imageDigest=$IMAGE_DIGEST" >/dev/null
 
           FOUNDATION_OUTPUTS="$(aws cloudformation describe-stacks --stack-name "$FOUNDATION_STACK" --query 'Stacks[0].Outputs' --output json)"
+          SERVICES_OUTPUTS="$(aws cloudformation describe-stacks --stack-name "$SERVICES_STACK" --query 'Stacks[0].Outputs' --output json)"
+          RLS_HMAC_SECRET_ARN="$(jq -r '.[] | select(.OutputKey=="RlsContextHmacKeySecretArn") | .OutputValue' <<< "$SERVICES_OUTPUTS")"
           CLUSTER_NAME="$(jq -r '.[] | select(.OutputKey=="EcsClusterName") | .OutputValue' <<< "$FOUNDATION_OUTPUTS")"
           API_TASK_DEFINITION_ARN="$(aws cloudformation describe-stack-resource --stack-name "$SERVICES_STACK" --logical-resource-id ApiTaskDefinition --query 'StackResourceDetail.PhysicalResourceId' --output text)"
           API_SERVICE_NAME="$(aws cloudformation describe-stack-resource --stack-name "$SERVICES_STACK" --logical-resource-id ApiService --query 'StackResourceDetail.PhysicalResourceId' --output text)"
@@ -252,7 +254,8 @@ jobs:
           CURRENT_CONTAINER_NAME="$(jq -r '.containerDefinitions[0].name' <<< "$CURRENT_TASK_DEFINITION")"
           CURRENT_IMAGE="$(jq -r '.containerDefinitions[0].image' <<< "$CURRENT_TASK_DEFINITION")"
           CURRENT_SECRET_NAMES="$(jq -r '.containerDefinitions[0].secrets | map(.name) | sort | join(",")' <<< "$CURRENT_TASK_DEFINITION")"
-          if [[ "$CURRENT_FAMILY" != "trademate-staging-api" || "$CURRENT_CONTAINER_COUNT" != "1" || "$CURRENT_CONTAINER_NAME" != "api" || "$CURRENT_SECRET_NAMES" != "DATABASE_URL,RLS_CONTEXT_HMAC_KEY,TOTP_ENCRYPTION_KEY" ]]; then
+          CURRENT_RLS_SECRET_ARN="$(jq -r '.containerDefinitions[0].secrets[] | select(.name=="RLS_CONTEXT_HMAC_KEY") | .valueFrom' <<< "$CURRENT_TASK_DEFINITION")"
+          if [[ "$CURRENT_FAMILY" != "trademate-staging-api" || "$CURRENT_CONTAINER_COUNT" != "1" || "$CURRENT_CONTAINER_NAME" != "api" || "$CURRENT_SECRET_NAMES" != "DATABASE_URL,RLS_CONTEXT_HMAC_KEY,TOTP_ENCRYPTION_KEY" || "$CURRENT_RLS_SECRET_ARN" != "$RLS_HMAC_SECRET_ARN" ]]; then
             echo "::error::The live API task definition does not match the reviewed single-container, runtime-secret-only baseline."
             exit 1
           fi
