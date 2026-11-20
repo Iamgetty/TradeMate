@@ -311,10 +311,13 @@ class AuthController {
     const security = await databasePool.query('SELECT totp_enabled FROM user_auth_security WHERE user_id = $1 LIMIT 1', [user.id]);
     if (security.rows[0]?.totp_enabled) {
       const challengeToken = randomBytes(32).toString('base64url');
-      await databasePool.query(
-        'INSERT INTO auth_login_challenges (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval \'5 minutes\')',
+      const challengeIssued = await databasePool.query(
+        'SELECT trademate_private.issue_totp_login_challenge($1, $2) AS issued',
         [user.id, tokenDigest(challengeToken)],
       );
+      if (!challengeIssued.rows[0]?.issued) {
+        throw new UnauthorizedException('Email or password is incorrect.');
+      }
       // Keep the password-stage rate limit until the second factor succeeds.
       return { requiresTwoFactor: true, challengeToken, expiresInSeconds: 300 };
     }
