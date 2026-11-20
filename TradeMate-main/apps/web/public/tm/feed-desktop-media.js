@@ -1,0 +1,3 @@
+/* Extracted from app.js: Desktop feed media sizing. */
+/* Desktop timeline/feed: keep post media a Twitter-like size instead of filling the screen (tap/click still opens full image) */
+!function(){if(document.getElementById("fdDeskMedia"))return;var s=document.createElement("style");s.id="fdDeskMedia";s.textContent="@media(min-width:900px){html.tm-desktop .fd-media.m1 .fd-mi img{max-height:min(380px,48vh)!important;object-fit:cover}html.tm-desktop .fd-media.m1{max-width:520px}html.tm-desktop .fd-media.m2,html.tm-desktop .fd-media.m3,html.tm-desktop .fd-media.m4{max-width:520px;max-height:min(300px,40vh)}html.tm-desktop .fd-media .fd-vid{max-height:min(380px,48vh);width:100%;background:#000}}";document.head.appendChild(s)}();
