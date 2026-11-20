@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 declare global {
   interface Window {
     TM_CONFIG?: { api: string };
+    TM_ART_UTILS?: { prmArt: () => string; dpArt: () => string; dxArt: () => string; tfArt: () => string; tfCoin: () => string; cxArt: () => string };
     TM_FX_SNAPSHOT_UTILS?: {
       createFxSnapshotStore: (options: { items: Array<Record<string, any>> }) => {
         apply: (rates: Record<string, number>, mode?: string, timestamp?: string, savedAt?: number) => boolean;
@@ -87,6 +88,7 @@ export default function TradeMateRuntime() {
     let snapshotUtilsReady = false;
     let fxSnapshotUtilsReady = false;
     let nftItemUtilsReady = false;
+    let artUtilsReady = false;
     let cssReady = false;
     let layoutCssReady = false;
     let patchesCssReady = false;
@@ -123,10 +125,10 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=160';
+    app.src = '/tm/app.js?v=161';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=160. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=161. Check the deployment and static asset response.');
     app.onload = () => {
       const postAppModules = [
         'pm-fix-css-loader',
@@ -175,7 +177,7 @@ export default function TradeMateRuntime() {
     };
 
     const loadApp = () => {
-      if (!feedReady || !feedMediaReady || !viewportModuleReady || !metadataReady || !marketQuoteUtilsReady || !snapshotUtilsReady || !fxSnapshotUtilsReady || !nftItemUtilsReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !feedMediaReady || !viewportModuleReady || !metadataReady || !marketQuoteUtilsReady || !snapshotUtilsReady || !fxSnapshotUtilsReady || !nftItemUtilsReady || !artUtilsReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -373,6 +375,21 @@ export default function TradeMateRuntime() {
     snapshotUtils.onerror = () => fail('TradeMate could not load', 'The required snapshot utility module failed to load.');
     document.body.appendChild(snapshotUtils);
 
+    // Static decorative SVG renderers are isolated from app state and must be ready before app.js.
+    const artUtils = document.createElement('script');
+    artUtils.src = '/tm/art-utils.js?v=1';
+    artUtils.async = false;
+    artUtils.onload = () => {
+      if (!window.TM_ART_UTILS) {
+        fail('TradeMate could not start', 'The decorative art utility module loaded without initialising.');
+        return;
+      }
+      artUtilsReady = true;
+      loadApp();
+    };
+    artUtils.onerror = () => fail('TradeMate could not load', 'The required decorative art utility module failed to load.');
+    document.body.appendChild(artUtils);
+
     // Pure NFT item normalization is loaded before app.js binds the legacy call sites.
     const nftItemUtils = document.createElement('script');
     nftItemUtils.src = '/tm/nft-item-utils.js?v=3';
@@ -499,7 +516,7 @@ export default function TradeMateRuntime() {
       if (!rendered) {
         fail(
           'TradeMate could not start',
-          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=160 returns successfully.'
+          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=161 returns successfully.'
         );
         return;
       }
