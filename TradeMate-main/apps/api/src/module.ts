@@ -265,30 +265,23 @@ class AuthController {
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const email = String(body.email || '').trim().toLowerCase();
     const code = String(body.code || '');
-    const client = await databasePool.connect();
     const sessionToken = randomBytes(32).toString('base64url');
-    try {
-      await client.query('BEGIN');
-      const account = await client.query("SELECT id, email, display_name, country_code, status, email_verified_at FROM users WHERE lower(email) = $1 FOR UPDATE", [email]);
-      if (!account.rowCount || account.rows[0].email_verified_at || account.rows[0].status !== 'pending') throw new UnauthorizedException('This verification code is invalid or expired. Request a new one.');
-      const verification = await client.query("SELECT id, code_hash, expires_at, attempts FROM email_verification_codes WHERE user_id = $1 AND used_at IS NULL ORDER BY created_at DESC LIMIT 1 FOR UPDATE", [account.rows[0].id]);
-      if (!verification.rowCount || new Date(verification.rows[0].expires_at).getTime() <= Date.now() || verification.rows[0].attempts >= 5) throw new UnauthorizedException('This verification code is invalid or expired. Request a new one.');
-      const suppliedCodeHash = Buffer.from(tokenDigest(code), 'hex');
-      const expectedCodeHash = Buffer.from(verification.rows[0].code_hash, 'hex');
-      if (suppliedCodeHash.length !== expectedCodeHash.length || !timingSafeEqual(suppliedCodeHash, expectedCodeHash)) {
-        await client.query('UPDATE email_verification_codes SET attempts = attempts + 1 WHERE id = $1', [verification.rows[0].id]);
-        await client.query('COMMIT');
-        throw new UnauthorizedException('The verification code is incorrect.');
-      }
-      await client.query('UPDATE email_verification_codes SET used_at = now() WHERE id = $1', [verification.rows[0].id]);
-      const verified = await client.query("UPDATE users SET email_verified_at = now(), status = 'active', updated_at = now() WHERE id = $1 RETURNING id, email, display_name, country_code", [account.rows[0].id]);
-      await client.query("INSERT INTO user_sessions (user_id, token_hash, expires_at, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5)", [account.rows[0].id, tokenDigest(sessionToken), new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000), request.ip || null, request.get('user-agent')?.slice(0, 500) || null]);
-      await client.query("INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.email_verified', 'user', $1, '{}'::jsonb)", [account.rows[0].id]);
-      await client.query('COMMIT');
-      response.cookie(SESSION_COOKIE, sessionToken, cookieOptions());
-      return { user: verified.rows[0] };
-    } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
-    finally { client.release(); }
+    const verified = await databasePool.query(
+      'SELECT verified_user_id AS id, verified_email AS email, verified_display_name AS display_name, verified_country_code AS country_code FROM trademate_private.complete_email_verification($1, $2, $3, $4, $5, $6)',
+      [
+        email,
+        tokenDigest(code),
+        tokenDigest(sessionToken),
+        new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000),
+        request.ip || null,
+        request.get('user-agent')?.slice(0, 500) || null,
+      ],
+    );
+    if (!verified.rowCount) {
+      throw new UnauthorizedException('This verification code is invalid or expired. Request a new one.');
+    }
+    response.cookie(SESSION_COOKIE, sessionToken, cookieOptions());
+    return { user: verified.rows[0] };
   }
 
   @Post('login')
