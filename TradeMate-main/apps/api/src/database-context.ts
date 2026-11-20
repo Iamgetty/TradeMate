@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import type { Pool, PoolClient } from 'pg';
 
@@ -25,12 +25,25 @@ export const databaseRequestContextMiddleware = (request: Request, _response: Re
 };
 
 const establishTransactionContext = async (client: PoolClient, context: DatabaseRequestContext) => {
-  await client.query("SELECT set_config('app.session_token_hash', $1, true)", [context.sessionTokenHash]);
+  const rawKey = process.env.RLS_CONTEXT_HMAC_KEY || '';
+  if (!/^[0-9a-f]{64}$/i.test(rawKey)) {
+    throw new Error('RLS_CONTEXT_HMAC_KEY must be configured as 64 hexadecimal characters.');
+  }
 
-  // Do not set app.user_id: custom PostgreSQL settings are caller-controlled
-  // by the runtime role and therefore cannot be trusted as an RLS identity.
-  // Policies resolve this opaque, presented bearer digest through a narrow
-  // SECURITY DEFINER function instead.
+  // Bind the assertion to the exact transaction and backend. The database
+  // verifier independently checks both values before resolving the session.
+  const transaction = await client.query(
+    'SELECT txid_current()::text AS transaction_id, pg_backend_pid()::text AS backend_pid',
+  );
+  const transactionId = transaction.rows[0].transaction_id as string;
+  const backendPid = transaction.rows[0].backend_pid as string;
+  const payload = `trademate-rls-context:v1|${transactionId}|${backendPid}|${context.sessionTokenHash}`;
+  const signature = createHmac('sha256', Buffer.from(rawKey, 'hex')).update(payload, 'utf8').digest('hex');
+
+  await client.query(
+    "SELECT set_config('app.session_token_hash', $1, true), set_config('app.session_transaction_id', $2, true), set_config('app.session_backend_pid', $3, true), set_config('app.session_signature', $4, true)",
+    [context.sessionTokenHash, transactionId, backendPid, signature],
+  );
 };
 
 const matchesSqlCommand = (sql: unknown, command: string) => {
@@ -45,9 +58,9 @@ const isCommitCommand = (sql: unknown) => matchesSqlCommand(sql, 'COMMIT');
 const isRollbackCommand = (sql: unknown) => matchesSqlCommand(sql, 'ROLLBACK');
 
 /**
- * Wraps every API query in a transaction and sets identity context transaction-locally.
- * Explicit multi-query transactions retain the same context on their checked-out client.
- * This is groundwork for RLS; it does not enable RLS or replace endpoint authorization.
+ * Wraps every API query in a transaction and establishes an API-signed,
+ * transaction-bound identity assertion. This is groundwork for RLS; it does
+ * not enable RLS or replace endpoint authorization.
  */
 export const createRlsAwarePool = (pool: Pool): Pool => new Proxy(pool, {
   get(target, property, receiver) {
@@ -93,8 +106,6 @@ export const createRlsAwarePool = (pool: Pool): Pool => new Proxy(pool, {
                     await establishTransactionContext(inner, context);
                     return result;
                   } catch (error) {
-                    // Keep the client marked as transactional until rollback succeeds.
-                    // If rollback itself fails, release() makes one final cleanup attempt.
                     await inner.query('ROLLBACK').then(() => {
                       inTransaction = false;
                     }).catch(() => undefined);
