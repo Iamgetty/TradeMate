@@ -75,3 +75,6 @@ Target groups identified in the remaining `app.js`:
 Counts are estimates, not a promise to split tightly coupled code. The first phase-2 audit may narrow or reorder these boundaries if the source proves more coupled than the initial scan suggests.
 
 **Completed:** extracted the three pure shared formatting helpers (`esc`, `fmt`, `fx2`) into `public/tm/format-utils.js`. `TradeMateRuntime.tsx` verifies the module is initialized before `app.js` loads; legacy call sites retain the same helper names and formatting behavior. The app cache is now `v=163`.
+
+
+**Completed:** extracted the pure marketplace API-to-view mappers (`mapListing`, `dealFromEnq`, `contractStatusLabel`) into `marketplace-mappers.js`. The module receives formatting helpers and lookup tables explicitly; legacy call sites keep their names. `TradeMateRuntime.tsx` now verifies the module before allowing `app.js` to start. App cache advanced to `v=164`.
