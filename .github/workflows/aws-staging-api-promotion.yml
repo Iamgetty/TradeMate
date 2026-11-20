@@ -41,6 +41,7 @@ jobs:
       migration_run_id: ${{ steps.handoff.outputs.migration_run_id }}
     steps:
       - name: Validate migration workflow run
+        id: run
         env:
           GH_TOKEN: ${{ github.token }}
           MIGRATION_RUN_ID: ${{ inputs.migration_run_id }}
@@ -61,6 +62,12 @@ jobs:
             echo "::error::The referenced run is not a successful main-branch staging migration workflow run."
             exit 1
           }
+          RUN_HEAD_SHA="$(jq -r '.head_sha' <<< "$RUN_JSON")"
+          if [[ ! "$RUN_HEAD_SHA" =~ ^[a-f0-9]{40}$ ]]; then
+            echo "::error::The migration workflow run did not report a valid source commit."
+            exit 1
+          fi
+          echo "head_sha=$RUN_HEAD_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Download successful migration handoff artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -74,7 +81,9 @@ jobs:
       - name: Verify handoff metadata and operator-supplied digest
         id: handoff
         env:
+          GH_TOKEN: ${{ github.token }}
           MIGRATION_RUN_ID: ${{ inputs.migration_run_id }}
+          MIGRATION_HEAD_SHA: ${{ steps.run.outputs.head_sha }}
           EXPECTED_API_IMAGE_URI: ${{ inputs.expected_api_image_uri }}
         run: |
           set -euo pipefail
@@ -104,6 +113,11 @@ jobs:
               (.ecs_task_arn | startswith("arn:aws:ecs:"))
             ' "$HANDOFF" >/dev/null
           SOURCE_SHA="$(jq -r '.source_sha' "$HANDOFF")"
+          CURRENT_MAIN_SHA="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')"
+          if [[ "$SOURCE_SHA" != "$MIGRATION_HEAD_SHA" || "$SOURCE_SHA" != "$CURRENT_MAIN_SHA" ]]; then
+            echo "::error::The migration artifact must match both its workflow run commit and the current main head; stale releases cannot be promoted."
+            exit 1
+          fi
           {
             echo "source_sha=$SOURCE_SHA"
             echo "image_uri=$EXPECTED_API_IMAGE_URI"
