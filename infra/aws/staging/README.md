@@ -197,3 +197,18 @@ A deployment review must additionally check CIDR overlap with existing VPCs/VPNs
 ## Deployment boundary
 
 Do not run `aws cloudformation deploy` from CI or a developer machine as part of validation. No stack should be created until AWS account/role permissions, target account and region, budget, and the exact change set have been reviewed and separately approved. This is staging-only; it does not authorize production infrastructure changes.
+
+
+### RLS verifier secret prerequisite
+
+Create a 32-byte random key encoded as 64 hexadecimal characters in AWS
+Secrets Manager as the `RLS_CONTEXT_HMAC_KEY` secret. Pass its ARN as
+`RlsContextHmacKeySecretArn` when deploying the services stack. The template
+grants secret retrieval only to the API and one-off migration task execution
+roles; the exchange-feed and Cloudflare tunnel tasks do not receive it. The
+API and migration task must reference the same secret value. Before running
+migration 050, a database administrator must install `pgcrypto` in the
+database `public` schema. Rotate the secret only through a coordinated
+migration/API release so no serving API task uses a key different from the
+database verifier. Do not place the key in CloudFormation parameters, Git,
+logs or task plaintext environment configuration.
