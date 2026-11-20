@@ -564,11 +564,8 @@ async function main() {
     }
     assert.deepEqual(
       exposedCredentialColumns,
-      credentialColumns.filter(([table, column]) => !(
-        (table === 'user_sessions' && column === 'token_hash')
-        || (table === 'user_credentials' && column === 'password_hash')
-      )).map(([table, column]) => `${table}.${column}`),
-      'Session bearer-token digests and password verifiers must not be directly readable by the runtime role.',
+      [],
+      'The runtime role must not directly read any inventoried credential-bearing column.',
     );
 
     await assert.rejects(
@@ -717,7 +714,7 @@ async function main() {
     assert.equal(replayedCancellation.rowCount, 0, 'A consumed account deletion cancellation token must not be reusable.');
 
     console.log(
-      'EXPECTED SECURITY LIMITATIONS CONFIRMED: direct trademate_app LOGIN can forge app.user_id and read another fixture user under the current pilot policy. Session token-hash disclosure is now blocked, while five other inventoried credential-bearing columns remain exposed. Account-deletion cancellation now consumes its token through an atomic scoped operation. Production RLS remains blocked.',
+      'EXPECTED SECURITY LIMITATIONS CONFIRMED: direct trademate_app LOGIN can forge app.user_id and read another fixture user under the current pilot policy. All seven inventoried credential-bearing columns are now blocked from direct runtime reads; access is mediated by scoped database operations. Account-deletion cancellation now consumes its token through an atomic scoped operation. Production RLS remains blocked.',
     );
   } finally {
     if (appClient) appClient.release();
