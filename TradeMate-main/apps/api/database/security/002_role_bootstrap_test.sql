@@ -41,7 +41,9 @@ BEGIN
   END IF;
 
   IF NOT has_table_privilege('trademate_app', 'public.users', 'SELECT')
-     OR NOT has_table_privilege('trademate_app', 'public.user_sessions', 'INSERT')
+     OR has_table_privilege('trademate_app', 'public.user_sessions', 'INSERT')
+     OR has_table_privilege('trademate_app', 'public.user_sessions', 'UPDATE')
+     OR has_table_privilege('trademate_app', 'public.user_sessions', 'DELETE')
      OR NOT has_table_privilege('trademate_app', 'public.marketplace_enquiries', 'UPDATE') THEN
     RAISE EXCEPTION 'trademate_app is missing required runtime table privileges.';
   END IF;
@@ -80,7 +82,16 @@ BEGIN
      OR has_table_privilege('trademate_app', 'public.auth_login_challenges', 'DELETE')
      OR has_column_privilege('trademate_app', 'public.password_reset_tokens', 'token_hash', 'SELECT')
      OR has_column_privilege('trademate_app', 'public.email_verification_codes', 'code_hash', 'SELECT')
-     OR has_column_privilege('trademate_app', 'public.user_deletion_requests', 'cancellation_token_hash', 'SELECT') THEN
+     OR has_column_privilege('trademate_app', 'public.user_deletion_requests', 'cancellation_token_hash', 'SELECT')
+     OR has_table_privilege('trademate_app', 'public.email_verification_codes', 'INSERT')
+     OR has_table_privilege('trademate_app', 'public.email_verification_codes', 'UPDATE')
+     OR has_table_privilege('trademate_app', 'public.email_verification_codes', 'DELETE')
+     OR has_table_privilege('trademate_app', 'public.password_reset_tokens', 'INSERT')
+     OR has_table_privilege('trademate_app', 'public.password_reset_tokens', 'UPDATE')
+     OR has_table_privilege('trademate_app', 'public.password_reset_tokens', 'DELETE')
+     OR has_table_privilege('trademate_app', 'public.user_deletion_requests', 'INSERT')
+     OR has_table_privilege('trademate_app', 'public.user_deletion_requests', 'UPDATE')
+     OR has_table_privilege('trademate_app', 'public.user_deletion_requests', 'DELETE') THEN
     RAISE EXCEPTION 'trademate_app must not directly read authentication secrets or one-time token digests.';
   END IF;
 
@@ -203,7 +214,10 @@ BEGIN
      OR NOT has_function_privilege('trademate_app', 'trademate_private.discard_password_reset_token(text)', 'EXECUTE')
      OR NOT has_function_privilege('trademate_app', 'trademate_private.rollback_account_deletion_request(text)', 'EXECUTE')
      OR NOT has_function_privilege('trademate_app', 'trademate_private.register_password_account(text,text,text,text)', 'EXECUTE')
-     OR NOT has_function_privilege('trademate_app', 'trademate_private.change_presented_password(text,text,text)', 'EXECUTE') THEN
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.change_presented_password(text,text,text)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.resend_email_verification_code(text,text)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.issue_password_reset(text,text)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.request_presented_account_deletion(text,text,text)', 'EXECUTE') THEN
     RAISE EXCEPTION 'trademate_app must have the reviewed narrow session operations.';
   END IF;
 
@@ -241,11 +255,11 @@ BEGIN
     FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname = 'trademate_private'
-      AND p.proname IN ('resolve_presented_session', 'touch_presented_session', 'list_presented_user_sessions', 'revoke_presented_user_session', 'logout_presented_session', 'revoke_other_presented_sessions', 'complete_password_reset', 'issue_password_login_session', 'complete_email_verification', 'complete_totp_login', 'resolve_totp_login_challenge', 'record_totp_login_failure', 'begin_totp_enrollment', 'resolve_totp_enrollment', 'complete_totp_enrollment', 'resolve_enabled_totp', 'disable_totp', 'resolve_password_login_credentials', 'resolve_presented_password_credentials', 'complete_account_deletion_cancellation', 'discard_password_reset_token', 'rollback_account_deletion_request', 'current_presented_user_id', 'issue_totp_login_challenge', 'register_password_account', 'change_presented_password')
+      AND p.proname IN ('resolve_presented_session', 'touch_presented_session', 'list_presented_user_sessions', 'revoke_presented_user_session', 'logout_presented_session', 'revoke_other_presented_sessions', 'complete_password_reset', 'issue_password_login_session', 'complete_email_verification', 'complete_totp_login', 'resolve_totp_login_challenge', 'record_totp_login_failure', 'begin_totp_enrollment', 'resolve_totp_enrollment', 'complete_totp_enrollment', 'resolve_enabled_totp', 'disable_totp', 'resolve_password_login_credentials', 'resolve_presented_password_credentials', 'complete_account_deletion_cancellation', 'discard_password_reset_token', 'rollback_account_deletion_request', 'current_presented_user_id', 'issue_totp_login_challenge', 'register_password_account', 'change_presented_password', 'resend_email_verification_code', 'issue_password_reset', 'request_presented_account_deletion')
       AND p.prosecdef
       AND p.proconfig @> ARRAY['search_path=pg_catalog']
       AND pg_get_userbyid(p.proowner) = 'trademate_migrator'
-  ) <> 26 THEN
+  ) <> 29 THEN
     RAISE EXCEPTION 'Every private session operation must be SECURITY DEFINER with a fixed safe search_path and migration-role owner.';
   END IF;
 END
