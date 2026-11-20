@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 declare global {
   interface Window {
     TM_CONFIG?: { api: string };
+    TM_MARKETPLACE_MAPPERS?: { create: (dependencies: Record<string, any>) => { mapListing: (listing: Record<string, any>, index: number) => Record<string, any>; dealFromEnq: (enquiry: Record<string, any>) => Record<string, any>; contractStatusLabel: (status: string) => string } };
     TM_FORMAT_UTILS?: { esc: (value: unknown) => string; fmt: (value: number, digits?: number) => string; fx2: (value: number, digits: number) => string };
     TM_ART_UTILS?: { prmArt: () => string; dpArt: () => string; dxArt: () => string; tfArt: () => string; tfCoin: () => string; cxArt: () => string; scoutArt: (...args: any[]) => string; scoutGlobe: (...args: any[]) => string; dxCoin: (...args: any[]) => string; dpCoin: (...args: any[]) => string };
     TM_FX_SNAPSHOT_UTILS?: {
@@ -91,6 +92,7 @@ export default function TradeMateRuntime() {
     let nftItemUtilsReady = false;
     let artUtilsReady = false;
     let formatUtilsReady = false;
+    let marketplaceMappersReady = false;
     let cssReady = false;
     let layoutCssReady = false;
     let patchesCssReady = false;
@@ -130,7 +132,7 @@ export default function TradeMateRuntime() {
     app.src = '/tm/app.js?v=162';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=163. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=164. Check the deployment and static asset response.');
     app.onload = () => {
       const postAppModules = [
         'pm-fix-css-loader',
@@ -179,7 +181,7 @@ export default function TradeMateRuntime() {
     };
 
     const loadApp = () => {
-      if (!feedReady || !feedMediaReady || !viewportModuleReady || !metadataReady || !marketQuoteUtilsReady || !snapshotUtilsReady || !fxSnapshotUtilsReady || !nftItemUtilsReady || !artUtilsReady || !formatUtilsReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !feedMediaReady || !viewportModuleReady || !metadataReady || !marketQuoteUtilsReady || !snapshotUtilsReady || !fxSnapshotUtilsReady || !nftItemUtilsReady || !artUtilsReady || !formatUtilsReady || !marketplaceMappersReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -377,6 +379,21 @@ export default function TradeMateRuntime() {
     snapshotUtils.onerror = () => fail('TradeMate could not load', 'The required snapshot utility module failed to load.');
     document.body.appendChild(snapshotUtils);
 
+    // Marketplace API-to-view mappers are pure and receive formatting/constants explicitly.
+    const marketplaceMappers = document.createElement('script');
+    marketplaceMappers.src = '/tm/marketplace-mappers.js?v=1';
+    marketplaceMappers.async = false;
+    marketplaceMappers.onload = () => {
+      if (!window.TM_MARKETPLACE_MAPPERS) {
+        fail('TradeMate could not start', 'The marketplace mapper module loaded without initialising.');
+        return;
+      }
+      marketplaceMappersReady = true;
+      loadApp();
+    };
+    marketplaceMappers.onerror = () => fail('TradeMate could not load', 'The required marketplace mapper module failed to load.');
+    document.body.appendChild(marketplaceMappers);
+
     // Pure display-formatting helpers must be ready before app.js binds their legacy names.
     const formatUtils = document.createElement('script');
     formatUtils.src = '/tm/format-utils.js?v=1';
@@ -533,7 +550,7 @@ export default function TradeMateRuntime() {
       if (!rendered) {
         fail(
           'TradeMate could not start',
-          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=163 returns successfully.'
+          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=164 returns successfully.'
         );
         return;
       }
