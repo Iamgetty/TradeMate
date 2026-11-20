@@ -49,6 +49,8 @@ GRANT USAGE ON SCHEMA public TO trademate_app;
 GRANT USAGE ON SCHEMA trademate_private TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.resolve_presented_session(TEXT) TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.touch_presented_session(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.list_presented_user_sessions(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.revoke_presented_user_session(TEXT, UUID) TO trademate_app;
 
 -- Transfer application tables, sequences and views to the migration owner.
 -- The app login must never own these objects.
