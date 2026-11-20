@@ -155,7 +155,7 @@ BEGIN
     JOIN pg_namespace n ON n.oid = p.pronamespace
     CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) AS acl
     WHERE n.nspname = 'trademate_private'
-      AND p.proname IN ('resolve_presented_session', 'touch_presented_session', 'list_presented_user_sessions', 'revoke_presented_user_session', 'logout_presented_session')
+      AND p.proname IN ('resolve_presented_session', 'touch_presented_session', 'list_presented_user_sessions', 'revoke_presented_user_session', 'logout_presented_session', 'revoke_other_presented_sessions')
       AND acl.grantee = 0
       AND acl.privilege_type = 'EXECUTE'
   ) THEN
@@ -167,11 +167,11 @@ BEGIN
     FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname = 'trademate_private'
-      AND p.proname IN ('resolve_presented_session', 'touch_presented_session', 'list_presented_user_sessions', 'revoke_presented_user_session', 'logout_presented_session')
+      AND p.proname IN ('resolve_presented_session', 'touch_presented_session', 'list_presented_user_sessions', 'revoke_presented_user_session', 'logout_presented_session', 'revoke_other_presented_sessions')
       AND p.prosecdef
       AND p.proconfig @> ARRAY['search_path=pg_catalog']
       AND pg_get_userbyid(p.proowner) <> 'trademate_app'
-  ) <> 5 THEN
+  ) <> 6 THEN
     RAISE EXCEPTION 'Every private session operation must be SECURITY DEFINER with a fixed safe search_path and non-runtime owner.';
   END IF;
 END
