@@ -48,6 +48,7 @@ const MIGRATIONS = [
   '039_complete_totp_login.sql',
   '040_resolve_totp_login_challenge.sql',
   '041_scoped_totp_enrollment_operations.sql',
+  '042_restrict_runtime_session_token_reads.sql',
 ];
 
 async function main() {
