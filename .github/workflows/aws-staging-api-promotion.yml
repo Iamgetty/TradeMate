@@ -104,9 +104,11 @@ jobs:
               (.ecs_task_arn | startswith("arn:aws:ecs:"))
             ' "$HANDOFF" >/dev/null
           SOURCE_SHA="$(jq -r '.source_sha' "$HANDOFF")"
-          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
-          echo "image_uri=$EXPECTED_API_IMAGE_URI" >> "$GITHUB_OUTPUT"
-          echo "migration_run_id=$MIGRATION_RUN_ID" >> "$GITHUB_OUTPUT"
+          {
+            echo "source_sha=$SOURCE_SHA"
+            echo "image_uri=$EXPECTED_API_IMAGE_URI"
+            echo "migration_run_id=$MIGRATION_RUN_ID"
+          } >> "$GITHUB_OUTPUT"
 
   promote-api:
     name: Promote attested API image to staging
