@@ -23,6 +23,7 @@ jobs:
       name: production-migrations
     env:
       MIGRATION_DATABASE_URL: ${{ secrets.TRADEMATE_MIGRATION_DATABASE_URL }}
+      RLS_CONTEXT_HMAC_KEY: ${{ secrets.TRADEMATE_RLS_CONTEXT_HMAC_KEY }}
       PGSSLMODE: require
     steps:
       - name: Check out repository
@@ -33,10 +34,14 @@ jobs:
         with:
           node-version: 24.22.1
 
-      - name: Verify dedicated migration secret is configured
+      - name: Verify dedicated migration and RLS verifier secrets are configured
         run: |
           if [ -z "$MIGRATION_DATABASE_URL" ]; then
             echo "::error::Configure TRADEMATE_MIGRATION_DATABASE_URL as a protected, environment-scoped secret."
+            exit 1
+          fi
+          if ! [[ "$RLS_CONTEXT_HMAC_KEY" =~ ^[0-9a-fA-F]{64}$ ]]; then
+            echo "::error::Configure TRADEMATE_RLS_CONTEXT_HMAC_KEY as a protected 32-byte hex secret matching the API verifier key."
             exit 1
           fi
 
