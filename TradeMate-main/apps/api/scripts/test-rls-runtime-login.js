@@ -170,7 +170,7 @@ async function main() {
     assert.equal(enabledEnrollment.rows[0].completed, true, 'A fresh verified TOTP counter must complete enrollment.');
     const enrollmentAudit = await admin.query(
       "SELECT id FROM public.audit_events WHERE event_type = 'auth.totp_enabled' AND entity_id = $1",
-      [enrollmentSessionHash],
+      [enrollmentUserId],
     );
     assert.equal(enrollmentAudit.rowCount, 1, 'TOTP enrollment must atomically record its audit event.');
     const duplicateEnrollment = await appClient.query(
@@ -197,14 +197,14 @@ async function main() {
     assert.equal(disabledTotp.rows[0].disabled, true, 'A fresh verified TOTP counter must disable the authenticator.');
     const disabledSecret = await admin.query(
       'SELECT totp_enabled, totp_secret_encrypted, totp_confirmed_at FROM public.user_auth_security WHERE user_id = $1',
-      [enrollmentSessionHash],
+      [enrollmentUserId],
     );
     assert.equal(disabledSecret.rows[0].totp_enabled, false);
     assert.equal(disabledSecret.rows[0].totp_secret_encrypted, null, 'Disabling TOTP must clear the encrypted secret.');
     assert.equal(disabledSecret.rows[0].totp_confirmed_at, null);
     const disableAudit = await admin.query(
       "SELECT id FROM public.audit_events WHERE event_type = 'auth.totp_disabled' AND entity_id = $1",
-      [enrollmentSessionHash],
+      [enrollmentUserId],
     );
     assert.equal(disableAudit.rowCount, 1, 'TOTP disable must atomically record its audit event.');
     const disabledResolution = await appClient.query(
