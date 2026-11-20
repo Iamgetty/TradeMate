@@ -26,8 +26,9 @@
     });
   }
   function interleaveItems(groups) {
+    groups = Array.isArray(groups) ? groups : [];
     var result = [], maxLength = 0;
-    (Array.isArray(groups) ? groups : []).forEach(function (group) {
+    groups.forEach(function (group) {
       maxLength = Math.max(maxLength, Array.isArray(group) ? group.length : 0);
     });
     for (var index = 0; index < maxLength; index++) {
