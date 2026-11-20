@@ -9,6 +9,7 @@ on:
       - 'TradeMate-main/apps/api/database/**'
       - 'TradeMate-main/apps/api/scripts/test-db-roles.js'
       - 'TradeMate-main/apps/api/scripts/test-rls-pilot.js'
+      - 'TradeMate-main/apps/api/scripts/test-rls-runtime-login.js'
       - 'TradeMate-main/apps/api/scripts/test-database-context.js'
       - 'TradeMate-main/apps/api/src/database-context.ts'
       - 'TradeMate-main/apps/api/package.json'
@@ -77,6 +78,11 @@ jobs:
         env:
           RLS_PILOT_TEST_DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: node scripts/test-rls-pilot.js
+      - name: Confirm runtime-login RLS identity spoofing limitation
+        working-directory: TradeMate-main/apps/api
+        env:
+          RLS_PILOT_TEST_DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-rls-runtime-login.js
       - name: Build API database-context module
         working-directory: TradeMate-main/apps/api
         run: npm run build
