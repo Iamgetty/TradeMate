@@ -67,6 +67,8 @@ GRANT EXECUTE ON FUNCTION trademate_private.disable_totp(TEXT, BIGINT) TO tradem
 GRANT EXECUTE ON FUNCTION trademate_private.resolve_password_login_credentials(TEXT) TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.resolve_presented_password_credentials(TEXT) TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.complete_account_deletion_cancellation(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.discard_password_reset_token(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.rollback_account_deletion_request(TEXT) TO trademate_app;
 
 -- Transfer application tables, sequences and views to the migration owner.
 -- The app login must never own these objects.
@@ -112,6 +114,18 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO trademate_app;
 REVOKE SELECT ON TABLE public.user_sessions FROM trademate_app;
 REVOKE SELECT ON TABLE public.user_credentials FROM trademate_app;
 GRANT SELECT (user_id) ON TABLE public.user_credentials TO trademate_app;
+
+-- Keep only non-secret authentication metadata readable by the API role.
+REVOKE SELECT ON TABLE public.user_auth_security FROM trademate_app;
+GRANT SELECT (user_id, totp_enabled, totp_confirmed_at)
+  ON TABLE public.user_auth_security TO trademate_app;
+REVOKE SELECT ON TABLE public.auth_login_challenges FROM trademate_app;
+REVOKE SELECT ON TABLE public.password_reset_tokens FROM trademate_app;
+GRANT SELECT (user_id) ON TABLE public.password_reset_tokens TO trademate_app;
+REVOKE SELECT ON TABLE public.email_verification_codes FROM trademate_app;
+GRANT SELECT (user_id) ON TABLE public.email_verification_codes TO trademate_app;
+REVOKE SELECT ON TABLE public.user_deletion_requests FROM trademate_app;
+GRANT SELECT (user_id) ON TABLE public.user_deletion_requests TO trademate_app;
 GRANT SELECT (user_id) ON TABLE public.user_sessions TO trademate_app;
 
 -- Audit and migration history are not mutable/readable by the runtime role.
