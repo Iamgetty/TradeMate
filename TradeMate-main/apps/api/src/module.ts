@@ -669,31 +669,28 @@ class AuthController {
         await client.query('COMMIT');
         throw new UnauthorizedException('The authenticator code is incorrect or has already been used.');
       }
-      const consumedCounter = await client.query(
-        'UPDATE user_auth_security SET last_totp_counter=$2, updated_at=now() WHERE user_id=$1 AND totp_enabled=true AND (last_totp_counter IS NULL OR last_totp_counter < $2) RETURNING user_id',
-        [challenge.rows[0].user_id, matchedCounter],
-      );
-      if (!consumedCounter.rowCount) {
-        await client.query('UPDATE auth_login_challenges SET attempts=attempts+1 WHERE id=$1', [challenge.rows[0].id]);
-        await client.query('COMMIT');
-        throw new UnauthorizedException('The authenticator code has already been used.');
-      }
-      await client.query('UPDATE auth_login_challenges SET consumed_at=now() WHERE id=$1', [challenge.rows[0].id]);
-      await client.query('DELETE FROM auth_rate_limits WHERE key_hash IN ($1, $2)', [totpRateKey, tokenDigest((request.ip || 'unknown') + '|' + String(challenge.rows[0].email).trim().toLowerCase())]);
       const sessionToken = randomBytes(32).toString('base64url');
       const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
-      await client.query('INSERT INTO user_sessions (user_id,token_hash,expires_at,ip_address,user_agent) VALUES ($1,$2,$3,$4,$5)', [challenge.rows[0].user_id,tokenDigest(sessionToken),expiresAt,request.ip || null,request.get('user-agent')?.slice(0,500) || null]);
-      await client.query(
-        "INSERT INTO user_notifications (user_id, category, title, body, icon, action_url) VALUES ($1, 'System', 'New sign-in', 'A sign-in to your TradeMate account was completed. If this was not you, review your active sessions and secure your account.', 'shield-check', '/settings/security')",
-        [challenge.rows[0].user_id],
+      const completedLogin = await client.query(
+        'SELECT verified_user_id AS id, verified_email AS email, verified_display_name AS display_name, verified_country_code AS country_code FROM trademate_private.complete_totp_login($1, $2, $3, $4, $5, $6)',
+        [
+          tokenDigest(challengeToken),
+          matchedCounter,
+          tokenDigest(sessionToken),
+          expiresAt,
+          request.ip || null,
+          request.get('user-agent')?.slice(0, 500) || null,
+        ],
       );
-      await client.query(
-        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.login_succeeded', 'user', $1, '{}'::jsonb)",
-        [challenge.rows[0].user_id],
-      );
+      if (!completedLogin.rowCount) {
+        await client.query('UPDATE auth_login_challenges SET attempts=attempts+1 WHERE id=$1 AND attempts < 5', [challenge.rows[0].id]);
+        await client.query('COMMIT');
+        throw new UnauthorizedException('The authenticator code is incorrect or has already been used.');
+      }
+      await client.query('DELETE FROM auth_rate_limits WHERE key_hash IN ($1, $2)', [totpRateKey, tokenDigest((request.ip || 'unknown') + '|' + String(challenge.rows[0].email).trim().toLowerCase())]);
       await client.query('COMMIT');
       response.cookie(SESSION_COOKIE, sessionToken, cookieOptions());
-      return { user: { id: challenge.rows[0].user_id, email: challenge.rows[0].email, display_name: challenge.rows[0].display_name, country_code: challenge.rows[0].country_code } };
+      return { user: completedLogin.rows[0] };
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;
