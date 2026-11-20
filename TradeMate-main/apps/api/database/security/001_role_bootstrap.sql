@@ -124,6 +124,13 @@ ALTER SCHEMA public OWNER TO trademate_migrator;
 -- isolated migration role. This lets future migrations replace reviewed
 -- functions without leaving them owned by the original administrator.
 ALTER SCHEMA trademate_private OWNER TO trademate_migrator;
+DO $private_table_owner$
+BEGIN
+  IF to_regclass('trademate_private.rls_context_hmac_keys') IS NOT NULL THEN
+    ALTER TABLE trademate_private.rls_context_hmac_keys OWNER TO trademate_migrator;
+  END IF;
+END
+$private_table_owner$;
 DO $ownership$
 DECLARE
   function_record RECORD;
