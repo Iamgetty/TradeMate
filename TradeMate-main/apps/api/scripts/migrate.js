@@ -39,6 +39,7 @@ const MIGRATIONS = [
   '030_sports_transfer_external_player_discovery.sql',
   '031_narrow_presented_session_resolver.sql',
   '032_touch_presented_session.sql',
+  '033_presented_session_management.sql',
 ];
 
 async function main() {
