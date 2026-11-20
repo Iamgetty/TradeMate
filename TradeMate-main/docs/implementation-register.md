@@ -210,3 +210,12 @@ The exact narrow operations, transaction atomicity, expiry, attempt limits, repl
 - **Important scope limit:** this is only the first narrow database primitive. Existing broad table grants remain, the API still has direct session/credential table access, and `database-context.ts` still uses caller-settable GUCs. The new resolver is not yet wired into request handling and does not establish trusted RLS identity. No direct grants were revoked, no RLS was enabled, and no production DB was changed.
 - Validation is pending on the new exact branch head. The register must not mark this capability accepted until PostgreSQL 16/18 migration, role-grant and actual-runtime-login checks pass.
 - Next: migrate request-context resolution to this function, then independently inventory and migrate each route-level session lifecycle operation before reducing raw grants. Keep the production RLS gate blocked.
+
+
+## Request-context session resolver integration — 20 Nov 2026
+
+- Updated `apps/api/src/database-context.ts` to resolve the presented cookie's SHA-256 digest through `trademate_private.resolve_presented_session($1)` instead of directly selecting `user_sessions.token_hash` joined to `users`. The resolver returns only the subject and retains the database-side expiry and active-account checks.
+- Verified the committed file content at code commit `af9532360b74d51e2f52744c09050cdb90a90c18`; the former direct lookup is absent from `database-context.ts`.
+- Scope is intentionally incremental: the transaction-local `app.session_token_hash` and `app.user_id` settings remain, the 39 direct `user_sessions` references in `module.ts` remain, and broad runtime table/default privileges remain. The resolver's EXECUTE grant does not by itself create trusted RLS identity or justify privilege reduction.
+- Exact-head CI for this code commit is pending. The existing real-login test already exercises valid, malformed, expired and inactive-account resolver inputs; additional API request-path and full auth lifecycle acceptance is still required.
+- Status: ✓ narrow resolver wired into request-context identity lookup at source level; ◐ exact-head CI and request-path integration acceptance pending; ☐ migrate remaining session lifecycle callers; ☐ replace broad runtime/default grants; ☐ trusted identity design and production RLS acceptance. Production RLS remains blocked. No production database, role, grant, policy, secret or deployment was changed.
