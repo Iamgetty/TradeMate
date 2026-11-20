@@ -15,7 +15,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <Script src="/tm/home-categories.js?v=2" strategy="beforeInteractive" />
         <Script src="/tm/home-promos.js?v=5" strategy="beforeInteractive" />
         <Script src="/tm/explore-tidy.js?v=1" strategy="beforeInteractive" />
-        <Script src="/tm/category-slides.js?v=3" strategy="afterInteractive" />
+        <Script src="/tm/category-slides.js?v=4" strategy="afterInteractive" />
         <Script src="/tm/remove-default-market.js?v=2" strategy="afterInteractive" />
         <Script src="/tm/profile-photo-preview.js?v=1" strategy="afterInteractive" />
       </body>
