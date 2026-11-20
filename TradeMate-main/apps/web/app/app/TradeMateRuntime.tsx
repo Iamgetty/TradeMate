@@ -5,6 +5,13 @@ import { useEffect, useState } from 'react';
 declare global {
   interface Window {
     TM_CONFIG?: { api: string };
+    TM_FX_SNAPSHOT_UTILS?: {
+      createFxSnapshotStore: (options: { items: Array<Record<string, any>> }) => {
+        apply: (rates: Record<string, number>, mode?: string, timestamp?: string, savedAt?: number) => boolean;
+        restore: () => boolean;
+        save: (payload: { rates?: Record<string, number>; time_last_update_utc?: string }) => void;
+      };
+    };
     TM_SNAPSHOT_UTILS?: {
       createNftSnapshotStore: (options: { prefix: string; getChain: () => string }) => {
         key: (term: string) => string;
@@ -70,6 +77,7 @@ export default function TradeMateRuntime() {
     let metadataReady = false;
     let marketQuoteUtilsReady = false;
     let snapshotUtilsReady = false;
+    let fxSnapshotUtilsReady = false;
     let cssReady = false;
     let layoutCssReady = false;
     let patchesCssReady = false;
@@ -106,7 +114,7 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=155';
+    app.src = '/tm/app.js?v=156';
     app.async = false;
     app.dataset.trademateApp = 'true';
     app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=155. Check the deployment and static asset response.');
@@ -158,7 +166,7 @@ export default function TradeMateRuntime() {
     };
 
     const loadApp = () => {
-      if (!feedReady || !feedMediaReady || !viewportModuleReady || !metadataReady || !marketQuoteUtilsReady || !snapshotUtilsReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !feedMediaReady || !viewportModuleReady || !metadataReady || !marketQuoteUtilsReady || !snapshotUtilsReady || !fxSnapshotUtilsReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -355,6 +363,21 @@ export default function TradeMateRuntime() {
     };
     snapshotUtils.onerror = () => fail('TradeMate could not load', 'The required snapshot utility module failed to load.');
     document.body.appendChild(snapshotUtils);
+
+    // FX snapshot helpers receive the market item collection explicitly; no app globals leak into the module.
+    const fxSnapshotUtils = document.createElement('script');
+    fxSnapshotUtils.src = '/tm/fx-snapshot-utils.js?v=1';
+    fxSnapshotUtils.async = false;
+    fxSnapshotUtils.onload = () => {
+      if (!window.TM_FX_SNAPSHOT_UTILS) {
+        fail('TradeMate could not start', 'The FX snapshot utility module loaded without initialising.');
+        return;
+      }
+      fxSnapshotUtilsReady = true;
+      loadApp();
+    };
+    fxSnapshotUtils.onerror = () => fail('TradeMate could not load', 'The required FX snapshot utility module failed to load.');
+    document.body.appendChild(fxSnapshotUtils);
 
     // Market quote utilities must be ready before app.js defines the MT5 quote adapters.
     const marketQuoteUtils = document.createElement('script');
