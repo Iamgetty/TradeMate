@@ -737,9 +737,11 @@ class AuthController {
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to request account deletion.');
+    const presentedSession = await resolvePresentedSessionUser(token);
+    if (!presentedSession.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const current = await databasePool.query(
-      "SELECT u.id, u.email, u.status, c.password_hash FROM user_sessions s JOIN users u ON u.id = s.user_id JOIN user_credentials c ON c.user_id = u.id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
+      "SELECT u.id, u.email, u.status, c.password_hash FROM users u JOIN user_credentials c ON c.user_id = u.id WHERE u.id = $1 AND u.status = 'active' LIMIT 1",
+      [presentedSession.rows[0].id],
     );
     if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     if (!current.rows[0].email) throw new ConflictException('Add an email address you can access before requesting account deletion so you can receive the cancellation code.');
