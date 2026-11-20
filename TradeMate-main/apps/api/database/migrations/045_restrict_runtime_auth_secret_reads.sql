@@ -58,7 +58,18 @@ BEGIN
     AND cancellation_token_hash = p_token_hash
     AND cancelled_at IS NULL;
 
-  RETURN FOUND;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Account deletion rollback state changed unexpectedly';
+  END IF;
+
+  INSERT INTO public.audit_events (
+    actor_user_id, event_type, entity_type, entity_id, metadata
+  ) VALUES (
+    target_user_id, 'account.deletion_request_rolled_back', 'user', target_user_id,
+    '{"reason":"notification_delivery_failed"}'::jsonb
+  );
+
+  RETURN true;
 END;
 $function$;
 
