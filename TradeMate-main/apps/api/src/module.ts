@@ -799,20 +799,13 @@ class AuthController {
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const token = typeof body?.token === 'string' ? body.token : '';
     if (!/^[A-Za-z0-9_-]{40,60}$/.test(token)) throw new BadRequestException('Enter a valid cancellation token.');
-    const client = await databasePool.connect();
-    try {
-      await client.query('BEGIN');
-      const restored = await client.query("UPDATE users u SET status = 'active', updated_at = now() FROM user_deletion_requests d WHERE d.user_id = u.id AND d.cancellation_token_hash = $1 AND d.cancelled_at IS NULL AND d.scheduled_for > now() AND u.status = 'deletion_pending' RETURNING u.id, u.email", [tokenDigest(token)]);
-      if (!restored.rowCount) throw new NotFoundException('This cancellation token is invalid, expired, or already used.');
-      await client.query('UPDATE user_deletion_requests SET cancelled_at = now(), cancellation_token_hash = NULL WHERE user_id = $1', [restored.rows[0].id]);
-      await client.query("INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'account.deletion_cancelled', 'user', $1, '{}'::jsonb)", [restored.rows[0].id]);
-      await client.query('COMMIT');
-      if (restored.rows[0].email) void sendTransactionalEmail(restored.rows[0].email, 'TradeMate account deletion cancelled', '<p>Your TradeMate account deletion request was cancelled. Sign in to continue using your account.</p>');
-      return { success: true, status: 'active', message: 'Account deletion cancelled. Sign in again to create a new session.' };
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally { client.release(); }
+    const restored = await databasePool.query(
+      'SELECT restored_user_id AS id, restored_email AS email FROM trademate_private.complete_account_deletion_cancellation($1)',
+      [tokenDigest(token)],
+    );
+    if (!restored.rowCount) throw new NotFoundException('This cancellation token is invalid, expired, or already used.');
+    if (restored.rows[0].email) void sendTransactionalEmail(restored.rows[0].email, 'TradeMate account deletion cancelled', '<p>Your TradeMate account deletion request was cancelled. Sign in to continue using your account.</p>');
+    return { success: true, status: 'active', message: 'Account deletion cancelled. Sign in again to create a new session.' };
   }
 
   @Post('logout')
