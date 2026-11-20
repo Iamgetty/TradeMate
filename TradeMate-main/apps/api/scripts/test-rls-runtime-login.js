@@ -141,65 +141,75 @@ async function main() {
     );
     const enrollmentUserId = enrollmentUserResult.rows[0].id;
     userIds.push(enrollmentUserId);
+    const enrollmentSessionHash = createHash('sha256').update(randomBytes(32)).digest('hex');
+    await admin.query(
+      "INSERT INTO public.user_sessions (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes')",
+      [enrollmentUserId, enrollmentSessionHash],
+    );
+    const foreignEnrollmentRead = await appClient.query(
+      'SELECT * FROM trademate_private.resolve_totp_enrollment($1)',
+      [sessionHashes[0]],
+    );
+    assert.equal(foreignEnrollmentRead.rowCount, 0, 'A presented session for another account must never resolve this enrollment secret.');
     const startedEnrollment = await appClient.query(
       'SELECT trademate_private.begin_totp_enrollment($1, $2) AS started',
-      [enrollmentUserId, 'test-only-encrypted-enrollment-secret'],
+      [enrollmentSessionHash, 'test-only-encrypted-enrollment-secret'],
     );
     assert.equal(startedEnrollment.rows[0].started, true, 'An active verified account must be able to start TOTP enrollment.');
     const pendingEnrollment = await appClient.query(
       'SELECT encrypted_totp_secret, enrollment_expires_at, last_totp_counter FROM trademate_private.resolve_totp_enrollment($1)',
-      [enrollmentUserId],
+      [enrollmentSessionHash],
     );
     assert.equal(pendingEnrollment.rowCount, 1);
     assert.equal(pendingEnrollment.rows[0].encrypted_totp_secret, 'test-only-encrypted-enrollment-secret');
     assert.ok(new Date(pendingEnrollment.rows[0].enrollment_expires_at).getTime() > Date.now());
     const enabledEnrollment = await appClient.query(
       'SELECT trademate_private.complete_totp_enrollment($1, $2) AS completed',
-      [enrollmentUserId, '223456789'],
+      [enrollmentSessionHash, '223456789'],
     );
     assert.equal(enabledEnrollment.rows[0].completed, true, 'A fresh verified TOTP counter must complete enrollment.');
     const enrollmentAudit = await admin.query(
       "SELECT id FROM public.audit_events WHERE event_type = 'auth.totp_enabled' AND entity_id = $1",
-      [enrollmentUserId],
+      [enrollmentSessionHash],
     );
     assert.equal(enrollmentAudit.rowCount, 1, 'TOTP enrollment must atomically record its audit event.');
     const duplicateEnrollment = await appClient.query(
       'SELECT trademate_private.begin_totp_enrollment($1, $2) AS started',
-      [enrollmentUserId, 'test-only-another-encrypted-secret'],
+      [enrollmentSessionHash, 'test-only-another-encrypted-secret'],
     );
     assert.equal(duplicateEnrollment.rows[0].started, false, 'An enabled authenticator must never be overwritten by setup.');
     const enabledSecret = await appClient.query(
       'SELECT encrypted_totp_secret, last_totp_counter FROM trademate_private.resolve_enabled_totp($1)',
-      [enrollmentUserId],
+      [enrollmentSessionHash],
     );
     assert.equal(enabledSecret.rowCount, 1);
     assert.equal(enabledSecret.rows[0].encrypted_totp_secret, 'test-only-encrypted-enrollment-secret');
     assert.equal(enabledSecret.rows[0].last_totp_counter.toString(), '223456789');
     const staleDisable = await appClient.query(
       'SELECT trademate_private.disable_totp($1, $2) AS disabled',
-      [enrollmentUserId, '223456789'],
+      [enrollmentSessionHash, '223456789'],
     );
     assert.equal(staleDisable.rows[0].disabled, false, 'TOTP disable must reject a replayed counter.');
     const disabledTotp = await appClient.query(
       'SELECT trademate_private.disable_totp($1, $2) AS disabled',
-      [enrollmentUserId, '223456790'],
+      [enrollmentSessionHash, '223456790'],
     );
     assert.equal(disabledTotp.rows[0].disabled, true, 'A fresh verified TOTP counter must disable the authenticator.');
     const disabledSecret = await admin.query(
       'SELECT totp_enabled, totp_secret_encrypted, totp_confirmed_at FROM public.user_auth_security WHERE user_id = $1',
-      [enrollmentUserId],
+      [enrollmentSessionHash],
     );
     assert.equal(disabledSecret.rows[0].totp_enabled, false);
     assert.equal(disabledSecret.rows[0].totp_secret_encrypted, null, 'Disabling TOTP must clear the encrypted secret.');
     assert.equal(disabledSecret.rows[0].totp_confirmed_at, null);
     const disableAudit = await admin.query(
       "SELECT id FROM public.audit_events WHERE event_type = 'auth.totp_disabled' AND entity_id = $1",
-      [enrollmentUserId],
+      [enrollmentSessionHash],
     );
     assert.equal(disableAudit.rowCount, 1, 'TOTP disable must atomically record its audit event.');
     const disabledResolution = await appClient.query(
       'SELECT * FROM trademate_private.resolve_enabled_totp($1)',
-      [enrollmentUserId],
+      [enrollmentSessionHash],
     );
     assert.equal(disabledResolution.rowCount, 0, 'Disabled TOTP secrets must no longer be resolvable.');
 
