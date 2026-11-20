@@ -1,3 +1,4 @@
+void 0,
 /*!
  * TradeMate — live app (app.js)
  * One self-contained file: injects fonts, styles and markup, then runs the app.
