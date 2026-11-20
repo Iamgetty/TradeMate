@@ -169,4 +169,4 @@ BEGIN
     RAISE EXCEPTION 'Presented-session resolver must be SECURITY DEFINER with a fixed safe search_path and non-runtime owner.';
   END IF;
 END
-$;
+$$;
