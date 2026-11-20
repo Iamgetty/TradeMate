@@ -297,3 +297,30 @@ and real-login positive and negative tests. In particular, list-own-sessions
 must not reveal `token_hash`, and revoke operations must prove that a user cannot
 select another user's session by substituting a UUID. No production privileges
 or RLS settings were changed.
+
+### Credential lifecycle call-site inventory (2026-11-20)
+
+The route-level audit of `apps/api/src/module.ts` expands the seven-column schema list into the following required application capabilities. These are distinct privileged operations; a blanket credential-table grant or generic owner-executed query endpoint is not an acceptable substitute.
+
+| Credential surface | Current application operation | Required security boundary |
+| --- | --- | --- |
+| `user_credentials.password_hash` | Registration inserts a newly computed password verifier; login reads it for scrypt verification; password change and reset replace it; account deletion verifies it before scheduling deletion. | Verify a password without returning the stored verifier to ordinary application query paths; set/replace only through authenticated or one-time-reset flows; preserve audit and session-revocation transactions. |
+| `user_sessions.token_hash` | Registration, email verification, password login and TOTP completion create sessions; API requests resolve the presented cookie digest; session settings list/revoke; password change/reset and deletion revoke sessions; logout revokes the presented session. | Resolve only the presented digest; never enumerate hashes; list metadata without digest; ownership-check single-session revocation; keep create/revoke atomic with auth events. |
+| `user_auth_security.totp_secret_encrypted` | Enrollment writes encrypted pending secret; confirmation and disable read/decrypt it under row lock; login challenge verification reads/decrypts enabled secret and advances replay counter. | Distinct enrollment, confirmation, disable and login-verification operations; preserve setup expiry, row locks and monotonic one-time counter; do not expose ciphertext to general SQL consumers. |
+| `auth_login_challenges.token_hash` | Password login creates a short-lived challenge; TOTP verification resolves the presented digest, increments bounded attempts, consumes it, then creates a session. Password reset invalidates outstanding challenges. | Atomic one-time challenge consumption, expiry and attempt limit; do not return stored digest; session creation must share the successful verification transaction. |
+| `password_reset_tokens.token_hash` | Reset request replaces prior tokens and inserts a new digest; email delivery failure removes that token; completion locks a valid unconsumed token, consumes it, updates password and revokes sessions/challenges. | Digest-only lookup; atomic expiry/consumption/password update/revocation/audit; delivery-failure cleanup scoped to the exact issued token. |
+| `email_verification_codes.code_hash` | Registration stores a digest; confirmation locks the latest pending code, checks expiry/attempts, increments failed attempts or consumes it and activates the account; resend replaces outstanding codes. | Atomic bounded-attempt verification and one-time consumption; account activation and initial session creation must commit together; never return the stored digest. |
+| `user_deletion_requests.cancellation_token_hash` | Account-deletion request stores a digest; cancellation validates and consumes it; deletion worker clears it during finalization. | Separate user cancellation and worker-finalization capabilities; compare/consume atomically; worker must not read or disclose the digest. |
+
+Additional transaction and data-flow constraints identified:
+
+- Password reset completion currently holds row locks while computing the new scrypt hash. A refactor may optimize lock duration only if it retains single-use token semantics under concurrent submissions and commits password replacement, session revocation, challenge invalidation and audit atomically.
+- TOTP verification must preserve replay protection: the matched counter must be strictly greater than `last_totp_counter`, and challenge attempts/consumption must not be split across transactions.
+- Email verification currently increments attempts on incorrect codes and commits that increment before returning the authentication error. Preserve this deliberate failure-path commit.
+- Session creation occurs in multiple successful authentication paths; all must share a consistent expiry, metadata and audit contract.
+- The account-deletion worker is a separate principal and execution path. Its ability to clear a cancellation digest does not justify runtime API read access to that column.
+- Integration scripts that seed credentials directly use privileged disposable test connections. They must remain test-only and must not become runtime-role grant requirements.
+
+**Implementation gate:** produce an explicit operation-to-function matrix and test each operation through an actual `trademate_app` LOGIN. Positive coverage must include register, email verification, password login, TOTP login/enrollment/disable, password change/reset, session list/revoke/logout and deletion request/cancel. Negative coverage must prove that the runtime login cannot SELECT any credential digest/verifier/ciphertext column, cannot resolve another user's session, cannot enumerate session hashes, and cannot bypass attempt/expiry/replay limits. Keep the current expected-vulnerability probes until replacement behavior and grants land together; then invert them in the same change set.
+
+No code, migration, grants, roles, production settings or RLS policies were changed by this inventory.
