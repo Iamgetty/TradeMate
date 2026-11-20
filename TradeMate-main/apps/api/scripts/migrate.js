@@ -42,6 +42,7 @@ const MIGRATIONS = [
   '033_presented_session_management.sql',
   '034_logout_presented_session.sql',
   '035_revoke_other_presented_sessions.sql',
+  '036_complete_password_reset.sql',
 ];
 
 async function main() {
