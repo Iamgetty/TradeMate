@@ -266,3 +266,18 @@ test('production migration runner refuses to fall back to the runtime database r
   assert.match(result.stderr, /MIGRATION_DATABASE_URL is required in production/);
   assert.doesNotMatch(result.stderr, /ECONNREFUSED|password authentication failed/);
 });
+
+test('production migration runner requires the dedicated RLS HMAC key before connecting', () => {
+  const migrationScript = path.join(__dirname, '..', 'scripts', 'migrate.js');
+  const env = {
+    ...process.env,
+    NODE_ENV: 'production',
+    DATABASE_URL: 'postgres://runtime:placeholder@localhost:5432/trademate',
+    MIGRATION_DATABASE_URL: 'postgres://migrator:placeholder@localhost:5432/trademate',
+  };
+  delete env.RLS_CONTEXT_HMAC_KEY;
+  const result = spawnSync(process.execPath, [migrationScript], { env, encoding: 'utf8' });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /RLS_CONTEXT_HMAC_KEY must be configured/);
+  assert.doesNotMatch(result.stderr, /ECONNREFUSED|password authentication failed/);
+});
