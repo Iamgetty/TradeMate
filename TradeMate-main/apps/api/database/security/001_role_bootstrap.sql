@@ -48,6 +48,7 @@ GRANT USAGE ON SCHEMA public TO trademate_app;
 -- Grant only the schema entry point and one narrowly scoped function here.
 GRANT USAGE ON SCHEMA trademate_private TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.resolve_presented_session(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.touch_presented_session(TEXT) TO trademate_app;
 
 -- Transfer application tables, sequences and views to the migration owner.
 -- The app login must never own these objects.
