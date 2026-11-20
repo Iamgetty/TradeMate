@@ -75,15 +75,6 @@ BEGIN
     RETURN;
   END IF;
 
-  UPDATE public.email_verification_codes
-  SET used_at = pg_catalog.now()
-  WHERE id = verification.id
-    AND used_at IS NULL;
-
-  IF NOT FOUND THEN
-    RETURN;
-  END IF;
-
   UPDATE public.users
   SET email_verified_at = pg_catalog.now(),
       status = 'active',
@@ -95,6 +86,15 @@ BEGIN
 
   IF NOT FOUND THEN
     RETURN;
+  END IF;
+
+  UPDATE public.email_verification_codes
+  SET used_at = pg_catalog.now()
+  WHERE id = verification.id
+    AND used_at IS NULL;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Email verification code was consumed concurrently.';
   END IF;
 
   INSERT INTO public.user_sessions (
