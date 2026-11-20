@@ -185,7 +185,7 @@ jobs:
             echo "::error::The deployed baseline task definition does not match the expected single-container Fargate migration task."
             exit 1
           fi
-          if [[ ! "$TASK_IMAGE" =~ ^[0-9]{12}\\.dkr\\.ecr\\.eu-north-1\\.amazonaws\\.com/.+@sha256:[a-f0-9]{64}$ ]]; then
+          if [[ ! "$TASK_IMAGE" =~ ^[0-9]{12}\.dkr\.ecr\.eu-north-1\.amazonaws\.com/.+@sha256:[a-f0-9]{64}$ ]]; then
             echo "::error::The baseline migration task image is not digest-pinned."
             exit 1
           fi
