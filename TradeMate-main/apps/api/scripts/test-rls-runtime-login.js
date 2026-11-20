@@ -188,6 +188,23 @@ async function main() {
     assert.equal(sessionsRevokedAudit.rows[0].actor_id, userIds[1]);
     assert.deepEqual(sessionsRevokedAudit.rows[0].metadata, { reason: 'password_changed', revoked_count: 1 });
 
+    const victimSessionBeforeBulkRevoke = await admin.query(
+      'SELECT id FROM public.user_sessions WHERE token_hash = $1',
+      [sessionHashes[0]],
+    );
+    assert.equal(victimSessionBeforeBulkRevoke.rowCount, 1);
+
+    const crossAccountBulkRevoke = await appClient.query(
+      'SELECT trademate_private.revoke_other_presented_sessions($1) AS revoked_count',
+      [sessionHashes[0]],
+    );
+    assert.equal(Number(crossAccountBulkRevoke.rows[0].revoked_count), 0, 'A presented session for another account must never authorize bulk revocation.');
+    const victimSessionAfterBulkRevoke = await admin.query(
+      'SELECT id FROM public.user_sessions WHERE token_hash = $1',
+      [sessionHashes[0]],
+    );
+    assert.equal(victimSessionAfterBulkRevoke.rowCount, 1, 'Cross-account bulk revocation must leave the victim session intact.');
+
     const invalidBulkRevoke = await appClient.query(
       'SELECT trademate_private.revoke_other_presented_sessions($1) AS revoked_count',
       ['not-a-sha256-digest'],
