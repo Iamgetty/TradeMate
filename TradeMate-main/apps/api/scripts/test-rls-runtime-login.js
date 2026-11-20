@@ -89,6 +89,49 @@ async function main() {
     );
     assert.ok(activity.rows[0].last_seen_at.getTime() > Date.now() - 60_000);
 
+    const secondaryToken = randomBytes(32).toString('hex');
+    const secondaryHash = createHash('sha256').update(secondaryToken).digest('hex');
+    const secondarySession = await admin.query(
+      "INSERT INTO public.user_sessions (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes') RETURNING id::text AS id",
+      [userIds[1], secondaryHash],
+    );
+    sessionIds.push(secondarySession.rows[0].id);
+    sessionHashes.push(secondaryHash);
+
+    const listed = await appClient.query(
+      'SELECT session_id::text AS id, is_current FROM trademate_private.list_presented_user_sessions($1)',
+      [sessionHashes[1]],
+    );
+    assert.equal(listed.rowCount, 2, 'Session listing must include only the authenticated user’s active sessions.');
+    assert.equal(listed.rows.filter((row) => row.is_current).length, 1);
+    assert.ok(listed.rows.every((row) => [sessionIds[1], secondarySession.rows[0].id].includes(row.id)));
+
+    const crossAccountRevoke = await appClient.query(
+      'SELECT revoked_session_id FROM trademate_private.revoke_presented_user_session($1, $2)',
+      [sessionHashes[1], sessionIds[0]],
+    );
+    assert.equal(crossAccountRevoke.rowCount, 0, 'A user must not revoke another account’s session.');
+    const crossAccountStillExists = await admin.query(
+      'SELECT id FROM public.user_sessions WHERE id = $1',
+      [sessionIds[0]],
+    );
+    assert.equal(crossAccountStillExists.rowCount, 1);
+
+    const revoked = await appClient.query(
+      'SELECT revoked_session_id::text AS id, revoked_user_id::text AS user_id, was_current FROM trademate_private.revoke_presented_user_session($1, $2)',
+      [sessionHashes[1], secondarySession.rows[0].id],
+    );
+    assert.equal(revoked.rowCount, 1);
+    assert.equal(revoked.rows[0].id, secondarySession.rows[0].id);
+    assert.equal(revoked.rows[0].user_id, userIds[1]);
+    assert.equal(revoked.rows[0].was_current, false);
+    const revokeAudit = await admin.query(
+      "SELECT metadata FROM public.audit_events WHERE event_type = 'auth.session_revoked' AND entity_id = $1 ORDER BY created_at DESC LIMIT 1",
+      [secondarySession.rows[0].id],
+    );
+    assert.equal(revokeAudit.rowCount, 1, 'Session revocation must append its audit event atomically.');
+    assert.deepEqual(revokeAudit.rows[0].metadata, { current: false });
+
     const malformed = await appClient.query(
       'SELECT resolved_user_id FROM trademate_private.resolve_presented_session($1)',
       ['not-a-sha256-digest'],
