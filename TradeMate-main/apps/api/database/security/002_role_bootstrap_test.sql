@@ -62,6 +62,9 @@ BEGIN
      OR NOT has_column_privilege('trademate_app', 'public.user_auth_security', 'totp_enabled', 'SELECT')
      OR has_column_privilege('trademate_app', 'public.user_auth_security', 'totp_secret_encrypted', 'SELECT')
      OR has_table_privilege('trademate_app', 'public.auth_login_challenges', 'SELECT')
+     OR has_table_privilege('trademate_app', 'public.auth_login_challenges', 'INSERT')
+     OR has_table_privilege('trademate_app', 'public.auth_login_challenges', 'UPDATE')
+     OR has_table_privilege('trademate_app', 'public.auth_login_challenges', 'DELETE')
      OR has_column_privilege('trademate_app', 'public.password_reset_tokens', 'token_hash', 'SELECT')
      OR has_column_privilege('trademate_app', 'public.email_verification_codes', 'code_hash', 'SELECT')
      OR has_column_privilege('trademate_app', 'public.user_deletion_requests', 'cancellation_token_hash', 'SELECT') THEN
