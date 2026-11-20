@@ -39,8 +39,31 @@
     }
     return result;
   }
+  function sortItems(items, sort) {
+    var result = Array.isArray(items) ? items.slice() : [];
+    function numeric(value, fallback) {
+      return typeof value === "number" ? value : fallback;
+    }
+    if (sort === "price") {
+      result.sort(function (left, right) {
+        return numeric(left.p, 1e18) - numeric(right.p, 1e18);
+      });
+    } else if (sort === "sales") {
+      result.sort(function (left, right) {
+        return numeric(right.sales24h, -1) - numeric(left.sales24h, -1);
+      });
+    }
+    return result;
+  }
+  function favoriteKey(item) {
+    item = item || {};
+    return String(item.collectionSlug || item.collection || "") + ":" +
+      String(item.tokenId || item.n || "");
+  }
   root.TM_NFT_ITEM_UTILS = Object.freeze({
     normalizeItems: normalizeItems,
-    interleaveItems: interleaveItems
+    interleaveItems: interleaveItems,
+    sortItems: sortItems,
+    favoriteKey: favoriteKey
   });
 })(window);
