@@ -45,6 +45,7 @@ export default function TradeMateRuntime() {
     let feedMediaReady = false;
     let viewportModuleReady = false;
     let metadataReady = false;
+    let marketQuoteUtilsReady = false;
     let cssReady = false;
     let layoutCssReady = false;
     let patchesCssReady = false;
@@ -133,7 +134,7 @@ export default function TradeMateRuntime() {
     };
 
     const loadApp = () => {
-      if (!feedReady || !feedMediaReady || !viewportModuleReady || !metadataReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !feedMediaReady || !viewportModuleReady || !metadataReady || !marketQuoteUtilsReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -315,6 +316,21 @@ export default function TradeMateRuntime() {
     earnPreload.onload = () => { earnCssReady = true; loadApp(); };
     earnPreload.onerror = () => { earnCssReady = true; loadApp(); };
     document.head.appendChild(earnPreload);
+
+    // Market quote utilities must be ready before app.js defines the MT5 quote adapters.
+    const marketQuoteUtils = document.createElement('script');
+    marketQuoteUtils.src = '/tm/market-quote-utils.js?v=1';
+    marketQuoteUtils.async = false;
+    marketQuoteUtils.onload = () => {
+      if (!window.TM_MARKET_QUOTE_UTILS) {
+        fail('TradeMate could not start', 'The market quote utility module loaded without initialising.');
+        return;
+      }
+      marketQuoteUtilsReady = true;
+      loadApp();
+    };
+    marketQuoteUtils.onerror = () => fail('TradeMate could not load', 'The required market quote utility module failed to load.');
+    document.body.appendChild(marketQuoteUtils);
 
     // Load the independently tested market-metadata lifecycle helper before
     // app.js. If it is unavailable, app.js retains its conservative legacy
