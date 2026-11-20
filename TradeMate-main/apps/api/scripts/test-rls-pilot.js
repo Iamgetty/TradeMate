@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { readFile } = require('node:fs/promises');
 const path = require('node:path');
-const { randomUUID, createHash, randomBytes } = require('node:crypto');
+const { randomUUID, createHash, createHmac, randomBytes } = require('node:crypto');
 const { Pool } = require('pg');
 
 function resolveRlsPilotConnectionString(env = process.env) {
@@ -40,6 +40,10 @@ function resolveRlsPilotConnectionString(env = process.env) {
 
 async function main() {
   const connectionString = resolveRlsPilotConnectionString();
+  const rlsContextHmacKey = process.env.RLS_CONTEXT_HMAC_KEY || '';
+  if (!/^[0-9a-f]{64}$/i.test(rlsContextHmacKey)) {
+    throw new Error('RLS_CONTEXT_HMAC_KEY is required for the signed RLS pilot test.');
+  }
   const pool = new Pool({ connectionString, ssl: process.env.PGSSLMODE === 'require' ? true : undefined, max: 2 });
   const suffix = randomUUID();
   const users = [];
@@ -84,10 +88,24 @@ async function main() {
     client = await pool.connect();
     await client.query('SET ROLE trademate_app');
 
+    const setSignedContext = async (sessionTokenHash) => {
+      const transaction = await client.query(
+        'SELECT txid_current()::text AS transaction_id, pg_backend_pid()::text AS backend_pid',
+      );
+      const transactionId = transaction.rows[0].transaction_id;
+      const backendPid = transaction.rows[0].backend_pid;
+      const payload = `trademate-rls-context:v1|${transactionId}|${backendPid}|${sessionTokenHash}`;
+      const signature = createHmac('sha256', Buffer.from(rlsContextHmacKey, 'hex')).update(payload, 'utf8').digest('hex');
+      await client.query(
+        "SELECT set_config('app.session_token_hash', $1, true), set_config('app.session_transaction_id', $2, true), set_config('app.session_backend_pid', $3, true), set_config('app.session_signature', $4, true)",
+        [sessionTokenHash, transactionId, backendPid, signature],
+      );
+    };
+
     const inspectAs = async (sessionTokenHash, forgedUserId = '') => {
       await client.query('BEGIN');
       try {
-        await client.query("SELECT set_config('app.session_token_hash', $1, true)", [sessionTokenHash || '']);
+        await setSignedContext(sessionTokenHash || '');
         // Demonstrate that caller-controlled app.user_id cannot override the
         // account represented by the presented bearer-token digest.
         await client.query("SELECT set_config('app.user_id', $1, true)", [forgedUserId || '']);
@@ -125,7 +143,7 @@ async function main() {
     assert.equal(anonymous.security.rowCount, 0);
 
     await client.query('BEGIN');
-    await client.query("SELECT set_config('app.session_token_hash', $1, true)", [sessions[0].tokenHash]);
+    await setSignedContext(sessions[0].tokenHash);
     await client.query("SELECT set_config('app.user_id', $1, true)", [users[1]]);
     const ownProfileUpdate = await client.query('UPDATE user_profiles SET bio = $1 WHERE user_id = $2', ['Owner updated profile', users[0]]);
     const otherProfileUpdate = await client.query('UPDATE user_profiles SET bio = $1 WHERE user_id = $2', ['Tampered profile', users[1]]);
