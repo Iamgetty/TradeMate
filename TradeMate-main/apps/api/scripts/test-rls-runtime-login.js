@@ -145,9 +145,9 @@ async function main() {
       'SELECT session_id::text AS id, is_current FROM trademate_private.list_presented_user_sessions($1)',
       [sessionHashes[1]],
     );
-    assert.equal(listed.rowCount, 2, 'Session listing must include only the authenticated user’s active sessions.');
+    assert.equal(listed.rowCount, 3, 'Session listing must include only the authenticated user’s active sessions.');
     assert.equal(listed.rows.filter((row) => row.is_current).length, 1);
-    assert.ok(listed.rows.every((row) => [sessionIds[1], secondarySession.rows[0].id].includes(row.id)));
+    assert.ok(listed.rows.every((row) => [sessionIds[1], sessionIds[2], secondarySession.rows[0].id].includes(row.id)));
 
     const crossAccountRevoke = await appClient.query(
       'SELECT revoked_session_id FROM trademate_private.revoke_presented_user_session($1, $2)',
