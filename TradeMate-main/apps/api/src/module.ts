@@ -542,7 +542,7 @@ class AuthController {
     const secret = base32Encode(randomBytes(20));
     const enrollment = await databasePool.query(
       'SELECT trademate_private.begin_totp_enrollment($1, $2) AS started',
-      [session.rows[0].id, encryptTotpSecret(secret)],
+      [tokenDigest(token), encryptTotpSecret(secret)],
     );
     if (!enrollment.rows[0]?.started) throw new ConflictException('Two-factor authentication is already enabled or setup is unavailable.');
     const label = encodeURIComponent('TradeMate:' + account.rows[0].email);
@@ -564,7 +564,7 @@ class AuthController {
       await client.query('BEGIN');
       const result = await client.query(
         'SELECT encrypted_totp_secret, enrollment_expires_at, last_totp_counter FROM trademate_private.resolve_totp_enrollment($1)',
-        [userId],
+        [tokenDigest(token)],
       );
       if (!result.rowCount || !result.rows[0].enrollment_expires_at || new Date(result.rows[0].enrollment_expires_at).getTime() < Date.now()) {
         throw new ConflictException('Start authenticator setup again; the setup has expired.');
@@ -577,7 +577,7 @@ class AuthController {
       }
       const completed = await client.query(
         'SELECT trademate_private.complete_totp_enrollment($1, $2) AS completed',
-        [userId, matchedCounter],
+        [tokenDigest(token), matchedCounter],
       );
       if (!completed.rows[0]?.completed) throw new UnauthorizedException('That authenticator code has already been used. Generate a new code and try again.');
       await client.query('DELETE FROM auth_rate_limits WHERE key_hash=$1', [rateKey]);
@@ -605,7 +605,7 @@ class AuthController {
       await client.query('BEGIN');
       const result = await client.query(
         'SELECT encrypted_totp_secret, last_totp_counter FROM trademate_private.resolve_enabled_totp($1)',
-        [userId],
+        [tokenDigest(token)],
       );
       if (!result.rowCount) throw new ConflictException('Two-factor authentication is not enabled.');
       let matchedCounter: number | null = null;
@@ -616,7 +616,7 @@ class AuthController {
       }
       const disabled = await client.query(
         'SELECT trademate_private.disable_totp($1, $2) AS disabled',
-        [userId, matchedCounter],
+        [tokenDigest(token), matchedCounter],
       );
       if (!disabled.rows[0]?.disabled) throw new UnauthorizedException('That authenticator code has already been used. Generate a new code and try again.');
       await client.query('DELETE FROM auth_rate_limits WHERE key_hash=$1', [rateKey]);
