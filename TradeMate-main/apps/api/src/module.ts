@@ -761,7 +761,6 @@ class AuthController {
     if (!token) throw new UnauthorizedException('Please sign in to manage sessions.');
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid session identifier.');
     const digest = tokenDigest(token);
-    const digest = tokenDigest(token);
     const current = await resolvePresentedSessionUserDigest(digest);
     if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const result = await databasePool.query(
