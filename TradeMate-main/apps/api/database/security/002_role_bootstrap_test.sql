@@ -203,24 +203,18 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1
     FROM pg_default_acl d
-    JOIN pg_namespace n ON n.oid = d.defaclnamespace
     JOIN pg_roles r ON r.oid = d.defaclrole
-    CROSS JOIN LATERAL aclexplode(d.defaclacl) AS acl
-    WHERE n.nspname = 'trademate_private'
+    WHERE d.defaclobjtype = 'f'
+      AND d.defaclnamespace = 0
       AND r.rolname = 'trademate_migrator'
-      AND d.defaclobjtype = 'f'
-      AND acl.grantee = 0
-      AND acl.privilege_type = 'EXECUTE'
-  ) AND NOT EXISTS (
-    SELECT 1
-    FROM pg_default_acl d
-    JOIN pg_namespace n ON n.oid = d.defaclnamespace
-    JOIN pg_roles r ON r.oid = d.defaclrole
-    WHERE n.nspname = 'trademate_private'
-      AND r.rolname = 'trademate_migrator'
-      AND d.defaclobjtype = 'f'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM aclexplode(d.defaclacl) AS acl
+        WHERE acl.grantee = 0
+          AND acl.privilege_type = 'EXECUTE'
+      )
   ) THEN
-    RAISE EXCEPTION 'Expected explicit private-function default privilege policy for trademate_migrator.';
+    RAISE EXCEPTION 'Expected global default function privileges to revoke PUBLIC execute for trademate_migrator.';
   END IF;
 
   IF (
