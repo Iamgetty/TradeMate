@@ -133,6 +133,15 @@ const databasePool = process.env.DATABASE_URL
     }))
   : null;
 
+const resolvePresentedSessionUserDigest = async (digest: string) => {
+  if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
+  return databasePool.query<{ id: string }>(
+    'SELECT resolved_user_id::text AS id FROM trademate_private.resolve_presented_session($1)',
+    [digest],
+  );
+};
+const resolvePresentedSessionUser = (token: string) => resolvePresentedSessionUserDigest(tokenDigest(token));
+
 const enforceTotpRateLimit = async (request: Request, userId: string) => {
   if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
   const key = tokenDigest((request.ip || 'unknown') + '|totp-action|' + userId);
@@ -357,10 +366,7 @@ class AuthController {
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to update your profile.');
-    const session = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const displayName = typeof body?.displayName === 'string' ? body.displayName.trim() : '';
     if (displayName.length < 2 || displayName.length > 24) throw new BadRequestException('Your nickname must be between 2 and 24 characters.');
@@ -397,10 +403,7 @@ class AuthController {
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to change your password.');
-    const session = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const currentPassword = typeof body?.currentPassword === 'string' ? body.currentPassword : '';
     const newPassword = typeof body?.newPassword === 'string' ? body.newPassword : '';
@@ -552,7 +555,7 @@ class AuthController {
   async twoFactorStatus(@Req() request: Request) {
     const token = sessionTokenFrom(request);
     if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
-    const session = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired.');
     const result = await databasePool.query('SELECT totp_enabled, totp_confirmed_at FROM user_auth_security WHERE user_id=$1', [session.rows[0].id]);
     return { enabled: Boolean(result.rows[0]?.totp_enabled), confirmedAt: result.rows[0]?.totp_confirmed_at || null, available: /^[0-9a-f]{64}$/i.test(process.env.TOTP_ENCRYPTION_KEY || '') };
@@ -583,7 +586,7 @@ class AuthController {
     parseBody(totpCodeBodySchema, body);
     const token = sessionTokenFrom(request);
     if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
-    const session = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired.');
     const userId = session.rows[0].id;
     const rateKey = await enforceTotpRateLimit(request, userId);
@@ -625,7 +628,7 @@ class AuthController {
     parseBody(totpCodeBodySchema, body);
     const token = sessionTokenFrom(request);
     if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
-    const session = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired.');
     const userId = session.rows[0].id;
     const rateKey = await enforceTotpRateLimit(request, userId);
@@ -733,10 +736,7 @@ class AuthController {
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to review your sessions.');
     const digest = tokenDigest(token);
-    const current = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [digest],
-    );
+    const current = await resolvePresentedSessionUserDigest(digest);
     if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     await databasePool.query('UPDATE user_sessions SET last_seen_at=now() WHERE token_hash=$1', [digest]);
     const result = await databasePool.query(
@@ -900,10 +900,7 @@ class PreferencesController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to manage preferences.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
@@ -971,10 +968,7 @@ class NotificationsController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to view notifications.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
@@ -1025,10 +1019,7 @@ class SupportController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to contact support.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
@@ -1185,10 +1176,7 @@ class OrganizationsController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to continue.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
@@ -1377,10 +1365,7 @@ class PublicListingsController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to create an offer.');
-    const session = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const userId = session.rows[0].id as string;
     const title = typeof body?.title === 'string' ? body.title.trim() : '';
@@ -1436,10 +1421,7 @@ class PublicListingsController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to view your offers.');
-    const session = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const result = await databasePool.query(
       `SELECT l.id, l.title, l.description, l.listing_type, l.division, l.price_minor_units::text AS price_minor_units,
@@ -1466,10 +1448,7 @@ class PublicListingsController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to submit an offer.');
-    const session = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const userId = session.rows[0].id as string;
     const client = await databasePool.connect();
@@ -1520,10 +1499,7 @@ class PublicListingsController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to edit an offer.');
-    const session = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const userId = session.rows[0].id as string;
     const title = typeof body?.title === 'string' ? body.title.trim() : '';
@@ -1591,10 +1567,7 @@ class PublicListingsController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to delete an offer.');
-    const session = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const userId = session.rows[0].id as string;
     const client = await databasePool.connect();
@@ -1742,10 +1715,7 @@ class EnquiriesController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to use marketplace enquiries.');
-    const session = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return session.rows[0].id as string;
   }
@@ -1969,10 +1939,7 @@ class MarketplaceContractsController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to manage contracts.');
-    const session = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return session.rows[0].id as string;
   }
@@ -2494,7 +2461,7 @@ class P2PMarketController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to continue.');
-    const result = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status = 'active' LIMIT 1", [tokenDigest(token)]);
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired.');
     return result.rows[0].id as string;
   }
@@ -2700,10 +2667,7 @@ class PublicProfilesController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to continue.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
@@ -2839,10 +2803,7 @@ class CommunityFeedController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to continue.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
@@ -3305,10 +3266,7 @@ class SportsTransferIdentityController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to continue.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
@@ -3532,10 +3490,7 @@ class SportsTransferOrganizationsController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to continue.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
@@ -3795,10 +3750,7 @@ class SportsTransferMandatesController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to continue.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
@@ -4207,10 +4159,7 @@ class SportsTransferOpportunitiesController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to continue.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
