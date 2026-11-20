@@ -129,7 +129,7 @@ jobs:
     needs: validate-migration-handoff
     if: ${{ needs.validate-migration-handoff.result == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     environment:
       name: aws-staging-api-promotion
     steps:
