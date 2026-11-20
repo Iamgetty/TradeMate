@@ -76,10 +76,18 @@ jobs:
       - name: Install API dependencies
         working-directory: TradeMate-main/apps/api
         run: npm ci --no-audit --no-fund
+      - name: Prepare disposable pgcrypto and HMAC test key
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: |
+          set -euo pipefail
+          echo "RLS_CONTEXT_HMAC_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;'
       - name: Apply migrations to clean PostgreSQL
         working-directory: TradeMate-main/apps/api
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+          NODE_ENV: test
         run: npm run db:migrate
       - name: Verify pgcrypto HMAC-SHA-256 compatibility and tamper rejection
         working-directory: TradeMate-main/apps/api
@@ -123,4 +131,5 @@ jobs:
         working-directory: TradeMate-main/apps/api
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+          RLS_CONTEXT_HMAC_KEY: ${{ env.RLS_CONTEXT_HMAC_KEY }}
         run: node scripts/test-database-context.js
