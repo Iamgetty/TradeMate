@@ -132,6 +132,30 @@ async function main() {
     assert.equal(revokeAudit.rowCount, 1, 'Session revocation must append its audit event atomically.');
     assert.deepEqual(revokeAudit.rows[0].metadata, { current: false });
 
+    const logout = await appClient.query(
+      'SELECT logged_out_user_id::text AS user_id FROM trademate_private.logout_presented_session($1)',
+      [sessionHashes[0]],
+    );
+    assert.equal(logout.rowCount, 1, 'A valid presented session can log out.');
+    assert.equal(logout.rows[0].user_id, userIds[0]);
+    const loggedOutSession = await admin.query(
+      'SELECT id FROM public.user_sessions WHERE id = $1',
+      [sessionIds[0]],
+    );
+    assert.equal(loggedOutSession.rowCount, 0, 'Logout must delete the presented session.');
+    const logoutAudit = await admin.query(
+      "SELECT actor_user_id::text AS actor_id, entity_id::text AS entity_id FROM public.audit_events WHERE event_type = 'auth.logout' AND entity_id = $1",
+      [userIds[0]],
+    );
+    assert.equal(logoutAudit.rowCount, 1, 'Logout must append exactly one audit event.');
+    assert.equal(logoutAudit.rows[0].actor_id, userIds[0]);
+
+    const invalidLogout = await appClient.query(
+      'SELECT logged_out_user_id FROM trademate_private.logout_presented_session($1)',
+      ['not-a-sha256-digest'],
+    );
+    assert.equal(invalidLogout.rowCount, 0, 'Malformed logout digests must not revoke a session.');
+
     const malformed = await appClient.query(
       'SELECT resolved_user_id FROM trademate_private.resolve_presented_session($1)',
       ['not-a-sha256-digest'],
