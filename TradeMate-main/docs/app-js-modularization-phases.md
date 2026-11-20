@@ -7,7 +7,7 @@ Branch: `refactor/split-web-app-runtime`
 ### Phase 1 — independent runtime patches
 - 41 standalone runtime modules extracted.
 - Runtime order is preserved by `TradeMateRuntime.tsx`.
-- `app.js` reduced from 705,335 to 684,937 characters (20,398 characters).
+- `app.js` currently contains 681,899 characters, down 23,436 characters from the 705,335-character baseline.
 - CI and browser acceptance checks passed on the last verified head.
 
 ## Remaining phases
