@@ -33,6 +33,18 @@
       "crypto_cfd" === t.instrumentType && e.length > 3 ? e.slice(0, -3) + "/" + e.slice(-3) + " (CFD)" :
       String(t.symbol || "MT5 instrument"));
   }
+  function selectMarketQuoteItems(items, assetClass, isMt5QuoteFresh) {
+    return (Array.isArray(items) ? items : []).filter(function (item) {
+      return item.assetClass === assetClass && item.providerSymbol &&
+        "Twelve Data Basic" !== item.quoteProvider &&
+        !("Exness MT5" === item.quoteProvider && "live" === item.quoteStatus &&
+          typeof isMt5QuoteFresh === "function" && isMt5QuoteFresh(item));
+    });
+  }
+  function marketQuoteRequestKey(assetClass, items) {
+    return assetClass + ":" + (Array.isArray(items) ? items : [])
+      .map(function (item) { return item.providerSymbol; }).join(",");
+  }
   root.TM_MARKET_QUOTE_UTILS = Object.freeze({
     MT5_PUBLIC_QUOTE_MAX_AGE_MS: MT5_PUBLIC_QUOTE_MAX_AGE_MS,
     MT5_CATEGORY_BY_TYPE: MT5_CATEGORY_BY_TYPE,
@@ -41,6 +53,8 @@
     mt5SymbolKey: mt5SymbolKey,
     mt5QuoteIsFresh: mt5QuoteIsFresh,
     mt5QuotePrice: mt5QuotePrice,
-    mt5NameForQuote: mt5NameForQuote
+    mt5NameForQuote: mt5NameForQuote,
+    selectMarketQuoteItems: selectMarketQuoteItems,
+    marketQuoteRequestKey: marketQuoteRequestKey
   });
 })(window);
