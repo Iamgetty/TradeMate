@@ -11,7 +11,7 @@
     "test:security": "node --test test/*.test.cjs"
   },
   "dependencies": {
-    "@nestjs/common": "^11.2.8",
+    "@nestjs/common": "^12.5.1",
     "@nestjs/core": "^11.2.8",
     "@nestjs/platform-express": "^11.2.8",
     "pg": "^8.13.1",
