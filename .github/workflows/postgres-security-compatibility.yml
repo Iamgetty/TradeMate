@@ -11,9 +11,11 @@ on:
       - 'TradeMate-main/apps/api/scripts/test-rls-pilot.js'
       - 'TradeMate-main/apps/api/scripts/test-rls-runtime-login.js'
       - 'TradeMate-main/apps/api/scripts/test-credential-write-operations.js'
+      - 'TradeMate-main/apps/api/scripts/test-credential-write-lockdown.js'
       - 'TradeMate-main/apps/api/scripts/test-rls-hmac-compatibility.js'
       - 'TradeMate-main/apps/api/scripts/test-database-context.js'
       - 'TradeMate-main/apps/api/src/database-context.ts'
+      - 'TradeMate-main/apps/api/src/module.ts'
       - 'TradeMate-main/apps/api/package.json'
       - 'TradeMate-main/apps/api/package-lock.json'
       - 'TradeMate-main/docs/security/database-rls-trusted-context.md'
@@ -27,9 +29,11 @@ on:
       - 'TradeMate-main/apps/api/scripts/test-rls-pilot.js'
       - 'TradeMate-main/apps/api/scripts/test-rls-runtime-login.js'
       - 'TradeMate-main/apps/api/scripts/test-credential-write-operations.js'
+      - 'TradeMate-main/apps/api/scripts/test-credential-write-lockdown.js'
       - 'TradeMate-main/apps/api/scripts/test-rls-hmac-compatibility.js'
       - 'TradeMate-main/apps/api/scripts/test-database-context.js'
       - 'TradeMate-main/apps/api/src/database-context.ts'
+      - 'TradeMate-main/apps/api/src/module.ts'
       - 'TradeMate-main/apps/api/package.json'
       - 'TradeMate-main/apps/api/package-lock.json'
       - 'TradeMate-main/docs/security/database-rls-trusted-context.md'
@@ -100,6 +104,11 @@ jobs:
         env:
           RLS_PILOT_TEST_DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: node scripts/test-credential-write-operations.js
+      - name: Verify runtime login cannot write credentials directly
+        working-directory: TradeMate-main/apps/api
+        env:
+          RLS_PILOT_TEST_DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-credential-write-lockdown.js
       - name: Build API database-context module
         working-directory: TradeMate-main/apps/api
         run: npm run build
