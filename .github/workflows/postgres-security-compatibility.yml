@@ -12,6 +12,7 @@ on:
       - 'TradeMate-main/apps/api/scripts/test-rls-runtime-login.js'
       - 'TradeMate-main/apps/api/scripts/test-credential-write-operations.js'
       - 'TradeMate-main/apps/api/scripts/test-credential-write-lockdown.js'
+      - 'TradeMate-main/apps/api/scripts/test-auth-lifecycle-operations.js'
       - 'TradeMate-main/apps/api/scripts/test-rls-hmac-compatibility.js'
       - 'TradeMate-main/apps/api/scripts/test-database-context.js'
       - 'TradeMate-main/apps/api/src/database-context.ts'
@@ -30,6 +31,7 @@ on:
       - 'TradeMate-main/apps/api/scripts/test-rls-runtime-login.js'
       - 'TradeMate-main/apps/api/scripts/test-credential-write-operations.js'
       - 'TradeMate-main/apps/api/scripts/test-credential-write-lockdown.js'
+      - 'TradeMate-main/apps/api/scripts/test-auth-lifecycle-operations.js'
       - 'TradeMate-main/apps/api/scripts/test-rls-hmac-compatibility.js'
       - 'TradeMate-main/apps/api/scripts/test-database-context.js'
       - 'TradeMate-main/apps/api/src/database-context.ts'
@@ -109,6 +111,11 @@ jobs:
         env:
           RLS_PILOT_TEST_DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: node scripts/test-credential-write-lockdown.js
+      - name: Verify scoped auth lifecycle operations and runtime write denial
+        working-directory: TradeMate-main/apps/api
+        env:
+          RLS_PILOT_TEST_DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-auth-lifecycle-operations.js
       - name: Build API database-context module
         working-directory: TradeMate-main/apps/api
         run: npm run build
