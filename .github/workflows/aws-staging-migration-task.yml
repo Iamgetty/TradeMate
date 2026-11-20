@@ -293,6 +293,7 @@ jobs:
           echo "task_arn=$TASK_ARN" >> "$GITHUB_OUTPUT"
 
       - name: Wait for migration task completion and verify exit code
+        id: result
         env:
           CLUSTER_NAME: ${{ steps.task.outputs.cluster }}
           TASK_ARN: ${{ steps.run.outputs.task_arn }}
@@ -339,3 +340,34 @@ jobs:
             echo
             echo "This workflow runs the migration task only. It does not update or promote the API service."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create verified migration handoff metadata
+        id: handoff
+        env:
+          EXPECTED_API_IMAGE_URI: ${{ steps.release.outputs.image_uri }}
+          RELEASE_SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
+          TASK_DEFINITION_ARN: ${{ steps.task.outputs.task_definition }}
+          TASK_ARN: ${{ steps.run.outputs.task_arn }}
+        run: |
+          set -euo pipefail
+          HANDOFF_PATH="$RUNNER_TEMP/trademate-staging-migration-release.json"
+          jq -n \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg workflow_path ".github/workflows/aws-staging-migration-task.yml" \
+            --arg migration_run_id "$GITHUB_RUN_ID" \
+            --arg source_sha "$RELEASE_SOURCE_SHA" \
+            --arg api_image_uri "$EXPECTED_API_IMAGE_URI" \
+            --arg task_definition_arn "$TASK_DEFINITION_ARN" \
+            --arg ecs_task_arn "$TASK_ARN" \
+            '{schema_version:1, repository:$repository, workflow_path:$workflow_path, migration_run_id:$migration_run_id, source_sha:$source_sha, api_image_uri:$api_image_uri, task_definition_arn:$task_definition_arn, ecs_task_arn:$ecs_task_arn, migration_result:"success", container_exit_code:0}' \
+            > "$HANDOFF_PATH"
+          jq -e '.schema_version == 1 and .migration_result == "success" and .container_exit_code == 0' "$HANDOFF_PATH" >/dev/null
+          echo "path=$HANDOFF_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Upload successful migration handoff
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: trademate-staging-migration-release
+          path: ${{ steps.handoff.outputs.path }}
+          if-no-files-found: error
+          retention-days: 7
