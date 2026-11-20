@@ -41,6 +41,7 @@ const MIGRATIONS = [
   '032_touch_presented_session.sql',
   '033_presented_session_management.sql',
   '034_logout_presented_session.sql',
+  '035_revoke_other_presented_sessions.sql',
 ];
 
 async function main() {
