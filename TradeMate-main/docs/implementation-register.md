@@ -172,3 +172,10 @@ Only use **★ Production accepted** when the exact deployed release has passed 
 - Confirmed direct dependencies: `database-context.ts` reads `user_sessions.token_hash` to resolve request identity; `module.ts` has additional session-validation and token-based deletion/revocation paths. A blanket revoke now would break authentication and account-security flows.
 - Next implementation gate: inventory all credential-bearing tables/columns and every read/write call site; design narrowly scoped, non-enumerating database operations with fixed ownership/search_path and explicit EXECUTE grants; refactor all callers; replace blanket default privileges with reviewed grants; then prove both negative access and positive authentication/session lifecycle behavior using the actual runtime LOGIN on PostgreSQL 16/18.
 - Status: ◐ repository-level access-path audit completed; remediation not yet implemented; no migration, grant, role, credential or production change made. Production RLS remains blocked.
+
+
+### Credential-bearing database inventory refinement (2026-11-20)
+
+Migration review confirmed these high-sensitivity columns for the runtime-grant remediation: `user_credentials.password_hash`, `user_sessions.token_hash`, `user_auth_security.totp_secret_encrypted`, `auth_login_challenges.token_hash`, `password_reset_tokens.token_hash`, `email_verification_codes.code_hash`, and `user_deletion_requests.cancellation_token_hash` (migrations 002, 015, 022 and 023). TOTP decryption also depends on the API-only `TOTP_ENCRYPTION_KEY`; it must not cross into SQL or logs.
+
+The exact narrow operations, transaction atomicity, expiry, attempt limits, replay/one-time consumption, audit behavior and worker deletion semantics must be designed before reducing grants. The inventory is an initial migration-backed set, not a claim that all secret-bearing schema has been exhausted.
