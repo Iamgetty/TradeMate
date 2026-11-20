@@ -151,7 +151,12 @@ BEGIN
      OR NOT has_function_privilege('trademate_app', 'trademate_private.complete_email_verification(text,text,text,timestamp with time zone,text,text)', 'EXECUTE')
      OR NOT has_function_privilege('trademate_app', 'trademate_private.complete_totp_login(text,bigint,text,timestamp with time zone,text,text)', 'EXECUTE')
      OR NOT has_function_privilege('trademate_app', 'trademate_private.resolve_totp_login_challenge(text)', 'EXECUTE')
-     OR NOT has_function_privilege('trademate_app', 'trademate_private.record_totp_login_failure(text)', 'EXECUTE') THEN
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.record_totp_login_failure(text)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.begin_totp_enrollment(uuid,text)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.resolve_totp_enrollment(uuid)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.complete_totp_enrollment(uuid,bigint)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.resolve_enabled_totp(uuid)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.disable_totp(uuid,bigint)', 'EXECUTE') THEN
     RAISE EXCEPTION 'trademate_app must have the reviewed narrow session operations.';
   END IF;
 
@@ -161,7 +166,7 @@ BEGIN
     JOIN pg_namespace n ON n.oid = p.pronamespace
     CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) AS acl
     WHERE n.nspname = 'trademate_private'
-      AND p.proname IN ('resolve_presented_session', 'touch_presented_session', 'list_presented_user_sessions', 'revoke_presented_user_session', 'logout_presented_session', 'revoke_other_presented_sessions', 'complete_password_reset', 'issue_password_login_session', 'complete_email_verification', 'complete_totp_login', 'resolve_totp_login_challenge', 'record_totp_login_failure')
+      AND p.proname IN ('resolve_presented_session', 'touch_presented_session', 'list_presented_user_sessions', 'revoke_presented_user_session', 'logout_presented_session', 'revoke_other_presented_sessions', 'complete_password_reset', 'issue_password_login_session', 'complete_email_verification', 'complete_totp_login', 'resolve_totp_login_challenge', 'record_totp_login_failure', 'begin_totp_enrollment', 'resolve_totp_enrollment', 'complete_totp_enrollment', 'resolve_enabled_totp', 'disable_totp')
       AND acl.grantee = 0
       AND acl.privilege_type = 'EXECUTE'
   ) THEN
@@ -173,11 +178,11 @@ BEGIN
     FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname = 'trademate_private'
-      AND p.proname IN ('resolve_presented_session', 'touch_presented_session', 'list_presented_user_sessions', 'revoke_presented_user_session', 'logout_presented_session', 'revoke_other_presented_sessions', 'complete_password_reset', 'issue_password_login_session', 'complete_email_verification', 'complete_totp_login', 'resolve_totp_login_challenge', 'record_totp_login_failure')
+      AND p.proname IN ('resolve_presented_session', 'touch_presented_session', 'list_presented_user_sessions', 'revoke_presented_user_session', 'logout_presented_session', 'revoke_other_presented_sessions', 'complete_password_reset', 'issue_password_login_session', 'complete_email_verification', 'complete_totp_login', 'resolve_totp_login_challenge', 'record_totp_login_failure', 'begin_totp_enrollment', 'resolve_totp_enrollment', 'complete_totp_enrollment', 'resolve_enabled_totp', 'disable_totp')
       AND p.prosecdef
       AND p.proconfig @> ARRAY['search_path=pg_catalog']
       AND pg_get_userbyid(p.proowner) <> 'trademate_app'
-  ) <> 12 THEN
+  ) <> 17 THEN
     RAISE EXCEPTION 'Every private session operation must be SECURITY DEFINER with a fixed safe search_path and non-runtime owner.';
   END IF;
 END
