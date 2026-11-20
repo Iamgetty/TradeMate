@@ -16,6 +16,8 @@ on:
       - 'TradeMate-main/apps/api/scripts/test-rls-hmac-compatibility.js'
       - 'TradeMate-main/apps/api/scripts/test-database-context.js'
       - 'TradeMate-main/apps/api/src/database-context.ts'
+      - 'TradeMate-main/apps/api/src/environment.ts'
+      - 'TradeMate-main/apps/api/scripts/migrate.js'
       - 'TradeMate-main/apps/api/src/module.ts'
       - 'TradeMate-main/apps/api/package.json'
       - 'TradeMate-main/apps/api/package-lock.json'
