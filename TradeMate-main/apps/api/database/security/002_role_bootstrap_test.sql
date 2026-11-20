@@ -39,7 +39,15 @@ BEGIN
        OR has_table_privilege('trademate_app', 'trademate_private.rls_context_hmac_keys', 'DELETE') THEN
       RAISE EXCEPTION 'trademate_app must not read or mutate the private RLS HMAC verifier key.';
     END IF;
-    IF pg_get_userbyid((SELECT relowner FROM pg_class WHERE oid = 'trademate_private.rls_context_hmac_keys'::regclass)) <> 'trademate_migrator' THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_catalog.pg_class AS relation
+      JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+      JOIN pg_catalog.pg_roles AS owner_role ON owner_role.oid = relation.relowner
+      WHERE namespace.nspname = 'trademate_private'
+        AND relation.relname = 'rls_context_hmac_keys'
+        AND owner_role.rolname = 'trademate_migrator'
+    ) THEN
       RAISE EXCEPTION 'The private RLS HMAC verifier key table must be owned by trademate_migrator.';
     END IF;
   END IF;
