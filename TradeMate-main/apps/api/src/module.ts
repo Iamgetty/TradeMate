@@ -232,25 +232,14 @@ class AuthController {
       );
       if (rate.rows[0].attempts > item.limit || (rate.rows[0].blocked_until && new Date(rate.rows[0].blocked_until).getTime() > Date.now())) throw new HttpException('Too many verification requests. Please wait 15 minutes.', HttpStatus.TOO_MANY_REQUESTS);
     }
-    const account = await databasePool.query("SELECT id, email FROM users WHERE lower(email) = $1 AND email_verified_at IS NULL AND status = 'pending' LIMIT 1", [email]);
-    if (account.rowCount) {
-      let code: string | null = null;
-      const client = await databasePool.connect();
-      try {
-        await client.query('BEGIN');
-        const stillPending = await client.query("SELECT id FROM users WHERE id = $1 AND email_verified_at IS NULL AND status = 'pending' FOR UPDATE", [account.rows[0].id]);
-        if (stillPending.rowCount) {
-          code = String(randomInt(0, 1000000)).padStart(6, '0');
-          await client.query('DELETE FROM email_verification_codes WHERE user_id = $1', [account.rows[0].id]);
-          await client.query("INSERT INTO email_verification_codes (user_id, code_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes')", [account.rows[0].id, tokenDigest(code)]);
-          await client.query("INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.email_verification_requested', 'user', $1, '{}'::jsonb)", [account.rows[0].id]);
-        }
-        await client.query('COMMIT');
-      } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
-      finally { client.release(); }
-      // Keep this response generic even when delivery fails so resend cannot be used
-      // to distinguish pending accounts from addresses with no account.
-      if (code) await sendTransactionalEmail(email, 'Your TradeMate verification code', '<p>Your TradeMate verification code is:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">' + code + '</p><p>This code expires in 10 minutes and can only be used once.</p>');
+    const code = String(randomInt(0, 1000000)).padStart(6, '0');
+    const issued = await databasePool.query(
+      'SELECT delivery_email FROM trademate_private.resend_email_verification_code($1, $2)',
+      [email, tokenDigest(code)],
+    );
+    // Keep the response generic even when no pending account exists or delivery fails.
+    if (issued.rowCount) {
+      await sendTransactionalEmail(issued.rows[0].delivery_email, 'Your TradeMate verification code', '<p>Your TradeMate verification code is:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">' + code + '</p><p>This code expires in 10 minutes and can only be used once.</p>');
     }
     return { success: true, message: 'If this account is awaiting verification, a new code has been sent.' };
   }
@@ -446,44 +435,26 @@ class AuthController {
         throw new HttpException('Too many password reset requests. Please wait 15 minutes before trying again.', HttpStatus.TOO_MANY_REQUESTS);
       }
     }
-    const account = await databasePool.query(
-      "SELECT id, email FROM users WHERE lower(email) = $1 AND status = 'active' LIMIT 1",
-      [email],
-    );
     const webOrigin = process.env.TRADEMATE_WEB_ORIGIN || process.env.PUBLIC_APP_URL || (process.env.WEB_ORIGIN || '').split(',')[0].trim();
     let resetOrigin = '';
     try {
       const parsed = new URL(webOrigin);
       if (parsed.protocol === 'https:' || (parsed.protocol === 'http:' && process.env.NODE_ENV !== 'production')) resetOrigin = parsed.origin;
     } catch { resetOrigin = ''; }
-    if (account.rowCount && resetOrigin) {
+    if (resetOrigin) {
       const rawToken = randomBytes(32).toString('base64url');
-      const client = await databasePool.connect();
-      try {
-        await client.query('BEGIN');
-        await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [account.rows[0].id]);
-        await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [account.rows[0].id]);
-        await client.query(
-          "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '30 minutes')",
-          [account.rows[0].id, tokenDigest(rawToken)],
-        );
-        await client.query(
-          "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.password_reset_requested', 'user', $1, '{}'::jsonb)",
-          [account.rows[0].id],
-        );
-        await client.query('COMMIT');
-      } catch (error) {
-        await client.query('ROLLBACK').catch(() => undefined);
-        throw error;
-      } finally { client.release(); }
-      const resetUrl = resetOrigin + '/app#passwordReset=' + encodeURIComponent(rawToken);
-      void sendTransactionalEmail(
-        account.rows[0].email,
-        'Reset your TradeMate password',
-        '<p>We received a request to reset your TradeMate password.</p><p><a href="' + resetUrl + '" style="display:inline-block;padding:13px 22px;background-color:#F6A43A;color:#17120b;text-decoration:none;font-weight:800;border-radius:9px;">Reset your password</a></p><p>This link expires in 30 minutes and can be used once. If you did not request this, you can ignore this email.</p>',
-      ).then((sent) => sent ? undefined : databasePool?.query('SELECT trademate_private.discard_password_reset_token($1)', [tokenDigest(rawToken)]).catch(() => undefined));
-    } else if (account.rowCount && !resetOrigin) {
-      console.warn('[auth] Password reset email was not sent because TRADEMATE_WEB_ORIGIN/PUBLIC_APP_URL is not configured with an allowed origin.');
+      const issued = await databasePool.query(
+        'SELECT delivery_email FROM trademate_private.issue_password_reset($1, $2)',
+        [email, tokenDigest(rawToken)],
+      );
+      if (issued.rowCount) {
+        const resetUrl = resetOrigin + '/app#passwordReset=' + encodeURIComponent(rawToken);
+        void sendTransactionalEmail(
+          issued.rows[0].delivery_email,
+          'Reset your TradeMate password',
+          '<p>We received a request to reset your TradeMate password.</p><p><a href="' + resetUrl + '" style="display:inline-block;padding:13px 22px;background-color:#F6A43A;color:#17120b;text-decoration:none;font-weight:800;border-radius:9px;">Reset your password</a></p><p>This link expires in 30 minutes and can be used once. If you did not request this, you can ignore this email.</p>',
+        ).then((sent) => sent ? undefined : databasePool?.query('SELECT trademate_private.discard_password_reset_token($1)', [tokenDigest(rawToken)]).catch(() => undefined));
+      }
     }
     return { success: true, message: 'If an active account exists for that email, a password reset link will be sent.' };
   }
@@ -745,19 +716,14 @@ class AuthController {
     const owner = await databasePool.query("SELECT 1 FROM organization_members WHERE user_id = $1 AND member_role = 'owner' LIMIT 1", [current.rows[0].id]);
     if (owner.rowCount) throw new ConflictException('Transfer organization ownership before requesting account deletion.');
     const cancelToken = randomBytes(32).toString('base64url');
-    const client = await databasePool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query("UPDATE users SET status = 'deletion_pending', updated_at = now() WHERE id = $1 AND status = 'active'", [current.rows[0].id]);
-      await client.query("INSERT INTO user_deletion_requests (user_id, cancellation_token_hash, requested_at, scheduled_for) VALUES ($1, $2, now(), now() + interval '30 days') ON CONFLICT (user_id) DO UPDATE SET cancellation_token_hash = EXCLUDED.cancellation_token_hash, requested_at = now(), scheduled_for = now() + interval '30 days', cancelled_at = NULL", [current.rows[0].id, tokenDigest(cancelToken)]);
-      await client.query('DELETE FROM user_sessions WHERE user_id = $1', [current.rows[0].id]);
-      await client.query("INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'account.deletion_requested', 'user', $1, '{\"grace_period_days\":30}'::jsonb)", [current.rows[0].id]);
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally { client.release(); }
-    const emailSent = await sendTransactionalEmail(current.rows[0].email, 'TradeMate account deletion requested', `<p>Your account is scheduled for deletion in 30 days.</p><p>To cancel, submit this one-time cancellation token in TradeMate account recovery:</p><p><strong>${cancelToken}</strong></p><p>Your sessions have been revoked and account access is disabled.</p>`);
+    const requested = await databasePool.query(
+      'SELECT delivery_email FROM trademate_private.request_presented_account_deletion($1, $2, $3)',
+      [tokenDigest(token), current.rows[0].password_hash, tokenDigest(cancelToken)],
+    );
+    if (!requested.rowCount) {
+      throw new UnauthorizedException('Your session or password changed. Please sign in again and retry.');
+    }
+    const emailSent = await sendTransactionalEmail(requested.rows[0].delivery_email, 'TradeMate account deletion requested', `<p>Your account is scheduled for deletion in 30 days.</p><p>To cancel, submit this one-time cancellation token in TradeMate account recovery:</p><p><strong>${cancelToken}</strong></p><p>Your sessions have been revoked and account access is disabled.</p>`);
     if (!emailSent) {
       const recovery = await databasePool.connect();
       try {
