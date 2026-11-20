@@ -6,7 +6,7 @@
 
 ## 1. Relation inventory
 
-### User identity and authentication (11)
+### User identity and authentication
 - `users` — account identity/contact/status; private to the account and narrowly authorized support/admin operations.
 - `user_profiles` — public-facing profile fields; public projection must not expose private account fields.
 - `user_credentials` — password verifier; no direct runtime read/write; scoped authentication functions only.
@@ -18,7 +18,7 @@
 - `user_preferences` — owner-only.
 - `user_follows` — relationship visibility and follower-only writes; confirm block/private-account semantics before public read.
 
-### Organization and marketplace (12)
+### Organization and marketplace
 - `organizations` — organization membership/visibility rules; do not assume every organization is public.
 - `organization_members` — membership-scoped; membership checks must be derived from trusted rows.
 - `organization_documents` — organization-member/reviewer access; uploaded bytes and review notes are private.
@@ -30,11 +30,11 @@
 - `marketplace_transactions` — buyer/seller participants only; state transitions must be controlled.
 - `audit_events` — append-only runtime behavior; visibility must be limited to authorized audit/support roles.
 
-### P2P marketplace (2)
+### P2P marketplace
 - `p2p_orders` — public-book visibility only for eligible active orders; owner-only mutations and private payment details.
 - `p2p_trades` — buyer/seller participants and narrowly authorized dispute reviewers; payment references and dispute data are private.
 
-### Feed and moderation (7)
+### Feed and moderation
 - `feed_posts` — public reads only for approved/published visibility; author controls own drafts; moderator actions are separate.
 - `feed_attachments` — inherit post visibility; binary content must not bypass parent-post policy.
 - `feed_comments` — inherit post visibility; author writes and moderation status are distinct.
@@ -42,7 +42,7 @@
 - `feed_reports` — reporter may create/read own report as product permits; moderation staff only for review fields and all reports.
 - `user_feedback` — submitter and authorized support staff only.
 
-### Sports and transfer domain (10)
+### Sports and transfer domain
 - `sports_profiles` — owner-controlled visibility; public/private profile setting must be honored.
 - `sports_organizations`, `sports_org_memberships` — organization membership/role-scoped.
 - `sports_guardian_relationships` — guardian, player (where appropriate), and verified reviewer access; sensitive relationship/evidence fields.
@@ -54,7 +54,7 @@
 - `sports_transfer_external_player_records` — public/restricted source-data policy, claim privacy and review-state controls.
 - `sports_transfer_external_player_history` — inherit record/source access; immutable or append-only history for ordinary runtime roles.
 
-### Support and operations (5)
+### Support and operations
 - `support_tickets`, `support_ticket_messages` — ticket owner and authorized support staff; message access inherits ticket access.
 - `audit_events` — append-only, restricted audit access (listed above; do not count twice).
 - `schema_migrations` — migrator-only; no runtime access.
