@@ -174,6 +174,7 @@ BEGIN
      OR NOT has_function_privilege('trademate_app', 'trademate_private.complete_totp_login(text,bigint,text,timestamp with time zone,text,text)', 'EXECUTE')
      OR NOT has_function_privilege('trademate_app', 'trademate_private.resolve_totp_login_challenge(text)', 'EXECUTE')
      OR NOT has_function_privilege('trademate_app', 'trademate_private.record_totp_login_failure(text)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.issue_totp_login_challenge(uuid,text)', 'EXECUTE')
      OR NOT has_function_privilege('trademate_app', 'trademate_private.begin_totp_enrollment(text,text)', 'EXECUTE')
      OR NOT has_function_privilege('trademate_app', 'trademate_private.resolve_totp_enrollment(text)', 'EXECUTE')
      OR NOT has_function_privilege('trademate_app', 'trademate_private.complete_totp_enrollment(text,bigint)', 'EXECUTE')
@@ -226,7 +227,7 @@ BEGIN
       AND p.prosecdef
       AND p.proconfig @> ARRAY['search_path=pg_catalog']
       AND pg_get_userbyid(p.proowner) = 'trademate_migrator'
-  ) <> 23 THEN
+  ) <> 24 THEN
     RAISE EXCEPTION 'Every private session operation must be SECURITY DEFINER with a fixed safe search_path and migration-role owner.';
   END IF;
 END
