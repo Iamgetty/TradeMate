@@ -130,7 +130,7 @@ jobs:
         env:
           EXPECTED_API_IMAGE_URI: ${{ steps.release.outputs.image_uri }}
           RELEASE_SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
-          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           FOUNDATION_STATUS="$(aws cloudformation describe-stacks \
