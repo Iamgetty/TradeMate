@@ -1,0 +1,733 @@
+# TradeMate Audit Remediation Checklist
+
+Baseline reviewed: `main` at `02d27f0313ca817b030c7fe2d2b8b5f5b9a692c1` (2026-11-18).
+
+This checklist records the source/configuration audit findings. Items are not complete until the relevant code change, automated checks, and required runtime verification have passed. Do not merge or deploy without explicit approval.
+
+## 1. Database migrations and profile integrity — code fix validated in CI
+
+- [x] Update `apps/api/scripts/migrate.js` so migrations `024_usernames.sql` and `025_ensure_public_profile_rows.sql` are included and applied in the correct order.
+- [x] Update `updateMyProfile()` in `apps/api/src/module.ts` so every profile-row insert satisfies the username NOT NULL constraint and username uniqueness rules.
+- [x] Update the `test-rls-pilot.js` fixture to provide a valid username after migration 024.
+- [x] Add a regression test that compares migration files with the runner's applied migration list, so future migrations cannot silently be skipped (runner fails fast on manifest mismatch).
+- [x] Run clean-database migration integration tests and profile create/update tests (CI run `44425744634`, all 8 jobs passed). Revalidated the complete migration integration and browser acceptance jobs on latest branch commit `218c9d0b02f76aa0880d8f80380019f075255fe1` in CI run `44429637981` (8/8 jobs passed).
+- [x] Review PR #216 against this branch's fix: it overlaps the migration registration and profile username insert, but omits the manifest guard and RLS fixture update. PR #219 contains the superset; leave #216 open and unmerged pending explicit PR housekeeping approval.
+
+## 2. Database backup and restore verification — local restore proven (2026-11-19)
+
+- [x] Confirmed the custom-format backup exists at the user's local path `Documents/TradeMate-Backups/trademate-backup.dump`; file size is 440,829 bytes (modified 2026-11-18 22:16 local time). No credentials or database URLs were recorded.
+- [x] Confirmed PostgreSQL 18 `pg_restore --list` can read the archive; the archive listing contains table-data and constraint entries.
+- [x] Restored the exact backup into a fresh, separate local verification database `trademate_restore_verify_20261119`; `pg_restore --exit-on-error` returned exit code 0.
+- [x] Queried the fresh verification database and confirmed 50 public base tables. A prior local test database also contained 50 tables, 35 migration records, representative application rows, 133 index entries, zero invalid/unready indexes, and zero unvalidated foreign keys; its provenance was not relied upon for the independent restore proof.
+- [x] Confirmed the restored `audit_events.id` identity generator resolves to `public.audit_events_id_seq`.
+- [ ] Application-level connectivity and full source-to-restore row-by-row/data-equivalence comparison were not performed; the successful clean restore proves archive recoverability and schema restoration, not exact data equivalence.
+- [x] Confirmed a recoverable local backup before the Render database expiry on 2026-11-25. Keep the original dump and restore-verification log safe; do not delete the verification database until a separate retention decision.
+- [ ] After backup/access needs are resolved, replace the broad database IP allowlist `0.0.0.0/0` with the narrowest practical allowlist.
+
+## 3. Render deployment and health configuration
+
+- [ ] Reconcile actual Render `autoDeployTrigger: commit` settings with `render.yaml` `checksPass` policy.
+- [x] Read-only live audit (2026-11-19): web and API use `commit`; exchange-feed uses `checksPass`. Web has no health-check path; API uses `/api/health`; feed uses `/health`. No live settings were changed.
+- [x] Record live deployment SHAs: web `02d27f0313ca817b030c7fe2d2b8b5f5b9a692c1`, API `d743ab1bc782676e6e35af6a3c234f94bbc6cf19`, exchange-feed `a3733604e58182d02b1891f595a5f75d399a2e3e`. These differ because the services have separate deployment histories; confirm compatibility before aligning them.
+- [ ] Review whether web health checks should use a lightweight web liveness endpoint; do not point web at the API health endpoint without confirming service boundaries.
+- [x] Verify API health route mapping: Nest applies the `/api` global prefix, so Render's `/api/health` maps to the liveness-only `HealthController.health()` route. `/api/health/database` separately performs `SELECT 1`; it is database readiness/diagnostics, not the configured liveness check.
+- [ ] Decide whether API deployment readiness should depend on database connectivity; assess startup/migration behavior and outage policy before changing health checks.
+- [x] Close the production migration-role fallback: source audit found the migration runner could fall back to the runtime `DATABASE_URL`, while production validation did not require `MIGRATION_DATABASE_URL`. The runner now requires the dedicated migration URL in production; API environment validation also requires it, and a regression test verifies production refuses the fallback. Validated by CI run `44427485813`; revalidated on latest branch commit `218c9d0b02f76aa0880d8f80380019f075255fe1` in run `44429637981` (8/8 jobs passed), with Cloudflare compatibility passing in run `44429638060`.
+- [ ] Add a lightweight web-service liveness endpoint only if the web runtime/platform requires one; no dedicated web health endpoint was found in the inspected app routes.
+- [x] Update the Render Blueprint to declare `DATABASE_URL` for the API runtime separately from `MIGRATION_DATABASE_URL` for migrations; both remain `sync: false`, and no secret values are stored in the repository.
+- [ ] Verify the live API service has both variables configured and that they point to the intended roles/database, without exposing secret values. The Render service-details response does not expose environment-variable names, so presence/role assignment remains unverified; do not infer it from Blueprint declarations.
+- [ ] Measure web/API-to-exchange-feed cross-region latency and decide whether region alignment is warranted.
+- [ ] Verify deployment commit SHAs and check results before treating a service as current or healthy.
+
+## 4. Homepage animation and frontend behavior
+
+- [x] Remove the unwanted legacy `.view.enter > *` entrance animation and its redundant override. The shared `@keyframes in` remains because other non-homepage screens (`.pgw`, `.lg`, and `#out`) still use it.
+- [x] Preserve the existing boot-gate loader in `app/layout.tsx`; the homepage entrance selector is removed. Runtime refresh/navigation verification remains open.
+- [x] Remove the remaining `.view.enter .mk-card` animation: those `.mk-card` elements are the Home marketplace shortcut tiles. Keep `.view.enter` animations scoped to market-page components that do not form the Home shortcuts.
+- [x] Add and pass a browser regression test that checks the served app bundle on initial load and refresh for both the broad legacy selector and the Home shortcut selector (CI run `44412507433`); browser acceptance also passed on latest branch commit in run `44429637981`.
+- [ ] Verify refresh, direct navigation, back/forward navigation, mobile layout, and reduced-motion behavior.
+- [ ] Regression-test homepage carousel and Explore category interactions; distinguish the active homepage carousel from the currently unloaded `category-ads.js`.
+
+## 5. Frontend/backend feature verification
+
+- [x] Create the initial source-level feature-to-endpoint acceptance matrix at `TradeMate-main/docs/feature-endpoint-acceptance-matrix-2026-11-19.md`; detailed workflow tests and provider/runtime acceptance remain open.
+- [ ] Test each claimed server-backed workflow against the real API contract and persisted state.
+- [x] Verify the new NFT provider timeout/resilience tests in CI; all five route-level tests passed in CI run `44425744634` browser acceptance job (39 E2E tests passed total). The latest branch commit's browser acceptance job also passed in run `44429637981`. `/api/nfts` and `/api/nft-collections` apply 8-second abort timeouts to all OpenSea requests.
+- [ ] Clearly label or disable incomplete flows until their backend/provider and security controls exist: KYC submission, crypto/fiat deposits, transfers/withdrawals, wallet funding, B2B subaccounts, social OAuth linking, referral rewards, promotion participation, advertising request submission, TradeMate Card, and unconfigured fee rates.
+- [ ] Ensure sample Portfolio Manager values and synthetic Contract Scout sparklines are not presented as real user balances or suitability recommendations.
+- [ ] Test on representative desktop and mobile viewports; record failures with reproducible steps.
+
+## 6. Production database security
+
+- [ ] Establish production least-privilege database roles and verify the application uses the intended role.
+- [ ] Plan and validate production RLS enablement and policies against real application workflows before rollout.
+- [ ] Run cross-account isolation tests against the production-equivalent schema and roles.
+- [ ] Complete DAST/independent penetration testing and resolve relevant dependency/security advisories.
+- [ ] Confirm branch protection and review requirements for protected branches.
+
+## 7. Pull-request and branch reconciliation
+
+- [x] Refresh open-PR inventory on 2026-11-19 (GitHub mergeability snapshot; mergeability can change):
+  - #216 open, mergeable, overlaps migration/profile changes; #219 supersets the migration manifest guard and RLS fixture fix. Keep #216 unmerged pending explicit housekeeping approval.
+  - #213 open, mergeable, targets `main`; review its governance reconciliation before any Sports Transfer merge.
+  - #171 open, not mergeable, targets `main`; #172 and #173 remain stacked on #171/#172 respectively. Do not merge the chain blindly.
+  - #176, #147, #142, #131, and #130 open, not mergeable.
+  - #146 and #134 open, mergeable; still require content/overlap/CI review before merge.
+  - #209, #214, #215, and #218 remain previously merged.
+- [x] Inspect changed files for #213, #146, and #134. PR #213 adds an API `package-lock.json` and changes the API Docker build to `npm ci`, but its lockfile root includes `@nestjs/cli` and `@nestjs/schematics` as devDependencies that are absent from the current API `package.json`. Treat that lockfile as out of sync; regenerate/validate it before adopting the `npm ci` change. #146 is a single browser scroll-anchor assertion adjustment; #134 adds a production data-integrity document and roadmap reference.
+- [x] Rechecked PR CI evidence on 2026-11-19: #213 head `5456c637b6edea48234713204a77206cfbb1dcb3` fails API TypeScript build, clean-database migration integration, AWS API container build, and the browser acceptance job (which stops at API build); its web, Cloudflare, security, and exchange-feed jobs pass. The changed API lockfile is out of sync with the package manifest, so do not merge or adopt its `npm ci` changes until regenerated and the failing build is diagnosed. #146 head `bb67ebbb9e2bad58676604bfcc4302300dbe1758` passes 8/9 jobs but its browser app-shell/live API acceptance job fails during the mocked smoke/live two-account acceptance step; inspect that failure before adopting the timing assertion change. #134 head `5af8410167ecb380e9977dd272e401793330f6f7` passes all 8 reported jobs and adds only a production data-integrity document plus roadmap reference; its policy is useful, but the PR remains separately reviewable and is not merged. These PRs were not modified or merged.
+- [ ] Reassess non-mergeable PRs #176, #147, #171, #172, #173, #142, #131, and #130; decide rebase, retarget, close, or retain only after explicit approval.
+- [ ] No PR merge, close, retarget, or branch deletion without explicit approval.
+
+## 8. AWS/Cloudflare migration readiness — no cutover yet
+
+- [ ] Resolve documentation disagreement about Render as current production versus AWS as target.
+- [ ] Verify Cloudflare Workers adapter compatibility, including the API proxy route currently declaring `runtime = 'nodejs'`.
+- [ ] Validate AWS staging, secrets, database migrations, backups, observability, rollback, and end-to-end acceptance before any production cutover.
+- [ ] Keep Render production in place until migration is explicitly approved and rollback is proven.
+
+## 9. Build reproducibility and static checks
+
+- [ ] Add and commit package lockfiles for the API, web, and exchange-feed workspaces, then use deterministic `npm ci` installs in CI and deployment builds. Rechecked the full review-branch Git tree on 2026-11-19: no `package-lock.json` files are present. CI and Render currently use `npm install`. Do not copy PR #213's API lockfile as-is: its root devDependency set does not match the current API `package.json`.
+- [ ] Resolve API lint configuration: `TradeMate-main/apps/api/package.json` declares `"lint": "eslint ..."`, but ESLint is not declared in its dependencies/devDependencies, no ESLint config file is present in the review-branch tree, and the current CI workflow does not run that lint script. The web `lint` script is TypeScript no-emit checking; exchange-feed uses Node's built-in test runner. Add a deliberate lint toolchain and validate it before marking this complete.
+
+
+## 10. Live Render PostgreSQL security audit — read-only findings (2026-11-19)
+
+- [x] Confirm the current Render database record: `trademate-db`, PostgreSQL 18, free plan, Oregon, expires `2026-11-25T21:52:06.818364Z`; IP allowlist remains `0.0.0.0/0`. No database changes were made.
+- [x] Inspect non-system PostgreSQL roles without retrieving credentials. The live database has the Render default database owner `trademate_db_jzjt_user` (LOGIN, CREATEDB, CREATEROLE, not superuser), `trademate_deletion_worker_ro` (LOGIN, not superuser), plus Render-managed roles. No dedicated `trademate_app` runtime role or `trademate_migrator` role exists.
+- [x] Verify live ownership and grants: the default database user owns the public schema and all 50 application tables. It has broad table privileges and CREATEDB/CREATEROLE. The deletion worker role has SELECT grants only. Its membership is granted to the database owner with ADMIN OPTION. No migration-role split is deployed in the live database.
+- [x] Verify production RLS state read-only: all 50 application tables have RLS disabled, RLS not forced, and zero policies. CI's disposable-database RLS pilot does not imply production RLS is enabled.
+- [x] Compare live `schema_migrations` with branch migration files: production has applied migrations through `030_sports_transfer_external_player_discovery.sql`, including `024_usernames.sql`, but has not applied branch migration `025_ensure_public_profile_rows.sql`. This is expected branch-only remediation pending review/deployment; do not manually run it against production. It will backfill missing public profile rows, populate missing usernames, enforce NOT NULL, and add case-insensitive uniqueness/format constraints when deployed.
+- [x] Inspect the CI RLS implementation: the API installs `databaseRequestContextMiddleware` and `createRlsAwarePool`, which sets transaction-local `app.session_token_hash` and `app.user_id` from the server-side session. The CI pilot enables policies on only five tables and tests explicit user contexts; it is not a complete production policy set.
+- [ ] Before production RLS, complete the policy inventory for all sensitive tables, including the session-token bootstrap lookup on `user_sessions`, and verify unauthenticated/session-expired behavior. Test every endpoint with the actual `trademate_app` role; the current pilot does not cover all tables or the session bootstrap policy.
+- [ ] **New RLS identity-integrity blocker (2026-11-19):** `database-context.ts` writes `app.session_token_hash` and `app.user_id` with transaction-local `set_config`, while the CI pilot policies trust `app.user_id` directly. A shared PostgreSQL runtime role can set those custom GUCs itself, so this is not a database-enforced identity boundary against arbitrary SQL executed as `trademate_app`. The current pilot test explicitly sets `app.user_id` and therefore verifies policy filtering, not resistance to context spoofing. Before any production RLS rollout, replace this trust model with a database-verifiable, request-bound signed context (signature material unavailable to the runtime DB role) or another independently enforced identity mechanism; make policies validate it rather than trusting raw GUC values, and add negative tests proving the app role cannot impersonate another user by changing settings.
+- [ ] **RLS session-bootstrap gap (2026-11-19):** the current `003_rls_pilot.sql` has no policy for `user_sessions`, but `database-context.ts` resolves the user by selecting `user_sessions` joined to `users` before setting `app.user_id`. A complete policy rollout must define a narrowly scoped bootstrap policy that permits only the current authenticated session lookup, while preventing enumeration of other sessions; it must also account for the `users` join and invalid/expired sessions. Do not assume the five-table pilot tests this path.
+- [ ] **RLS validation redesign (2026-11-19):** extend the disposable-database tests beyond the current happy-path GUC switching. Required cases: attempt to spoof another user's identity as `trademate_app`; missing/invalid signature; valid session with expired/revoked token; anonymous requests; two concurrent users sharing a pool; explicit multi-query transactions; login/session creation before an identity exists; and account deletion under a distinct worker role. Verify denial at SQL policy level, not only endpoint authorization.
+- [ ] **Candidate identity design (not implemented):** bind the session hash and resolved user ID to a cryptographic MAC generated by the API using a dedicated secret unavailable to the PostgreSQL runtime role; verify the MAC in a tightly scoped database function used by RLS policies. Keep the secret out of SQL parameters/logs and ensure the verifier function has a fixed safe `search_path`, minimal owner privileges, and revoked default `PUBLIC` execute. Review key rotation, replay scope, transaction lifetime, and failure-closed behavior before coding. This is a design candidate, not an approved implementation.
+- [ ] Design explicit least-privilege RLS access for the account-deletion background worker. It runs outside `databaseRequestContextMiddleware` and cannot rely on request-local `app.user_id`; once RLS is enabled/forced, its due-request lookup and narrowly scoped anonymisation operations need dedicated worker policies or another reviewed mechanism. Do not grant BYPASSRLS as a shortcut.
+- [ ] Plan and approve a controlled production role migration: create a dedicated least-privilege application role, a separate migration owner/role, and an appropriately scoped deletion-worker role; grant only required schema/table/sequence/function privileges; rotate service connection strings securely; test on a staging clone; then separately plan RLS policy rollout. Do not attempt ad hoc live SQL changes.
+- [ ] Verify live Render environment-variable names/role assignments. Render's available service metadata does not expose environment-variable names, so `DATABASE_URL`, `MIGRATION_DATABASE_URL`, and `WORKER_DATABASE_URL` values/role targets remain unverified. Never retrieve or print secret values.
+- [x] Inspect the scheduled `trademate-account-deletion-dry-run` cron source at its live deployed commit `492dea1d8d704288e9a53afddd94820431e8c618`: permanent processing requires both `ACCOUNT_DELETION_EXECUTE=true` and `ACCOUNT_DELETION_LEGAL_APPROVAL=true`; otherwise it is dry-run only. The production script requires `WORKER_DATABASE_URL`. The live worker role currently has SELECT-only grants, so it cannot perform the script's delete/update/insert operations if that is the configured URL.
+- [x] Confirm the scheduled cron service is separately managed and absent from the checked-in `render.yaml`; it runs daily at 03:00 UTC, targets `main`, and its latest deployment is commit `492dea1d8d704288e9a53afddd94820431e8c618`. Its configuration therefore is not governed by the current Blueprint file.
+- [x] Verify the most recent available cron run log (2026-11-18 03:01 UTC): run completed successfully, reported 0 due requests, and explicitly logged `Dry run only`; this confirms permanent processing was disabled for that run. Do not generalize this to future runs if environment settings change.
+- [ ] Verify the cron job's live environment-variable names and confirm both execution flags remain disabled; current Render service metadata does not expose env var names. Confirm the configured worker URL targets a deliberately scoped role. Do not trigger the cron job during this audit.
+- [x] Fix the checked-in future `trademate_worker` bootstrap grants: the worker's DELETE/UPDATE statements filter on `user_id`, `sender_user_id`, and `accepted_by_user_id`, which also require SELECT on those predicate columns in PostgreSQL. Added narrow column-level SELECT grants and extended `002_role_bootstrap_test.sql` to assert them. This is a CI/bootstrap-code fix only; no live roles or grants were changed.
+- [ ] Decide and test whether the deletion worker should remain permanently read-only/dry-run or receive a separate, narrowly scoped write role after legal/privacy/records-retention approval. Do not broaden the existing live read-only role ad hoc.
+- [x] Added `scripts/test-account-deletion-worker.js` and wired it into the PostgreSQL CI integration job after the least-privilege role bootstrap. It requires the explicitly named `ACCOUNT_DELETION_TEST_DATABASE_URL`, refuses database names that do not identify a test database, requires a superuser solely to `SET ROLE`, creates a disposable fixture inside a transaction, executes the due-request lookup, row lock, every worker DELETE/UPDATE/INSERT under `SET LOCAL ROLE trademate_worker`, verifies anonymisation and commercial-record preservation, and rolls the entire fixture back. CI execution verified on PR head `489b55c45298e9ccff5fa0acf24ee6061494c456`: TradeMate CI run `44464722387` completed successfully, including this worker execution step and all subsequent RLS, audit-immutability, and transaction-context tests.
+- [x] Static SQL privilege review found that the deletion worker's support-message anonymisation reads `sender_type` in a `CASE` expression while updating it. Added a column-level `SELECT(sender_type)` grant to the checked-in worker bootstrap and asserted it in `002_role_bootstrap_test.sql`. This closes the identified privilege omission in the bootstrap definition; the full disposable worker execution test subsequently passed in CI run `44464722387`. No live role was changed.
+- [x] Expanded `002_role_bootstrap_test.sql` to assert every worker UPDATE column used by the anonymisation statements, all four DELETE-table grants and predicate-column SELECT grants, both support-message UPDATE columns, the marketplace-contract UPDATE column, and audit-sequence USAGE when that sequence exists. These catalogue assertions are complemented by the passing disposable-PostgreSQL worker execution test in CI run `44464722387`.
+- [x] The disposable worker execution test is wired into `.github/workflows/ci.yml` using only the CI `trademate_test` database; it does not invoke `process-account-deletions.js`, set either permanent-execution flag, or connect to the production worker URL.
+
+## 11. Live Render deployment configuration — refreshed read-only check (2026-11-19)
+
+- [x] Confirmed current service metadata: API and web remain `autoDeployTrigger=commit`; exchange-feed remains `checksPass`. All three target `main`; no preview services are enabled.
+- [x] Confirmed web health path is empty; API health path is `/api/health`; exchange-feed health path is `/health`.
+- [x] Confirmed API, web, exchange-feed, and the database all currently allow inbound IPv4 `0.0.0.0/0`. This is broad exposure; do not change without an approved access/availability plan.
+- [ ] Reconcile live deployment triggers with the checked-in Blueprint after reviewing the risk of changing deployment behavior. No Render settings were changed.
+- [ ] Add a web liveness endpoint only if required by the chosen platform health policy; validate it in staging before changing Render.
+
+## Working rules
+
+- Work on `fix/audit-remediation-2026-11-18`; keep `main` untouched.
+- Fix and verify one bounded item at a time.
+- Update this checklist as evidence is produced; never mark an item complete based only on code being written.
+- No production database changes, deployment, merge, PR closure, secret changes, infrastructure provisioning, or AWS cutover without explicit approval.
+- Never request or commit database URLs, passwords, API keys, or other secrets.
+
+
+## 12. API lint and dependency reproducibility — follow-up audit (2026-11-19)
+
+- [x] Re-inspect `TradeMate-main/apps/api/package.json` on the review branch: the `lint` script invokes ESLint, but `eslint` is not declared in either `dependencies` or `devDependencies`.
+- [x] Check the expected API ESLint configuration paths (`.eslintrc.js` and `eslint.config.js`); neither exists at the API root. The lint script is therefore not a validated quality gate and may fail before checking source files.
+- [x] Confirm `TradeMate-main/apps/api/package-lock.json` is absent on the review branch. Do not copy PR #213's stale lockfile: its root dependency declarations do not match the current API manifest. A lockfile must be generated from the reviewed manifest and validated with a clean `npm ci` install before adoption.
+- [ ] Select and pin a compatible ESLint/tooling configuration for the API's TypeScript version and module format; add the required parser/plugin/config dependencies and a repository-owned config, or remove the misleading lint script until a real lint gate is implemented. Validate against the actual source tree and CI runner.
+- [ ] Generate and commit an API lockfile from the final manifest using the intended Node/npm versions; prove clean install and build using `npm ci`. Repeat separately for web and exchange-feed if those workspaces are intended to be reproducible.
+- [x] Freshly inspect PR #219 CI run 1525 (run ID `44435308255`) for code commit `1f67e94f79d64609a277020e3602e7f6c1a22b0a`: Cloudflare compatibility, API TypeScript build, database migration integration, container builds, web build/runtime syntax, exchange-feed/MT5 tests, and security scanning passed. The browser app-shell/live API acceptance job ended `cancelled`, not passed; therefore this run is not a full green CI result.
+- [x] Rechecked PR #219 head `6256eb13affb660521a2abdda255b3bc6eab9c27`: TradeMate CI run 1527 (ID `44435758010`) completed successfully with all 8/8 jobs passing, including browser app-shell/live two-account API acceptance and SAST/SCA/secret scanning. Cloudflare compatibility run 343 (ID `44435757991`) also passed. This supersedes the incomplete run 1525 status for the current branch head; API lint and lockfile tasks above remain open.
+
+## 13. Latest PR-head CI confirmation (2026-11-19)
+
+- [x] Rechecked exact latest PR head `74100949d1aac560484dc3e6bdd95a708215462c`: TradeMate CI run 1529 (ID `44436629596`) completed with all 8/8 jobs successful. This includes API TypeScript build/security validation, clean PostgreSQL migration integration and role/RLS tests, exchange-feed/MT5 tests, web build/runtime checks, browser app-shell plus mocked and live two-account API acceptance, isolated Cloudflare Workers build/runtime, SAST/SCA/secret scanning, and AWS API/exchange-feed container builds.
+- [x] Confirmed browser acceptance job `135267006668` completed successfully; the migration integration job `135267006888` and security scan job `135267006723` also passed.
+- [x] Cloudflare frontend compatibility run 345 (ID `44436629633`) completed successfully on the same latest PR head.
+- [ ] API lint remains unconfigured and is not run by CI. ESLint is absent from API dependencies and no API ESLint config exists.
+- [ ] API, web, and exchange-feed lockfiles remain absent; deterministic `npm ci` validation remains outstanding. Do not adopt PR #213's stale API lockfile.
+- [ ] This CI result validates the checked-in CI suite, not production Render configuration, production PostgreSQL roles/RLS, or deployment readiness. No production changes were made.
+
+
+## 14. Latest review-branch CI confirmation (2026-11-19)
+
+- [x] Rechecked exact latest PR #219 head `bad9c94e7aa176d074d9be194a331a994cac3fc5`: TradeMate CI run 1530 (ID `44437003928`) completed successfully. All eight reported jobs passed.
+- [x] Cloudflare frontend compatibility run 346 (ID `44437003920`) completed successfully on the same head.
+- [ ] API lint remains unconfigured and is not run by CI. ESLint is absent from API dependencies and no API ESLint config exists.
+- [ ] API, web, and exchange-feed lockfiles remain absent; deterministic `npm ci` validation remains outstanding. Do not adopt PR #213's stale API lockfile.
+- [ ] These CI results validate the checked-in CI suite, not production Render configuration, production PostgreSQL roles/RLS, or deployment readiness. No production changes were made.
+
+
+## 15. Reproducibility toolchain alignment — source inspection (2026-11-19)
+
+- [x] Re-inspected the three package manifests on the current review branch. API uses TypeScript 5.7.2, NestJS 11.2.8, CommonJS, and has an ESLint script but no ESLint dependency. Web uses Next 16.4.3, React 19.3.1, TypeScript 5.7.2, and Playwright 1.56.1; its `lint` script is `tsc --noEmit`. Exchange-feed has only `ws` as a runtime dependency and uses Node's built-in test runner.
+- [x] Compared execution runtimes: the primary CI jobs install with Node 20; the API and exchange-feed Dockerfiles build/run on Node 22; the isolated Cloudflare compatibility job uses Node 22. The lockfile/toolchain plan must explicitly choose and test supported Node/npm versions rather than assume these environments are interchangeable.
+- [x] Confirmed API and exchange-feed Dockerfiles copy `package*.json` and run `npm install`; adding a lockfile alone will not make builds deterministic until Docker install commands and CI install commands are deliberately switched to `npm ci` and validated.
+- [ ] Decide and document a supported Node/npm matrix for API, web, exchange-feed, CI, Docker, and Render before generating lockfiles. Check framework and dependency engine requirements against that matrix.
+- [ ] Generate each lockfile using the selected npm version, then validate clean `npm ci`, build/tests, security audit, and container builds in the corresponding Node runtime. Do not mark complete based on a lockfile being present.
+- [ ] Only after clean validation, update CI and Docker install commands to `npm ci`; preserve separate production `--omit=dev` install behavior where required and test the resulting images.
+
+
+## 16. Render Node runtime pinning — deployment source audit (2026-11-19)
+
+- [x] Re-inspected the review-branch `TradeMate-main/render.yaml`: all three Render services declare `runtime: node` but do not pin a Node version in the Blueprint or a checked-in `.node-version`/`.nvmrc` file at the inspected locations.
+- [x] Confirmed the Blueprint build commands use `npm install` for API, web, and exchange-feed. The API and exchange-feed Dockerfiles use Node 22, while primary CI jobs currently use Node 20 and the isolated Cloudflare compatibility job uses Node 22.
+- [ ] Select one supported Node major for all three services and CI. Node 22 is the leading alignment candidate because both runtime Dockerfiles and the Cloudflare compatibility job already use it; verify framework engine constraints and Render's supported Node version mechanism before pinning.
+- [ ] Pin the selected Node version for Render and local development (for example, a repository `.node-version` plus an explicit Render `NODE_VERSION` setting if supported), then validate all builds/tests and production startup on that exact major before deployment.
+- [ ] Keep the live Render services unchanged until this has been validated and separately approved. This is a source configuration finding only; no live Render settings were changed.
+
+
+## 17. Node runtime compatibility and Render pinning mechanism — documentation verification (2026-11-19)
+
+- [x] Verified from the official Next.js 16 upgrade guide that Next.js 16 requires Node.js 20.9 or later. This makes Node 22 compatible with the declared framework minimum; it does not by itself certify every dependency or the full application on Node 22.
+- [x] Verified from current Render documentation that native Node services can be pinned, in precedence order, with the service's `NODE_VERSION` environment variable, a repository-root `.node-version`, a root `.nvmrc`, or a bounded `engines.node` range. Render recommends an upper bound for ranges and documents the Blueprint `NODE_VERSION` environment variable.
+- [x] Confirmed that the current Render default is Node 24.22.1 for services created on/after 2026-10-21; older services can retain different defaults. Therefore the existing unpinned Render services must not be assumed to use Node 22 or the same Node major as CI/Docker.
+- [x] Node 22 remains the best alignment candidate from repository evidence: API and exchange-feed Dockerfiles use Node 22; Cloudflare compatibility CI uses Node 22; Next.js 16's documented minimum is Node 20.9. Primary CI currently uses Node 20 and must be aligned only after an exact Node/npm version is selected and validated.
+- [x] Identified an exact Node 22 candidate from the official Node.js release archive: Node 22.23.5 (published 2026-11-11), bundled npm 10.9.9. The official Node.js security release notice identifies this as the current 22.x security release at the time of this audit. This is the proposed pin, not yet an adopted or tested toolchain.
+- [ ] Verify the Node 22.23.5 patch is accepted by Render's native runtime and all dependency engine constraints; then, in a real checkout/build environment, align primary CI, all three Render services, Docker build/runtime images, and local development on Node 22.23.5/npm 10.9.9. Run clean installs, API/web/feed builds and tests, and container builds before changing deployment configuration.
+- [ ] No `.node-version`, `.nvmrc`, `engines`, CI runtime, Docker image, or live Render setting was changed as part of this documentation-only verification.
+
+
+## 18. API lint scope review — source inspection (2026-11-19)
+
+- [x] Inspected the API TypeScript configuration: strict TypeScript is enabled; compiler module is CommonJS; target is ES2021; production build includes `src/**/*.ts` and excludes tests/spec files.
+- [x] Enumerated the API source tree on the review branch: ten TypeScript source files are currently present under `src`; the largest is `src/module.ts` (approximately 252 KB). The API test suite is JavaScript `.cjs` and is exercised separately with Node's built-in test runner.
+- [x] Confirmed the existing lint glob `eslint "{src,apps,libs,test}/**/*.ts"` does not accurately describe the current API project layout: the checked API root has `src` and `test`, but no `apps` or `libs` directories, and the test files are `.cjs`, not TypeScript. A future lint script should target the actual TypeScript source and explicitly define whether test/config TypeScript is in scope.
+- [ ] Implement a pinned ESLint 9 + typescript-eslint flat-config setup only after it can be installed and executed against the full API source tree. Select rules deliberately; do not enable broad type-aware or stylistic rules without checking compatibility and existing code findings.
+- [ ] Run lint against all ten source files, resolve or explicitly justify findings, then add the lint command to CI. The GitHub file-editing connection does not provide a repository checkout or Node/npm execution, so no lint package/config changes are claimed as validated in this audit.
+- [ ] Keep the existing API TypeScript build and security tests as separate gates; passing them does not mean ESLint is configured or passing.
+
+
+## 19. API security source review — public market WebSocket resource controls (2026-11-19)
+
+- [x] Inspected the market-feed upgrade handler and subscription lifecycle in `apps/api/src/market-feed.ts`.
+- [x] Confirmed the WebSocket endpoint is intentionally public market data, but the upgrade path currently has no explicit Origin allowlist, authentication, per-IP connection cap, global session cap, subscription rate limit, or idle-client timeout.
+- [x] A single accepted subscription opens multiple upstream venue WebSockets (two or three depending on the symbol) and emits a snapshot every second. There is no explicit `bufferedAmount` backpressure guard before sending snapshots. Consequently, a high number of clients or slow-reading clients can amplify resource consumption on the API and upstream connections.
+- [x] Client message size is bounded (`maxPayload: 16 KiB`) and symbol syntax is constrained, but these controls do not cap the number of accepted clients or upstream subscriptions.
+- [ ] Add a documented public-feed capacity policy: per-IP and global connection limits, per-connection subscription limit, handshake Origin validation for browser clients (as a CSWSH defense, not as authentication), idle/heartbeat handling, upstream connection budget, and `bufferedAmount` backpressure/drop behavior.
+- [ ] Add regression tests for rejected origins, connection/session caps, reconnect cleanup, slow-client backpressure, and bounded upstream sockets; verify legitimate browser market-feed subscriptions still work.
+- [ ] Do not make the endpoint private merely to mitigate abuse: market data is public functionality. Apply explicit limits and monitor connection counts instead.
+- [ ] No runtime WebSocket behavior was changed during this source-only audit; these are confirmed code-level hardening gaps requiring implementation and executable validation.
+
+## 20. API security source review — authentication and query boundaries (2026-11-19)
+
+- [x] Reviewed password hashing (scrypt), constant-time password/TOTP comparisons, hashed opaque session/reset tokens, short-lived one-use verification/reset challenges, login/password-reset rate-limit records, and server-side session revocation flows.
+- [x] Confirmed API SQL values in inspected authentication and market activity queries are parameterized; dynamic market activity filters are selected from fixed allowlists and the limit placeholder is generated from the number of bound values.
+- [x] Confirmed login rate limiting is keyed by IP plus normalized email, and the second-factor challenge has both a per-challenge attempt ceiling and a per-IP/user rate-limit record.
+- [x] Confirmed the account-deletion worker is guarded by separate execution and legal-approval flags; its production database URL cannot fall back to the API runtime URL.
+- [ ] Review all remaining 4,000+ lines of `module.ts` route-by-route for authorization/ownership checks, moderation boundaries, mass assignment, and transaction consistency. The sampled review is not a full endpoint security certification.
+- [ ] Review WebSocket Origin behavior against the actual production web origin and reverse-proxy configuration; ensure trusted proxy settings cannot permit client spoofing of `request.ip` for rate limiting.
+- [ ] Verify all login, password reset, email verification, 2FA and deletion cancellation rate-limit paths under concurrency and confirm expired `auth_rate_limits`/challenge rows are cleaned up safely.
+- [ ] No authentication or endpoint code was changed as part of this review entry.
+
+
+## 21. Public market-feed WebSocket capacity controls — implementation added (2026-11-19)
+
+- [x] Added an explicit per-instance ceiling of 100 concurrent WebSocket clients and a per-client-IP ceiling of 5.
+- [x] Added browser Origin allowlisting for the deployed TradeMate web origin, localhost development, and normalized comma-separated `WEB_ORIGIN` values. Requests without an Origin remain permitted for non-browser clients; an unexpected or malformed browser Origin is rejected before upgrade.
+- [x] Per-IP accounting uses the right-most valid `X-Forwarded-For` address, consistent with the API's existing one-hop trusted-proxy setting in `main.ts`; invalid forwarding data falls back to the transport peer address.
+- [x] Added a 10-second subscription deadline, one symbol per connection, and a 30-second ping/pong heartbeat that terminates unresponsive clients.
+- [x] Added snapshot backpressure handling: skip sends while buffered output exceeds 1 MiB and close a client after 3 consecutive over-limit snapshots.
+- [x] Added cleanup for upstream connection timeouts and Bybit ping intervals when sessions stop, preventing timers from surviving client disconnects.
+- [x] Added a 10-second upstream WebSocket handshake timeout and exponential reconnect backoff (1–30 seconds, with jitter), resetting the backoff after a successful connection to reduce venue reconnect storms.
+- [x] Added `market-feed.test.cjs` coverage for allowed/blocked origins, configured-origin normalization, trusted proxy client-IP selection, and explicit resource ceilings.
+- [x] Added `market-feed.integration.test.cjs` coverage that opens real local WebSocket connections and verifies rejection of an untrusted Origin and the fifth-to-sixth per-IP connection boundary.
+- [x] API TypeScript build and database-backed API integration suite completed successfully on commit `e8dc171c8d233b752aab1b57968f7309e4a62b97` in TradeMate CI run 1560 (all 8/8 jobs passed).
+- [ ] Add live WebSocket integration tests for slow-client closure, heartbeat termination, subscription timeout, and upstream cleanup; those behaviors currently have implementation but not dedicated socket-level regression coverage.
+- [ ] Validate the Render edge proxy's actual `X-Forwarded-For` behavior before rollout. The current per-IP quota assumes the one trusted proxy hop configured in `main.ts` appends the connecting client IP as the right-most value.
+- [ ] Capacity values are conservative initial per-instance ceilings, not production load-test results. Revisit after observing real concurrent-client and upstream-connection metrics.
+- [ ] No production deployment, Render setting, or live service was changed.
+
+
+## 22. Sports Transfer mandate confidentiality — organization membership scope (2026-11-19)
+
+- [x] Reviewed player profile consent ownership, mandate creation, representative acceptance/rejection, mandate revocation, organization membership management, and opportunity ownership checks.
+- [x] Found that `GET /api/sports-transfer/mandates/mine` exposed organization-represented mandates to any membership marked active, although mandate acceptance is restricted to active owners/admins. The list query also needed to enforce the same role boundary as the response action.
+- [x] Restricted organization-side mandate visibility to active owner/admin memberships with valid `starts_at` and `expires_at` windows, matching the existing `canRespond` authorization rule. Directly appointed individual representatives retain access to their own mandates.
+- [x] Extended the database-backed Sports Transfer mandate HTTP integration test to verify active owner/admin visibility and denial for ordinary members, expired admins, future-dated admins, and outsiders.
+- [x] Latest review-branch commit `c2fb08c473c2e263703205785f46ed93c94cbd30`: TradeMate CI run 1552 (`44439610122`) passed all 8/8 jobs, including the updated database-backed Sports Transfer mandate integration cases; Cloudflare compatibility run 368 (`44439610108`) passed.
+- [ ] Continue auditing other Sports Transfer reads for equivalent role/date-scope mismatches. This is a targeted source finding, not a certification of the entire Sports Transfer module.
+
+
+## 23. Sports Transfer organization owner-role assignment — schema boundary regression test (2026-11-19)
+
+- [x] Reviewed the organization membership invitation schema and confirmed it explicitly excludes the `owner` role; ownership can only be established when an organization is created. The route separately restricts admin invitations to owners.
+- [x] The first added test incorrectly expected HTTP 403 for an owner-role invitation. TradeMate CI run 1556 reached the organization integration test and correctly returned HTTP 400 because Zod rejects the role before route authorization. The source guard was restored to its original, schema-aligned behavior; no owner-escalation vulnerability was established by this test.
+- [x] Updated the regression assertion to require HTTP 400 and document that owner assignment is rejected by the invitation schema.
+- [x] Corrected schema-boundary assertion and checklist passed full TradeMate CI run 1560 on commit `e8dc171c8d233b752aab1b57968f7309e4a62b97` (8/8 jobs), including database migration integration; Cloudflare compatibility run 376 passed.
+- [ ] Continue auditing organization-role changes, membership reactivation, and all organization-scoped opportunity/document actions for independent privilege escalation paths.
+
+
+## 24. Latest review-branch verification and continued Sports Transfer access review (2026-11-19)
+
+- [x] Verified PR #219 head commit `e8dc171c8d233b752aab1b57968f7309e4a62b97` remains open, draft, unmerged, and mergeable.
+- [x] TradeMate CI run 1560 (`44440391941`) completed successfully: all 8/8 jobs passed, including API TypeScript build, database migration integration, web build/runtime, security scanning, container builds, exchange-feed/MT5 tests, and browser app-shell/live API acceptance.
+- [x] Cloudflare frontend compatibility run 376 (`44440391933`) completed successfully.
+- [x] Re-reviewed Sports Transfer organization membership routes, mandate inbox visibility, private opportunity creation/listing, and organization-scoped role/date checks. Opportunity creation requires active, in-window membership with a recruitment-capable role and workspace/recruitment scope; organization opportunity listing applies active membership, role, scope, and date-window predicates.
+- [x] Existing opportunity integration test covers player-owned versus organization-owned drafts, outsider denial, and access removal after membership revocation. Mandate integration test covers owner/admin visibility and denial for ordinary, expired, future-dated, and outsider memberships.
+- [ ] Continue a separate review of all read and write paths for organization documents, negotiation, offer, and opportunity lifecycle actions before treating Sports Transfer authorization as fully audited. Current opportunity API exposes private draft creation and owner-scoped listing; it does not provide publish/edit/delete routes in this controller.
+- [ ] Add socket-level WebSocket tests for slow-client closure, heartbeat termination, subscription timeout, and upstream cleanup; CI passing does not replace these missing targeted tests or a Render proxy/load validation.
+
+
+## 25. Sports Transfer organization-manager date-window regression coverage (2026-11-19)
+
+- [x] Extended the database-backed organization HTTP integration test with active-status admin rows whose membership windows are expired or future-dated.
+- [x] Added assertions that both expired and future-dated admins receive HTTP 403 for member listing and membership invitations; this exercises the shared manager-role date-window guard.
+- [ ] Run the updated organization integration test and full CI on this commit before treating the new regression cases as verified.
+
+
+## 26. Sports Transfer organization notification audience — membership date-window enforcement (2026-11-19)
+
+- [x] Reviewed organization-member acceptance and organization-representative mandate notification recipient queries.
+- [x] Found two notification queries that selected active owner/admin rows without checking `starts_at`; one also omitted an expiry check. This could send organization activity notices to future-dated or expired managers even though those memberships cannot currently manage the organization or access its mandate inbox.
+- [x] Added both `starts_at IS NULL OR starts_at <= now()` and `expires_at IS NULL OR expires_at > now()` predicates to each manager-notification recipient query.
+- [x] Extended the database-backed organization integration test to assert that expired and future-dated admins do not receive new-member notifications.
+- [x] Extended the database-backed mandate integration test to assert that active owner/admin members receive organization mandate notices while ordinary members, expired admins, and future-dated admins do not.
+- [ ] Run full CI on the resulting commit before treating these changes as validated.
+- [ ] Continue the separate audit of Sports Transfer document access and all remaining organization-scoped actions. This notification fix does not certify document authorization.
+- [ ] No production database, service, or deployment was changed.
+
+## 27. Sports Transfer mandate revocation notification audience (2026-11-19)
+
+- [x] Reviewed organization mandate revocation notification recipients.
+- [x] Found the revocation notification query selected active owner/admin memberships but did not enforce membership start and expiry timestamps.
+- [x] Added both membership-window predicates, matching the invitation-acceptance and mandate-creation notification queries.
+- [x] Extended the database-backed mandate integration test to verify current owners/admins receive revocation notices and ordinary, expired, and future-dated members do not.
+- [ ] Run full CI on the resulting commit before treating this change as validated.
+- [ ] Continue authorization review for the complete Sports Transfer opportunity lifecycle and any future document routes.
+- [ ] No production services or database were changed.
+
+
+## 28. Sports Transfer opportunity authorization and lifecycle review (2026-11-19)
+
+- [x] Re-reviewed the opportunity creation request schema: it strictly validates allowed fields, sport/movement compatibility, exactly one owner (player profile or organization), visibility, and structured financial terms.
+- [x] Re-reviewed player-owned creation: the profile is selected by both profile ID and authenticated user ID under row lock, and the opportunity sport must match the profile.
+- [x] Re-reviewed organization-owned creation: the organization must exist, and the creator must hold an active recruitment-capable membership with workspace/recruitment scope and a currently valid start/expiry window.
+- [x] Re-reviewed `GET /sports-transfer/opportunities/mine`: player records are scoped to profiles owned by the authenticated user; organization records require active, in-window membership, an allowed role, and workspace/recruitment scope.
+- [x] Confirmed migration 029 enforces exactly one owner, sport-specific movement types, bounded fields, allowed visibility/status values, and states that drafts are private and unpublished. No public discovery or publication transition is implemented in this controller.
+- [x] Confirmed this controller currently exposes draft creation and owner-scoped listing only; no edit, delete, submission, publication, pause, or close endpoint was found. This is a product lifecycle limitation, not an authorization defect to patch by inventing endpoints.
+- [ ] Continue the separate audit of document authorization and any negotiation/offer endpoints outside this controller before declaring Sports Transfer authorization fully reviewed.
+- [x] Latest head `1103d188e2915ba08dc643b88c7bcfb2f3feb711` passed TradeMate CI #1570 and Cloudflare compatibility #386.
+- [x] No production services, deployments, or databases were changed.
+
+
+## 29. Organization verification documents and Sports Transfer document-surface review (2026-11-19)
+
+- [x] Reviewed the legacy `/api/organizations/:id/documents` upload/list routes and migration 011. These are business-organization verification documents, not Sports Transfer negotiation or player-identity documents.
+- [x] Upload and metadata-list operations require an authenticated organization owner/admin; ordinary organization members are denied. The database-backed HTTP integration test covers owner/admin allow, member deny, and transaction rollback when the audit insert fails.
+- [x] Upload validation restricts names, declared MIME types, base64 input size, decoded file size (5 MiB), and document count (1–4); document bytes are not returned by the list endpoint.
+- [x] No API read/download route for `organization_documents.file_data` or reviewer document-review route was found in the reviewed API controller/search results. This is a document workflow completeness gap; no new retrieval/review route was invented during a security audit.
+- [ ] Before adding any document retrieval/review workflow, verify file signatures rather than trusting declared MIME type, enforce safe download headers/content disposition, authorize reviewers explicitly, audit every read/review, and test cross-organization denial.
+- [x] No dedicated Sports Transfer document, negotiation-room, offer, or transaction-document route was found in the reviewed Sports Transfer controller. The current Sports Transfer API remains profiles, consents, organizations/memberships, mandates, quotes, and private opportunity drafts/listing.
+- [x] No production data or services changed.
+- [ ] Continue repository-wide review of any frontend document access assumptions and other controllers that may handle sports-related records before closing the authorization audit.
+
+
+## 30. Document authorization schema verification and frontend recovery review (2026-11-19)
+
+- [x] Verified the legacy `organization_members` schema in migration 001: it contains organization ID, user ID, member role, and creation timestamp only. It does not have membership status, start, or expiry columns. The earlier Sports Transfer date-window predicates apply to the separate `sports_org_memberships` table and must not be copied onto this legacy table.
+- [x] Rejected the initial hypothesis that legacy document routes had a date-window bypass. The temporary attempted predicate/test edits were reverted immediately after schema verification; final source retains the existing schema-compatible owner/admin role check. No migration was added.
+- [x] Confirmed the frontend has an organization-document loading/retry path and a Playwright recovery test for transient document API failures in `apps/web/e2e/contract-lifecycle.spec.ts`.
+- [x] Confirmed the current UI integration exercises document metadata loading and retry; it does not establish file download/review capability. No client call for retrieving `file_data` was found in the reviewed search results.
+- [ ] Extend the document integration tests with cross-organization owner/admin denial and upload input edge cases; do not add date-window cases to the legacy membership schema.
+- [ ] Continue reviewing organization moderation/reviewer routes and cross-controller sports-related access before closing the broader audit.
+- [x] No production data, services, or deployments were changed.
+
+
+## 31. Cross-organization document isolation and organization moderation review (2026-11-19)
+
+- [x] Traced both document routes in `OrganizationsController`: listing and upload first require a membership row matching the exact target organization ID and authenticated user ID, then require owner/admin role. The document list query is additionally constrained by the same target organization ID. No cross-organization data exposure was found in these paths.
+- [x] Extended `apps/api/scripts/test-organization-documents.js` with a second unrelated organization and regression assertions that an owner/admin from organization A receives 403 when listing or uploading documents for organization B. This is a source-level test addition; it has not yet been executed against PostgreSQL.
+- [x] Reviewed `ModerationController`: organization queue and review endpoints require the dedicated `TRADEMATE_REVIEW_API_KEY` via constant-time comparison; organization decisions are limited to pending records and transactionally update organization status, review record, pending document review statuses, and audit event.
+- [x] Identified a workflow completeness gap: moderation queue returns organization identity/contact metadata but not document metadata or bytes. The moderation decision updates all pending documents for that organization, but no API route was found to retrieve the uploaded `file_data` for actual content inspection. Do not treat this as evidence that a reviewer has examined the documents.
+- [x] Repository search found `file_data` only in the migration definition and upload insert path; no API download/read path was found. Sports Transfer offer/negotiation/document endpoints were also not found in the reviewed controller/search scope.
+- [ ] Product/security decision required before building reviewer access: define reviewer identity and least-privilege document read scope, safe streaming/download headers, file-signature validation, read-access audit events, retention/deletion, and cross-organization denial tests. Do not expose document bytes through the existing organization member list endpoint or public listing moderation.
+- [ ] Run the updated PostgreSQL-backed organization-document integration test in CI and inspect the result before marking cross-organization isolation runtime-verified.
+- [x] No production data, services, or deployments were changed.
+
+
+## 32. Organization membership lifecycle, Sports Transfer manager boundaries, and reviewer-route audit (2026-11-19)
+
+- [x] Searched all API mutations of the legacy `organization_members` table. The only insert in the reviewed API module creates the initial owner membership alongside organization creation; no invite, role-change, removal, or reactivation route was found for this legacy organization model. This is an absent lifecycle capability, not evidence of an exploitable membership-change endpoint.
+- [x] Re-reviewed all `SportsTransferOrganizationsController` membership operations. Member listing and invitation require an active owner/admin membership with valid `starts_at`/`expires_at` bounds. Invitation expiry is constrained to the next 30 days; invitation acceptance is restricted to the invited user and an unexpired invitation.
+- [x] Confirmed the invitation schema excludes `owner`; admins cannot invite another admin. Revocation rejects owner removal and prevents an admin from revoking another admin. Revocation and invitation changes write audit events transactionally.
+- [x] Confirmed `GET /sports-transfer/organizations/mine` is a self-membership listing, not an authorization grant. It currently returns historical/revoked or out-of-window membership rows as well as active rows; downstream manager authorization separately enforces active status and date windows. Consider filtering or explicitly labelling inactive rows in the UI to avoid stale membership presentation.
+- [x] Rechecked every route in `ModerationController`: organization queue, organization review, listing queue, and listing review each invoke the shared `TRADEMATE_REVIEW_API_KEY` authorization check.
+- [x] Extended the reviewer-route search to `CommunityFeedController`: report queue, report decision, and announcement publication each invoke its `reviewKey()` guard, which uses the same configured key, constant-time comparison, and reviewer key ID. No unguarded feed reviewer route was found in the controller.
+- [ ] The shared review key remains a service-level identity rather than named staff accounts with per-reviewer roles, revocation, or separation of duties; retain the documented product/security decision before expanding sensitive reviewer workflows.
+- [ ] No changes to source code were required by this pass. No runtime tests were run as part of this source review; existing test/CI evidence remains scoped to the commits and runs documented above.
+- [x] No production data, services, deployments, or infrastructure were changed.
+
+
+## 33. Sports Transfer permission-scope enforcement review (2026-11-19)
+
+- [x] Compared membership scope values in the API schema and migration: `workspace`, `recruitment`, `negotiation`, `documents`, `signing`, and `read_only`.
+- [x] Confirmed opportunity creation and organization opportunity listing explicitly require active, in-window memberships with `workspace` or `recruitment` scope, in addition to permitted roles.
+- [x] Found that `SportsTransferOrganizationsController.managerRole()` checks active status, start/expiry dates, and `owner`/`admin` role, but does not inspect `permission_scope`. This helper gates member listing, invitations, and membership revocation. Consequently a narrow-scope or `read_only` owner/admin membership currently passes these management checks.
+- [ ] Treat this as a scope-enforcement inconsistency requiring a product/security decision, not yet a confirmed privilege vulnerability: the technical foundation describes membership role and permission scope as distinct fields but does not define a complete permission matrix for management actions. Define which scope grants member administration before changing the helper or existing memberships.
+- [ ] Add database-backed tests covering owner/admin memberships with `read_only`, `documents`, `recruitment`, and `workspace` scopes once the authorization matrix is approved.
+- [x] No source behavior changed in this pass. No runtime tests were run. No production data, services, deployments, or infrastructure were changed.
+
+
+## 34. Sports Transfer player-consent lifecycle review (2026-11-19)
+
+- [x] Reviewed player-profile ownership checks for consent listing, granting, and revocation. All three operations require the authenticated user to own the referenced profile; revocation additionally updates only a currently granted, not-yet-revoked consent.
+- [x] Consent grants require exactly one recipient (user or sporting organization), an existing active user when targeting a person, an existing organization when targeting an organization, a supported purpose, a strictly shaped scope object, and an expiry within 12 months. Grant/revoke operations are audited transactionally.
+- [x] A player can grant consent to an existing sporting organization without being a member of that organization. This is consistent with recipient-directed consent, not an authorization bypass by itself; no API route was found that consumes these consent rows to grant access.
+- [ ] Consent enforcement remains incomplete at the API surface reviewed: no recipient-side endpoint was found that demonstrates purpose, recipient identity, expiry, revocation, and territory/competition scope being enforced before access to private profile or documents. Do not expose private data based solely on the existence of a consent row; any future consumer must enforce every applicable field and have recipient authentication.
+- [ ] No source behavior changed in this pass. No runtime tests were run. No production data, services, deployments, or infrastructure were changed.
+
+
+## 35. Sports Transfer mandate-to-consent lifecycle and recipient access review (2026-11-19)
+
+- [x] Traced all API references to `sports_player_consents`, `sports_profiles`, and `sports_representative_mandates` in the API module. The only current consent consumer found is mandate creation; no recipient-side private-profile/document read endpoint was found that authorizes access from consent or mandate records.
+- [x] Confirmed mandate creation requires a currently granted, unexpired `representative_access` consent from the profile owner to the exact representative user or organization. It checks requested territory and competition values against non-empty corresponding consent arrays.
+- [x] Identified a scope-semantics ambiguity with concrete enforcement impact: when a consent scope omits `territoryCodes` or `competitionIds`, or supplies an empty array, mandate creation treats that dimension as unrestricted because it only rejects out-of-scope values when the allowed array has entries. The schema permits both fields to be omitted and permits empty arrays. This may be intentional “unrestricted” semantics, but it is not explicit in the API contract; do not silently assume empty means deny-all or unrestricted.
+- [x] Confirmed the mandate expiry is validated independently of the selected consent expiry. A mandate may therefore be created with an expiry later than the consent that enabled its creation, provided both are individually valid when created.
+- [x] Confirmed consent revocation updates only the consent row. It does not update or revoke any mandate. The player has a separate mandate-revocation endpoint, and that endpoint does notify the representative. Acceptance checks mandate status and time bounds but does not re-check the originating consent.
+- [ ] Product/security decision required: define whether representative-access consent is only a one-time prerequisite for creating a separately binding mandate, or whether it must remain valid throughout the mandate lifecycle. If it must remain valid, bind the mandate to the consent ID, cap mandate expiry at consent expiry, and revoke/suspend pending or active mandates when consent is revoked; add DB-backed tests for each lifecycle transition. If the mandate is the independent authorization after creation, make that distinction explicit in API/UI wording and audit trail.
+- [ ] Define scope semantics for omitted and empty territory/competition arrays. Add tests for omitted, empty, partial, and broader-than-consent scopes; do not change authorization behavior until the intended semantics are approved.
+- [x] Reviewed mandate listing: player-side list is owner-scoped; representative-side list returns only mandates addressed to that user or to an organization where the user has active, in-window owner/admin membership. The representative list exposes player display name and sport with mandate metadata, not biography or private profile fields.
+- [x] Reviewed mandate acceptance/rejection/revocation: acceptance and rejection require the exact named representative or active organization owner/admin; player revocation is owner-scoped and audited. Acceptance explicitly leaves mandate inactive pending separate TradeMate verification.
+- [x] No recipient-side API route currently consumes mandate permissions to expose profile or document content. Do not add such a route without checking mandate status, acceptance, verification, start/expiry, representative identity/membership, permitted action, territory, competition, and revocation.
+- [x] No source behavior changed. No runtime tests were run in this source-review pass. No production data, services, deployments, or infrastructure were changed.
+
+
+## 36. Legacy marketplace enquiry and contract authorization consistency review (2026-11-19)
+
+- [x] Reviewed enquiry participant authorization. `authorizedEnquiry()` allows the buyer or any user with a row in legacy `organization_members` for the seller organization to read the enquiry and messages. Reply uses the same participant helper, then rejects closed/reported enquiries and rechecks status under a row lock.
+- [x] Reviewed contract actions. Contract proposal response and seller-side completion confirmation explicitly require legacy organization membership role `owner` or `admin`; buyer-side cancellation is restricted to the buyer. Contract detail/messages use the shared `authorizedContract()` helper.
+- [x] This establishes a concrete policy inconsistency: ordinary organization members can access and reply to buyer enquiries, while only owner/admin can accept/reject contracts or confirm seller completion. The legacy membership model has no date-window or permission-scope columns, so Sports Transfer membership rules must not be applied to it.
+- [ ] Product decision required: confirm whether every legacy organization member is intentionally allowed to see and respond to commercial enquiries. If yes, document this as a deliberate distinction between enquiry collaboration and contract authority, and ensure the UI explains it. If no, introduce a defined enquiry permission/role rule and add DB-backed HTTP tests for member versus owner/admin access to enquiry read/reply, contract read/respond, and completion confirmation.
+- [x] The inspected contract queries use buyer identity or seller-organization membership predicates; no cross-organization contract access path was identified in this source pass.
+- [x] No source behavior changed. No runtime tests were run in this source-review pass. No production data, services, deployments, or infrastructure were changed.
+
+## 37. Public profile visibility and community-feed attachment content review (2026-11-19)
+
+- [x] Reviewed `GET /profiles/:id`: it requires any active signed-in user, then returns the target user's bio, social handles, website, profile and cover image data, highlights, and public engagement counts. The route does not consult a per-profile visibility setting or per-field audience setting.
+- [x] Reviewed `PATCH /profiles/me`: updates only the authenticated user's profile and validates field lengths, HTTPS website URLs, base64 image data URLs, and highlight shape/size. The mutation and audit event are transactional.
+- [ ] Product/privacy decision required: confirm whether all profile fields and image/highlight data are intentionally visible to every authenticated user. If so, document this as the public-profile contract and provide clear UI disclosure. If not, add explicit profile/field visibility rules and DB-backed cross-account tests before exposing private profile fields. This source review does not establish an unauthorized cross-account access vulnerability because the route is explicitly the public-profile read surface.
+- [x] Reviewed public feed attachment reads: the feed list exposes attachment metadata for published posts, and the attachment route is unauthenticated but constrained to an attachment belonging to the specified published post. The response sets the stored content type, `X-Content-Type-Options: nosniff`, a sanitized inline filename, and public one-hour caching. This is consistent with a public-feed attachment model.
+- [x] Upload validation restricts declared MIME types to an allowlist, validates canonical base64, enforces a 5 MiB per-file limit and a maximum of four attachments, and checks that a data URL's declared MIME matches the separate client-supplied MIME field.
+- [ ] Verified content-validation gap: the feed upload path does not inspect file signatures or decode/re-encode images; it trusts the client-declared MIME after syntactic validation. A caller can therefore submit bytes that do not match the claimed allowed type. The response's `nosniff` header is a useful mitigation but does not prove content/type correspondence or safe handling by every client. Add magic-byte/container validation (and image decoding/re-encoding where appropriate), tests for mismatched and malformed payloads, and explicit download/inline policy before treating uploaded content as trusted.
+- [ ] No source behavior changed. No runtime tests were run in this source-review pass. No production data, services, deployments, or infrastructure were changed.
+
+## 38. Preferences, notifications and customer-support account isolation review (2026-11-19)
+
+- [x] Reviewed preferences read/update: both routes require an active authenticated session and select/update only the row keyed by the authenticated `user_id`. Updates use a strict key/value allowlist and merge only supplied keys; the preference write and audit event are transactional.
+- [x] Reviewed notification list/read mutations: list, mark-one-read and mark-all-read all require an active authenticated session. Every query is scoped by the authenticated `user_id`; the mark-one route returns not-found for another user's notification rather than disclosing its existence.
+- [x] Reviewed support ticket list, create, message read/reply and feedback list/submit. Reads and replies constrain ticket access by both ticket ID and authenticated owner ID. Replies lock the owned ticket row, reject resolved/closed tickets, and commit the message, status update and audit event together. Ticket creation commits the initial message and audit event with the ticket. Feedback reads/submissions are scoped to the authenticated user and submission is audited transactionally.
+- [x] No cross-user ticket, notification, preference or feedback access path was identified in these controller methods. No unauthenticated support write route was found.
+- [ ] Operational follow-up: the reviewed customer-facing controller contains no staff support-ticket queue, staff reply, assignment, or resolution endpoint. Confirm whether support operations are handled by a separate trusted system; otherwise the in-app ticket workflow currently supports user submission and reply but not staff handling through this API. This is a workflow-completeness question, not an authorization bypass.
+- [x] No source behavior changed. No runtime tests were run in this source-review pass. No production data, services, deployments, or infrastructure were changed.
+
+
+## 39. Upload content signature hardening (2026-11-19)
+
+- [x] Added shared upload-signature validation for JPEG, PNG, WebP, GIF, PDF, WebM, Ogg, MP4, MPEG audio, and WAV content.
+- [x] Applied signature checks to community-feed attachments after canonical Base64 and size validation; a client-supplied MIME label or matching data-URL MIME is no longer sufficient by itself.
+- [x] Applied decoded-byte signature validation to profile and cover image data URLs, with canonical Base64 enforcement and a 650 KiB decoded-byte ceiling per image.
+- [x] Added unit regression coverage for valid signatures, MIME spoofing, truncated/unsupported payloads, malformed Base64, and oversized profile images.
+- [x] Follow-up GitHub Actions for the later branch head completed successfully: all eight TradeMate CI jobs and the Cloudflare compatibility scan passed. The API job explicitly runs `npm run build` followed by `npm run test:security`, whose glob includes `test/*.test.cjs`.
+- [ ] Signature checks establish file-type correspondence at the container/header level; they are not a full malware scan or a guarantee that every image/audio/document decoder will accept the entire payload. Consider safe image decode/re-encode and isolated document inspection as separate defense-in-depth work.
+- [x] No production data, services, deployments, or infrastructure were changed.
+
+
+## 40. Organization verification-document upload consistency review (2026-11-19)
+
+- [x] Reviewed the separate organization verification-document upload route. It already enforced owner/admin authorization, a four-file maximum, a 5 MiB per-file limit, an allowed PDF/JPEG/PNG MIME set, data-URL MIME consistency, and signature checks.
+- [x] Identified a consistency gap: unlike feed uploads, organization documents did not compare decoded bytes re-encoded as Base64 with the supplied Base64. Non-canonical padding bits could therefore pass the syntax check.
+- [x] Reused the shared upload-signature validator for organization PDF/JPEG/PNG documents and added canonical Base64 round-trip validation before storage.
+- [x] Added an HTTP integration regression case for non-canonical Base64. The existing integration suite also covers spoofed PDF content, data-URL MIME mismatch, role restrictions, cross-organization denial, and transaction rollback.
+- [x] Verified on merge commit `d5155803dfb24da32f51742723b6904aa6f0cfa2`: TradeMate CI run `44460205942` passed all eight jobs, including database migration integration, API build/security tests, and browser acceptance. Cloudflare compatibility run `44460206086` also passed.
+- [x] No production data, services, deployments, or infrastructure were changed.
+
+
+## 41. Uploaded attachment delivery and inline-content policy review (2026-11-19)
+
+- [x] Traced every upload/storage path in the API module: community-feed attachments, organization verification documents, and profile/cover image data URLs. No additional multipart or arbitrary file-upload handler was found in this module.
+- [x] Rechecked the public feed attachment read query: it binds the attachment ID to the requested post ID and requires the post to remain published; it returns not-found for a missing/unpublished attachment.
+- [x] Confirmed response headers include the stored validated content type, `X-Content-Type-Options: nosniff`, a CR/LF/quote-sanitized inline filename, exact stored byte length, and one-hour public caching.
+- [x] The upload allowlist excludes HTML, SVG, and other active web content, and MIME/signature correspondence is now checked before feed storage. Organization verification documents are not served through this public feed route.
+- [ ] Delivery-policy follow-up: the feed endpoint deliberately uses `Content-Disposition: inline` for every allowed format, including PDF and audio. Decide explicitly whether PDFs/audio should remain inline or use attachment download behavior; add HTTP response-header tests for each allowed type and ensure the product's preview/download UX matches the policy. Do not change behavior without confirming the intended feed experience.
+- [ ] Defense-in-depth follow-up: signature checks are header/container checks, not full media decoding or malware scanning. Consider image decode/re-encode and isolated PDF inspection before treating uploaded bytes as fully trusted. Keep this separate from MIME spoofing prevention already implemented.
+- [x] No further upload write paths were found in the inspected API module. No production data, services, deployments, or infrastructure were changed.
+
+
+## 42. API request-body limit and upload-route isolation review (2026-11-19)
+
+- [x] Inspected the API bootstrap in `apps/api/src/main.ts`: Nest's default body parser is disabled and one Express JSON parser is mounted globally with a `28mb` limit before the API controllers and market-feed attachment handler are registered.
+- [x] The large limit was intentional for the feed and organization-document contracts: each accepts up to four files Base64-encoded inside JSON, so the encoded representation plus JSON metadata can approach the global limit. Before this change, the same 28 MiB allowance also applied to unrelated JSON endpoints.
+- [x] Implemented route-specific JSON parsing in `apps/api/src/request-body-parser.ts`: `POST /api/feed/posts` and `POST /api/organizations/:uuid/documents` receive the 28 MiB allowance; every other JSON request receives a 1 MiB allowance. The middleware selects one parser and invokes it once. Existing controller limits remain four attachments/documents and 5 MiB per file.
+- [x] Traced the upload route in `apps/api/src/module.ts`: feed attachments are accepted by the Nest controller's `POST /api/feed/posts` handler, which receives the JSON `attachments` array. This is distinct from `apps/api/src/market-feed.ts`.
+- [x] Traced `market-feed.ts`: it registers a WebSocket `upgrade` listener and processes WebSocket messages; it is not the HTTP feed-post attachment upload handler. The separate market-highlights attachment is also not the JSON upload route.
+- [x] `main.ts` now mounts the single route-selecting parser before Nest route dispatch. It matches the externally visible `/api/feed/posts` path including the global prefix and does not add a second parser.
+- [x] Added Express HTTP regression tests in `test/request-body-parser.test.cjs`: ordinary 1 MiB overflow is rejected, the exact feed and organization-document routes accept the encoded envelope for four 5 MiB PNG uploads (including JSON overhead), while unrelated paths, malformed organization IDs, and wrong methods do not receive the larger allowance. Verified on merge commit `d5155803dfb24da32f51742723b6904aa6f0cfa2`; TradeMate CI run `44460205942` passed all eight jobs, including API security tests and browser acceptance.
+- [x] Source behavior is changed on the remediation branch only: ordinary JSON requests now have a 1 MiB limit, while the two documented upload routes retain 28 MiB. The API security test job passed in run `44460205942` on merge commit `d5155803dfb24da32f51742723b6904aa6f0cfa2`. No production data, services, deployments, or infrastructure were changed.
+
+
+## 43. Account-deletion worker execution and latest PR-head CI confirmation (2026-11-19)
+
+- [x] Fixed the worker fixture's PostgreSQL parameter inference error by explicitly casting the session fixture's first bind parameter to `uuid` while retaining a text cast for the token-hash expression. Commit `489b55c45298e9ccff5fa0acf24ee6061494c456`.
+- [x] Verified exact PR #219 head `489b55c45298e9ccff5fa0acf24ee6061494c456`: TradeMate CI run `44464722387` passed all eight jobs; Cloudflare compatibility run `44464722388` also passed.
+- [x] Inspected the database integration job step results: clean migrations, least-privilege role assertions, restricted `trademate_worker` transaction execution, RLS pilot, audit immutability, and transaction-local context/pool-isolation tests all completed successfully.
+- [x] Confirmed PR #219 remains open and draft; GitHub reported the head mergeable. No merge, deployment, production database operation, or live worker execution was performed.
+
+
+
+## 44. Authentication bootstrap and RLS rollout dependency audit (2026-11-19)
+
+- [x] Re-read the request-context middleware and pool proxy. The middleware extracts only the HttpOnly session cookie, hashes it with SHA-256, and starts an AsyncLocalStorage context with an unresolved user identity. The pool proxy opens a transaction for each ordinary query, sets `app.session_token_hash` transaction-locally, resolves the active user through `user_sessions` joined to `users`, then sets `app.user_id`. Explicit checked-out-client transactions establish the same context immediately after `BEGIN`.
+- [x] Confirmed the current session bootstrap lookup occurs before `app.user_id` is set. A future RLS policy on `user_sessions` or the joined `users` table cannot simply require `app.user_id`; it needs a narrowly scoped bootstrap policy/function that validates the supplied session-token hash, expiry and active account without allowing session enumeration. The current `user_sessions` table has no RLS policy in the migration reviewed.
+- [x] Traced registration and email verification: registration creates a pending user, credentials and a verification code without a session; successful email verification activates the user and creates the first session in one transaction. A blanket owner-only policy on `users`, `user_credentials`, or verification tables would break these unauthenticated flows unless narrowly scoped database operations are designed for them.
+- [x] Traced password login and 2FA: password login reads `users` and `user_credentials` before a session exists; it then reads `user_auth_security` to decide whether a second factor is required. The 2FA completion route consumes a challenge and creates a session before any session cookie exists. These are separate unauthenticated bootstrap operations and must not depend on an already-established `app.user_id`.
+- [x] Traced password reset request/completion, email-verification resend/confirm, account-deletion cancellation, and logout. Each uses one-time or hashed tokens/challenges or session state without necessarily having an authenticated session. Their database access needs explicitly scoped policies/functions rather than a broad anonymous table policy.
+- [x] Confirmed the five-table RLS pilot currently protects `user_preferences`, `user_notifications`, and `user_auth_security` with owner policies, while `user_profiles` and `user_follows` expose public reads and owner-scoped writes. If this pilot SQL were applied to the app role, password login's pre-session `user_auth_security` lookup would see no row when no valid session cookie is present; the current login handler would then incorrectly skip the 2FA challenge. The pilot remains CI-only and is not in the production migration runner.
+- [x] Confirmed `DatabaseService` creates a separate plain `Pool` for its health check, while the application module's operational pool is wrapped by `createRlsAwarePool`. Do not mistake the health-check pool for a safe authentication bypass pool; it is not a reviewed least-privilege auth boundary.
+- [ ] Design and threat-model dedicated bootstrap operations for registration, email verification, password login, 2FA challenge verification, password reset, session resolution, account-deletion cancellation and logout. Prefer narrow parameterized database functions or a separately credentialed least-privilege role with explicit operation grants; do not grant broad table access or RLS bypass to the general API role.
+- [ ] For session identity, define a database-verifiable binding between the cookie-token hash and resolved user ID that the app role cannot forge by setting custom GUCs. Specify secret/key provisioning, rotation, verifier ownership, fixed `search_path`, EXECUTE grants, failure behavior, replay scope, and safe handling of signature material before implementing an HMAC design.
+- [ ] Add negative integration tests proving `trademate_app` cannot spoof another user's identity by changing `app.user_id`, cannot reuse a valid session proof for a different token/user, and cannot read another user's rows through pooled or explicit multi-query transactions. Add positive tests for every anonymous bootstrap path and for expired, revoked, malformed and 2FA-pending sessions.
+- [x] This pass was a source and migration review only. No application behavior, SQL policy, migration, role, or production configuration was changed. No production data, services, deployments, or infrastructure were changed.
+
+
+## 45. Authentication route-to-database boundary inventory (2026-11-19)
+
+- [x] Confirmed `apps/api/src/module.ts` constructs the only operational API pool as `createRlsAwarePool(new Pool({ connectionString: process.env.DATABASE_URL, max: 5 }))`. Authentication handlers do not currently use a separately scoped bootstrap pool or database credential.
+- [x] Confirmed `main.ts` mounts `databaseRequestContextMiddleware` before Nest route dispatch. For requests without a valid session cookie, the request context begins with an empty token hash and unresolved user ID; the first database operation resolves no user and sets transaction-local `app.user_id` to the empty string. Therefore, any future policy that requires an authenticated owner identity will intentionally deny these requests unless they are routed through dedicated bootstrap operations.
+- [x] Mapped anonymous bootstrap reads/writes directly in the authentication controller: registration writes `users`, `user_credentials`, `email_verification_codes`, `auth_rate_limits`, and `audit_events`; verification resend reads/locks `users` and replaces `email_verification_codes`; verification confirmation locks/updates `users`, consumes `email_verification_codes`, creates `user_sessions`, and writes `audit_events`.
+- [x] Mapped password login: rate-limit writes precede lookup of `users` + `user_credentials`; login then reads `user_auth_security`, optionally creates `auth_login_challenges`, and otherwise creates `user_sessions`, a `user_notifications` row, and an audit event. The pre-session `user_auth_security` read is a direct dependency of the 2FA security decision and cannot be hidden by owner-only RLS.
+- [x] Mapped 2FA challenge completion: `auth_login_challenges` and `users` are read/locked before `user_auth_security` is checked; successful verification consumes the challenge and creates the authenticated session before a session cookie exists. This must be a one-time challenge-scoped operation, not a general unauthenticated read policy.
+- [x] Mapped password reset: request uses `auth_rate_limits`, email-based active-account lookup in `users`, and writes `password_reset_tokens` plus audit data. Completion validates and locks a one-time reset token joined to `users`, then updates `user_credentials`, revokes `user_sessions` and login challenges, and consumes/deletes reset tokens. The reset token, not `app.user_id`, is the authorization credential for this flow.
+- [x] Mapped account-deletion cancellation: a token-hash match in `user_deletion_requests` authorizes the atomic status restoration in `users`, token consumption, and audit event. It must not require an existing active session because the deletion request revoked all sessions.
+- [x] Mapped authenticated operations that still perform direct session lookups: password change, 2FA status/setup/confirm/disable, logout, account-deletion request and cancellation-related paths query `user_sessions` and/or join `users` directly. Their eventual function/policy contract must distinguish valid session authentication from one-time-token bootstrap rather than grant blanket access to those tables.
+- [x] Confirmed the RLS pilot is not safe to promote unchanged: its `user_auth_security` owner policy makes the login-time 2FA lookup return no row when no cookie is present. This would make an enabled 2FA factor appear disabled and permit password-only session issuance. The existing CI pilot is not deployed and no production migration was changed.
+- [ ] Define an explicit operation matrix before implementation: operation name, credential presented (none / email+password / verification code / challenge token / reset token / cancellation token / session cookie), allowed target rows, permitted columns, rate-limit effects, atomic writes, replay/expiry semantics, audit actor, and generic error behavior. Require every bootstrap function to validate and consume its credential inside the same transaction as its protected state change.
+- [ ] Review and test the raw cookie parser separately from middleware parsing: `sessionTokenFrom` currently calls `decodeURIComponent` without a local malformed-cookie catch, while middleware parsing catches decode errors. Ensure malformed percent-encoding consistently fails closed and cannot cause a 500 or a divergent identity context.
+- [ ] Add integration tests that execute every anonymous flow through the actual `trademate_app` role with RLS forced, including negative cross-account probes and replay/race tests for verification, 2FA challenge, password-reset and deletion-cancellation tokens. Include the critical regression assertion that an account with TOTP enabled cannot obtain a session after password-only login.
+- [x] This inventory was read-only. No API code, database function, role, policy, migration, production data, service, deployment, or infrastructure was changed.
+
+
+## 46. Authentication bootstrap permission matrix and design constraints (2026-11-19)
+
+This is a design inventory, not an approved SQL/API implementation. Each operation below must eventually be exposed as a narrow, parameterized database operation (or an equivalently isolated least-privilege credential). The general API role must not receive anonymous table-wide access merely to keep these routes working.
+
+| Operation | Credential / trust anchor | Required database scope | Required atomicity and abuse controls |
+| --- | --- | --- | --- |
+| Registration | No account credential; validated email/password and request IP | Create one pending user, its password credential, verification-code digest, rate-limit rows and audit event | Enforce unique normalized email; rate limit by IP and email digest; do not return account-existence detail |
+| Verification resend | Email address only; not proof of account ownership | Rate-limit keys; discover only eligible pending account; lock that account; replace its outstanding verification digest; audit | Generic response for existing/non-existing accounts; code expiry, attempt limit, single outstanding usable code; email delivery outside DB transaction |
+| Verification confirmation | Email + one-time code | Lock pending user and current verification record; increment failed attempts or consume code; activate account; create initial session; audit | Code check, one-time consumption, activation and session issuance in one transaction; race/replay safe |
+| Password login | Email + password, verified in application using stored password hash | Rate-limit key; retrieve only the matching account and password hash; retrieve its 2FA-enabled state; create a challenge or session; audit/notification | Generic invalid-credential response; preserve rate limit until 2FA succeeds; never treat a hidden/missing 2FA row as 2FA disabled |
+| 2FA login completion | Short-lived, one-time challenge token + TOTP code | Lock challenge, associated user and TOTP security row; update monotonic TOTP counter; consume challenge; create session; clear applicable rate limits; audit/notification | Challenge expiry and attempt limit; counter update and challenge consumption must serialize with session creation; replay and concurrent submissions denied |
+| Password-reset request | Email + request IP; no account credential | Rate-limit keys; discover active account; lock account; replace reset-token digest; audit | Generic response; one-time digest only, expiry, no email enumeration; send mail after commit |
+| Password-reset completion | One-time reset token + new password | Lock token and user; update password hash; revoke existing sessions/challenges; consume reset token; audit | Token validation, password update, revocation and consumption in one transaction; replay/race safe |
+| Session resolution / `me` | HttpOnly session cookie, SHA-256 digest | Validate one unexpired session joined to active user; return minimum identity fields; optionally update last-seen | No session enumeration; token digest only; revoked/expired/inactive account fails closed |
+| Authenticated profile/password/security operations | Valid session cookie; password or TOTP re-authentication where endpoint requires it | Resolve caller; restrict every read/write to caller; access only necessary credential/security columns; audit sensitive changes | Identity must be database-verifiable, not accepted from `app.user_id` alone; preserve transaction context and prevent cross-account IDs |
+| Session list/revoke/logout | Valid current session cookie | Resolve caller; list only caller's sessions; revoke only caller-owned session; update current last-seen; audit revocation | Ownership check and mutation in one transaction; clear cookie only after successful current-session revocation |
+| Account-deletion request | Valid session + current password | Resolve caller; read credential and organization-owner constraint; transition account to deletion-pending; write cancellation-token digest; revoke all sessions; audit | State transition, cancellation token, session revocation and audit atomic; prevent owner account deletion until ownership transferred |
+| Account-deletion cancellation | One-time cancellation token; no live session (request revoked sessions) | Lock matching pending deletion request; restore account status; consume cancellation digest; audit | Token match, state restoration and token consumption atomic; expired/used/wrong token denied; never expose request enumeration |
+| Auth rate limiting | Server-derived IP/email/challenge identifiers, stored as digests | Atomic upsert/read of only the applicable rate-limit key | Database-side atomic increment/window reset/block expiry; callers cannot select or inspect arbitrary keys |
+
+### Required design invariants
+
+- [x] The current implementation's authentication routes use the same `databasePool` built from `DATABASE_URL` and wrapped by `createRlsAwarePool`; there is no dedicated bootstrap credential or separately scoped auth pool in the reviewed module.
+- [x] The middleware's initial identity lookup occurs before `app.user_id` is populated. Empty-cookie requests therefore cannot pass policies that require an already resolved owner identity.
+- [x] The login 2FA decision is security-critical: the handler queries `user_auth_security` before a session exists. Any future policy/function must return the actual enabled state for the credential-verified account, not silently collapse authorization denial into “no 2FA row”.
+- [x] One-time token flows currently perform validation and state changes using explicit checked-out-client transactions in several paths. A replacement database boundary must preserve their lock ordering, rollback semantics, and single-use behavior.
+- [ ] Choose and document the implementation boundary: (A) dedicated narrowly privileged auth database role/pool, or (B) carefully owned `SECURITY DEFINER` functions with fixed safe `search_path`, schema-qualified objects, revoked PUBLIC execute, strict argument validation, and explicit grants. Do not mix both approaches casually or give the general app role broad RLS bypass.
+- [ ] For function-based operations, ensure the function owner is a dedicated non-login, non-superuser, non-BYPASSRLS role with only the table/column privileges needed for that operation. Avoid ownership by the broad migration role where possible.
+- [ ] Define how the database distinguishes a legitimate API invocation from arbitrary SQL under `trademate_app`. A SECURITY DEFINER function callable by the same compromised app role is not, by itself, proof of a trusted caller. Bind authenticated operations to a verifiable session proof or isolate credentials/connection identity; do not treat caller-supplied user IDs, custom GUCs, or function arguments as authentication.
+- [ ] Decide whether password verification remains in the API or moves into a bounded auth service. If it remains in the API, restrict the credential lookup to a single normalized email and return only the password hash and minimum account state; do not expose a general credential-table SELECT operation.
+- [ ] Ensure all one-time challenge/reset/verification/cancellation functions consume the token and perform the authorized mutation in the same transaction. Add concurrency tests with two simultaneous submissions, not only sequential replay tests.
+- [ ] Make malformed percent-encoding behavior consistent between `database-context.ts` and `sessionTokenFrom` in `module.ts`: invalid cookie encoding must fail closed as unauthenticated, not throw an uncaught URIError or create divergent request/database identity.
+- [ ] Add forced-RLS integration tests using the actual runtime role for each positive operation above and negative tests for cross-account reads/writes, forged `app.user_id`, arbitrary session lookup, token replay, expired/revoked sessions, and concurrent one-time-token consumption.
+- [ ] Specifically prove that a TOTP-enabled account cannot receive a session from password-only login when the auth-security row is inaccessible under ordinary owner policies.
+- [x] This pass changed documentation only. No function, role, policy, migration, API code, production configuration, data, service, or deployment was changed.
+## 47. Consistent fail-closed session cookie parsing (2026-11-19)
+
+- [x] Reproduced the parser inconsistency: request-context middleware already treated malformed percent-encoding as an absent session, while the authentication controller's separate sessionTokenFrom helper allowed decodeURIComponent to throw.
+- [x] Added one shared sessionTokenFromCookieHeader parser in database-context.ts. It selects the named session cookie, decodes it, and returns an empty token for absent or malformed values.
+- [x] Updated both database request-context middleware and authentication controller session extraction to use the shared parser, preventing divergent cookie interpretation between database identity setup and endpoint authorization.
+- [x] Extended database-context.test.cjs to cover valid percent-decoding, malformed UTF-8 percent sequences, invalid percent escapes, absent cookies and unrelated cookies. Existing middleware integration test continues to assert malformed input establishes anonymous context and does not pass raw cookie text into SQL context.
+- [ ] Await CI on the resulting PR head. No local test execution is claimed.
+- [x] This change only normalizes malformed-cookie handling; it does not alter session validity, token hashing, authentication policy, database roles, RLS policies, migrations, production configuration, data, services, or deployments.
+## 48. Authentication bootstrap database-operation matrix (2026-11-19)
+
+Source reviewed: `apps/api/src/module.ts` authentication controller, including registration, verification, login, session resolution, password reset, TOTP, account deletion and logout handlers. This is a source-level permission matrix, not an implemented grant set.
+
+| Operation | Authentication state | Database objects observed | Required narrow capability |
+|---|---|---|---|
+| Registration | No session | `auth_rate_limits`, `users`, `user_credentials`, `email_verification_codes`, `audit_events` | IP rate-limit upsert; create pending user and credential; create hashed verification code; append scoped audit event |
+| Verification resend | No session | `auth_rate_limits`, `users`, `email_verification_codes`, `audit_events` | Rate-limit upserts; non-enumerating pending-account lookup; lock pending user; rotate one-time code; append audit event |
+| Verification confirm | No session; valid one-time code | `users`, `email_verification_codes`, `user_sessions`, `audit_events` | Lock pending account and current code; bounded attempt accounting; consume code; activate account; create first session atomically; audit |
+| Password login | No session | `auth_rate_limits`, `users`, `user_credentials`, `user_auth_security`, `auth_login_challenges`, `user_sessions`, `user_notifications`, `audit_events` | Rate-limit upsert; credential lookup by normalized email; read TOTP-enabled flag; create short-lived challenge or session; scoped notification and audit writes |
+| 2FA login completion | No session; valid challenge | `auth_login_challenges`, `users`, `auth_rate_limits`, `user_auth_security`, `user_sessions`, `user_notifications`, `audit_events` | Lock and validate challenge; increment attempts; rate-limit; read encrypted TOTP material for challenge user; atomically consume counter/challenge and create session |
+| Session bootstrap / `me` | Cookie supplied, identity unresolved | `user_sessions`, `users` | Validate only the presented token hash, expiry and active status; no session enumeration; update only that session's last-seen timestamp |
+| Password reset request | No session | `auth_rate_limits`, `users`, `password_reset_tokens`, `audit_events` | Rate-limit; generic response; account lookup; replace scoped reset tokens; append audit event |
+| Password reset completion | No session; valid one-time token | `password_reset_tokens`, `users`, `user_credentials`, `user_sessions`, `audit_events` | Lock and validate token/account; consume token; replace password hash; revoke all sessions; clean sibling reset tokens; audit atomically |
+| Authenticated TOTP setup/confirm/disable | Existing session | `user_sessions`, `users`, `user_auth_security`, `auth_rate_limits`, `audit_events` | Validate presented session; owner-scoped security-row read/write; enforce rate limit; lock row and monotonic counter; audit |
+| Account deletion request | Existing session plus password recheck | `user_sessions`, `users`, `user_credentials`, `organization_members`, `user_deletion_requests`, `audit_events` | Validate session and password; check ownership constraint; transition account and create cancellation token; revoke sessions; audit atomically |
+| Account deletion cancellation | No session; valid one-time token | `user_deletion_requests`, `users`, `audit_events` | Single atomic token-hash compare-and-consume with expiry/grace-period checks; restore account; audit |
+| Logout | Cookie supplied; may be expired | `user_sessions`, `audit_events` | Delete only the presented token hash and append audit event only for the returned user ID |
+
+### Boundary conclusions
+
+- The anonymous bootstrap surface is not one generic capability. It contains distinct proof types: normalized email plus password, verification code, reset token, TOTP challenge plus code, deletion-cancellation token, and presented session cookie.
+- Several handlers use multi-statement transactions with row locks and conditional updates. Replacing them with broad table grants or independent functions that split atomicity would weaken replay and race protections.
+- Rate limiting is shared across anonymous flows through `auth_rate_limits`; its upsert must be atomic and narrowly parameterized. Do not grant unrestricted SELECT/UPDATE/DELETE on the table merely to support these flows.
+- Login must read `user_auth_security` before a session exists. A policy that returns no row for anonymous `app.user_id` would silently bypass the TOTP challenge branch; this remains a release-blocking positive test case.
+- Verification, reset and deletion-cancellation functions must not reveal whether arbitrary email addresses or token hashes exist. Preserve generic external responses and bounded attempt/expiry behavior.
+- Session bootstrap must validate only the supplied token hash and return the associated active identity. A function accepting arbitrary user IDs, or a policy permitting broad reads of `user_sessions`, is not an acceptable substitute.
+- The matrix does not yet define exact SQL signatures, ownership, role grants, secret storage, proof format, or `SECURITY DEFINER` implementation. Those remain design work; no migration or permission change is authorized by this review.
+
+### Required test gates before any bootstrap/RLS implementation
+
+- [ ] Positive tests for each operation above, including pending registration, resend, successful and failed verification, password login with and without TOTP, TOTP challenge replay/expiry/attempt limits, reset token replay/expiry, deletion cancellation replay/expiry, and logout of expired sessions.
+- [ ] Negative tests using `trademate_app`: no arbitrary user lookup by ID/email beyond the narrowly allowed operation; no cross-user credential/security/session reads; no rate-limit table browsing or mutation outside scoped operations.
+- [ ] Identity-integrity tests: forged `app.user_id` alone grants no access; proof for token A cannot authorize token B or user B; expired/revoked sessions fail closed; concurrent pooled requests and explicit transactions cannot cross-contaminate identity.
+- [ ] Atomicity/race tests for one-time code consumption, reset completion, challenge consumption, TOTP counter advancement and deletion cancellation.
+- [ ] Catalog assertions for function owner, fixed safe `search_path`, `EXECUTE` grants, revoked `PUBLIC` access, no runtime secret/key reads, and no `BYPASSRLS` privilege.
+
+- [x] This section records observed SQL dependencies only. No application behavior, SQL policy, migration, role, production config, production data, service or deployment was changed.
+
+## 49. Authentication permission-matrix reconciliation against SQL statements (2026-11-19)
+
+Sources rechecked on the remediation branch: apps/api/src/module.ts (authentication controller, lines 130–850), migrations 001, 002, 003, 012, 015, 017, 020, 021, 022, and 023.
+
+### Confirmed schema facts
+
+- users has nullable email with a partial unique index on lower(email); status includes pending, active, suspended, closed, and deletion_pending.
+- user_credentials is one row per user and stores the password hash.
+- user_sessions stores a unique token digest, expiry, last-seen timestamp, and client metadata; session rows cascade on user deletion.
+- auth_rate_limits is keyed by key_hash, with a single mutable window/attempt/block row per key.
+- user_auth_security stores encrypted TOTP material, enabled/confirmation state, setup expiry, and monotonic last_totp_counter; its enabled-state constraint requires encrypted secret and confirmation timestamp.
+- auth_login_challenges, email_verification_codes, and password_reset_tokens store token/code digests, expiry and consumption/attempt state. Email verification and TOTP challenge attempts are capped at five by schema checks; reset tokens have no schema-level attempt column.
+- user_deletion_requests is one row per user, with a unique cancellation-token digest, scheduled time and cancellation timestamp.
+- audit_events is append-only: migration 020 installs ALWAYS-enabled mutation/truncate rejection triggers. Auth capabilities need INSERT, not UPDATE/DELETE/TRUNCATE.
+- user_notifications is a separate user-owned inbox table. organization_members is the source for the account-deletion owner check.
+
+### Reconciliation findings
+
+1. **Verification resend currently contains a cross-account cleanup predicate.** The resend transaction executes DELETE FROM email_verification_codes WHERE user_id = $1 OR expires_at <= now() OR used_at IS NOT NULL. The final two disjuncts delete expired/used codes belonging to every account, not just the account being resent. This is broader than the section 48 capability (rotate one-time code) and conflicts with a future owner-scoped operation boundary. The safe intended scope is the target user's rows; global cleanup should be a separate maintenance operation with its own explicit authority. This is a source-level finding; no behavior has been changed in this section.
+
+2. **Password-reset completion has an additional rate-limit dependency.** Before opening its transaction it upserts a token-digest-derived key in auth_rate_limits; section 48's password-reset completion row must include that operation. Within the transaction it updates the credential, deletes all user sessions, marks outstanding login challenges consumed, consumes the reset token, and appends an audit event. Those operations must remain atomic and user-scoped.
+
+3. **TOTP enable/disable consume rate-limit rows.** Both successful authenticated TOTP operations delete their own derived auth_rate_limits key after the locked security-row/counter operation. The TOTP capability therefore needs scoped deletion of the exact caller-derived key as well as the atomic upsert; it must not imply table-wide DELETE.
+
+4. **2FA completion also performs scoped rate-limit cleanup.** On success it deletes the TOTP-action key and password-stage key, then creates the session, notification and audit event in the same transaction. The operation boundary must not expose arbitrary rate-limit key deletion.
+
+5. **Session list/revoke and deletion request need distinct SQL scopes.** Session listing first resolves the presented session and then lists only unexpired sessions for that user; revocation locks the current session, deletes a target session constrained by both session ID and owner ID, and audits the returned row. Deletion request checks the user's password and organization-owner membership, upserts the user's cancellation request, deletes that user's sessions and audits in one transaction.
+
+### Required follow-up
+
+- [ ] Correct verification-resend cleanup so it cannot delete another user's verification rows; add a regression test with an unrelated user's expired/used code that must survive resend.
+- [ ] Amend section 48 to explicitly include reset-completion rate limiting, TOTP exact-key rate-limit deletion, 2FA exact-key cleanup, and separate session list/revoke SQL constraints.
+- [ ] Treat global expiry cleanup as a separate maintenance capability; do not hide it inside an anonymous account-specific operation.
+- [ ] Keep immutable audit table insert-only in all proposed auth grants/functions.
+
+- [x] This reconciliation pass was documentation-only. No application SQL, migration, database role, policy, production data, service, configuration, or deployment was changed.
+
+
+## 50. Scope verification-resend cleanup to the requested account (2026-11-19)
+
+- [x] Changed verification resend cleanup from a global expired/used-row predicate to `DELETE FROM email_verification_codes WHERE user_id = $1`, so the resend transaction replaces only the requested pending user's verification rows.
+- [x] Extended `apps/api/scripts/test-auth-audit.js`: before resending one pending account's code, create a separate pending account with one expired code and one used code; after resend, assert both unrelated rows remain, including their expired/used state.
+- [x] Retained the existing assertions that the replacement digest is persisted and receives a fresh attempt budget.
+- [ ] Await CI for the resulting PR head. No local build or integration-test execution is claimed.
+- [x] The change is limited to the resend cleanup predicate and its integration regression coverage. It does not introduce global cleanup, alter code expiry/attempt semantics, or change database roles, RLS, migrations, production configuration, data, services or deployments.
+
+
+## 51. Scope password-reset resend cleanup to the requested account (2026-11-19)
+
+- [x] Corrected password-reset request cleanup from `DELETE FROM password_reset_tokens WHERE user_id = $1 OR expires_at <= now() OR used_at IS NOT NULL` to `DELETE FROM password_reset_tokens WHERE user_id = $1`. An account-specific reset request can no longer delete expired or consumed reset tokens belonging to unrelated users.
+- [x] Extended `apps/api/scripts/test-auth-audit.js` to create a separate active account with an expired reset token and a used reset token, request a reset for a different active account, and assert both unrelated rows remain unchanged.
+- [x] Adjusted the test email stub to accept the password-reset email while retaining the six-digit verification-code capture for email-verification cases.
+- [ ] Await CI for the resulting PR head. No local build or integration-test execution is claimed.
+- [x] The fix preserves the existing account row lock, transaction, token rotation, audit insert, generic response and email-delivery behavior. No global cleanup, migration, database role, RLS, production data/configuration, service or deployment was changed.
+
+
+## 52. Make failed account-deletion email recovery atomic (2026-11-19)
+
+- [x] Replaced the two independent recovery updates after cancellation-email failure with one explicit transaction.
+- [x] Recovery now restores the user only while the matching deletion request still carries the exact cancellation-token digest created by this request; it invalidates only that same matching request. This prevents a delayed email failure from cancelling a newer request or undoing a completed cancellation.
+- [x] Added an auth integration regression case that simulates the transactional email provider returning HTTP 503 and verifies the account returns to `active`, the cancellation digest is cleared, and the request is marked cancelled.
+- [ ] Await CI for the resulting PR head. No local build or integration-test execution is claimed.
+- [x] The original deletion-request transaction, session revocation, generic failure response and normal successful email path remain unchanged. No schema, migration, role, RLS, production data/configuration, service or deployment was changed.
+
+
+## 53. Block RLS rollout on caller-settable identity GUCs (2026-11-19)
+
+- [x] Re-read the current RLS pilot policy, request-context middleware, and RLS integration test on the remediation branch.
+- [x] Confirmed the five pilot tables authorize rows directly from `current_setting('app.user_id', true)`; `database-context.ts` writes that value with transaction-local `set_config` after resolving the presented session token.
+- [x] Confirmed the current test enters `trademate_app` and itself calls `set_config('app.user_id', <chosen user UUID>, true)`. It verifies row filtering and FORCE RLS owner behavior, but does not prove that the database authenticates the identity value.
+- [x] Security boundary: PostgreSQL custom GUCs are caller-settable by a session using the shared runtime role. A compromised query path or arbitrary SQL execution as `trademate_app` can replace `app.user_id` with another user's UUID and satisfy the current pilot policies. Transaction-local scope prevents pool leakage; it does not make the value tamper-proof.
+- [x] Therefore the pilot demonstrates row-filter mechanics only, not database-enforced identity isolation. Do not expand or enable these policies in production based on the current test result.
+- [ ] Design a database-verifiable bootstrap capability that derives the principal from the presented session-token proof without accepting an arbitrary user ID. Keep the bootstrap lookup narrowly scoped and preserve pre-session operations (registration, login/TOTP, verification, reset, deletion cancellation and logout).
+- [ ] Add an adversarial test proving that setting or changing `app.user_id` alone cannot access another user's rows; include token-A/user-B mismatch, expired/revoked sessions, pooled requests and explicit transaction boundaries.
+- [ ] Review function ownership, fixed safe `search_path`, PUBLIC EXECUTE revocation, role grants, secret exposure and SECURITY DEFINER risks before adopting any capability function.
+- [x] No policy, migration, role, production database, service, deployment or application behavior was changed in this review.
+
+
+## 54. Candidate transaction-bound identity bootstrap design (2026-11-19)
+
+### Observed integration constraints
+
+- [x] The API request middleware currently retains only the SHA-256 digest of the presented session cookie in AsyncLocalStorage. The pool wrapper opens a transaction for each ordinary query and initializes context after BEGIN for explicit transactions.
+- [x] The existing session lookup validates the digest against an unexpired session joined to an active user. It is performed before setting app.user_id.
+- [x] The existing database-context unit test checks transaction-local setup, explicit transaction reuse, concurrent request isolation, and malformed-cookie fail-closed behavior. Its mock does not establish database-side resistance to caller-settable identity values.
+- [x] The API has a separate unwrapped health-check pool in DatabaseService; do not assume that it has the same request context or should gain access to protected user rows.
+
+### Preferred design to prototype (not yet implemented)
+
+1. Create a dedicated non-login, non-superuser owner for a private authorization schema and its context table. The runtime role receives no direct schema/table access; the migration owner creates and owns the objects. Do not reuse the broad application role as the function owner.
+2. Expose one narrowly scoped SECURITY DEFINER bootstrap function. It accepts only the presented high-entropy session-token digest (never a user_id), validates that digest against user_sessions and an active users row, and records the derived user ID in the private context table for the current backend and current transaction. Empty/invalid/expired/revoked proof records an anonymous context or fails closed. The function must not return credentials, hashes, or arbitrary user records.
+3. Key the protected context by backend PID plus the current transaction ID (and include postmaster-start identity if needed to make backend PID reuse unambiguous). Upsert the current backend's row on each transaction; policy lookup must require an exact current-transaction match. Stale rows must never authorize a later transaction. Define bounded cleanup for abandoned backend rows.
+4. Expose a second narrowly scoped SECURITY DEFINER helper used by RLS policies. It reads only the private context row for the current backend and transaction. Policies compare row ownership against this helper, not app.user_id or app.session_token_hash. Directly setting either GUC must have no authorization effect.
+5. Call bootstrap immediately after BEGIN in both ordinary-query and checked-out-client transaction paths. Preserve the existing single-transaction semantics and ensure COMMIT, ROLLBACK, release-on-error, and pool reuse cannot carry identity into another transaction. The digest must be supplied from AsyncLocalStorage as a bound parameter, never copied into a caller-settable GUC.
+6. Restrict function EXECUTE grants to the runtime role as required; revoke PUBLIC execution. Fix search_path to trusted schemas, fully qualify referenced objects, audit every function owner and grant, and ensure the private schema/table cannot be read or mutated by the runtime role. No dynamic SQL or caller-controlled object names.
+
+### Important limits and required proof
+
+- [ ] This is a candidate design, not a security certification. Verify PostgreSQL version support for transaction-ID and backend identity functions on the target database before choosing exact SQL.
+- [ ] Confirm SECURITY DEFINER ownership and grants cannot be reached through role membership, object ownership, PUBLIC privileges, or writable schemas. Verify the helper cannot be shadowed and that function volatility/parallel-safety declarations are correct.
+- [ ] Confirm session-token digests are treated as bearer-equivalent proof if exposed; do not log bootstrap parameters. Review PostgreSQL statement/parameter logging and error paths before implementation.
+- [ ] Test direct forged app.user_id and app.session_token_hash values, wrong/unknown digest, expired/revoked session, suspended user, token A with attempted user B, anonymous access, concurrent pooled requests, explicit transactions, rollback, failed bootstrap, connection release and backend PID reuse.
+- [ ] Prove a caller cannot insert/update/delete private context rows or invoke any helper to select an arbitrary principal. A known valid session proof may authorize only its associated active user.
+- [ ] Keep pre-session auth operations separate from authenticated row context. Login, registration, verification, password reset, 2FA challenge and deletion cancellation must retain their existing narrow proof/transaction boundaries; do not grant broad table access to make them work under RLS.
+- [ ] Reconcile the private context function's own lookup privileges with RLS on user_sessions/users before enabling any policy; avoid a circular bootstrap dependency.
+- [ ] Add real PostgreSQL integration tests under SET ROLE trademate_app. The existing mock-only database-context tests are insufficient for this boundary.
+
+- [x] No implementation, migration, policy, role, production database, service, deployment or application behavior was changed in this design pass.
+
+
+
+## 55. Resolve RLS bootstrap privilege and test-safety blockers before prototyping (2026-11-19)
+
+### Findings from the current role and pilot scripts
+
+- [x] Re-read the branch's role bootstrap, role-bootstrap assertions, RLS pilot policies, pilot integration script, request-context wrapper and unit tests.
+- [x] The checked-in role bootstrap creates only `trademate_app`, `trademate_migrator` and `trademate_worker`. It does not create the separate non-login authorization-context owner proposed in section 54. The migrator is a LOGIN role and owns the public schema/application objects; it should not be repurposed as the private authorization function owner.
+- [x] The bootstrap gives `trademate_app` CRUD grants on all public tables (with explicit audit/schema-migration restrictions) and future default CRUD grants. This is compatible with a future RLS design only if every protected table has complete policies and the pre-session operations are separately accounted for; grants alone are not row authorization.
+- [x] A SECURITY DEFINER function owner that is not a table owner and has no BYPASSRLS will itself be subject to FORCE ROW LEVEL SECURITY on `users` and `user_sessions`. The proposed bootstrap therefore cannot simply query those tables and assume SECURITY DEFINER bypasses RLS. Its lookup path needs a deliberate, narrowly scoped database authorization policy for the non-login function owner (or another reviewed design), exact SELECT grants, and adversarial tests. Do not grant BYPASSRLS or broad table access as a shortcut.
+- [x] The current pilot test requires only `DATABASE_URL`, reads and executes `003_rls_pilot.sql` directly, and does not wrap the DDL in a rollbackable transaction. It permanently enables/forces RLS and replaces policies on five tables in whichever database that variable targets. Its CI-only comment is not an execution guard. This is a test-safety defect: a misconfigured invocation could alter a non-test database before any fixture assertion runs.
+- [x] The pilot test intentionally uses `SET ROLE trademate_app` and then sets `app.user_id` itself. Its current assertions are useful for policy mechanics but are not adversarial identity-authentication tests.
+- [x] The role-bootstrap SQL and tests do not yet assert the existence, attributes, membership isolation, schema/table ACLs or function EXECUTE grants for a dedicated authorization-context role because no such role/functions exist.
+- [x] The production database was previously observed as PostgreSQL 18. This makes modern transaction-ID functions plausible, but exact function choice and transaction semantics still require a real PostgreSQL integration test; do not infer support from the live version alone or run a production probe.
+
+### Required changes before any RLS implementation
+
+- [ ] Harden `test-rls-pilot.js` so it cannot execute policy DDL using the ordinary `DATABASE_URL`. Introduce an explicit test-only connection variable, validate a test database name before connecting/issuing SQL, and add a test that rejects missing or production-like targets. Confirm CI wiring before changing the variable contract.
+- [ ] Define a separate `NOLOGIN`, `NOSUPERUSER`, `NOBYPASSRLS`, non-owner authorization function role. Prove `trademate_app`, `trademate_worker` and the ordinary migration/runtime paths cannot `SET ROLE` to it and cannot access its private schema/table directly. Review membership grants and PUBLIC privileges, not only role attributes.
+- [ ] Design how that function role can validate a session digest against `user_sessions` and active `users` while those tables are subject to FORCE RLS. Prefer explicit, tightly scoped bootstrap policies for that non-login role and minimum required SELECT columns; document why the function's fixed SQL cannot be turned into an arbitrary-row oracle. Do not rely on SECURITY DEFINER alone to bypass RLS.
+- [ ] Verify the transaction-bound context insert and helper lookup under real PostgreSQL, including function volatility, transaction-ID assignment, rollback behavior, stale-row cleanup, backend PID reuse and transaction boundaries. The context row must not survive a rollback as authorization, and a later transaction on the same backend must not match it.
+- [ ] Extend role-bootstrap assertions to cover the private schema/table owner, schema ACLs, absence of runtime membership, exact function owners, PUBLIC EXECUTE revocation, runtime EXECUTE only on intended entry points, and no direct runtime DML/SELECT on private context.
+- [ ] Add real database adversarial tests under `SET ROLE trademate_app`: forged GUCs, valid token A paired with attempted user B, invalid/expired/revoked token, suspended user, anonymous request, rollback, explicit transactions, concurrent pooled requests and failed bootstrap. Keep pre-session auth endpoints and the separate health-check pool outside authenticated identity assumptions.
+- [ ] Keep the five-table pilot CI-only until the test-target guard, bootstrap lookup policy, role ACL assertions and adversarial database tests are all in place and reviewed.
+
+- [x] This pass changed only this audit checklist. No pilot SQL, application code, database role, migration, policy, production data, service, configuration or deployment was changed.

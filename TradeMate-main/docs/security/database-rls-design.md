@@ -27,15 +27,15 @@ No credentials are to be copied into source files, workflow YAML, issue comments
 
 ## 3. Request identity context
 
-RLS policies will use transaction-local PostgreSQL settings, not session-wide settings:
+RLS identity must be derived from the opaque presented session digest, not from a caller-supplied user identifier:
 
-- `app.user_id`: authenticated user UUID.
-- `app.organization_id`: organization UUID only after membership has been checked for the current request.
-- `app.session_token_hash`: optional bootstrap context for resolving the current session without exposing another user's session rows.
+- `app.session_token_hash`: transaction-local SHA-256 digest of the presented session cookie. The raw bearer token is never placed in PostgreSQL settings.
+- `trademate_private.current_presented_user_id()`: SECURITY DEFINER policy helper that resolves the digest through the narrow active-session resolver.
+- `app.user_id`: **untrusted and must never be used by an RLS policy or authorization predicate**. PostgreSQL custom settings can be set by the runtime role, so a compromised query path can forge this value.
 
-The API now establishes `app.session_token_hash` and `app.user_id` with parameterized `set_config(name, value, true)` calls inside the same transaction as each protected query. The final `true` argument makes each setting transaction-local. The middleware hashes the session cookie with SHA-256; the raw cookie is never placed in PostgreSQL settings. The `database-context.ts` pool wrapper resolves the user ID from the matching unexpired server-side session, then applies context to ordinary `pool.query` calls and explicit checked-out-client transactions. The browser cannot supply or override `app.user_id`. Unit tests cover query transactions, explicit transactions, malformed cookies and concurrent-user identity isolation. Never use session-level `SET` or `set_config(..., false)` with a pooled connection: a reused connection could leak one user's context into another request.
+The API pool wrapper sets only `app.session_token_hash` using parameterized `set_config(name, value, true)` inside each transaction. It deliberately does not set or resolve an `app.user_id` setting. Every protected policy must call `trademate_private.current_presented_user_id()` (or an equally narrow, reviewed helper) so the database binds the row owner to the presented opaque bearer digest. The helper resolves an active, unexpired session without exposing another user's session rows. Organization context must be derived from a verified membership record, never trusted directly from a request body, query string or custom GUC.
 
-The session bootstrap path must resolve the user from a valid, unexpired, unrevoked session before assigning `app.user_id`. Organization context must be derived from a verified membership record, never trusted directly from a request body or query string.
+A previous CI pilot exposed a critical flaw in the original design: a runtime caller could forge `app.user_id` and read another account's rows. The pilot policies and tests have been changed to bind access to the presented session digest and deliberately set a conflicting `app.user_id` to prove that it has no effect. Unit tests cover query transactions, explicit transactions, malformed cookies and concurrent session-digest isolation. Never use session-level `SET` or `set_config(..., false)` with a pooled connection: a reused connection could leak one user's context into another request.
 
 Every query path must be covered, including direct `pool.query`, explicit `pool.connect()` transactions, public routes, account recovery, webhook handlers and scheduled workers. The current implementation does not yet set `app.organization_id`; organization access must be derived from verified membership in policy expressions or a separately validated context setter. This remains groundwork only. Login/registration bootstrap, TOTP challenge flows, webhook/system operations and worker identity need explicit policy design. The API must not start with RLS enabled until this inventory and refactor are complete.
 
@@ -83,10 +83,11 @@ The migration inventory includes the following data classes. Exact policy expres
 4. Anonymous/public requests can read only explicitly public published data.
 5. Drafts, moderation records and unpublished attachments remain private.
 6. A worker can perform only its scheduled task and cannot access unrelated account data.
-7. A connection returned to the pool after User A's request does not retain User A's identity when reused for User B or an anonymous request.
-8. Missing context denies access by default.
-9. The migration owner can migrate; the runtime role cannot create, alter, drop or truncate application tables.
-10. CI tests run against a real PostgreSQL service with the same role grants and RLS settings used by production.
+7. A connection returned to the pool after User A's request does not retain User A's session digest when reused for User B or an anonymous request.
+8. Forging `app.user_id` to another user's UUID cannot grant access; policies resolve identity only from the presented session digest.
+9. Missing context denies access by default.
+10. The migration owner can migrate; the runtime role cannot create, alter, drop or truncate application tables.
+11. CI tests run against a real PostgreSQL service with the same role grants and RLS settings used by production.
 
 ## 7. Rollout sequence
 
@@ -139,6 +140,6 @@ The CI role bootstrap runs on an isolated PostgreSQL 16 instance. This does not 
 - `user_auth_security`
 - `user_profiles` and `user_follows` (public profile/follow reads with owner-only profile and follower-edge writes)
 
-The matching `scripts/test-rls-pilot.js` test runs as `trademate_app` and verifies private own-row reads, public profile/follow reads, owner-only profile and follower-edge writes, cross-user update denial, rejection of cross-user inserts, anonymous default-deny for private tables, and `FORCE ROW LEVEL SECURITY` against the table owner role. The clean PostgreSQL CI job passed this pilot.
+The matching `scripts/test-rls-pilot.js` test runs as `trademate_app` and verifies private own-row reads, public profile/follow reads, owner-only profile and follower-edge writes, cross-user update denial, rejection of cross-user inserts, anonymous default-deny for private tables, and `FORCE ROW LEVEL SECURITY` against the table owner role. It also deliberately forges `app.user_id` to the other account and proves the policy still resolves the owner from the presented session digest. The CI job runs this pilot on an isolated PostgreSQL test database.
 
 **This pilot is not part of `scripts/migrate.js` and has not been applied to Render production.** It proves the policy pattern for these three tables only. Production rollout still requires the complete policy inventory, authentication bootstrap policies, all-query-path review, role cutover, cross-organization tests, and operational approval.

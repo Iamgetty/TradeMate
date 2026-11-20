@@ -2,7 +2,9 @@ import { BadRequestException, Body, ConflictException, Controller, ForbiddenExce
 import type { Request, Response } from 'express';
 import { createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, randomInt, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { Pool } from 'pg';
-import { createRlsAwarePool } from './database-context';
+import type { PoolClient } from 'pg';
+import { createRlsAwarePool, sessionTokenFromCookieHeader } from './database-context';
+import { decodeProfileImageDataUrl, hasMatchingUploadSignature } from './upload-validation';
 import { decimalToUnits, fiatCentsToQuantityUnits, productToFiatCents, unitsToDecimal } from './p2p-decimal';
 import { renderTradeMateEmail } from './email-templates';
 import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema, sportsOrganizationCreateBodySchema, sportsOrganizationMembershipInviteBodySchema, sportsRepresentativeMandateCreateBodySchema, sportsRepresentativeMandateResponseBodySchema, sportsTransferOpportunityCreateBodySchema } from './validation';
@@ -14,6 +16,9 @@ const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options
       else resolve(derivedKey);
     });
   });
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 const SESSION_COOKIE = 'trademate_session';
 const SESSION_DAYS = 7;
 const passwordHash = async (password: string) => {
@@ -118,10 +123,7 @@ const sendTransactionalEmail = async (to: string, subject: string, html: string)
 };
 
 const cookieOptions = () => ({ httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/', maxAge: SESSION_DAYS * 24 * 60 * 60 * 1000 });
-const sessionTokenFrom = (request: Request) => {
-  const cookie = request.headers.cookie?.split(';').map((part) => part.trim()).find((part) => part.startsWith(SESSION_COOKIE + '='));
-  return cookie ? decodeURIComponent(cookie.slice(SESSION_COOKIE.length + 1)) : '';
-};
+const sessionTokenFrom = (request: Request) => sessionTokenFromCookieHeader(request.headers.cookie);
 const databasePool = process.env.DATABASE_URL
   ? createRlsAwarePool(new Pool({
       connectionString: process.env.DATABASE_URL,
@@ -130,6 +132,15 @@ const databasePool = process.env.DATABASE_URL
       max: 5,
     }))
   : null;
+
+const resolvePresentedSessionUserDigest = async (digest: string) => {
+  if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
+  return databasePool.query<{ id: string }>(
+    'SELECT resolved_user_id::text AS id FROM trademate_private.resolve_presented_session($1)',
+    [digest],
+  );
+};
+const resolvePresentedSessionUser = (token: string) => resolvePresentedSessionUserDigest(tokenDigest(token));
 
 const enforceTotpRateLimit = async (request: Request, userId: string) => {
   if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
@@ -168,7 +179,7 @@ class HealthController {
 @Controller('auth')
 class AuthController {
   @Post('register')
-  async register(@Body() body: { email?: string; password?: string; displayName?: string }, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+  async register(@Body() body: { email?: string; password?: string; displayName?: string }, @Req() request: Request) {
     parseBody(registerBodySchema, body);
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
@@ -233,7 +244,7 @@ class AuthController {
         const stillPending = await client.query("SELECT id FROM users WHERE id = $1 AND email_verified_at IS NULL AND status = 'pending' FOR UPDATE", [account.rows[0].id]);
         if (stillPending.rowCount) {
           code = String(randomInt(0, 1000000)).padStart(6, '0');
-          await client.query('DELETE FROM email_verification_codes WHERE user_id = $1 OR expires_at <= now() OR used_at IS NOT NULL', [account.rows[0].id]);
+          await client.query('DELETE FROM email_verification_codes WHERE user_id = $1', [account.rows[0].id]);
           await client.query("INSERT INTO email_verification_codes (user_id, code_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes')", [account.rows[0].id, tokenDigest(code)]);
           await client.query("INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.email_verification_requested', 'user', $1, '{}'::jsonb)", [account.rows[0].id]);
         }
@@ -254,30 +265,23 @@ class AuthController {
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const email = String(body.email || '').trim().toLowerCase();
     const code = String(body.code || '');
-    const client = await databasePool.connect();
     const sessionToken = randomBytes(32).toString('base64url');
-    try {
-      await client.query('BEGIN');
-      const account = await client.query("SELECT id, email, display_name, country_code, status, email_verified_at FROM users WHERE lower(email) = $1 FOR UPDATE", [email]);
-      if (!account.rowCount || account.rows[0].email_verified_at || account.rows[0].status !== 'pending') throw new UnauthorizedException('This verification code is invalid or expired. Request a new one.');
-      const verification = await client.query("SELECT id, code_hash, expires_at, attempts FROM email_verification_codes WHERE user_id = $1 AND used_at IS NULL ORDER BY created_at DESC LIMIT 1 FOR UPDATE", [account.rows[0].id]);
-      if (!verification.rowCount || new Date(verification.rows[0].expires_at).getTime() <= Date.now() || verification.rows[0].attempts >= 5) throw new UnauthorizedException('This verification code is invalid or expired. Request a new one.');
-      const suppliedCodeHash = Buffer.from(tokenDigest(code), 'hex');
-      const expectedCodeHash = Buffer.from(verification.rows[0].code_hash, 'hex');
-      if (suppliedCodeHash.length !== expectedCodeHash.length || !timingSafeEqual(suppliedCodeHash, expectedCodeHash)) {
-        await client.query('UPDATE email_verification_codes SET attempts = attempts + 1 WHERE id = $1', [verification.rows[0].id]);
-        await client.query('COMMIT');
-        throw new UnauthorizedException('The verification code is incorrect.');
-      }
-      await client.query('UPDATE email_verification_codes SET used_at = now() WHERE id = $1', [verification.rows[0].id]);
-      const verified = await client.query("UPDATE users SET email_verified_at = now(), status = 'active', updated_at = now() WHERE id = $1 RETURNING id, email, display_name, country_code", [account.rows[0].id]);
-      await client.query("INSERT INTO user_sessions (user_id, token_hash, expires_at, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5)", [account.rows[0].id, tokenDigest(sessionToken), new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000), request.ip || null, request.get('user-agent')?.slice(0, 500) || null]);
-      await client.query("INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.email_verified', 'user', $1, '{}'::jsonb)", [account.rows[0].id]);
-      await client.query('COMMIT');
-      response.cookie(SESSION_COOKIE, sessionToken, cookieOptions());
-      return { user: verified.rows[0] };
-    } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
-    finally { client.release(); }
+    const verified = await databasePool.query(
+      'SELECT verified_user_id AS id, verified_email AS email, verified_display_name AS display_name, verified_country_code AS country_code FROM trademate_private.complete_email_verification($1, $2, $3, $4, $5, $6)',
+      [
+        email,
+        tokenDigest(code),
+        tokenDigest(sessionToken),
+        new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000),
+        request.ip || null,
+        request.get('user-agent')?.slice(0, 500) || null,
+      ],
+    );
+    if (!verified.rowCount) {
+      throw new UnauthorizedException('This verification code is invalid or expired. Request a new one.');
+    }
+    response.cookie(SESSION_COOKIE, sessionToken, cookieOptions());
+    return { user: verified.rows[0] };
   }
 
   @Post('login')
@@ -296,7 +300,10 @@ class AuthController {
     if (rate.rows[0].attempts > 10 || (rate.rows[0].blocked_until && new Date(rate.rows[0].blocked_until).getTime() > Date.now())) {
       throw new HttpException('Too many sign-in attempts. Please wait 15 minutes before trying again.', HttpStatus.TOO_MANY_REQUESTS);
     }
-    const result = await databasePool.query("SELECT u.id, u.email, u.display_name, u.country_code, u.status, u.email_verified_at, c.password_hash FROM users u JOIN user_credentials c ON c.user_id = u.id WHERE lower(u.email) = $1 LIMIT 1", [email]);
+    const result = await databasePool.query(
+      'SELECT user_id AS id, email, display_name, country_code, account_status AS status, email_verified_at, password_hash FROM trademate_private.resolve_password_login_credentials($1)',
+      [email],
+    );
     const user = result.rows[0];
     if (!user || !(await passwordMatches(password, user.password_hash))) throw new UnauthorizedException('Email or password is incorrect.');
     if (!user.email_verified_at) throw new ForbiddenException('Verify your email address before signing in. Use Resend to receive a new code.');
@@ -304,35 +311,33 @@ class AuthController {
     const security = await databasePool.query('SELECT totp_enabled FROM user_auth_security WHERE user_id = $1 LIMIT 1', [user.id]);
     if (security.rows[0]?.totp_enabled) {
       const challengeToken = randomBytes(32).toString('base64url');
-      await databasePool.query(
-        'INSERT INTO auth_login_challenges (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval \'5 minutes\')',
+      const challengeIssued = await databasePool.query(
+        'SELECT trademate_private.issue_totp_login_challenge($1, $2) AS issued',
         [user.id, tokenDigest(challengeToken)],
       );
+      if (!challengeIssued.rows[0]?.issued) {
+        throw new UnauthorizedException('Email or password is incorrect.');
+      }
       // Keep the password-stage rate limit until the second factor succeeds.
       return { requiresTwoFactor: true, challengeToken, expiresInSeconds: 300 };
     }
-    await databasePool.query('DELETE FROM auth_rate_limits WHERE key_hash = $1', [rateKey]);
     const token = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
-    const client = await databasePool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query('INSERT INTO user_sessions (user_id, token_hash, expires_at, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5)', [user.id, tokenDigest(token), expiresAt, request.ip || null, request.get('user-agent')?.slice(0, 500) || null]);
-      await client.query(
-        "INSERT INTO user_notifications (user_id, category, title, body, icon, action_url) VALUES ($1, 'System', 'New sign-in', 'A sign-in to your TradeMate account was completed. If this was not you, review your active sessions and secure your account.', 'shield-check', '/settings/security')",
-        [user.id],
-      );
-      await client.query(
-        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.login_succeeded', 'user', $1, '{}'::jsonb)",
-        [user.id],
-      );
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally {
-      client.release();
+    const issuedSession = await databasePool.query(
+      'SELECT trademate_private.issue_password_login_session($1, $2, $3, $4, $5, $6) AS session_id',
+      [
+        user.id,
+        user.password_hash,
+        tokenDigest(token),
+        expiresAt,
+        request.ip || null,
+        request.get('user-agent')?.slice(0, 500) || null,
+      ],
+    );
+    if (!issuedSession.rows[0]?.session_id) {
+      throw new UnauthorizedException('Email or password is incorrect.');
     }
+    await databasePool.query('DELETE FROM auth_rate_limits WHERE key_hash = $1', [rateKey]);
     void sendTransactionalEmail(user.email, 'New sign-in to your TradeMate account', '<p>A sign-in to your TradeMate account was completed.</p><p>If this was not you, change your password and review your active sessions immediately.</p>');
     response.cookie(SESSION_COOKIE, token, cookieOptions());
     return { user: { id: user.id, email: user.email, display_name: user.display_name, country_code: user.country_code } };
@@ -343,9 +348,14 @@ class AuthController {
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in.');
-    const result = await databasePool.query("SELECT u.id, u.email, u.display_name, u.country_code FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1", [tokenDigest(token)]);
+    const session = await resolvePresentedSessionUser(token);
+    if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    await databasePool.query('SELECT touched_user_id FROM trademate_private.touch_presented_session($1)', [tokenDigest(token)]);
+    const result = await databasePool.query(
+      'SELECT id, email, display_name, country_code FROM users WHERE id = $1 AND status = \'active\' LIMIT 1',
+      [session.rows[0].id],
+    );
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
-    await databasePool.query('UPDATE user_sessions SET last_seen_at=now() WHERE token_hash=$1', [tokenDigest(token)]);
     return { user: result.rows[0] };
   }
 
@@ -355,10 +365,7 @@ class AuthController {
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to update your profile.');
-    const session = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const displayName = typeof body?.displayName === 'string' ? body.displayName.trim() : '';
     if (displayName.length < 2 || displayName.length > 24) throw new BadRequestException('Your nickname must be between 2 and 24 characters.');
@@ -395,10 +402,7 @@ class AuthController {
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to change your password.');
-    const session = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const currentPassword = typeof body?.currentPassword === 'string' ? body.currentPassword : '';
     const newPassword = typeof body?.newPassword === 'string' ? body.newPassword : '';
@@ -406,7 +410,10 @@ class AuthController {
     if (newPassword.length < 12 || newPassword.length > 128) throw new BadRequestException('Use a new password between 12 and 128 characters.');
     if (currentPassword === newPassword) throw new BadRequestException('Choose a password you have not used for this change.');
     const userId = session.rows[0].id as string;
-    const credentials = await databasePool.query('SELECT password_hash FROM user_credentials WHERE user_id = $1 LIMIT 1', [userId]);
+    const credentials = await databasePool.query(
+      'SELECT password_hash FROM trademate_private.resolve_presented_password_credentials($1)',
+      [tokenDigest(token)],
+    );
     if (!credentials.rowCount || !(await passwordMatches(currentPassword, credentials.rows[0].password_hash))) {
       throw new UnauthorizedException('Your current password is incorrect.');
     }
@@ -415,7 +422,7 @@ class AuthController {
     try {
       await client.query('BEGIN');
       await client.query('UPDATE user_credentials SET password_hash = $1, updated_at = now() WHERE user_id = $2', [nextHash, userId]);
-      await client.query('DELETE FROM user_sessions WHERE user_id = $1 AND token_hash <> $2', [userId, tokenDigest(token)]);
+      await client.query('SELECT trademate_private.revoke_other_presented_sessions($1)', [tokenDigest(token)]);
       await client.query(
         "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.password_changed', 'user', $1, '{}'::jsonb)",
         [userId],
@@ -469,7 +476,7 @@ class AuthController {
       try {
         await client.query('BEGIN');
         await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [account.rows[0].id]);
-        await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1 OR expires_at <= now() OR used_at IS NOT NULL', [account.rows[0].id]);
+        await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [account.rows[0].id]);
         await client.query(
           "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '30 minutes')",
           [account.rows[0].id, tokenDigest(rawToken)],
@@ -488,7 +495,7 @@ class AuthController {
         account.rows[0].email,
         'Reset your TradeMate password',
         '<p>We received a request to reset your TradeMate password.</p><p><a href="' + resetUrl + '" style="display:inline-block;padding:13px 22px;background-color:#F6A43A;color:#17120b;text-decoration:none;font-weight:800;border-radius:9px;">Reset your password</a></p><p>This link expires in 30 minutes and can be used once. If you did not request this, you can ignore this email.</p>',
-      ).then((sent) => sent ? undefined : databasePool?.query('DELETE FROM password_reset_tokens WHERE token_hash = $1', [tokenDigest(rawToken)]).catch(() => undefined));
+      ).then((sent) => sent ? undefined : databasePool?.query('SELECT trademate_private.discard_password_reset_token($1)', [tokenDigest(rawToken)]).catch(() => undefined));
     } else if (account.rowCount && !resetOrigin) {
       console.warn('[auth] Password reset email was not sent because TRADEMATE_WEB_ORIGIN/PUBLIC_APP_URL is not configured with an allowed origin.');
     }
@@ -510,38 +517,13 @@ class AuthController {
     if (rate.rows[0].attempts > 5 || (rate.rows[0].blocked_until && new Date(rate.rows[0].blocked_until).getTime() > Date.now())) {
       throw new HttpException('Too many password reset attempts. Please request a new link later.', HttpStatus.TOO_MANY_REQUESTS);
     }
-    const client = await databasePool.connect();
-    let email = '';
-    let userId = '';
-    try {
-      await client.query('BEGIN');
-      const reset = await client.query(
-        "SELECT t.id, t.user_id, u.email FROM password_reset_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = $1 AND t.used_at IS NULL AND t.expires_at > now() AND u.status = 'active' FOR UPDATE OF t, u",
-        [tokenDigest(rawToken)],
-      );
-      if (!reset.rowCount) throw new BadRequestException('This password reset link is invalid, expired, or already used.');
-      userId = reset.rows[0].user_id;
-      email = reset.rows[0].email;
-      const nextHash = await passwordHash(newPassword);
-      const consumed = await client.query(
-        'UPDATE password_reset_tokens SET used_at = now() WHERE id = $1 AND used_at IS NULL AND expires_at > now() RETURNING id',
-        [reset.rows[0].id],
-      );
-      if (!consumed.rowCount) throw new BadRequestException('This password reset link is invalid, expired, or already used.');
-      const credentialUpdate = await client.query('UPDATE user_credentials SET password_hash = $1, updated_at = now() WHERE user_id = $2', [nextHash, userId]);
-      if (!credentialUpdate.rowCount) throw new NotFoundException('Account credentials could not be updated.');
-      await client.query('DELETE FROM user_sessions WHERE user_id = $1', [userId]);
-      await client.query('UPDATE auth_login_challenges SET consumed_at = now() WHERE user_id = $1 AND consumed_at IS NULL', [userId]);
-      await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1 AND id <> $2', [userId, reset.rows[0].id]);
-      await client.query(
-        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.password_reset_completed', 'user', $1, '{}'::jsonb)",
-        [userId],
-      );
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally { client.release(); }
+    const nextHash = await passwordHash(newPassword);
+    const reset = await databasePool.query(
+      'SELECT reset_user_id::text AS user_id, reset_email AS email FROM trademate_private.complete_password_reset($1, $2)',
+      [tokenDigest(rawToken), nextHash],
+    );
+    if (!reset.rowCount) throw new BadRequestException('This password reset link is invalid, expired, or already used.');
+    const email = reset.rows[0].email as string;
     if (email) void sendTransactionalEmail(email, 'Your TradeMate password was reset', '<p>Your TradeMate password was reset successfully. All existing sessions have been signed out.</p><p>If you did not make this change, contact TradeMate support immediately.</p>');
     return { success: true, message: 'Your password has been reset. Sign in again with your new password.' };
   }
@@ -550,7 +532,7 @@ class AuthController {
   async twoFactorStatus(@Req() request: Request) {
     const token = sessionTokenFrom(request);
     if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
-    const session = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired.');
     const result = await databasePool.query('SELECT totp_enabled, totp_confirmed_at FROM user_auth_security WHERE user_id=$1', [session.rows[0].id]);
     return { enabled: Boolean(result.rows[0]?.totp_enabled), confirmedAt: result.rows[0]?.totp_confirmed_at || null, available: /^[0-9a-f]{64}$/i.test(process.env.TOTP_ENCRYPTION_KEY || '') };
@@ -560,18 +542,19 @@ class AuthController {
   async setupTwoFactor(@Req() request: Request) {
     const token = sessionTokenFrom(request);
     if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
-    const session = await databasePool.query("SELECT u.id,u.email FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired.');
+    const account = await databasePool.query('SELECT email FROM users WHERE id = $1 AND status = \'active\' LIMIT 1', [session.rows[0].id]);
+    if (!account.rowCount) throw new UnauthorizedException('Your session has expired.');
     const encryptionKey = process.env.TOTP_ENCRYPTION_KEY || '';
     if (!/^[0-9a-f]{64}$/i.test(encryptionKey)) throw new HttpException('Authenticator setup is not available until the server encryption key is configured.', HttpStatus.SERVICE_UNAVAILABLE);
-    const existing = await databasePool.query('SELECT totp_enabled FROM user_auth_security WHERE user_id=$1', [session.rows[0].id]);
-    if (existing.rows[0]?.totp_enabled) throw new ConflictException('Two-factor authentication is already enabled.');
     const secret = base32Encode(randomBytes(20));
-    await databasePool.query(
-      'INSERT INTO user_auth_security (user_id, totp_secret_encrypted, totp_enabled, setup_expires_at) VALUES ($1,$2,false,now()+interval \'15 minutes\') ON CONFLICT (user_id) DO UPDATE SET totp_secret_encrypted=EXCLUDED.totp_secret_encrypted, totp_enabled=false, last_totp_counter=NULL, setup_expires_at=EXCLUDED.setup_expires_at, updated_at=now()',
-      [session.rows[0].id, encryptTotpSecret(secret)],
+    const enrollment = await databasePool.query(
+      'SELECT trademate_private.begin_totp_enrollment($1, $2) AS started',
+      [tokenDigest(token), encryptTotpSecret(secret)],
     );
-    const label = encodeURIComponent('TradeMate:' + session.rows[0].email);
+    if (!enrollment.rows[0]?.started) throw new ConflictException('Two-factor authentication is already enabled or setup is unavailable.');
+    const label = encodeURIComponent('TradeMate:' + account.rows[0].email);
     const issuer = encodeURIComponent('TradeMate');
     return { secret, otpauthUrl: 'otpauth://totp/' + label + '?secret=' + secret + '&issuer=' + issuer + '&algorithm=SHA1&digits=6&period=30', expiresInSeconds: 900 };
   }
@@ -581,7 +564,7 @@ class AuthController {
     parseBody(totpCodeBodySchema, body);
     const token = sessionTokenFrom(request);
     if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
-    const session = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired.');
     const userId = session.rows[0].id;
     const rateKey = await enforceTotpRateLimit(request, userId);
@@ -589,25 +572,24 @@ class AuthController {
     try {
       await client.query('BEGIN');
       const result = await client.query(
-        'SELECT totp_secret_encrypted, setup_expires_at, last_totp_counter FROM user_auth_security WHERE user_id=$1 AND totp_enabled=false FOR UPDATE',
-        [userId],
+        'SELECT encrypted_totp_secret, enrollment_expires_at, last_totp_counter FROM trademate_private.resolve_totp_enrollment($1)',
+        [tokenDigest(token)],
       );
-      if (!result.rowCount || !result.rows[0].setup_expires_at || new Date(result.rows[0].setup_expires_at).getTime() < Date.now()) {
+      if (!result.rowCount || !result.rows[0].enrollment_expires_at || new Date(result.rows[0].enrollment_expires_at).getTime() < Date.now()) {
         throw new ConflictException('Start authenticator setup again; the setup has expired.');
       }
       let matchedCounter: number | null = null;
-      try { matchedCounter = verifyTotp(decryptTotpSecret(result.rows[0].totp_secret_encrypted), String(body?.code || '')); } catch { matchedCounter = null; }
+      try { matchedCounter = verifyTotp(decryptTotpSecret(result.rows[0].encrypted_totp_secret), String(body?.code || '')); } catch { matchedCounter = null; }
       const lastCounter = result.rows[0].last_totp_counter == null ? null : BigInt(result.rows[0].last_totp_counter);
       if (matchedCounter === null || (lastCounter !== null && BigInt(matchedCounter) <= lastCounter)) {
         throw new UnauthorizedException('That authenticator code is invalid or has already been used.');
       }
-      const updated = await client.query(
-        'UPDATE user_auth_security SET totp_enabled=true, last_totp_counter=$2, totp_confirmed_at=now(), setup_expires_at=NULL, updated_at=now() WHERE user_id=$1 AND totp_enabled=false AND (last_totp_counter IS NULL OR last_totp_counter < $2) RETURNING user_id',
-        [userId, matchedCounter],
+      const completed = await client.query(
+        'SELECT trademate_private.complete_totp_enrollment($1, $2) AS completed',
+        [tokenDigest(token), matchedCounter],
       );
-      if (!updated.rowCount) throw new UnauthorizedException('That authenticator code has already been used. Generate a new code and try again.');
+      if (!completed.rows[0]?.completed) throw new UnauthorizedException('That authenticator code has already been used. Generate a new code and try again.');
       await client.query('DELETE FROM auth_rate_limits WHERE key_hash=$1', [rateKey]);
-      await client.query("INSERT INTO audit_events (actor_user_id,event_type,entity_type,entity_id,metadata) VALUES ($1,'auth.totp_enabled','user',$1,'{}'::jsonb)", [userId]);
       await client.query('COMMIT');
       return { success: true, enabled: true };
     } catch (error) {
@@ -623,7 +605,7 @@ class AuthController {
     parseBody(totpCodeBodySchema, body);
     const token = sessionTokenFrom(request);
     if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
-    const session = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired.');
     const userId = session.rows[0].id;
     const rateKey = await enforceTotpRateLimit(request, userId);
@@ -631,23 +613,22 @@ class AuthController {
     try {
       await client.query('BEGIN');
       const result = await client.query(
-        'SELECT totp_secret_encrypted, last_totp_counter FROM user_auth_security WHERE user_id=$1 AND totp_enabled=true FOR UPDATE',
-        [userId],
+        'SELECT encrypted_totp_secret, last_totp_counter FROM trademate_private.resolve_enabled_totp($1)',
+        [tokenDigest(token)],
       );
       if (!result.rowCount) throw new ConflictException('Two-factor authentication is not enabled.');
       let matchedCounter: number | null = null;
-      try { matchedCounter = verifyTotp(decryptTotpSecret(result.rows[0].totp_secret_encrypted), String(body?.code || '')); } catch { matchedCounter = null; }
+      try { matchedCounter = verifyTotp(decryptTotpSecret(result.rows[0].encrypted_totp_secret), String(body?.code || '')); } catch { matchedCounter = null; }
       const lastCounter = result.rows[0].last_totp_counter == null ? null : BigInt(result.rows[0].last_totp_counter);
       if (matchedCounter === null || (lastCounter !== null && BigInt(matchedCounter) <= lastCounter)) {
         throw new UnauthorizedException('That authenticator code is invalid or has already been used.');
       }
-      const updated = await client.query(
-        'UPDATE user_auth_security SET totp_enabled=false, last_totp_counter=$2, totp_secret_encrypted=NULL, totp_confirmed_at=NULL, setup_expires_at=NULL, updated_at=now() WHERE user_id=$1 AND totp_enabled=true AND (last_totp_counter IS NULL OR last_totp_counter < $2) RETURNING user_id',
-        [userId, matchedCounter],
+      const disabled = await client.query(
+        'SELECT trademate_private.disable_totp($1, $2) AS disabled',
+        [tokenDigest(token), matchedCounter],
       );
-      if (!updated.rowCount) throw new UnauthorizedException('That authenticator code has already been used. Generate a new code and try again.');
+      if (!disabled.rows[0]?.disabled) throw new UnauthorizedException('That authenticator code has already been used. Generate a new code and try again.');
       await client.query('DELETE FROM auth_rate_limits WHERE key_hash=$1', [rateKey]);
-      await client.query("INSERT INTO audit_events (actor_user_id,event_type,entity_type,entity_id,metadata) VALUES ($1,'auth.totp_disabled','user',$1,'{}'::jsonb)", [userId]);
       await client.query('COMMIT');
       return { success: true, enabled: false };
     } catch (error) {
@@ -669,11 +650,12 @@ class AuthController {
     const client = await databasePool.connect();
     try {
       await client.query('BEGIN');
+      const challengeHash = tokenDigest(challengeToken);
       const challenge = await client.query(
-        "SELECT c.id,c.user_id,c.attempts,u.email,u.display_name,u.country_code FROM auth_login_challenges c JOIN users u ON u.id=c.user_id WHERE c.token_hash=$1 AND c.expires_at>now() AND c.consumed_at IS NULL AND u.status='active' FOR UPDATE OF c",
-        [tokenDigest(challengeToken)],
+        'SELECT challenge_user_id AS user_id, challenge_attempts AS attempts, challenge_email AS email, challenge_display_name AS display_name, challenge_country_code AS country_code, encrypted_totp_secret, last_totp_counter FROM trademate_private.resolve_totp_login_challenge($1)',
+        [challengeHash],
       );
-      if (!challenge.rowCount || challenge.rows[0].attempts >= 5) throw new UnauthorizedException('This verification attempt has expired. Sign in again.');
+      if (!challenge.rowCount) throw new UnauthorizedException('This verification attempt has expired. Sign in again.');
       const totpRateKey = tokenDigest((request.ip || 'unknown') + '|totp|' + challenge.rows[0].user_id);
       const totpRate = await client.query(
         "INSERT INTO auth_rate_limits (key_hash, window_started_at, attempts, blocked_until) VALUES ($1, now(), 1, NULL) ON CONFLICT (key_hash) DO UPDATE SET attempts = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END, window_started_at = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN now() ELSE auth_rate_limits.window_started_at END, blocked_until = CASE WHEN (CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END) >= 10 THEN now() + interval '15 minutes' ELSE auth_rate_limits.blocked_until END RETURNING attempts, blocked_until",
@@ -683,42 +665,38 @@ class AuthController {
         await client.query('COMMIT');
         throw new HttpException('Too many authenticator attempts. Please wait 15 minutes before trying again.', HttpStatus.TOO_MANY_REQUESTS);
       }
-      const secretResult = await client.query('SELECT totp_secret_encrypted,totp_enabled,last_totp_counter FROM user_auth_security WHERE user_id=$1 FOR UPDATE', [challenge.rows[0].user_id]);
       let matchedCounter: number | null = null;
       try {
-        if (secretResult.rows[0]?.totp_enabled) matchedCounter = verifyTotp(decryptTotpSecret(secretResult.rows[0].totp_secret_encrypted), code);
+        matchedCounter = verifyTotp(decryptTotpSecret(challenge.rows[0].encrypted_totp_secret), code);
       } catch { matchedCounter = null; }
-      const lastCounter = secretResult.rows[0]?.last_totp_counter == null ? null : BigInt(secretResult.rows[0].last_totp_counter);
+      const lastCounter = challenge.rows[0].last_totp_counter == null ? null : BigInt(challenge.rows[0].last_totp_counter);
       if (matchedCounter === null || (lastCounter !== null && BigInt(matchedCounter) <= lastCounter)) {
-        await client.query('UPDATE auth_login_challenges SET attempts=attempts+1 WHERE id=$1', [challenge.rows[0].id]);
+        await client.query('SELECT trademate_private.record_totp_login_failure($1)', [challengeHash]);
         await client.query('COMMIT');
         throw new UnauthorizedException('The authenticator code is incorrect or has already been used.');
       }
-      const consumedCounter = await client.query(
-        'UPDATE user_auth_security SET last_totp_counter=$2, updated_at=now() WHERE user_id=$1 AND totp_enabled=true AND (last_totp_counter IS NULL OR last_totp_counter < $2) RETURNING user_id',
-        [challenge.rows[0].user_id, matchedCounter],
-      );
-      if (!consumedCounter.rowCount) {
-        await client.query('UPDATE auth_login_challenges SET attempts=attempts+1 WHERE id=$1', [challenge.rows[0].id]);
-        await client.query('COMMIT');
-        throw new UnauthorizedException('The authenticator code has already been used.');
-      }
-      await client.query('UPDATE auth_login_challenges SET consumed_at=now() WHERE id=$1', [challenge.rows[0].id]);
-      await client.query('DELETE FROM auth_rate_limits WHERE key_hash IN ($1, $2)', [totpRateKey, tokenDigest((request.ip || 'unknown') + '|' + String(challenge.rows[0].email).trim().toLowerCase())]);
       const sessionToken = randomBytes(32).toString('base64url');
       const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
-      await client.query('INSERT INTO user_sessions (user_id,token_hash,expires_at,ip_address,user_agent) VALUES ($1,$2,$3,$4,$5)', [challenge.rows[0].user_id,tokenDigest(sessionToken),expiresAt,request.ip || null,request.get('user-agent')?.slice(0,500) || null]);
-      await client.query(
-        "INSERT INTO user_notifications (user_id, category, title, body, icon, action_url) VALUES ($1, 'System', 'New sign-in', 'A sign-in to your TradeMate account was completed. If this was not you, review your active sessions and secure your account.', 'shield-check', '/settings/security')",
-        [challenge.rows[0].user_id],
+      const completedLogin = await client.query(
+        'SELECT verified_user_id AS id, verified_email AS email, verified_display_name AS display_name, verified_country_code AS country_code FROM trademate_private.complete_totp_login($1, $2, $3, $4, $5, $6)',
+        [
+          tokenDigest(challengeToken),
+          matchedCounter,
+          tokenDigest(sessionToken),
+          expiresAt,
+          request.ip || null,
+          request.get('user-agent')?.slice(0, 500) || null,
+        ],
       );
-      await client.query(
-        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.login_succeeded', 'user', $1, '{}'::jsonb)",
-        [challenge.rows[0].user_id],
-      );
+      if (!completedLogin.rowCount) {
+        await client.query('SELECT trademate_private.record_totp_login_failure($1)', [challengeHash]);
+        await client.query('COMMIT');
+        throw new UnauthorizedException('The authenticator code is incorrect or has already been used.');
+      }
+      await client.query('DELETE FROM auth_rate_limits WHERE key_hash IN ($1, $2)', [totpRateKey, tokenDigest((request.ip || 'unknown') + '|' + String(challenge.rows[0].email).trim().toLowerCase())]);
       await client.query('COMMIT');
       response.cookie(SESSION_COOKIE, sessionToken, cookieOptions());
-      return { user: { id: challenge.rows[0].user_id, email: challenge.rows[0].email, display_name: challenge.rows[0].display_name, country_code: challenge.rows[0].country_code } };
+      return { user: completedLogin.rows[0] };
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;
@@ -731,15 +709,12 @@ class AuthController {
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to review your sessions.');
     const digest = tokenDigest(token);
-    const current = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [digest],
-    );
+    const current = await resolvePresentedSessionUserDigest(digest);
     if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
-    await databasePool.query('UPDATE user_sessions SET last_seen_at=now() WHERE token_hash=$1', [digest]);
+    await databasePool.query('SELECT touched_user_id FROM trademate_private.touch_presented_session($1)', [digest]);
     const result = await databasePool.query(
-      'SELECT id, created_at, last_seen_at, expires_at, ip_address, user_agent, (token_hash = $2) AS is_current FROM user_sessions WHERE user_id = $1 AND expires_at > now() ORDER BY is_current DESC, last_seen_at DESC LIMIT 50',
-      [current.rows[0].id, digest],
+      'SELECT session_id AS id, created_at, last_seen_at, expires_at, ip_address, user_agent, is_current FROM trademate_private.list_presented_user_sessions($1)',
+      [digest],
     );
     return { sessions: result.rows };
   }
@@ -752,32 +727,14 @@ class AuthController {
     if (!token) throw new UnauthorizedException('Please sign in to manage sessions.');
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid session identifier.');
     const digest = tokenDigest(token);
-    const client = await databasePool.connect();
-    let isCurrent = false;
-    try {
-      await client.query('BEGIN');
-      const current = await client.query(
-        "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1 FOR UPDATE OF s",
-        [digest],
-      );
-      if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
-      const result = await client.query(
-        'DELETE FROM user_sessions WHERE id = $1 AND user_id = $2 RETURNING (token_hash = $3) AS is_current',
-        [id, current.rows[0].id, digest],
-      );
-      if (!result.rowCount) throw new NotFoundException('Session not found.');
-      isCurrent = Boolean(result.rows[0].is_current);
-      await client.query(
-        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.session_revoked', 'user_session', $2, $3::jsonb)",
-        [current.rows[0].id, id, JSON.stringify({ current: isCurrent })],
-      );
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally {
-      client.release();
-    }
+    const current = await resolvePresentedSessionUserDigest(digest);
+    if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    const result = await databasePool.query(
+      'SELECT revoked_session_id, revoked_user_id, was_current FROM trademate_private.revoke_presented_user_session($1, $2)',
+      [digest, id],
+    );
+    if (!result.rowCount) throw new NotFoundException('Session not found.');
+    const isCurrent = Boolean(result.rows[0].was_current);
     if (isCurrent) response.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' });
     return { success: true, current: isCurrent };
   }
@@ -789,8 +746,10 @@ class AuthController {
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to request account deletion.');
+    const presentedSession = await resolvePresentedSessionUser(token);
+    if (!presentedSession.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const current = await databasePool.query(
-      "SELECT u.id, u.email, u.status, c.password_hash FROM user_sessions s JOIN users u ON u.id = s.user_id JOIN user_credentials c ON c.user_id = u.id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+      'SELECT user_id AS id, email, password_hash FROM trademate_private.resolve_presented_password_credentials($1)',
       [tokenDigest(token)],
     );
     if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
@@ -814,8 +773,21 @@ class AuthController {
     } finally { client.release(); }
     const emailSent = await sendTransactionalEmail(current.rows[0].email, 'TradeMate account deletion requested', `<p>Your account is scheduled for deletion in 30 days.</p><p>To cancel, submit this one-time cancellation token in TradeMate account recovery:</p><p><strong>${cancelToken}</strong></p><p>Your sessions have been revoked and account access is disabled.</p>`);
     if (!emailSent) {
-      await databasePool.query("UPDATE users SET status = 'active', updated_at = now() WHERE id = $1 AND status = 'deletion_pending'", [current.rows[0].id]);
-      await databasePool.query("UPDATE user_deletion_requests SET cancellation_token_hash = NULL, cancelled_at = now() WHERE user_id = $1", [current.rows[0].id]);
+      const recovery = await databasePool.connect();
+      try {
+        await recovery.query('BEGIN');
+        const rollback = await recovery.query(
+          'SELECT trademate_private.rollback_account_deletion_request($1) AS restored',
+          [tokenDigest(cancelToken)],
+        );
+        if (!rollback.rows[0]?.restored) {
+          throw new Error('The pending account deletion could not be rolled back safely.');
+        }
+        await recovery.query('COMMIT');
+      } catch (error) {
+        await recovery.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      } finally { recovery.release(); }
       throw new HttpException('We could not send your cancellation email, so the deletion request was not activated. Please try again later.', HttpStatus.SERVICE_UNAVAILABLE);
     }
     response.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' });
@@ -829,20 +801,13 @@ class AuthController {
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const token = typeof body?.token === 'string' ? body.token : '';
     if (!/^[A-Za-z0-9_-]{40,60}$/.test(token)) throw new BadRequestException('Enter a valid cancellation token.');
-    const client = await databasePool.connect();
-    try {
-      await client.query('BEGIN');
-      const restored = await client.query("UPDATE users u SET status = 'active', updated_at = now() FROM user_deletion_requests d WHERE d.user_id = u.id AND d.cancellation_token_hash = $1 AND d.cancelled_at IS NULL AND d.scheduled_for > now() AND u.status = 'deletion_pending' RETURNING u.id, u.email", [tokenDigest(token)]);
-      if (!restored.rowCount) throw new NotFoundException('This cancellation token is invalid, expired, or already used.');
-      await client.query('UPDATE user_deletion_requests SET cancelled_at = now(), cancellation_token_hash = NULL WHERE user_id = $1', [restored.rows[0].id]);
-      await client.query("INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'account.deletion_cancelled', 'user', $1, '{}'::jsonb)", [restored.rows[0].id]);
-      await client.query('COMMIT');
-      if (restored.rows[0].email) void sendTransactionalEmail(restored.rows[0].email, 'TradeMate account deletion cancelled', '<p>Your TradeMate account deletion request was cancelled. Sign in to continue using your account.</p>');
-      return { success: true, status: 'active', message: 'Account deletion cancelled. Sign in again to create a new session.' };
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally { client.release(); }
+    const restored = await databasePool.query(
+      'SELECT restored_user_id AS id, restored_email AS email FROM trademate_private.complete_account_deletion_cancellation($1)',
+      [tokenDigest(token)],
+    );
+    if (!restored.rowCount) throw new NotFoundException('This cancellation token is invalid, expired, or already used.');
+    if (restored.rows[0].email) void sendTransactionalEmail(restored.rows[0].email, 'TradeMate account deletion cancelled', '<p>Your TradeMate account deletion request was cancelled. Sign in to continue using your account.</p>');
+    return { success: true, status: 'active', message: 'Account deletion cancelled. Sign in again to create a new session.' };
   }
 
   @Post('logout')
@@ -851,26 +816,10 @@ class AuthController {
     const token = sessionTokenFrom(request);
     response.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' });
     if (databasePool && token) {
-      const client = await databasePool.connect();
-      try {
-        await client.query('BEGIN');
-        const removed = await client.query(
-          'DELETE FROM user_sessions WHERE token_hash = $1 RETURNING user_id',
-          [tokenDigest(token)],
-        );
-        if (removed.rowCount) {
-          await client.query(
-            "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.logout', 'user', $1, '{}'::jsonb)",
-            [removed.rows[0].user_id],
-          );
-        }
-        await client.query('COMMIT');
-      } catch (error) {
-        await client.query('ROLLBACK').catch(() => undefined);
-        throw error;
-      } finally {
-        client.release();
-      }
+      await databasePool.query(
+        'SELECT logged_out_user_id FROM trademate_private.logout_presented_session($1)',
+        [tokenDigest(token)],
+      );
     }
     return { success: true };
   }
@@ -884,10 +833,7 @@ class PreferencesController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to manage preferences.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
@@ -955,10 +901,7 @@ class NotificationsController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to view notifications.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
@@ -1009,10 +952,7 @@ class SupportController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to contact support.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
@@ -1169,10 +1109,7 @@ class OrganizationsController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to continue.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
@@ -1299,12 +1236,22 @@ class OrganizationsController {
       for (const file of files) {
         const fileName = typeof file.fileName === 'string' ? file.fileName.trim().slice(0, 180) : '';
         const mimeType = String(file.mimeType || '').toLowerCase();
-        const encoded = String(file.dataBase64 || '').replace(/^data:[^,]+,/, '');
-        if (!fileName || !['application/pdf', 'image/jpeg', 'image/png'].includes(mimeType) || !/^[A-Za-z0-9+/]+=*$/.test(encoded)) {
-          throw new BadRequestException('Use PDF, JPG or PNG documents.');
+        const suppliedData = String(file.dataBase64 || '');
+        const dataUrl = /^data:([^;,]+);base64,(.*)$/i.exec(suppliedData);
+        const encoded = dataUrl ? dataUrl[2] : suppliedData;
+        if (!fileName || !['application/pdf', 'image/jpeg', 'image/png'].includes(mimeType)
+          || (suppliedData.startsWith('data:') && !dataUrl)
+          || (dataUrl && dataUrl[1].toLowerCase() !== mimeType)
+          || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) {
+          throw new BadRequestException('Use valid PDF, JPG or PNG documents.');
         }
         const data = Buffer.from(encoded, 'base64');
-        if (!data.length || data.length > 5 * 1024 * 1024) throw new BadRequestException('Each document must be 5 MB or smaller.');
+        if (!data.length || data.length > 5 * 1024 * 1024 || data.toString('base64') !== encoded) {
+          throw new BadRequestException('Each document must be valid and 5 MB or smaller.');
+        }
+        if (!hasMatchingUploadSignature(mimeType, data)) {
+          throw new BadRequestException('The document content does not match its declared file type.');
+        }
         const result = await client.query(
           "INSERT INTO organization_documents (organization_id, uploaded_by_user_id, file_name, mime_type, file_size, file_data) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, file_name, mime_type, file_size, review_status, created_at",
           [id, userId, fileName, mimeType, data.length, data],
@@ -1351,10 +1298,7 @@ class PublicListingsController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to create an offer.');
-    const session = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const userId = session.rows[0].id as string;
     const title = typeof body?.title === 'string' ? body.title.trim() : '';
@@ -1410,10 +1354,7 @@ class PublicListingsController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to view your offers.');
-    const session = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const result = await databasePool.query(
       `SELECT l.id, l.title, l.description, l.listing_type, l.division, l.price_minor_units::text AS price_minor_units,
@@ -1440,10 +1381,7 @@ class PublicListingsController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to submit an offer.');
-    const session = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const userId = session.rows[0].id as string;
     const client = await databasePool.connect();
@@ -1494,10 +1432,7 @@ class PublicListingsController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to edit an offer.');
-    const session = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const userId = session.rows[0].id as string;
     const title = typeof body?.title === 'string' ? body.title.trim() : '';
@@ -1565,10 +1500,7 @@ class PublicListingsController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to delete an offer.');
-    const session = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const userId = session.rows[0].id as string;
     const client = await databasePool.connect();
@@ -1716,10 +1648,7 @@ class EnquiriesController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to use marketplace enquiries.');
-    const session = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return session.rows[0].id as string;
   }
@@ -1943,10 +1872,7 @@ class MarketplaceContractsController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to manage contracts.');
-    const session = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return session.rows[0].id as string;
   }
@@ -2411,7 +2337,7 @@ class MarketplaceTradesController {
 
 @Controller('p2p')
 class P2PMarketController {
-  private async writeP2PAudit(client: any, actorId: string, eventType: string, entityType: string, entityId: string, metadata: Record<string, unknown> = {}) {
+  private async writeP2PAudit(client: PoolClient, actorId: string, eventType: string, entityType: string, entityId: string, metadata: Record<string, unknown> = {}) {
     await client.query(
       'INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, $2, $3, $4, $5::jsonb)',
       [actorId, eventType, entityType, entityId, JSON.stringify(metadata)],
@@ -2468,24 +2394,24 @@ class P2PMarketController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to continue.');
-    const result = await databasePool.query("SELECT u.id FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status = 'active' LIMIT 1", [tokenDigest(token)]);
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired.');
     return result.rows[0].id as string;
   }
 
   @Post('ads')
-  async createAd(@Req() request: Request, @Body() body: any) {
-    parseBody(p2pAdBodySchema, body);
+  async createAd(@Req() request: Request, @Body() body: unknown) {
+    const input = parseBody(p2pAdBodySchema, body);
     const userId = await this.authenticatedUser(request);
-    const side = String(body?.side || '').toLowerCase(), asset = String(body?.asset || '').trim().toUpperCase(), fiat = String(body?.fiat || '').trim().toUpperCase();
+    const side = String(input?.side || '').toLowerCase(), asset = String(input?.asset || '').trim().toUpperCase(), fiat = String(input?.fiat || '').trim().toUpperCase();
     let priceUnits: bigint, quantityUnits: bigint, minCents: bigint, maxCents: bigint;
     try {
-      priceUnits = decimalToUnits(body.price, 10, 'Price');
-      quantityUnits = decimalToUnits(body.quantity, 12, 'Quantity');
-      minCents = decimalToUnits(body.minFiatAmount ?? '0', 2, 'Minimum fiat amount');
-      maxCents = body.maxFiatAmount === undefined ? productToFiatCents(priceUnits, quantityUnits) : decimalToUnits(body.maxFiatAmount, 2, 'Maximum fiat amount');
+      priceUnits = decimalToUnits(input.price, 10, 'Price');
+      quantityUnits = decimalToUnits(input.quantity, 12, 'Quantity');
+      minCents = decimalToUnits(input.minFiatAmount ?? '0', 2, 'Minimum fiat amount');
+      maxCents = input.maxFiatAmount === undefined ? productToFiatCents(priceUnits, quantityUnits) : decimalToUnits(input.maxFiatAmount, 2, 'Maximum fiat amount');
     } catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Enter valid P2P amounts.'); }
-    const methods = Array.isArray(body?.paymentMethods) ? body.paymentMethods.map((v: unknown) => String(v).trim()).filter(Boolean) : [];
+    const methods = Array.isArray(input?.paymentMethods) ? input.paymentMethods.map((v: unknown) => String(v).trim()).filter(Boolean) : [];
     if (!['buy','sell'].includes(side) || !/^[A-Z0-9]{2,16}$/.test(asset) || !/^[A-Z]{3}$/.test(fiat)) throw new BadRequestException('Choose a valid side, asset and fiat currency.');
     const totalCents = productToFiatCents(priceUnits, quantityUnits);
     if (priceUnits <= 0n || quantityUnits <= 0n || minCents < 0n || maxCents < minCents || maxCents <= 0n || maxCents > totalCents) throw new BadRequestException('Enter valid price, quantity and fiat limits.');
@@ -2533,11 +2459,11 @@ class P2PMarketController {
   }
 
   @Post('orders')
-  async placeOrder(@Req() request: Request, @Body() body: any) {
-    parseBody(p2pOrderBodySchema, body);
-    const userId = await this.authenticatedUser(request), adId = String(body?.adId || '');
+  async placeOrder(@Req() request: Request, @Body() body: unknown) {
+    const input = parseBody(p2pOrderBodySchema, body);
+    const userId = await this.authenticatedUser(request), adId = String(input?.adId || '');
     let fiatCents: bigint;
-    try { fiatCents = decimalToUnits(body.fiatAmount, 2, 'Fiat amount'); }
+    try { fiatCents = decimalToUnits(input.fiatAmount, 2, 'Fiat amount'); }
     catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Enter a valid fiat amount.'); }
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(adId) || fiatCents <= 0n) throw new BadRequestException('Choose an offer and enter a valid fiat amount.');
     const client = await databasePool!.connect();
@@ -2574,10 +2500,10 @@ class P2PMarketController {
   }
 
   @Post('orders/:id/payment-sent')
-  async paymentSent(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+  async paymentSent(@Param('id') id: string, @Req() request: Request, @Body() body: unknown) {
     parseUuidParam(id);
-    parseBody(p2pPaymentSentBodySchema, body);
-    const userId = await this.authenticatedUser(request), ref = typeof body?.reference === 'string' ? body.reference.trim() : '';
+    const input = parseBody(p2pPaymentSentBodySchema, body);
+    const userId = await this.authenticatedUser(request), ref = typeof input?.reference === 'string' ? input.reference.trim() : '';
     if (ref.length > 160) throw new BadRequestException('Reference is too long.');
     const client = await databasePool!.connect();
     try {
@@ -2644,10 +2570,10 @@ class P2PMarketController {
   }
 
   @Post('orders/:id/dispute')
-  async dispute(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+  async dispute(@Param('id') id: string, @Req() request: Request, @Body() body: unknown) {
     parseUuidParam(id);
-    parseBody(p2pDisputeBodySchema, body);
-    const userId = await this.authenticatedUser(request), reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
+    const input = parseBody(p2pDisputeBodySchema, body);
+    const userId = await this.authenticatedUser(request), reason = typeof input?.reason === 'string' ? input.reason.trim() : '';
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('id must be a valid order UUID.');
     if (reason.length < 5 || reason.length > 1000) throw new BadRequestException('Dispute reason must be 5 to 1,000 characters.');
     const client = await databasePool!.connect();
@@ -2674,10 +2600,7 @@ class PublicProfilesController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to continue.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
@@ -2718,17 +2641,17 @@ class PublicProfilesController {
     if (instagram && !/^[A-Za-z0-9._]{1,30}$/.test(instagram)) throw new BadRequestException('Enter a valid Instagram username.');
     if (x && !/^[A-Za-z0-9_]{1,15}$/.test(x)) throw new BadRequestException('Enter a valid X username.');
     if (website && (!/^https:\/\//i.test(website) || website.length > 2048)) throw new BadRequestException('Enter a valid HTTPS website URL.');
-    const validImage = (value: string) => !value || (/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value) && value.length <= 900000);
+    const validImage = (value: string) => !value || !!decodeProfileImageDataUrl(value);
     if (!validImage(photo) || !validImage(cover)) throw new BadRequestException('Profile images must be JPEG, PNG or WebP and smaller than 650 KB each.');
-    if (highlights.length > 12 || JSON.stringify(highlights).length > 200000 || highlights.some((h) => !h || typeof h !== 'object' || typeof (h as any).id !== 'string' || typeof (h as any).title !== 'string' || (h as any).title.length > 20 || typeof (h as any).img !== 'string' || (h as any).img.length > 700000)) {
+    if (highlights.length > 12 || JSON.stringify(highlights).length > 200000 || highlights.some((h) => !h || typeof h !== 'object' || !isRecord(h) || typeof h.id !== 'string' || typeof h.title !== 'string' || h.title.length > 20 || typeof h.img !== 'string' || h.img.length > 700000)) {
       throw new BadRequestException('Highlights are invalid or exceed the profile limits.');
     }
     const client = await databasePool!.connect();
     try {
       await client.query('BEGIN');
       const result = await client.query(
-        `INSERT INTO user_profiles (user_id, bio, instagram_username, x_username, website_url, profile_photo_data, cover_photo_data, highlights)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)
+        `INSERT INTO user_profiles (user_id, username, bio, instagram_username, x_username, website_url, profile_photo_data, cover_photo_data, highlights)
+         VALUES ($1, 'tm_' || left(replace($1::uuid::text, '-', ''), 21), $2,$3,$4,$5,$6,$7,$8::jsonb)
          ON CONFLICT (user_id) DO UPDATE SET bio=EXCLUDED.bio, instagram_username=EXCLUDED.instagram_username,
            x_username=EXCLUDED.x_username, website_url=EXCLUDED.website_url, profile_photo_data=EXCLUDED.profile_photo_data,
            cover_photo_data=EXCLUDED.cover_photo_data, highlights=EXCLUDED.highlights, updated_at=now()
@@ -2813,10 +2736,7 @@ class CommunityFeedController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to continue.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
@@ -2882,6 +2802,9 @@ class CommunityFeedController {
       const bytes = Buffer.from(encoded, 'base64');
       if (!bytes.length || bytes.length > 5 * 1024 * 1024 || bytes.toString('base64') !== encoded) {
         throw new BadRequestException('Each attachment must be valid and 5 MB or smaller.');
+      }
+      if (!hasMatchingUploadSignature(mime, bytes)) {
+        throw new BadRequestException('The attachment content does not match its declared file type.');
       }
       return { name, mime, bytes };
     });
@@ -3276,10 +3199,7 @@ class SportsTransferIdentityController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to continue.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
@@ -3297,12 +3217,11 @@ class SportsTransferIdentityController {
   }
 
   @Post('profiles')
-  async createProfile(@Req() request: Request, @Body() body: any) {
+  async createProfile(@Req() request: Request, @Body() body: unknown) {
     const input = parseBody(sportsProfileCreateBodySchema, body);
     const userId = await this.currentUser(request);
+    const client = await databasePool!.connect();
     try {
-      const client = await databasePool!.connect();
-      try {
         await client.query('BEGIN');
         const result = await client.query(
           `INSERT INTO sports_profiles (user_id, sport, display_name, biography, primary_position, country_code)
@@ -3317,20 +3236,17 @@ class SportsTransferIdentityController {
         );
         await client.query('COMMIT');
         return { profile: result.rows[0], message: 'Your private Sports Transfer profile has been created.' };
-      } catch (error) {
-        await client.query('ROLLBACK').catch(() => undefined);
-        if ((error as { code?: string })?.code === '23505') throw new ConflictException('You already have a profile for this sport.');
-        throw error;
-      } finally {
-        client.release();
-      }
     } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      if ((error as { code?: string })?.code === '23505') throw new ConflictException('You already have a profile for this sport.');
       throw error;
+    } finally {
+      client.release();
     }
   }
 
   @Patch('profiles/:id')
-  async updateProfile(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+  async updateProfile(@Param('id') id: string, @Req() request: Request, @Body() body: unknown) {
     parseUuidParam(id);
     const input = parseBody(sportsProfileUpdateBodySchema, body);
     const userId = await this.currentUser(request);
@@ -3373,7 +3289,7 @@ class SportsTransferIdentityController {
   }
 
   @Post('profiles/:id/consents')
-  async grantProfileConsent(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+  async grantProfileConsent(@Param('id') id: string, @Req() request: Request, @Body() body: unknown) {
     parseUuidParam(id);
     const input = parseBody(sportsConsentGrantBodySchema, body);
     const userId = await this.currentUser(request);
@@ -3429,22 +3345,68 @@ class SportsTransferIdentityController {
     const client = await databasePool!.connect();
     try {
       await client.query('BEGIN');
+      const profile = await client.query(
+        `SELECT p.id FROM sports_player_consents c
+         JOIN sports_profiles p ON p.id = c.player_profile_id
+         WHERE c.id = $1 AND p.user_id = $2
+         FOR UPDATE OF p`,
+        [id, userId],
+      );
+      if (!profile.rowCount) throw new NotFoundException('Active consent not found.');
       const result = await client.query(
         `UPDATE sports_player_consents c
          SET status = 'revoked', revoked_at = now()
-         FROM sports_profiles p
-         WHERE c.id = $1 AND c.player_profile_id = p.id AND p.user_id = $2
+         WHERE c.id = $1 AND c.player_profile_id = $2
            AND c.status = 'granted' AND c.revoked_at IS NULL
-         RETURNING c.id, c.player_profile_id, c.purpose, c.status, c.revoked_at`,
-        [id, userId],
+         RETURNING c.id, c.player_profile_id, c.granted_to_user_id,
+                   c.granted_to_organization_id, c.purpose, c.status, c.revoked_at`,
+        [id, profile.rows[0].id],
       );
       if (!result.rowCount) throw new NotFoundException('Active consent not found.');
+      const consent = result.rows[0];
       await client.query(
         "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.consent.revoked', 'sports_player_consent', $2, $3::jsonb)",
-        [userId, id, JSON.stringify({ profile_id: result.rows[0].player_profile_id, purpose: result.rows[0].purpose })],
+        [userId, id, JSON.stringify({ profile_id: consent.player_profile_id, purpose: consent.purpose })],
       );
+      if (consent.purpose === 'representative_access') {
+        const mandates = await client.query(
+          `UPDATE sports_representative_mandates
+           SET status = 'revoked', revoked_at = now(), updated_at = now(),
+               response_note = 'Underlying representative-access consent was revoked.'
+           WHERE player_profile_id = $1 AND status IN ('pending', 'active')
+             AND revoked_at IS NULL
+             AND (($2::uuid IS NOT NULL AND representative_user_id = $2)
+               OR ($3::uuid IS NOT NULL AND representative_organization_id = $3))
+           RETURNING id, representative_user_id, representative_organization_id`,
+          [consent.player_profile_id, consent.granted_to_user_id, consent.granted_to_organization_id],
+        );
+        for (const mandate of mandates.rows) {
+          await client.query(
+            "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'sports.mandate.revoked', 'sports_representative_mandate', $2, $3::jsonb)",
+            [userId, mandate.id, JSON.stringify({ profile_id: consent.player_profile_id, consent_id: id, reason: 'consent_revoked' })],
+          );
+          if (mandate.representative_user_id) {
+            await client.query(
+              "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'System', 'Sports Transfer mandate revoked', 'The player revoked the consent authorizing this representation mandate. Do not act on their behalf.', 'shield-alert')",
+              [mandate.representative_user_id],
+            );
+          } else {
+            await client.query(
+              `INSERT INTO user_notifications (user_id, category, title, body, icon)
+               SELECT user_id, 'System', 'Sports Transfer mandate revoked',
+                      'The player revoked the consent authorizing this organization representation mandate.', 'shield-alert'
+               FROM sports_org_memberships
+               WHERE sports_organization_id = $1 AND role IN ('owner', 'admin')
+                 AND status = 'active'
+                 AND (starts_at IS NULL OR starts_at <= now())
+                 AND (expires_at IS NULL OR expires_at > now())`,
+              [mandate.representative_organization_id],
+            );
+          }
+        }
+      }
       await client.query('COMMIT');
-      return { consent: result.rows[0], message: 'Consent has been revoked.' };
+      return { consent: { id: consent.id, player_profile_id: consent.player_profile_id, purpose: consent.purpose, status: consent.status, revoked_at: consent.revoked_at }, message: 'Consent has been revoked.' };
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;
@@ -3461,15 +3423,12 @@ class SportsTransferOrganizationsController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to continue.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
 
-  private async managerRole(client: any, organizationId: string, userId: string) {
+  private async managerRole(client: Pool | PoolClient, organizationId: string, userId: string) {
     const result = await client.query(
       `SELECT role FROM sports_org_memberships
        WHERE sports_organization_id = $1 AND user_id = $2 AND status = 'active'
@@ -3502,7 +3461,7 @@ class SportsTransferOrganizationsController {
   }
 
   @Post('organizations')
-  async createOrganization(@Req() request: Request, @Body() body: any) {
+  async createOrganization(@Req() request: Request, @Body() body: unknown) {
     const input = parseBody(sportsOrganizationCreateBodySchema, body);
     const userId = await this.currentUser(request);
     const client = await databasePool!.connect();
@@ -3557,7 +3516,7 @@ class SportsTransferOrganizationsController {
   }
 
   @Post('organizations/:id/memberships')
-  async inviteMember(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+  async inviteMember(@Param('id') id: string, @Req() request: Request, @Body() body: unknown) {
     parseUuidParam(id);
     const input = parseBody(sportsOrganizationMembershipInviteBodySchema, body);
     const userId = await this.currentUser(request);
@@ -3651,7 +3610,10 @@ class SportsTransferOrganizationsController {
                 'A new member has accepted an invitation to your sporting organization.', 'users'
          FROM sports_org_memberships
          WHERE sports_organization_id = $1 AND role IN ('owner', 'admin')
-           AND status = 'active' AND user_id <> $2`,
+           AND status = 'active'
+           AND (starts_at IS NULL OR starts_at <= now())
+           AND (expires_at IS NULL OR expires_at > now())
+           AND user_id <> $2`,
         [result.rows[0].sports_organization_id, userId],
       );
       await client.query('COMMIT');
@@ -3721,15 +3683,12 @@ class SportsTransferMandatesController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to continue.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
 
-  private async canRespond(client: any, mandate: any, userId: string) {
+  private async canRespond(client: PoolClient, mandate: Record<string, unknown>, userId: string) {
     if (mandate.representative_user_id) return mandate.representative_user_id === userId;
     const membership = await client.query(
       `SELECT role FROM sports_org_memberships
@@ -3788,6 +3747,7 @@ class SportsTransferMandatesController {
             SELECT 1 FROM sports_org_memberships om
             WHERE om.sports_organization_id = m.representative_organization_id
               AND om.user_id = $1 AND om.status = 'active'
+              AND om.role IN ('owner', 'admin')
               AND (om.starts_at IS NULL OR om.starts_at <= now())
               AND (om.expires_at IS NULL OR om.expires_at > now())
           )
@@ -3798,7 +3758,7 @@ class SportsTransferMandatesController {
   }
 
   @Post('profiles/:id/mandates')
-  async createMandate(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+  async createMandate(@Param('id') id: string, @Req() request: Request, @Body() body: unknown) {
     parseUuidParam(id);
     const input = parseBody(sportsRepresentativeMandateCreateBodySchema, body);
     const userId = await this.currentUser(request);
@@ -3855,10 +3815,10 @@ class SportsTransferMandatesController {
       const consentScope = consent.rows[0].scope || {};
       const allowedTerritories = Array.isArray(consentScope.territoryCodes) ? consentScope.territoryCodes : [];
       const allowedCompetitions = Array.isArray(consentScope.competitionIds) ? consentScope.competitionIds : [];
-      if (allowedTerritories.length && (input.territoryCodes || []).some((code: string) => !allowedTerritories.includes(code))) {
+      if ((input.territoryCodes || []).some((code: string) => !allowedTerritories.includes(code))) {
         throw new ForbiddenException('The mandate territory exceeds the territory in your representative-access consent.');
       }
-      if (allowedCompetitions.length && (input.competitionIds || []).some((competitionId: string) => !allowedCompetitions.includes(competitionId))) {
+      if ((input.competitionIds || []).some((competitionId: string) => !allowedCompetitions.includes(competitionId))) {
         throw new ForbiddenException('The mandate competition scope exceeds your representative-access consent.');
       }
 
@@ -3902,7 +3862,9 @@ class SportsTransferMandatesController {
                   'A player has requested to appoint your sporting organization as a representative.', 'shield-check'
            FROM sports_org_memberships
            WHERE sports_organization_id = $1 AND role IN ('owner', 'admin')
-             AND status = 'active' AND (expires_at IS NULL OR expires_at > now())`,
+             AND status = 'active'
+             AND (starts_at IS NULL OR starts_at <= now())
+             AND (expires_at IS NULL OR expires_at > now())`,
           [input.representativeOrganizationId],
         );
       }
@@ -3917,7 +3879,7 @@ class SportsTransferMandatesController {
   }
 
   @Post('mandates/:id/accept')
-  async acceptMandate(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+  async acceptMandate(@Param('id') id: string, @Req() request: Request, @Body() body: unknown) {
     parseUuidParam(id);
     const input = parseBody(sportsRepresentativeMandateResponseBodySchema, body || {});
     const userId = await this.currentUser(request);
@@ -3968,7 +3930,7 @@ class SportsTransferMandatesController {
   }
 
   @Post('mandates/:id/reject')
-  async rejectMandate(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+  async rejectMandate(@Param('id') id: string, @Req() request: Request, @Body() body: unknown) {
     parseUuidParam(id);
     const input = parseBody(sportsRepresentativeMandateResponseBodySchema, body || {});
     const userId = await this.currentUser(request);
@@ -4013,7 +3975,7 @@ class SportsTransferMandatesController {
   }
 
   @Post('mandates/:id/revoke')
-  async revokeMandate(@Param('id') id: string, @Req() request: Request, @Body() body: any) {
+  async revokeMandate(@Param('id') id: string, @Req() request: Request, @Body() body: unknown) {
     parseUuidParam(id);
     const input = parseBody(sportsRepresentativeMandateResponseBodySchema, body || {});
     const userId = await this.currentUser(request);
@@ -4047,7 +4009,9 @@ class SportsTransferMandatesController {
            SELECT user_id, 'System', 'Sports Transfer mandate revoked',
                   'The player has revoked the representation mandate granted to your organization.', 'shield-alert'
            FROM sports_org_memberships WHERE sports_organization_id = $1
-             AND role IN ('owner', 'admin') AND status = 'active'`,
+             AND role IN ('owner', 'admin') AND status = 'active'
+             AND (starts_at IS NULL OR starts_at <= now())
+             AND (expires_at IS NULL OR expires_at > now())`,
           [mandate.representative_organization_id],
         );
       }
@@ -4068,7 +4032,8 @@ const MARKET_SYMBOLS = new Set([
   'AAPL','MSFT','NVDA','AMZN','GOOGL','META','TSLA','BRK-B','JPM','AVGO',
   '^IRX','^FVX','^TNX','^TYX','TLT','IEF','SHY','GOVT','TIP','VGIT',
 ]);
-const marketQuoteCache = new Map<string, { expiresAt: number; value: any }>();
+type MarketQuote = { symbol: string; price: number; previousClose: number | null; changePercent: number | null; currency: string | null; marketTime: string; exchange: string | null; status: 'live' | 'delayed' };
+const marketQuoteCache = new Map<string, { expiresAt: number; value: MarketQuote }>();
 
 @Controller('market')
 class PublicMarketQuotesController {
@@ -4090,16 +4055,19 @@ class PublicMarketQuotesController {
           signal: AbortSignal.timeout(7000),
         });
         if (!response.ok) throw new Error('Upstream quote unavailable');
-        const payload: any = await response.json();
-        const result = payload?.chart?.result?.[0];
-        const meta = result?.meta;
+        const payload: unknown = await response.json();
+        const chart = isRecord(payload) && isRecord(payload.chart) ? payload.chart : null;
+        const resultRows = chart?.result;
+        const result = Array.isArray(resultRows) && isRecord(resultRows[0]) ? resultRows[0] : null;
+        const meta = result && isRecord(result.meta) ? result.meta : null;
+        if (!meta) throw new Error('Upstream returned an invalid quote payload');
         const price = Number(meta?.regularMarketPrice);
         const previous = Number(meta?.chartPreviousClose ?? meta?.previousClose);
         const timestamp = Number(meta?.regularMarketTime) * 1000;
         if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(timestamp) || timestamp <= 0) {
           throw new Error('Upstream returned no current quote');
         }
-        const value = {
+        const value: MarketQuote = {
           symbol, price, previousClose: Number.isFinite(previous) && previous > 0 ? previous : null,
           changePercent: Number.isFinite(previous) && previous > 0 ? ((price - previous) / previous) * 100 : null,
           currency: typeof meta.currency === 'string' ? meta.currency : null,
@@ -4124,10 +4092,7 @@ class SportsTransferOpportunitiesController {
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in to continue.');
-    const result = await databasePool.query(
-      "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-      [tokenDigest(token)],
-    );
+    const result = await resolvePresentedSessionUser(token);
     if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return result.rows[0].id as string;
   }
@@ -4162,7 +4127,7 @@ class SportsTransferOpportunitiesController {
   }
 
   @Post('opportunities')
-  async create(@Req() request: Request, @Body() body: any) {
+  async create(@Req() request: Request, @Body() body: unknown) {
     const input = parseBody(sportsTransferOpportunityCreateBodySchema, body);
     const userId = await this.currentUser(request);
     const client = await databasePool!.connect();

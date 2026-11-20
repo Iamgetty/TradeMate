@@ -5,17 +5,23 @@ services:
     runtime: node
     plan: free
     rootDir: TradeMate-main/apps/api
-    buildCommand: npm install --include=dev && npm run build
+    buildCommand: npm ci --include=dev --no-audit --no-fund && npm run build
     startCommand: npm run db:migrate && npm run start:prod
     healthCheckPath: /api/health
     autoDeployTrigger: checksPass
     envVars:
+      - key: NODE_VERSION
+        value: 24.22.1
       - key: NODE_ENV
         value: production
       - key: WEB_ORIGIN
         value: https://trademate-web.onrender.com
       - key: TOTP_ENCRYPTION_KEY
         sync: false
+      # Runtime API queries use the least-privilege application database role.
+      - key: DATABASE_URL
+        sync: false
+      # Migrations use a separate elevated role; it may target the same database.
       - key: MIGRATION_DATABASE_URL
         sync: false
       - key: WORKER_DATABASE_URL
@@ -29,18 +35,23 @@ services:
     runtime: node
     plan: free
     rootDir: TradeMate-main/exchange-feed
-    buildCommand: npm install
+    buildCommand: npm ci --no-audit --no-fund
     startCommand: npm start
     healthCheckPath: /health
     autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_VERSION
+        value: 24.22.1
   - type: web
     name: trademate-web
     runtime: node
     plan: free
     rootDir: TradeMate-main/apps/web
-    buildCommand: npm install && npm run build && mkdir -p .next/standalone/public .next/standalone/.next && cp -R public/. .next/standalone/public/ && cp -R .next/static .next/standalone/.next/
+    buildCommand: npm ci --no-audit --no-fund && npm run build && mkdir -p .next/standalone/public .next/standalone/.next && cp -R public/. .next/standalone/public/ && cp -R .next/static .next/standalone/.next/
     startCommand: node .next/standalone/server.js
     autoDeployTrigger: checksPass
     envVars:
+      - key: NODE_VERSION
+        value: 24.22.1
       - key: TRADEMATE_API_ORIGIN
         value: https://trademate-api-toip.onrender.com

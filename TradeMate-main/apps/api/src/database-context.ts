@@ -3,11 +3,11 @@ import { createHash } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import type { Pool, PoolClient } from 'pg';
 
-type DatabaseRequestContext = { sessionTokenHash: string; userId: string; userResolved: boolean };
+type DatabaseRequestContext = { sessionTokenHash: string };
 const requestContext = new AsyncLocalStorage<DatabaseRequestContext>();
 
-const sessionCookieToken = (request: Request): string => {
-  const cookie = request.headers.cookie?.split(';')
+export const sessionTokenFromCookieHeader = (cookieHeader?: string): string => {
+  const cookie = cookieHeader?.split(';')
     .map((part) => part.trim())
     .find((part) => part.startsWith('trademate_session='));
   if (!cookie) return '';
@@ -19,29 +19,18 @@ const sessionCookieToken = (request: Request): string => {
 };
 
 export const databaseRequestContextMiddleware = (request: Request, _response: Response, next: NextFunction) => {
-  const token = sessionCookieToken(request);
+  const token = sessionTokenFromCookieHeader(request.headers.cookie);
   const sessionTokenHash = token ? createHash('sha256').update(token).digest('hex') : '';
-  requestContext.run({ sessionTokenHash, userId: '', userResolved: false }, next);
+  requestContext.run({ sessionTokenHash }, next);
 };
 
 const establishTransactionContext = async (client: PoolClient, context: DatabaseRequestContext) => {
   await client.query("SELECT set_config('app.session_token_hash', $1, true)", [context.sessionTokenHash]);
 
-  // Resolve identity from the hashed, unexpired server-side session. The initial
-  // lookup is allowed by the future session-hash RLS policy; user_id itself is
-  // never accepted from the browser or request body.
-  if (!context.userResolved) {
-    if (context.sessionTokenHash) {
-      const session = await client.query(
-        "SELECT s.user_id::text AS user_id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
-        [context.sessionTokenHash],
-      );
-      context.userId = session.rows[0]?.user_id || '';
-    }
-    context.userResolved = true;
-  }
-
-  await client.query("SELECT set_config('app.user_id', $1, true)", [context.userId]);
+  // Do not set app.user_id: custom PostgreSQL settings are caller-controlled
+  // by the runtime role and therefore cannot be trusted as an RLS identity.
+  // Policies resolve this opaque, presented bearer digest through a narrow
+  // SECURITY DEFINER function instead.
 };
 
 const matchesSqlCommand = (sql: unknown, command: string) => {
@@ -99,9 +88,18 @@ export const createRlsAwarePool = (pool: Pool): Pool => new Proxy(pool, {
 
                 if (isBeginCommand(sql)) {
                   const result = await (inner.query as (...queryArgs: unknown[]) => unknown).apply(inner, args);
-                  await establishTransactionContext(inner, context);
                   inTransaction = true;
-                  return result;
+                  try {
+                    await establishTransactionContext(inner, context);
+                    return result;
+                  } catch (error) {
+                    // Keep the client marked as transactional until rollback succeeds.
+                    // If rollback itself fails, release() makes one final cleanup attempt.
+                    await inner.query('ROLLBACK').then(() => {
+                      inTransaction = false;
+                    }).catch(() => undefined);
+                    throw error;
+                  }
                 }
 
                 if (isCommitCommand(sql) || isRollbackCommand(sql)) {

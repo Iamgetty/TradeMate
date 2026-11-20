@@ -26,6 +26,11 @@ async function main() {
       ['Document integration ' + suffix],
     );
     const organizationId = organization.rows[0].id;
+    const organizationB = await rawPool.query(
+      "INSERT INTO organizations (name, organization_type, country_code, default_currency, status) VALUES ($1, 'business', 'NG', 'NGN', 'active') RETURNING id",
+      ['Unrelated document organization ' + suffix],
+    );
+    const unrelatedOrganizationId = organizationB.rows[0].id;
     const actors = {};
 
     for (const role of ['owner', 'admin', 'member']) {
@@ -46,6 +51,7 @@ async function main() {
       actors[role] = { userId, token };
     }
 
+
     app = await NestFactory.create(AppModule, { logger: false, bodyParser: false });
     app.use(json({ limit: '28mb' }));
     app.use(databaseRequestContextMiddleware);
@@ -53,7 +59,7 @@ async function main() {
     await app.listen(0, '127.0.0.1');
     const address = app.getHttpServer().address();
     const baseUrl = 'http://127.0.0.1:' + address.port;
-    const request = (role, method, body) => fetch(baseUrl + '/api/organizations/' + organizationId + '/documents', {
+    const request = (role, method, body, targetOrganizationId = organizationId) => fetch(baseUrl + '/api/organizations/' + targetOrganizationId + '/documents', {
       method,
       headers: {
         cookie: 'trademate_session=' + encodeURIComponent(actors[role].token),
@@ -61,8 +67,9 @@ async function main() {
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
+    const validPdfBase64 = Buffer.from('%PDF-1.4\\n').toString('base64');
     const file = (name) => ({
-      files: [{ fileName: name, mimeType: 'application/pdf', dataBase64: 'YQ==' }],
+      files: [{ fileName: name, mimeType: 'application/pdf', dataBase64: validPdfBase64 }],
     });
 
     for (const role of ['owner', 'admin']) {
@@ -72,12 +79,34 @@ async function main() {
     const memberList = await request('member', 'GET');
     assert.equal(memberList.status, 403, 'ordinary members must not list verification documents');
 
+    const crossOrganizationList = await request('owner', 'GET', undefined, unrelatedOrganizationId);
+    assert.equal(crossOrganizationList.status, 403, 'an owner of another organization must not list its documents');
+    const crossOrganizationUpload = await request('admin', 'POST', file('cross-organization.pdf'), unrelatedOrganizationId);
+    assert.equal(crossOrganizationUpload.status, 403, 'an admin of another organization must not upload its documents');
+
+    const spoofedPdf = await request('owner', 'POST', {
+      files: [{ fileName: 'spoofed.pdf', mimeType: 'application/pdf', dataBase64: Buffer.from('not a PDF').toString('base64') }],
+    });
+    assert.equal(spoofedPdf.status, 400, 'a file with a PDF MIME label but no PDF signature must be rejected');
+
+    const mismatchedDataUrl = await request('owner', 'POST', {
+      files: [{ fileName: 'mismatch.pdf', mimeType: 'application/pdf', dataBase64: 'data:image/png;base64,' + Buffer.from('not a PNG').toString('base64') }],
+    });
+    assert.equal(mismatchedDataUrl.status, 400, 'a data URL MIME type must match the declared document type');
+
+    const nonCanonicalBase64 = validPdfBase64.slice(0, -3) + 'h==';
+    const nonCanonicalUpload = await request('owner', 'POST', {
+      files: [{ fileName: 'non-canonical.pdf', mimeType: 'application/pdf', dataBase64: nonCanonicalBase64 }],
+    });
+    assert.equal(nonCanonicalUpload.status, 400, 'non-canonical Base64 padding bits must be rejected');
+
     const ownerUpload = await request('owner', 'POST', file('owner.pdf'));
     assert.equal(ownerUpload.status, 201, 'owner upload must succeed');
     const adminUpload = await request('admin', 'POST', file('admin.pdf'));
     assert.equal(adminUpload.status, 201, 'admin upload must succeed');
     const memberUpload = await request('member', 'POST', file('member.pdf'));
     assert.equal(memberUpload.status, 403, 'ordinary member upload must be forbidden');
+
 
     const beforeFailure = await rawPool.query(
       'SELECT count(*)::int AS count FROM organization_documents WHERE organization_id = $1',

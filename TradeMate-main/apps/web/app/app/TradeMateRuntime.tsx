@@ -6,6 +6,21 @@ declare global {
   interface Window {
     TM_CONFIG?: { api: string };
     __tradeMateBooted?: boolean;
+    tmMarketMetadataStatus?: {
+      state: 'fresh' | 'stale' | 'unavailable';
+      lastAttemptAt: number | null;
+      lastSuccessAt: number | null;
+      error: string | null;
+    };
+    createMarketMetadataRefresher?: (options?: {
+      onStatus?: (status: {
+        state: 'fresh' | 'stale' | 'unavailable';
+        lastAttemptAt: number | null;
+        lastSuccessAt: number | null;
+        error: string | null;
+      }) => void;
+    }) => unknown;
+    applyCoinGeckoMarketMetadata?: (rows: unknown[], options?: Record<string, unknown>) => void;
   }
 }
 
@@ -27,6 +42,7 @@ export default function TradeMateRuntime() {
 
     let settled = false;
     let feedReady = false;
+    let metadataReady = false;
     let cssReady = false;
     let layoutCssReady = false;
     let patchesCssReady = false;
@@ -63,13 +79,13 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=144';
+    app.src = '/tm/app.js?v=148';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=144. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=148. Check the deployment and static asset response.');
 
     const loadApp = () => {
-      if (!feedReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !metadataReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -143,7 +159,7 @@ export default function TradeMateRuntime() {
     const polishPreload = document.createElement('link');
     polishPreload.rel = 'preload';
     polishPreload.as = 'style';
-    polishPreload.href = '/tm/runtime-polish.css?v=1';
+    polishPreload.href = '/tm/runtime-polish.css?v=3';
     polishPreload.onload = () => {
       polishCssReady = true;
       loadApp();
@@ -251,6 +267,38 @@ export default function TradeMateRuntime() {
     earnPreload.onload = () => { earnCssReady = true; loadApp(); };
     earnPreload.onerror = () => { earnCssReady = true; loadApp(); };
     document.head.appendChild(earnPreload);
+
+    // Load the independently tested market-metadata lifecycle helper before
+    // app.js. If it is unavailable, app.js retains its conservative legacy
+    // fallback so a public metadata dependency cannot block core startup.
+    const metadata = document.createElement('script');
+    metadata.src = '/tm/market-metadata.js?v=1';
+    metadata.async = false;
+    metadata.onload = () => {
+      if (!window.createMarketMetadataRefresher || !window.applyCoinGeckoMarketMetadata) {
+        window.tmMarketMetadataStatus = {
+          state: 'unavailable',
+          lastAttemptAt: null,
+          lastSuccessAt: null,
+          error: 'Market metadata helper did not initialise correctly',
+        };
+      }
+      metadataReady = true;
+      loadApp();
+    };
+    metadata.onerror = () => {
+      // Market metadata is secondary to the exchange-feed spot quote. Fail
+      // closed for this optional source while keeping the core app available.
+      window.tmMarketMetadataStatus = {
+        state: 'unavailable',
+        lastAttemptAt: null,
+        lastSuccessAt: null,
+        error: 'Market metadata helper could not be loaded',
+      };
+      metadataReady = true;
+      loadApp();
+    };
+    document.body.appendChild(metadata);
 
     const feed = document.createElement('script');
     feed.src = '/tm/feed-client.js?v=2';

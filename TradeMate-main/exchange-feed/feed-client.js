@@ -49,15 +49,30 @@
 
     function aggregate(levels, side) {
       const m = new Map();
-      for (const [p, s] of levels) {
-        const k = bucket(p, side);
-        m.set(k, (m.get(k) || 0) + s);
+      for (const [rawPrice, rawSize] of levels) {
+        const price = Number(rawPrice);
+        const size = Number(rawSize);
+        if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(size) || size <= 0) continue;
+        const k = bucket(price, side);
+        m.set(k, (m.get(k) || 0) + size);
       }
       const rows = [...m.entries()]
         .sort((a, b) => (side === 'bid' ? b[0] - a[0] : a[0] - b[0]))
         .slice(0, o.levels);
       let running = 0;
       return rows.map(([price, size]) => ({ price, size, total: (running += size) }));
+    }
+
+    function clearMarketData() {
+      trades = [];
+      o.onUpdate({
+        symbol: `${o.base}/${o.quote}`,
+        bids: [], asks: [], bestBid: null, bestAsk: null, mid: null, spread: null,
+        last: null, trades: [], booksCombined: 0,
+        feedsLive: 0, feedsTotal: 0, fxQuotes: [], marketQuotes: [],
+        fxStatus: { state: 'unavailable', provider: 'OANDA' },
+        ts: Date.now(),
+      });
     }
 
     function handle(msg) {
@@ -81,8 +96,12 @@
         last: trades.length ? trades[0].price : mid,
         trades,                                       // [{ exchange, market, ts, price, qty, side }] newest first
         booksCombined: fresh.length,                  // "N exchange books combined"
-        feedsLive: msg.feeds.live,                    // "N/M FEEDS LIVE"
-        feedsTotal: msg.feeds.total,
+        feedsLive: Array.isArray(msg.feeds)
+          ? msg.feeds.filter((feed) => feed && feed.status === 'live' && feed.stale !== true).length
+          : Number.isFinite(msg.feeds.live) ? msg.feeds.live : 0,
+        feedsTotal: Array.isArray(msg.feeds)
+          ? msg.feeds.length
+          : Number.isFinite(msg.feeds.total) ? msg.feeds.total : 0,
         fxQuotes: Array.isArray(msg.fxQuotes) ? msg.fxQuotes : [],
         // Expose every fresh spot ticker to the marketplace list, not just
         // the currently watched coin's order book.
@@ -151,6 +170,7 @@
         }
       };
       socket.onclose = () => {
+        clearMarketData();
         o.onStatus(false);
         clearStableTimer();
         scheduleReconnect();
@@ -167,7 +187,13 @@
         clearStableTimer();
         if (ws) ws.close();
       },
-      setSymbol(base, quote) { o.base = base; o.quote = quote; trades = []; watch(); },   // call when the user switches pair
+      setSymbol(base, quote) {
+        if (o.base === base && o.quote === quote) return;
+        o.base = base;
+        o.quote = quote;
+        clearMarketData();
+        watch();
+      },   // call when the user switches pair
     };
   }
 

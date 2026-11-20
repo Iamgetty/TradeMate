@@ -19,10 +19,11 @@ const listing = {
 };
 
 async function login(page: import('@playwright/test').Page) {
-  await expect(page.getByRole('button', { name: /Sign in/ })).toBeVisible();
+  const submit = page.locator('form.auth-form button.auth-submit');
+  await expect(submit).toHaveText(/Sign in/);
   await page.getByLabel('Email address').fill('buyer@example.test');
   await page.getByLabel('Password').fill('example-password');
-  await page.getByRole('button', { name: /Sign in/ }).click();
+  await submit.click();
 }
 
 test('marketplace enquiry draft survives login and returns to its offer', async ({ page }) => {
@@ -34,7 +35,19 @@ test('marketplace enquiry draft survives login and returns to its offer', async 
       ? { status: 401, json: { message: 'Authentication required.' } }
       : { status: 201, json: { data: { id: enquiryId } } });
   });
-  await page.route('**/api/auth/login', route => route.fulfill({ status: 200, json: { user: { id: 'buyer-001', email: 'buyer@example.test' } } }));
+  // Match the API's real login contract: it sets the httpOnly trademate_session cookie.
+  // The follow-up /me request must see that cookie before the offer page is considered signed in.
+  await page.route('**/api/auth/me', route => {
+    const cookie = route.request().headers().cookie || '';
+    return cookie.includes('trademate_session=mock-session')
+      ? route.fulfill({ status: 200, json: { user: { id: 'buyer-001', email: 'buyer@example.test' } } })
+      : route.fulfill({ status: 401, json: { message: 'Please sign in.' } });
+  });
+  await page.route('**/api/auth/login', route => route.fulfill({
+    status: 200,
+    headers: { 'set-cookie': 'trademate_session=mock-session; Path=/; HttpOnly; SameSite=Lax' },
+    json: { user: { id: 'buyer-001', email: 'buyer@example.test' } },
+  }));
 
   await page.goto('/market/' + listingId);
   await page.getByLabel('Your message').fill('Please confirm the available delivery schedule.');

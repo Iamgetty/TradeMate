@@ -138,37 +138,40 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 
 ### Phase S1 — Secure development foundations
 
-**Implementation status (2026-11-01): in progress.** The first code and process tranche is implemented and CI-verified:
+**Implementation status (2026-11-19): in progress.** The first code and process tranche is implemented and CI-verified:
 
 - API TypeScript uses `strict: true`; API build passes with strict checks.
-- Zod runtime schemas cover every current `@Body` request body, all current `@Query` inputs and UUID route parameters in the API module. Schemas reject unknown object keys and validate formats, limits, enumerations and numeric inputs. Critical startup environment values are also schema-validated before the API starts.
+- Zod runtime schemas cover every current `@Body` request body, all current `@Query` inputs and UUID route parameters in the API module. Schemas reject unknown object keys and validate formats, limits, enumerations and numeric inputs. Critical startup environment values are schema-validated before the API starts.
 - API Zod schema tests cover authentication, TOTP, deletion, profiles, feed, support, organization documents, listings, enquiries, contracts, P2P, moderation, query filters and environment configuration.
 - NIST SSDF policy: `docs/security/ssdf-policy.md`.
-- PostgreSQL roles/RLS architecture: `docs/security/database-rls-design.md`. Least-privilege `trademate_app`, `trademate_migrator` and scoped `trademate_worker` bootstrap grants are implemented and passed on a clean PostgreSQL database in CI. The deletion worker uses its own production credential slot and no longer edits historical audit events. Transaction-local `app.session_token_hash` and DB-resolved `app.user_id` context is implemented and tested. Production roles have not yet been created or switched; RLS is not enabled.
+- PostgreSQL roles/RLS architecture: `docs/security/database-rls-design.md`. Least-privilege `trademate_app`, `trademate_migrator` and scoped `trademate_worker` bootstrap grants are implemented and passed on a clean PostgreSQL database in CI. Production roles have not yet been created or switched; RLS is not enabled. The API now sets only transaction-local `app.session_token_hash`; RLS policies resolve identity through `trademate_private.current_presented_user_id()` and must ignore caller-forgeable `app.user_id`. The CI-only RLS pilot includes a regression test that forges `app.user_id` to another account.
 - Pull-request security checklist: `.github/PULL_REQUEST_TEMPLATE.md`.
-- CI security job runs Semgrep SAST, npm dependency audits for API/web/exchange-feed, and Gitleaks secret scanning. The high-severity audit threshold and all three scanners passed in CI run 41324646848.
-- Next.js/React and NestJS/Zod dependency upgrades are applied. The API dependency tree still has lower-severity development-tool advisories below the current high-severity gate; these remain tracked for remediation.
-- PostgreSQL TLS certificate verification is enabled for SSL connections. External Render DB migration workflow succeeded with verification enabled.
+- CI security job runs Semgrep SAST, npm dependency audits for API/web/exchange-feed, and Gitleaks secret scanning.
+- PostgreSQL TLS certificate verification is enabled for SSL connections. External Render DB migration workflow previously succeeded with verification enabled.
 - AES-256-GCM TOTP encryption and decryption explicitly require a 16-byte authentication tag.
-- Migration runner now prefers `MIGRATION_DATABASE_URL`, falling back to `DATABASE_URL` during the transition. Render Blueprint exposes the new secret slot.
+- The migration runner requires `MIGRATION_DATABASE_URL` in production and permits the ordinary `DATABASE_URL` fallback only outside production. This protects the migration runner from silently using the runtime role; it does **not** isolate the elevated credential from the API process when both commands share one Render service environment.
 
 **Still open before S1 is complete:**
 
-1. **API integration tests:** authenticated/unauthenticated requests are now exercised against a running Nest HTTP server in CI; expand these tests as endpoints and policies change.
+1. **API integration tests:** authenticated/unauthenticated requests are exercised against a running Nest HTTP server in CI; expand these tests as endpoints and policies change.
 2. Create separate Render-managed runtime, migration and worker credentials, run the tested role bootstrap on Render, grant least-privilege access, and verify deployment using the split URLs.
-3. Complete organization-membership context and auth-bootstrap policy design. Session hash and database-resolved user ID are now applied transaction-locally to ordinary pool queries and explicit transactions; concurrent-request and connection-context tests are in CI.
+3. Complete organization-membership context and auth-bootstrap policy design. Session hash and database-resolved user ID are applied transaction-locally to ordinary pool queries and explicit transactions; concurrent-request and connection-context tests are in CI.
 4. Expand the CI-only RLS pilot to the complete sensitive-table inventory, including login/registration/TOTP bootstrap and organization membership. Only then promote RLS and FORCE RLS to production after auth-bootstrap, cross-user, cross-organization and pool-reuse tests pass.
-5. Add database-role/RLS integration tests and verify audit-event append-only permissions under the actual runtime role.
-6. Set GitHub main-branch protection so required CI checks and independent review cannot be bypassed. The repository currently has no GitHub rulesets visible to the connected integration; branch-protection settings require owner-level dashboard access.
-7. Review and remediate the remaining moderate/low dependency advisories, then decide whether to raise the SCA gate to moderate.
+5. **RLS pilot test-target protection — repository implementation and CI verified:** `scripts/test-rls-pilot.js` requires the dedicated `RLS_PILOT_TEST_DATABASE_URL`, rejects generic `DATABASE_URL` fallback, requires a loopback PostgreSQL host and an explicitly test/CI-named database, rejects query/fragment overrides, and has regression coverage invoked by CI. This protects the test harness; it does not enable RLS or complete production role/policy rollout.
+6. Add database-role/RLS integration tests and verify audit-event append-only permissions under the actual runtime role.
+7. Set GitHub main-branch protection so required CI checks and independent review cannot be bypassed. The repository currently has no GitHub rulesets visible to the connected integration; branch-protection settings require owner-level dashboard access.
+8. Review and remediate the remaining moderate/low dependency advisories, then decide whether to raise the SCA gate to moderate.
+9. **Isolate migration execution from the API runtime:** resolve the design in `docs/security/migration-execution-isolation.md`. The current Render API service receives `MIGRATION_DATABASE_URL` and its startup command runs migrations before the API; the API inherits that secret. The existing GitHub migration workflow also permits fallback to `TRADEMATE_DATABASE_URL` and can trigger on migration-related pushes to `main`. Do not remove startup migrations or change production workflow triggers until a separately credentialed, approval-gated migration path and exact-release deployment ordering are implemented and rehearsed.
 
 ### Phase S2 — Identity, verification and financial crime controls
 
-1. Select and integrate a third-party KYC/KYB identity-verification provider (evaluate Sumsub and Onfido/Entrust); TradeMate will not build document verification itself.
-2. Implement verified webhook handling, signature validation, replay protection, status reconciliation and auditable case outcomes.
-3. Add risk-based AML/sanctions screening and ongoing monitoring appropriate to the supported jurisdictions and product scope.
-4. Evaluate Chainalysis, Elliptic or TRM Labs for blockchain address and transaction screening before any crypto transfer feature.
-5. Evaluate verifiable credentials/attestations only where they add a clear privacy and compliance benefit.
+1. Select and integrate a third-party KYC/KYB identity-verification provider; TradeMate will not build document-authenticity or biometric verification itself. Run a documented, evidence-based comparison of Sumsub, Jumio, Entrust Identity Verification (formerly Onfido) and Veriff. Treat Binance only as a product/process benchmark: do not claim it uses any named provider unless independently verified from a reliable public source.
+2. Validate provider coverage and accuracy for every launch jurisdiction before selection, with explicit Nigerian testing for supported identity documents and verification methods (including NIN-linked checks only where the provider, lawful basis and applicable regulator requirements support them). Compare document authenticity, selfie/face match, passive/active liveness, spoof/deepfake resistance, duplicate identity detection, fraud signals, manual-review quality, appeals, accessibility, completion/conversion, latency, uptime, pricing and support.
+3. Complete legal, privacy and security due diligence: data-controller/processor roles, lawful basis and consent where required, data minimization, retention/deletion, data residency and cross-border transfers, sub-processors, encryption, access controls, breach notification, independent assurance and audit rights. Do not collect or retain raw identity/biometric data beyond the approved necessity.
+4. Implement verified webhook handling, signature validation, replay protection, idempotency, status reconciliation and auditable case outcomes; keep provider status separate from TradeMate's own risk decision and provide secure manual review and user appeal paths.
+5. Add risk-based AML/sanctions screening and ongoing monitoring appropriate to the supported jurisdictions and product scope.
+6. Evaluate Chainalysis, Elliptic or TRM Labs for blockchain address and transaction screening before any crypto transfer feature.
+7. Evaluate verifiable credentials/attestations only where they add a clear privacy and compliance benefit.
 
 ### Phase S3 — Database, financial and transaction safety
 
@@ -710,3 +713,282 @@ See [`sports-transfer-guardian-safeguarding.md`](sports-transfer-guardian-safegu
 8. Complete football and basketball-specific validation, minors safeguarding, privacy/security threat modelling, penetration testing, delivery failure testing, legal review and staged live acceptance.
 
 **Release gate:** no player may be described as personally available/consenting or represented solely because an external source lists them; no private contact details are exposed to clubs; no unverified contact route is treated as a successful notification; no agent receives authority without a verified, active player mandate; no minor is exposed to unapproved direct contact.
+
+
+---
+
+## Global technology and security standard — mandatory cross-stack roadmap
+
+**Strategic direction:** TradeMate is being built for a global standard. Every stack and subsystem must be selected and engineered for best-in-class security, resilience, performance, scalability, interoperability, privacy, accessibility, observability and maintainability. Choose technologies based on independently supportable capability, threat fit, regional coverage, integration, data residency, lifecycle cost and exit strategy—not familiarity or lowest initial price. Keep provider-neutral interfaces where practical.
+
+This is a roadmap commitment and target architecture, not a claim that products have been purchased, configured, deployed or certified. Vendor names are evaluation candidates only. This entry does not change production configuration, services, secrets, databases, deployments, subscriptions or integrations.
+
+### Governance, standards and assurance
+- [ ] Establish a complete asset inventory, data classification, data-flow maps, trust boundaries, threat models and risk register covering web/mobile, APIs, identity, trading/MT5, payments, data, cloud, workforce, CI/CD, vendors and support operations.
+- [ ] Adopt NIST Cybersecurity Framework 2.0 for governance; CIS Controls v8.1 for prioritized safeguards; OWASP ASVS Level 2 baseline with selected Level 3 controls for critical trading/admin functions; OWASP API Security Top 10; MITRE ATT&CK; and Zero Trust principles.
+- [ ] Establish secure SDLC, privacy impact reviews, security architecture reviews, vulnerability disclosure/response, incident command, tabletop exercises, remediation SLAs and evidence-based release gates.
+- [ ] Map applicable financial, privacy, consumer, AML/KYC, sanctions and data-residency obligations by operating jurisdiction with qualified legal/compliance review. Do not claim certification or regulatory approval without independent evidence.
+
+### Edge, firewall, network and API protection
+- [ ] Evaluate Cloudflare Enterprise WAAP capabilities (WAF/managed rules, DDoS, bot management, API discovery/protection, rate limiting, abuse controls, client-side security and Zero Trust access) against leading alternatives and measured requirements.
+- [ ] Protect every intended public endpoint; prevent direct-origin bypass with restricted ingress and authenticated origin connectivity/mTLS or equivalent where supported.
+- [ ] Apply deny-by-default ingress/egress, least-privilege service networking, private data services, strong identity-aware administrative access and strict environment separation.
+- [ ] Maintain API inventory/schema contracts; enforce authentication, object/function/property-level authorization, quotas, payload limits, idempotency/replay protection, safe errors and data minimization.
+- [ ] Harden registrar/DNS accounts, DNSSEC where supported, TLS/certificate lifecycle, HSTS and certificate-expiry monitoring.
+- [ ] Adversarially test DDoS, bot abuse, credential stuffing, scraping, injection, SSRF, request smuggling and origin bypass.
+
+### Identity, phishing, account and privileged-access protection
+- [ ] Require phishing-resistant MFA/passkeys or hardware security keys for privileged users and developers; evaluate YubiKey/FIDO2 and equivalent options.
+- [ ] Evaluate Microsoft Entra ID or equivalent workforce identity, conditional access, device posture, just-in-time privilege and privileged identity management.
+- [ ] Evaluate Proofpoint or equivalent email security for phishing, impersonation/BEC, malicious links and attachments.
+- [ ] Enforce SPF, DKIM and DMARC with monitored staged enforcement; protect registrar, DNS, email administration and account recovery channels.
+- [ ] Harden customer authentication: strong password hashing, breached-password checks, MFA/passkeys, anti-enumeration, credential-stuffing protection, session rotation/revocation, device/session visibility, risk-based step-up and safe recovery.
+- [ ] Require dual control and out-of-band verification for high-impact admin, payout, credential rotation and account-recovery actions. Never rely on email alone for high-impact recovery.
+- [ ] Evaluate enterprise password/secrets vaults such as 1Password Business or equivalent; prohibit secrets in source, tickets, logs, chat and build artifacts.
+
+### Endpoint, malware, ransomware and workforce security
+- [ ] Evaluate CrowdStrike Falcon against Microsoft Defender XDR/Endpoint and equivalent EDR for endpoint coverage, malware/ransomware prevention, threat hunting, containment, forensic retention, OS support and total cost. Select a coherent primary platform; avoid ungoverned overlapping agents.
+- [ ] Require managed-device baselines, disk encryption, secure boot, timely patching, endpoint firewall, EDR health monitoring, least privilege, application control and secure remote access.
+- [ ] Protect developer endpoints, CI runners, build agents, support workstations and machines with production/trading credentials.
+- [ ] Establish role-specific phishing training, reporting and rapid credential/session revocation.
+- [ ] Scan and quarantine uploaded files; isolate risky document/archive processing and never execute untrusted content on application hosts.
+
+### Application, database, data and cryptographic security
+- [ ] Complete PostgreSQL least-privilege roles and RLS remediation. Prove identity integrity against caller-settable context, bootstrap access, worker paths, anonymous/pre-session flows and cross-tenant access with adversarial real-PostgreSQL tests. Keep production RLS disabled until design and staged rollout are validated.
+- [ ] Classify/minimize sensitive data; encrypt in transit and at rest; separate key management, rotate keys and audit access. Evaluate managed KMS/HSM and envelope encryption for high-value keys.
+- [ ] Review password, session, reset, verification, TOTP, API-token, MT5 and provider credential storage; use purpose-specific secrets, least privilege, short lifetimes, rotation and revocation. Never expose broker credentials to browsers or general logs.
+- [ ] Enforce ownership/tenant authorization at every sensitive boundary; test horizontal/vertical privilege escalation and IDOR.
+- [ ] Defend against SQL/command injection, XSS, CSRF, SSRF, deserialization, path traversal, prototype pollution, race conditions, upload abuse and business-logic fraud.
+- [ ] Protect audit records from alteration/deletion; log security-sensitive actions with trusted timestamps, restricted access and privacy-aware retention.
+- [ ] Establish DLP/export controls, retention/deletion rules, encrypted immutable/offline backups, restore drills and documented RPO/RTO.
+- [ ] Redact passwords, tokens, keys, payment credentials and MT5 secrets from logs, traces, analytics and error reports.
+
+### Trading, MT5 and financial transaction security
+- [ ] Threat-model broker/MT5 connectivity, terminal/bridge services, account linking, credential storage, order routing, market data and webhooks.
+- [ ] Isolate trading connectors and credentials by user/account/environment; enforce least privilege, encryption, rotation, revocation and broker-side permission limits where available.
+- [ ] Enforce server-side order authorization, ownership, trading permissions, exposure/position and order-size limits, market/price validation, idempotency, replay protection, rate limits and circuit breakers.
+- [ ] Separate read-only market access from order execution and administrative override privileges; require explicit intent and step-up verification for high-impact actions.
+- [ ] Maintain tamper-evident order, risk-check, broker-response and operator audit trails; reconcile internal and broker state and alert on divergence.
+- [ ] Build kill switches, safe degradation, duplicate-order prevention, stale-price controls and tested recovery. Fail closed when execution safety cannot be established.
+- [ ] Test credential theft, account substitution, order manipulation, replay, duplicate execution, authorization bypass and compromised connectors.
+
+### Cloud, containers, infrastructure and resilience
+- [ ] Review Render, Cloudflare and any AWS target under one security baseline; verify live configuration rather than inferring it from repository declarations.
+- [ ] Separate dev/test/staging/production identities, projects, networks, secrets, data and deployment permissions.
+- [ ] Evaluate cloud security posture/workload protection, private networking, egress controls, audit logs, backup isolation and policy-as-code.
+- [ ] Harden containers: minimal pinned images, non-root execution, least capabilities, read-only filesystems where possible, resource limits, image scanning, signatures and provenance.
+- [ ] Restrict admin panels, databases, metrics, debug routes and internal services; remove unnecessary public exposure.
+- [ ] Define availability, regional failure handling, tested rollback, disaster recovery, capacity controls and resilience exercises. No provider cutover until security, migration, observability and rollback are proven.
+
+### Secure software supply chain and developer workflow
+- [ ] Evaluate GitHub Advanced Security/CodeQL or equivalent SAST, secret scanning/push protection, dependency/SCA, license and vulnerability controls.
+- [ ] Add container, IaC, workflow and artifact scanning; generate/retain SBOMs and build provenance.
+- [ ] Require protected branches, mandatory reviews, signed release provenance, least-privilege CI identities, short-lived OIDC credentials and protected deployment environments.
+- [ ] Isolate untrusted PR execution from secrets/privileged runners; pin third-party actions and review workflow permissions.
+- [ ] Require deterministic builds, lockfiles, artifact integrity verification and promotion of tested immutable artifacts.
+- [ ] Define severity-based vulnerability SLAs, patch windows, exception expiry and emergency response.
+
+### Security operations, threat detection and incident response
+- [ ] Evaluate Microsoft Sentinel, Splunk Enterprise Security, Datadog Security Monitoring or equivalent SIEM/security analytics based on coverage, detection quality, response workflows, data residency, scale and cost.
+- [ ] Centralize relevant edge, identity, endpoint, cloud, API, database, CI/CD and trading events with synchronized time, restricted access, retention and tamper resistance.
+- [ ] Detect account takeover, risky logins, privilege escalation, leaked secrets, unusual database access, API abuse, malware, suspicious deployments, MT5 credential misuse and anomalous trading.
+- [ ] Define severity-based alerting, escalation/on-call ownership, evidence preservation and tested containment playbooks.
+- [ ] Maintain incident runbooks for ransomware, phishing/BEC, leaked secrets, database/cloud compromise, DDoS, insider threats, supply-chain compromise and trading abuse; exercise them regularly.
+
+### Independent validation and release gates
+- [ ] Perform recurring independent penetration tests for perimeter, web/API, identity, cloud, database, trading/MT5 and business logic.
+- [ ] Add SAST, SCA, secret scanning, IaC/container scanning, DAST, API tests, fuzzing and adversarial authorization tests to CI/CD where appropriate.
+- [ ] Track every finding with evidence, severity, owner, remediation, retest and closure approval.
+- [ ] Block releases for unresolved critical/high-risk exploitable findings, broken tenant isolation, exposed secrets, unsafe trading authorization or unproven recovery. Exceptions require documented risk acceptance, compensating controls, owner and expiry.
+- [ ] Assess ISO 27001 and SOC 2 readiness when control scope and evidence support it; assess PCI DSS only if actual payment-data scope requires it.
+
+### Technology selection and implementation rules
+1. Inventory current controls and threats before procurement; do not buy tools before requirements and gaps are known.
+2. Compare leading providers on efficacy, independent evidence, regional coverage, integration, privacy/data residency, resilience, support, contractual terms, portability and lifecycle cost.
+3. Choose the best fit per capability; no vendor is presumed best at every layer and more products do not automatically mean more security.
+4. Prefer managed capabilities where they demonstrably improve protection and response, while retaining independent controls and tested exit plans.
+5. Roll out through design review, isolated proof of concept, adversarial tests, staging validation and controlled production change with rollback.
+6. Record decisions, rationale, owner, dependencies, costs, runbooks, evidence and review dates.
+7. No production firewall/DNS/identity setting, endpoint agent, database role/policy, secret, vendor subscription, deployment or cutover is changed by this roadmap entry; each requires its own reviewed implementation and authorization.
+
+**Completion criterion:** TradeMate does not claim global security because it uses named products. Material threats must have layered preventive, detective, responsive and recovery controls, tested under realistic adversarial conditions, continuously monitored and independently assessed where appropriate.
+
+
+## Global technology excellence standard — all stacks
+
+### Objective and governing principle
+
+Establish TradeMate as a globally competitive, best-in-class financial technology platform across **every technology stack and operating discipline**, not security alone. “Best” means demonstrably fit for TradeMate's product, users, markets, regulatory obligations and risk profile—not simply the newest, most expensive or most fashionable technology. The standard applies to existing systems, new capabilities, vendor choices, architecture decisions and future migrations.
+
+This section is a roadmap and evaluation mandate. It does not assert that any capability is already implemented, certified or production-ready. Adding an item here does not authorize a purchase, subscription, migration, production configuration change, deployment, data movement or cutover. Existing production controls and approval requirements remain in force.
+
+### Global decision and engineering standard
+
+For every material stack or platform decision:
+
+1. Inventory the current implementation, versions, dependencies, data flows, owners, operational constraints, technical debt and known risks. Verify repository and deployed state separately; do not assume they match.
+2. Define user and business outcomes, workload profiles, target markets, threat model, regulatory constraints, availability needs and measurable acceptance criteria.
+3. Benchmark credible leading options, including proven open standards and build-versus-buy alternatives. Use current primary documentation, independent evidence, realistic proof-of-concepts and relevant production references.
+4. Compare options consistently across security and privacy, correctness, performance, scalability, reliability, recoverability, interoperability, accessibility, developer productivity, operational maturity, support, regional availability, compliance fit, total cost of ownership, portability and vendor lock-in.
+5. Record the decision, alternatives rejected, assumptions, risks, lifecycle costs, exit strategy, owner and review date in an architecture decision record (ADR).
+6. Define target architecture and a staged implementation/migration plan with compatibility, rollback, observability, data integrity and operational-readiness requirements.
+7. Prove the result with automated tests and representative workload or user validation before release. Define measurable SLOs, SLIs, KPIs, error budgets where appropriate, alerts, dashboards, runbooks and accountable operational ownership.
+8. Reassess material decisions periodically and when scale, threat landscape, regulation, vendor lifecycle or product requirements change.
+
+Prefer composable, standards-based and portable designs where they improve resilience and bargaining power. Avoid unnecessary complexity, premature microservices, speculative rewrites and technology churn. Select the simplest architecture that meets the verified global requirements with adequate headroom.
+
+### Technology domains and roadmap requirements
+
+#### 1. Web frontend, product experience and design systems
+- Evaluate modern, maintainable frontend architecture, rendering strategy, component systems, state/data-fetching patterns, forms, routing and error handling against actual product needs.
+- Set measurable standards for usability, responsive behavior, interaction latency, Core Web Vitals, bundle size, resilience on weak networks and browser/device compatibility.
+- Make accessibility a release requirement, targeting WCAG 2.2 AA where applicable; include keyboard, screen-reader, contrast, reduced-motion and localization validation.
+- Establish a coherent design system, reusable components, visual regression coverage, product analytics with privacy controls, and consistent loading/empty/error states.
+
+#### 2. Backend architecture, APIs and distributed systems
+- Evaluate service boundaries, modularity, synchronous/asynchronous communication, event-driven patterns, queues, idempotency, consistency, retries, timeouts, back-pressure and graceful degradation.
+- Standardize API design, versioning, schema contracts, validation, pagination, rate limits, error semantics, authentication/authorization boundaries and machine-readable documentation.
+- Require explicit capacity models, latency budgets, concurrency limits, dependency isolation and safe failure behavior for critical workflows.
+- Prefer well-defined modular architecture over splitting services without evidence that independent scaling, deployment or ownership justifies the added distributed-systems cost.
+
+#### 3. Databases, storage and data engineering
+- Assess relational and other storage technologies against transactional correctness, query patterns, growth, durability, consistency, availability, recovery objectives, encryption, access control and operational burden.
+- Establish schema/migration governance, indexing and query-performance budgets, connection-pool limits, backup/restore drills, point-in-time recovery validation, retention and archival policies.
+- Define data ownership, lineage, quality checks, classification, minimization, retention, deletion, auditability and controlled access across operational and analytical data.
+- For streaming, caching, search and analytical platforms, validate ordering, replay, deduplication, freshness, failure recovery and source-of-truth rules.
+- Require representative load tests and restore evidence; a successful backup job or restore exit code alone is not proof of recoverability or data equivalence.
+
+#### 4. Trading, market data, broker and MT5 infrastructure
+- Treat trading and execution systems as safety-critical financial workflows. Define explicit boundaries between signal generation, risk checks, order management, broker connectivity, execution, reconciliation and portfolio/account state.
+- Evaluate market-data quality, provenance, timestamps, clock synchronization, stale/out-of-order detection, symbol mapping, session calendars, corporate actions where relevant and feed failover.
+- Specify order lifecycle state machines, idempotent submission, duplicate prevention, partial fills, rejects, timeouts, reconnect behavior, reconciliation and deterministic audit trails.
+- Require pre-trade and runtime risk controls, exposure/position limits, kill switches, market/session safeguards, strategy isolation and fail-closed behavior where appropriate.
+- Validate MT5 terminal/manager or broker integrations with contract tests, sandbox/demo environments, failure injection and reconciliation tests. Never infer broker execution guarantees from a successful API response alone.
+- Separate research/backtesting from live execution; address look-ahead and survivorship bias, realistic spreads/slippage/fees, latency assumptions, reproducibility and independent strategy validation.
+- No live-trading enablement, broker cutover or changes to production execution/risk settings without explicit authorization and completed release gates.
+
+#### 5. AI, machine learning and quantitative intelligence
+- Establish a governed model lifecycle covering data provenance, consent and rights, feature/label quality, reproducibility, evaluation, versioning, deployment, monitoring, rollback and retirement.
+- Benchmark models against task-specific baselines and out-of-sample datasets; measure calibration, robustness, drift, latency, cost and failure modes—not headline accuracy alone.
+- Apply human oversight and explicit permission boundaries to consequential financial actions. Models must not bypass authorization, risk limits, suitability rules or deterministic controls.
+- Evaluate prompt injection, data leakage, model supply-chain risk, insecure tool use, privacy, explainability and abuse resistance for AI-enabled features.
+- Keep model outputs distinguishable from verified facts; provide audit records and safe fallback behavior. Do not introduce autonomous live trading or other high-impact automation without separately approved controls and validation.
+
+#### 6. Cloud, infrastructure, networking and compute
+- Compare cloud and hosting architectures for regional coverage, service maturity, resilience, latency, security controls, support, compliance, portability and full lifecycle cost.
+- Standardize infrastructure as code, immutable/repeatable environments, least-privilege identities, network segmentation, private connectivity where appropriate, managed secrets and controlled configuration.
+- Define container/runtime standards, resource requests and limits, patching, image provenance, artifact retention, autoscaling and capacity planning.
+- Design for regional failure and dependency outages where business impact warrants it; document data residency, cross-region replication and recovery trade-offs.
+- Avoid provider-specific commitments without an explicit portability and exit assessment. No cloud migration or production infrastructure change is authorized by this roadmap entry.
+
+#### 7. Mobile and cross-platform applications
+- Determine native, cross-platform or progressive-web approaches from user needs, device capabilities, security, performance, accessibility and maintenance cost.
+- Define secure local storage, session lifecycle, device compromise considerations, network trust, offline behavior, push-notification privacy and app update strategy.
+- Establish supported OS/device matrices, crash-free and startup targets, accessibility checks, automated device testing and release-channel controls.
+
+#### 8. Integrations and interoperability
+- Maintain an inventory and ownership map for payment, identity, market-data, broker, email, messaging, analytics and other third-party integrations.
+- Require documented contracts, scoped credentials, rotation, rate-limit handling, retries, idempotency, webhook signature validation, replay protection, timeouts and circuit breakers.
+- Assess vendor resilience, incident history, support SLAs, data processing terms, geographic availability, regulatory fit, exit rights and substitution cost.
+- Prefer open protocols and stable interfaces; isolate vendor-specific logic behind adapters and test contract compatibility continuously.
+
+#### 9. DevOps, platform engineering and release engineering
+- Improve reproducible builds, dependency management, CI/CD integrity, artifact signing/provenance, environment parity, deployment safety and rollback.
+- Standardize infrastructure and application configuration, secret injection, policy-as-code, branch protections, review requirements and auditable change approvals.
+- Evaluate progressive delivery (feature flags, canaries and controlled rollouts) according to service criticality and available telemetry.
+- Establish developer self-service and paved paths without weakening security, auditability or production controls.
+
+#### 10. Testing, quality and performance engineering
+- Define a risk-based quality strategy spanning unit, component, integration, contract, end-to-end, migration, accessibility, security, load, stress, soak, resilience and recovery testing.
+- Require tests for critical financial invariants, authorization boundaries, concurrency, idempotency, rounding/precision, time zones, market sessions and failure recovery.
+- Use representative datasets and workload profiles; establish performance budgets and regression thresholds for critical user and trading paths.
+- Use fault injection and chaos experiments only in controlled, authorized environments with blast-radius limits and abort criteria.
+- Treat flaky tests, skipped checks and unverified manual steps as tracked quality risks, not successful evidence.
+
+#### 11. Observability, analytics and operational intelligence
+- Establish structured, correlated logs, metrics and distributed traces with consistent service, environment and request identifiers.
+- Define actionable dashboards, alert thresholds, on-call ownership, incident severity, escalation paths and runbooks for critical services.
+- Measure user experience, API latency/error rates, data freshness, market-feed health, order lifecycle health, database saturation, queue lag, infrastructure cost and recovery performance.
+- Apply privacy-aware telemetry, data minimization, access controls and retention limits; never log credentials, session tokens or sensitive financial data unnecessarily.
+- Use analytics and experimentation with clear event definitions, data quality checks and safeguards against misleading metrics.
+
+#### 12. Security, identity and privacy
+- Apply the detailed **Global technology and security standard — mandatory cross-stack roadmap** section in this roadmap as the security baseline for every domain.
+- Integrate secure-by-design threat modeling, identity and access management, privacy engineering, encryption, secure SDLC, supply-chain controls, vulnerability management, incident response and independent assurance throughout architecture and delivery.
+- Security and privacy are release gates, not optional specialist add-ons. Do not duplicate the detailed security workstream; maintain traceability between domain-specific work and its controls.
+
+#### 13. Reliability, resilience and business continuity
+- Classify services and workflows by criticality; define service-level objectives, availability targets, latency targets, recovery time objectives (RTOs) and recovery point objectives (RPOs).
+- Design and test graceful degradation, dependency isolation, queue recovery, failover, backups, restore, disaster recovery and business continuity.
+- Ensure critical trading, account, payment and identity workflows have explicit safe-state behavior and operational ownership.
+- Conduct periodic recovery exercises and record evidence, gaps, remediation owners and completion dates.
+
+#### 14. Compliance, localization and global readiness
+- Maintain a jurisdiction and product-feature matrix covering applicable financial-services, privacy, consumer-protection, records, accessibility, tax and data-residency obligations, with qualified legal/compliance review.
+- Design for localization of language, number/date formats, currencies, time zones, calendars, regional payment methods and market trading sessions.
+- Define controls for data subject rights, consent, retention, export, deletion, audit records and cross-border transfers where applicable.
+- Do not claim regulatory approval, certification or legal compliance solely from technical implementation; require documented assessment by qualified owners.
+
+#### 15. Developer experience, architecture governance and maintainability
+- Establish coding standards, type safety, linting/formatting, documentation, dependency hygiene, code ownership and review expectations across repositories.
+- Track complexity, duplication, dependency health, technical debt, maintainability and upgrade lifecycle; prioritize remediation by risk and business impact.
+- Maintain architecture diagrams, data-flow diagrams, service catalogues, ADRs, ownership records and operational documentation.
+- Evaluate developer tooling by measurable improvements in delivery quality, cycle time and reliability while protecting source code and sensitive data.
+- Defer broad file/folder restructuring and large-scale code movement until the designated end-of-roadmap cleanup phase, unless a specific safety or correctness issue requires earlier targeted action.
+
+### Global acceptance gates
+
+A material technology initiative is not complete until its owner can demonstrate:
+
+- A verified current-state inventory and documented problem statement.
+- An approved ADR and target architecture, including alternatives, risks, cost and exit strategy.
+- Security, privacy, compliance and data-governance review appropriate to the system's risk.
+- Automated functional, integration, contract and relevant non-functional tests with recorded evidence.
+- Measured performance, capacity and reliability against agreed targets using representative conditions.
+- Monitoring, alerts, runbooks, support ownership, backup/recovery and incident procedures appropriate to criticality.
+- A staged rollout and rollback plan, compatibility assessment and explicit authorization for any production-impacting action.
+- Updated technical documentation, service ownership and a scheduled reassessment date.
+
+### Delivery sequence and controls
+
+1. **Discover and baseline:** inventory all stacks, services, integrations, versions, owners, data flows, costs, SLOs and known gaps.
+2. **Prioritize:** rank work by user impact, financial/trading risk, security/privacy exposure, reliability, regulatory urgency, scale constraints and cost of delay.
+3. **Set target standards:** publish domain-specific reference architectures, engineering standards, decision records and measurable quality gates.
+4. **Prove before adopting:** run isolated prototypes and benchmarks; validate migration, portability, vendor exit and operational assumptions.
+5. **Implement incrementally:** sequence low-risk foundations before dependent migrations; preserve compatibility and provide rollback.
+6. **Verify and operate:** collect acceptance evidence, establish operational ownership and monitor real outcomes.
+7. **Continuously improve:** review architecture, technology lifecycle, incidents, costs, performance and market-leading alternatives on a defined cadence.
+
+The technology inventory, baseline and prioritization are prerequisites to selecting specific upgrades. Vendor and product names in other roadmap material are evaluation candidates only unless a separate decision record and approval explicitly select them. No tool purchase, vendor commitment, production change, deployment, merge, infrastructure migration, database change or trading cutover is authorized merely by this roadmap section.
+
+
+## Implementation register — evidence and production acceptance governance
+
+The canonical cross-stack implementation register is `TradeMate-main/docs/implementation-register.md`. Keep it synchronized with repository changes and independently verified deployed/production behavior. This register is an evidence ledger, not a progress estimate or a declaration of certification.
+
+### Status definitions
+
+- **Implemented (repository):** code/configuration exists on the tracked branch and has been reviewed; required automated checks pass. This status alone does not mean production acceptance.
+- **Partially implemented:** only a subset, prototype, foundation or non-production capability exists, or required tests/operational controls remain outstanding.
+- **Production accepted:** the exact deployed version/configuration has been identified and production acceptance evidence is recorded, including successful relevant end-to-end checks, operational telemetry, security/privacy review, rollback/recovery readiness and accountable owner approval.
+- **Not implemented:** no qualifying implementation evidence exists.
+- **Unverified:** evidence is insufficient, stale, contradictory or unavailable. Do not convert unverified to implemented by inference.
+
+### Evidence required for every status change
+
+1. Record the repository path(s), commit SHA and concise implementation description.
+2. Link the automated test/workflow run and record its final conclusion. A skipped, cancelled, queued or merely started job is not a pass.
+3. For production acceptance, identify the deployed release/version and environment, deployment evidence, production-safe acceptance result, observed SLO/SLI evidence where applicable, and named accountable approval. Do not expose secrets or sensitive customer data.
+4. Record known gaps, dependencies, risks, owner and next verification date.
+5. Re-check affected rows whenever code, dependencies, infrastructure, provider behavior, architecture or production configuration changes. Downgrade status when evidence expires or a regression is found.
+
+### Non-negotiable reporting rules
+
+- Never tick an entire technology domain because one library, service, endpoint or prototype exists.
+- Separate repository implementation, CI verification, staging validation and production acceptance; they are different gates.
+- Never infer production state from source code, a successful build, a deployment request, a database restore exit code or a vendor feature list.
+- A test pass applies only to the tested commit, configuration, environment and scope.
+- Keep evidence links and timestamps with the row; do not claim certification or regulatory compliance without independent, applicable evidence.
+- Update the register in the same change as material implementation work, or immediately after the evidence becomes available.
+- Preserve the agreed constraint that broad file/folder restructuring occurs at the end of the roadmap, except for a narrowly justified safety/correctness fix.
+- Register maintenance does not authorize production changes, deployments, merges, purchases, vendor commitments, data movement or cutovers.

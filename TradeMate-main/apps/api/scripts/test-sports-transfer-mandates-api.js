@@ -19,7 +19,7 @@ async function main() {
   try {
     const suffix = randomUUID();
     const actors = {};
-    for (const role of ['player', 'representative', 'representative2', 'representative3', 'organizationOwner', 'outsider']) {
+    for (const role of ['player', 'representative', 'representative2', 'representative3', 'organizationOwner', 'organizationAdmin', 'organizationMember', 'expiredAdmin', 'futureAdmin', 'outsider']) {
       const user = await pool.query(
         "INSERT INTO users (email, display_name, status) VALUES ($1, $2, 'active') RETURNING id",
         [role + '-' + suffix + '@example.invalid', 'Mandate test ' + role],
@@ -40,6 +40,22 @@ async function main() {
     await pool.query(
       "INSERT INTO sports_org_memberships (sports_organization_id, user_id, role, permission_scope, status, invited_by_user_id, starts_at) VALUES ($1, $2, 'owner', 'workspace', 'active', $2, now())",
       [organizationId, actors.organizationOwner.userId],
+    );
+    await pool.query(
+      "INSERT INTO sports_org_memberships (sports_organization_id, user_id, role, permission_scope, status, invited_by_user_id, starts_at) VALUES ($1, $2, 'admin', 'workspace', 'active', $3, now())",
+      [organizationId, actors.organizationAdmin.userId, actors.organizationOwner.userId],
+    );
+    await pool.query(
+      "INSERT INTO sports_org_memberships (sports_organization_id, user_id, role, permission_scope, status, invited_by_user_id, starts_at) VALUES ($1, $2, 'member', 'workspace', 'active', $3, now())",
+      [organizationId, actors.organizationMember.userId, actors.organizationOwner.userId],
+    );
+    await pool.query(
+      "INSERT INTO sports_org_memberships (sports_organization_id, user_id, role, permission_scope, status, invited_by_user_id, starts_at, expires_at) VALUES ($1, $2, 'admin', 'workspace', 'active', $3, now() - interval '2 days', now() - interval '1 day')",
+      [organizationId, actors.expiredAdmin.userId, actors.organizationOwner.userId],
+    );
+    await pool.query(
+      "INSERT INTO sports_org_memberships (sports_organization_id, user_id, role, permission_scope, status, invited_by_user_id, starts_at) VALUES ($1, $2, 'admin', 'workspace', 'active', $3, now() + interval '1 day')",
+      [organizationId, actors.futureAdmin.userId, actors.organizationOwner.userId],
     );
 
     app = await NestFactory.create(AppModule, { logger: false, bodyParser: false });
@@ -67,7 +83,7 @@ async function main() {
     };
     const grantConsent = async (profileId, target, scope) => {
       const response = await call('player', 'POST', '/api/sports-transfer/profiles/' + profileId + '/consents', {
-        ...target, purpose: 'representative_access', scope, expiresAt: expiresAt(),
+        ...target, purpose: 'representative_access', scope: scope ?? { territoryCodes: ['NG'] }, expiresAt: expiresAt(),
       });
       assert.equal(response.status, 201, 'player must be able to grant purpose-specific representative access consent');
       return (await response.json()).consent;
@@ -89,7 +105,7 @@ async function main() {
     const noConsent = await createMandate(football.id, { representativeUserId: actors.representative.userId });
     assert.equal(noConsent.status, 403, 'mandates cannot be created without prior representative-access consent');
 
-    await grantConsent(football.id, { targetUserId: actors.representative.userId });
+    const userConsent = await grantConsent(football.id, { targetUserId: actors.representative.userId });
     const userMandateResponse = await createMandate(football.id, { representativeUserId: actors.representative.userId });
     assert.equal(userMandateResponse.status, 201);
     const userMandate = (await userMandateResponse.json()).mandate;
@@ -126,11 +142,51 @@ async function main() {
     const orgMandateResponse = await createMandate(football.id, { representativeOrganizationId: organizationId });
     assert.equal(orgMandateResponse.status, 201);
     const orgMandate = (await orgMandateResponse.json()).mandate;
+    for (const actor of ['organizationOwner', 'organizationAdmin']) {
+      const activeManagerNotice = await pool.query(
+        "SELECT id FROM user_notifications WHERE user_id = $1 AND title = 'Sports Transfer representation request' AND body LIKE '%organization as a representative%'",
+        [actors[actor].userId],
+      );
+      assert.equal(activeManagerNotice.rowCount, 1, actor + ' receives an organization mandate notice');
+    }
+    for (const actor of ['expiredAdmin', 'futureAdmin', 'organizationMember']) {
+      const inactiveManagerNotice = await pool.query(
+        "SELECT id FROM user_notifications WHERE user_id = $1 AND title = 'Sports Transfer representation request' AND body LIKE '%organization as a representative%'",
+        [actors[actor].userId],
+      );
+      assert.equal(inactiveManagerNotice.rowCount, 0, actor + ' does not receive an organization mandate notice outside the active manager scope');
+    }
     const orgOutsiderAccept = await call('outsider', 'POST', '/api/sports-transfer/mandates/' + orgMandate.id + '/accept', {});
     assert.equal(orgOutsiderAccept.status, 404, 'only an active organization owner/admin can accept an organization mandate');
     const orgAccepted = await call('organizationOwner', 'POST', '/api/sports-transfer/mandates/' + orgMandate.id + '/accept', {});
     assert.equal(orgAccepted.status, 201);
     assert.equal((await orgAccepted.json()).mandate.representative_response, 'accepted');
+    for (const actor of ['organizationOwner', 'organizationAdmin']) {
+      const inbox = await call(actor, 'GET', '/api/sports-transfer/mandates/mine');
+      assert.equal(inbox.status, 200);
+      assert.ok((await inbox.json()).mandates.some((mandate) => mandate.id === orgMandate.id), actor + ' can see an organization mandate');
+    }
+    for (const actor of ['organizationMember', 'expiredAdmin', 'futureAdmin', 'outsider']) {
+      const inbox = await call(actor, 'GET', '/api/sports-transfer/mandates/mine');
+      assert.equal(inbox.status, 200);
+      assert.ok(!(await inbox.json()).mandates.some((mandate) => mandate.id === orgMandate.id), actor + ' cannot see an organization mandate');
+    }
+    const orgRevoked = await call('player', 'POST', '/api/sports-transfer/mandates/' + orgMandate.id + '/revoke', {});
+    assert.equal(orgRevoked.status, 201);
+    for (const actor of ['organizationOwner', 'organizationAdmin']) {
+      const notice = await pool.query(
+        "SELECT id FROM user_notifications WHERE user_id = $1 AND title = 'Sports Transfer mandate revoked'",
+        [actors[actor].userId],
+      );
+      assert.equal(notice.rowCount, 1, actor + ' receives the organization mandate revocation notice');
+    }
+    for (const actor of ['organizationMember', 'expiredAdmin', 'futureAdmin']) {
+      const notice = await pool.query(
+        "SELECT id FROM user_notifications WHERE user_id = $1 AND title = 'Sports Transfer mandate revoked'",
+        [actors[actor].userId],
+      );
+      assert.equal(notice.rowCount, 0, actor + ' does not receive the organization mandate revocation notice');
+    }
 
     await grantConsent(basketball.id, { targetUserId: actors.representative2.userId });
     const rejectedMandateResponse = await createMandate(basketball.id, { representativeUserId: actors.representative2.userId });
@@ -142,6 +198,9 @@ async function main() {
     assert.equal(rejected.status, 201);
     assert.equal((await rejected.json()).mandate.status, 'rejected');
 
+    await grantConsent(basketball.id, { targetUserId: actors.representative3.userId }, { territoryCodes: [], competitionIds: [] });
+    const emptyScopeMandate = await createMandate(basketball.id, { representativeUserId: actors.representative3.userId });
+    assert.equal(emptyScopeMandate.status, 403, 'an empty consent scope must not grant unrestricted territory access');
     await grantConsent(basketball.id, { targetUserId: actors.representative3.userId }, { territoryCodes: ['NG'] });
     const revokeMandateResponse = await createMandate(basketball.id, { representativeUserId: actors.representative3.userId });
     assert.equal(revokeMandateResponse.status, 201);
@@ -163,6 +222,18 @@ async function main() {
       expiresAt: expiresAt(),
     });
     assert.equal(badScope.status, 403, 'mandate scope cannot exceed the explicit consent scope');
+
+    const consentRevoked = await call('player', 'POST', '/api/sports-transfer/consents/' + userConsent.id + '/revoke');
+    assert.equal(consentRevoked.status, 201, 'player can revoke representative-access consent');
+    const representativeAfterConsentRevoke = await call('representative', 'GET', '/api/sports-transfer/mandates/mine');
+    assert.equal(representativeAfterConsentRevoke.status, 200);
+    assert.equal((await representativeAfterConsentRevoke.json()).mandates.find((mandate) => mandate.id === userMandate.id).effective_status, 'revoked',
+      'revoking representative-access consent must revoke the associated mandate');
+    const consentRevocationNotice = await pool.query(
+      "SELECT id FROM user_notifications WHERE user_id = $1 AND title = 'Sports Transfer mandate revoked'",
+      [actors.representative.userId],
+    );
+    assert.equal(consentRevocationNotice.rowCount, 1, 'representative is notified when underlying consent is revoked');
 
     const audit = await pool.query(
       "SELECT event_type FROM audit_events WHERE entity_type = 'sports_representative_mandate' AND entity_id = ANY($1::uuid[])",
