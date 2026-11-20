@@ -589,16 +589,23 @@ async function main() {
     assert.equal(loginCredentials.rows[0].user_id, userIds[1]);
     assert.equal(loginCredentials.rows[0].password_hash, 'argon2id$verified-login-test-password-hash');
 
+    const spoofTestSessionHash = createHash('sha256').update(randomBytes(32)).digest('hex');
+    const spoofTestSession = await admin.query(
+      "INSERT INTO public.user_sessions (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes') RETURNING id::text AS id",
+      [userIds[0], spoofTestSessionHash],
+    );
+    sessionIds.push(spoofTestSession.rows[0].id);
+
     await appClient.query('BEGIN');
     try {
       // The real LOGIN role can set arbitrary custom GUCs. A conflicting
       // app.user_id must not change the identity derived from its presented
       // session digest or permit cross-account reads.
-      await appClient.query("SELECT set_config('app.session_token_hash', $1, true)", [sessionHashes[0]]);
+      await appClient.query("SELECT set_config('app.session_token_hash', $1, true)", [spoofTestSessionHash]);
       await appClient.query("SELECT set_config('app.user_id', $1, true)", [userIds[1]]);
       const activePresentedSession = await admin.query(
         'SELECT user_id::text AS user_id, expires_at > now() AS active FROM public.user_sessions WHERE token_hash = $1',
-        [sessionHashes[0]],
+        [spoofTestSessionHash],
       );
       assert.equal(activePresentedSession.rowCount, 1);
       assert.equal(activePresentedSession.rows[0].user_id, userIds[0]);
