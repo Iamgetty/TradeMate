@@ -322,7 +322,6 @@ class AuthController {
       // Keep the password-stage rate limit until the second factor succeeds.
       return { requiresTwoFactor: true, challengeToken, expiresInSeconds: 300 };
     }
-    await databasePool.query('DELETE FROM auth_rate_limits WHERE key_hash = $1', [rateKey]);
     const token = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
     const issuedSession = await databasePool.query(
@@ -339,6 +338,7 @@ class AuthController {
     if (!issuedSession.rows[0]?.session_id) {
       throw new UnauthorizedException('Email or password is incorrect.');
     }
+    await databasePool.query('DELETE FROM auth_rate_limits WHERE key_hash = $1', [rateKey]);
     void sendTransactionalEmail(user.email, 'New sign-in to your TradeMate account', '<p>A sign-in to your TradeMate account was completed.</p><p>If this was not you, change your password and review your active sessions immediately.</p>');
     response.cookie(SESSION_COOKIE, token, cookieOptions());
     return { user: { id: user.id, email: user.email, display_name: user.display_name, country_code: user.country_code } };
