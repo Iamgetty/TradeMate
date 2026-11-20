@@ -140,8 +140,9 @@ BEGIN
     RAISE EXCEPTION 'trademate_worker must not own database objects.';
   END IF;
   IF NOT has_schema_privilege('trademate_app', 'trademate_private', 'USAGE')
-     OR NOT has_function_privilege('trademate_app', 'trademate_private.resolve_presented_session(text)', 'EXECUTE') THEN
-    RAISE EXCEPTION 'trademate_app must have access only through the narrow session resolver.';
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.resolve_presented_session(text)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.touch_presented_session(text)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'trademate_app must have the reviewed narrow session operations.';
   END IF;
 
   IF EXISTS (
@@ -150,7 +151,7 @@ BEGIN
     JOIN pg_namespace n ON n.oid = p.pronamespace
     CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) AS acl
     WHERE n.nspname = 'trademate_private'
-      AND p.proname = 'resolve_presented_session'
+      AND p.proname IN ('resolve_presented_session', 'touch_presented_session')
       AND acl.grantee = 0
       AND acl.privilege_type = 'EXECUTE'
   ) THEN
@@ -161,12 +162,12 @@ BEGIN
     SELECT 1 FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname = 'trademate_private'
-      AND p.proname = 'resolve_presented_session'
+      AND p.proname IN ('resolve_presented_session', 'touch_presented_session')
       AND p.prosecdef
       AND p.proconfig @> ARRAY['search_path=pg_catalog']
       AND pg_get_userbyid(p.proowner) <> 'trademate_app'
   ) THEN
-    RAISE EXCEPTION 'Presented-session resolver must be SECURITY DEFINER with a fixed safe search_path and non-runtime owner.';
+    RAISE EXCEPTION 'Private session operations must be SECURITY DEFINER with a fixed safe search_path and non-runtime owner.';
   END IF;
 END
 $$;
