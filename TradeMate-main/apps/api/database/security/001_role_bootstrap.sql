@@ -66,6 +66,7 @@ GRANT EXECUTE ON FUNCTION trademate_private.resolve_enabled_totp(TEXT) TO tradem
 GRANT EXECUTE ON FUNCTION trademate_private.disable_totp(TEXT, BIGINT) TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.resolve_password_login_credentials(TEXT) TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.resolve_presented_password_credentials(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.complete_account_deletion_cancellation(TEXT) TO trademate_app;
 
 -- Transfer application tables, sequences and views to the migration owner.
 -- The app login must never own these objects.
