@@ -27,6 +27,7 @@ declare global {
     };
     TM_NFT_ITEM_UTILS?: {
       normalizeItems: (items: unknown[], chain: string, color?: string) => Array<Record<string, any>>;
+      interleaveItems: (groups: Array<Array<Record<string, any>>>) => Array<Record<string, any>>;
     };
     TM_MARKET_QUOTE_UTILS?: {
       MT5_PUBLIC_QUOTE_MAX_AGE_MS: number;
@@ -118,10 +119,10 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=157';
+    app.src = '/tm/app.js?v=158';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=157. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=158. Check the deployment and static asset response.');
     app.onload = () => {
       const postAppModules = [
         'pm-fix-css-loader',
@@ -370,7 +371,7 @@ export default function TradeMateRuntime() {
 
     // Pure NFT item normalization is loaded before app.js binds the legacy call sites.
     const nftItemUtils = document.createElement('script');
-    nftItemUtils.src = '/tm/nft-item-utils.js?v=1';
+    nftItemUtils.src = '/tm/nft-item-utils.js?v=2';
     nftItemUtils.async = false;
     nftItemUtils.onload = () => {
       if (!window.TM_NFT_ITEM_UTILS) {
@@ -494,7 +495,7 @@ export default function TradeMateRuntime() {
       if (!rendered) {
         fail(
           'TradeMate could not start',
-          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=157 returns successfully.'
+          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=158 returns successfully.'
         );
         return;
       }
