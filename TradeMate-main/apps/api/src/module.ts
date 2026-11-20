@@ -354,9 +354,14 @@ class AuthController {
     if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
     const token = sessionTokenFrom(request);
     if (!token) throw new UnauthorizedException('Please sign in.');
-    const result = await databasePool.query("SELECT u.id, u.email, u.display_name, u.country_code FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1", [tokenDigest(token)]);
-    if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    const session = await resolvePresentedSessionUser(token);
+    if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     await databasePool.query('UPDATE user_sessions SET last_seen_at=now() WHERE token_hash=$1', [tokenDigest(token)]);
+    const result = await databasePool.query(
+      'SELECT id, email, display_name, country_code FROM users WHERE id = $1 AND status = \'active\' LIMIT 1',
+      [session.rows[0].id],
+    );
+    if (!result.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     return { user: result.rows[0] };
   }
 
@@ -565,8 +570,10 @@ class AuthController {
   async setupTwoFactor(@Req() request: Request) {
     const token = sessionTokenFrom(request);
     if (!token || !databasePool) throw new UnauthorizedException('Please sign in.');
-    const session = await databasePool.query("SELECT u.id,u.email FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' LIMIT 1", [tokenDigest(token)]);
+    const session = await resolvePresentedSessionUser(token);
     if (!session.rowCount) throw new UnauthorizedException('Your session has expired.');
+    const account = await databasePool.query('SELECT email FROM users WHERE id = $1 AND status = \'active\' LIMIT 1', [session.rows[0].id]);
+    if (!account.rowCount) throw new UnauthorizedException('Your session has expired.');
     const encryptionKey = process.env.TOTP_ENCRYPTION_KEY || '';
     if (!/^[0-9a-f]{64}$/i.test(encryptionKey)) throw new HttpException('Authenticator setup is not available until the server encryption key is configured.', HttpStatus.SERVICE_UNAVAILABLE);
     const existing = await databasePool.query('SELECT totp_enabled FROM user_auth_security WHERE user_id=$1', [session.rows[0].id]);
@@ -576,7 +583,7 @@ class AuthController {
       'INSERT INTO user_auth_security (user_id, totp_secret_encrypted, totp_enabled, setup_expires_at) VALUES ($1,$2,false,now()+interval \'15 minutes\') ON CONFLICT (user_id) DO UPDATE SET totp_secret_encrypted=EXCLUDED.totp_secret_encrypted, totp_enabled=false, last_totp_counter=NULL, setup_expires_at=EXCLUDED.setup_expires_at, updated_at=now()',
       [session.rows[0].id, encryptTotpSecret(secret)],
     );
-    const label = encodeURIComponent('TradeMate:' + session.rows[0].email);
+    const label = encodeURIComponent('TradeMate:' + account.rows[0].email);
     const issuer = encodeURIComponent('TradeMate');
     return { secret, otpauthUrl: 'otpauth://totp/' + label + '?secret=' + secret + '&issuer=' + issuer + '&algorithm=SHA1&digits=6&period=30', expiresInSeconds: 900 };
   }
