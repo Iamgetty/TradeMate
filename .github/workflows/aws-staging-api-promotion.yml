@@ -227,20 +227,31 @@ jobs:
             exit 1
           fi
 
+          aws ecs wait services-stable --cluster "$CLUSTER_NAME" --services "$API_SERVICE_NAME"
           CURRENT_SERVICE="$(aws ecs describe-services --cluster "$CLUSTER_NAME" --services "$API_SERVICE_NAME" --query 'services[0]' --output json)"
           if [[ "$(jq -r '.status' <<< "$CURRENT_SERVICE")" != "ACTIVE" || "$(jq -r '.deploymentConfiguration.deploymentCircuitBreaker.enable' <<< "$CURRENT_SERVICE")" != "true" || "$(jq -r '.deploymentConfiguration.deploymentCircuitBreaker.rollback' <<< "$CURRENT_SERVICE")" != "true" ]]; then
             echo "::error::The API ECS service is not active or does not have deployment-circuit-breaker rollback enabled."
+            exit 1
+          fi
+          if [[ "$(jq -r '.taskDefinition' <<< "$CURRENT_SERVICE")" != "$API_TASK_DEFINITION_ARN" || "$(jq -r '.pendingCount' <<< "$CURRENT_SERVICE")" != "0" || "$(jq -r '.runningCount' <<< "$CURRENT_SERVICE")" != "$(jq -r '.desiredCount' <<< "$CURRENT_SERVICE")" || "$(jq -r '.desiredCount' <<< "$CURRENT_SERVICE")" -lt 1 ]]; then
+            echo "::error::The active ECS service is not aligned with the CloudFormation task definition or its desired capacity."
+            exit 1
+          fi
+
+          STACK_PARAMETERS="$(aws cloudformation describe-stacks --stack-name "$SERVICES_STACK" --query 'Stacks[0].Parameters' --output json)"
+          if [[ "$(jq '[.[] | select(.ParameterKey=="ApiImageUri")] | length' <<< "$STACK_PARAMETERS")" != "1" ]]; then
+            echo "::error::The services stack does not expose exactly one ApiImageUri parameter."
+            exit 1
+          fi
+          STACK_API_IMAGE="$(jq -r '.[] | select(.ParameterKey=="ApiImageUri") | .ParameterValue' <<< "$STACK_PARAMETERS")"
+          if [[ "$STACK_API_IMAGE" != "$CURRENT_IMAGE" ]]; then
+            echo "::error::CloudFormation's ApiImageUri parameter and the deployed API task definition have drifted; reconcile the stack before promotion."
             exit 1
           fi
           if [[ "$CURRENT_IMAGE" == "$IMAGE_URI" ]]; then
             echo "The requested attested API digest is already the active CloudFormation task definition."
             echo "already_promoted=true" >> "$GITHUB_OUTPUT"
           else
-            STACK_PARAMETERS="$(aws cloudformation describe-stacks --stack-name "$SERVICES_STACK" --query 'Stacks[0].Parameters' --output json)"
-            if [[ "$(jq '[.[] | select(.ParameterKey=="ApiImageUri")] | length' <<< "$STACK_PARAMETERS")" != "1" ]]; then
-              echo "::error::The services stack does not expose exactly one ApiImageUri parameter."
-              exit 1
-            fi
             PARAMETERS_FILE="$RUNNER_TEMP/trademate-api-promotion-parameters.json"
             jq --arg image "$IMAGE_URI" '
               map(
