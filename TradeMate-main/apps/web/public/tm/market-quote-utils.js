@@ -1,4 +1,5 @@
 /* TradeMate market quote utilities. Pure helpers shared with the legacy runtime. */
+/* Keep these implementations behavior-identical to the former inline helpers. */
 (function (root) {
   "use strict";
   var MT5_PUBLIC_QUOTE_MAX_AGE_MS = 15e3;
