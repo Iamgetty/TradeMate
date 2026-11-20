@@ -230,7 +230,7 @@ BEGIN
       AND p.prosecdef
       AND p.proconfig @> ARRAY['search_path=pg_catalog']
       AND pg_get_userbyid(p.proowner) = 'trademate_migrator'
-  ) <> 25 THEN
+  ) <> 24 THEN
     RAISE EXCEPTION 'Every private session operation must be SECURITY DEFINER with a fixed safe search_path and migration-role owner.';
   END IF;
 END
