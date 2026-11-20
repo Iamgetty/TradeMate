@@ -2,7 +2,7 @@
 -- The runtime role receives EXECUTE only; it must not read token_hash directly.
 -- This is an incremental primitive. It does not enable RLS or establish a
 -- trusted app.user_id context by itself.
-CREATE SCHEMA IF NOT EXISTS trademate_private AUTHORIZATION trademate_migrator;
+CREATE SCHEMA IF NOT EXISTS trademate_private;
 REVOKE ALL ON SCHEMA trademate_private FROM PUBLIC;
 GRANT USAGE ON SCHEMA trademate_private TO trademate_app;
 
