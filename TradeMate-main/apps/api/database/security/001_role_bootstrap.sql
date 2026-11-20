@@ -118,7 +118,7 @@ ALTER SCHEMA public OWNER TO trademate_migrator;
 -- isolated migration role. This lets future migrations replace reviewed
 -- functions without leaving them owned by the original administrator.
 ALTER SCHEMA trademate_private OWNER TO trademate_migrator;
-DO $
+DO $ownership$
 DECLARE
   function_record RECORD;
 BEGIN
@@ -137,7 +137,7 @@ BEGIN
     );
   END LOOP;
 END
-$;
+$ownership$;
 
 -- Runtime CRUD privileges. RLS policies will subsequently restrict rows.
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO trademate_app;
