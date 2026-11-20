@@ -43,7 +43,6 @@ export const validateEnvironment = (input: Record<string, string | undefined> = 
   if (parsed.data.NODE_ENV === 'production') {
     const missing = [
       !parsed.data.DATABASE_URL ? 'DATABASE_URL' : null,
-      !parsed.data.MIGRATION_DATABASE_URL ? 'MIGRATION_DATABASE_URL' : null,
       !parsed.data.TOTP_ENCRYPTION_KEY ? 'TOTP_ENCRYPTION_KEY' : null,
     ].filter(Boolean);
     if (missing.length) {
