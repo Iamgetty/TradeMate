@@ -288,8 +288,10 @@ jobs:
             }
 
             aws cloudformation execute-change-set --stack-name "$SERVICES_STACK" --change-set-name "$CHANGE_SET_NAME"
-            echo "already_promoted=false" >> "$GITHUB_OUTPUT"
-            echo "change_set_name=$CHANGE_SET_NAME" >> "$GITHUB_OUTPUT"
+            {
+              echo "already_promoted=false"
+              echo "change_set_name=$CHANGE_SET_NAME"
+            } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Wait for API service stability and verify healthy targets
