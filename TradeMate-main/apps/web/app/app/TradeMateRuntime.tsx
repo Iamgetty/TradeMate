@@ -43,6 +43,7 @@ export default function TradeMateRuntime() {
     let settled = false;
     let feedReady = false;
     let feedMediaReady = false;
+    let viewportModuleReady = false;
     let metadataReady = false;
     let cssReady = false;
     let layoutCssReady = false;
@@ -80,13 +81,29 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=149';
+    app.src = '/tm/app.js?v=150';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=148. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=150. Check the deployment and static asset response.');
+    app.onload = () => {
+      const postAppModules = [
+        'scout-wallet-fix', 'cards-map-fix', 'feed-x-layout', 'profile-x-layout',
+        'scout-spin-fix', 'feed-desktop-media', 'timeline-nav-fix',
+        'timeline-chip-small', 'scout-spin-fix-2',
+      ];
+      const loadPostAppModule = (index: number) => {
+        if (index >= postAppModules.length) return;
+        const moduleScript = document.createElement('script');
+        moduleScript.src = `/tm/${postAppModules[index]}.js?v=1`;
+        moduleScript.async = false;
+        moduleScript.onload = moduleScript.onerror = () => loadPostAppModule(index + 1);
+        document.body.appendChild(moduleScript);
+      };
+      loadPostAppModule(0);
+    };
 
     const loadApp = () => {
-      if (!feedReady || !feedMediaReady || !metadataReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !feedMediaReady || !viewportModuleReady || !metadataReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -328,6 +345,17 @@ export default function TradeMateRuntime() {
       loadApp();
     };
     document.body.appendChild(feedMedia);
+
+
+    // Viewport setup is the only extracted patch that must run before app.js.
+    const viewportModule = document.createElement('script');
+    viewportModule.src = '/tm/viewport-meta.js?v=1';
+    viewportModule.async = false;
+    viewportModule.onload = viewportModule.onerror = () => {
+      viewportModuleReady = true;
+      loadApp();
+    };
+    document.body.appendChild(viewportModule);
 
     // The Next.js /app route does not execute public/tm/index.html, so it needs
     // its own rendered-shell and landing-overlay watchdog.
