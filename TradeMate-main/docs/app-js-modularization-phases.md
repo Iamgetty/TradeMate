@@ -84,3 +84,6 @@ Counts are estimates, not a promise to split tightly coupled code. The first pha
 
 
 **Completed:** extracted the `markets()` and `tradeCore()` renderers (11,213 source characters) into `public/tm/market-ui.js`. Their shared runtime values and callbacks are injected at call time; the legacy function signatures remain as delegates. `TradeMateRuntime.tsx` now loads and validates the module before app startup. App cache is `v=166`.
+
+
+**Completed:** extracted 22 contract, agreement and conversation UI renderers/helpers (13,162 source characters) into `public/tm/contract-ui.js`. A lazy factory receives the legacy runtime dependencies once, and the original function signatures remain as delegates. Runtime startup validates the module before loading `app.js`; app cache is `v=167`.
