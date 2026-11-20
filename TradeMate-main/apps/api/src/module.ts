@@ -300,7 +300,10 @@ class AuthController {
     if (rate.rows[0].attempts > 10 || (rate.rows[0].blocked_until && new Date(rate.rows[0].blocked_until).getTime() > Date.now())) {
       throw new HttpException('Too many sign-in attempts. Please wait 15 minutes before trying again.', HttpStatus.TOO_MANY_REQUESTS);
     }
-    const result = await databasePool.query("SELECT u.id, u.email, u.display_name, u.country_code, u.status, u.email_verified_at, c.password_hash FROM users u JOIN user_credentials c ON c.user_id = u.id WHERE lower(u.email) = $1 LIMIT 1", [email]);
+    const result = await databasePool.query(
+      'SELECT user_id AS id, email, display_name, country_code, account_status AS status, email_verified_at, password_hash FROM trademate_private.resolve_password_login_credentials($1)',
+      [email],
+    );
     const user = result.rows[0];
     if (!user || !(await passwordMatches(password, user.password_hash))) throw new UnauthorizedException('Email or password is incorrect.');
     if (!user.email_verified_at) throw new ForbiddenException('Verify your email address before signing in. Use Resend to receive a new code.');
@@ -404,7 +407,10 @@ class AuthController {
     if (newPassword.length < 12 || newPassword.length > 128) throw new BadRequestException('Use a new password between 12 and 128 characters.');
     if (currentPassword === newPassword) throw new BadRequestException('Choose a password you have not used for this change.');
     const userId = session.rows[0].id as string;
-    const credentials = await databasePool.query('SELECT password_hash FROM user_credentials WHERE user_id = $1 LIMIT 1', [userId]);
+    const credentials = await databasePool.query(
+      'SELECT password_hash FROM trademate_private.resolve_presented_password_credentials($1)',
+      [tokenDigest(token)],
+    );
     if (!credentials.rowCount || !(await passwordMatches(currentPassword, credentials.rows[0].password_hash))) {
       throw new UnauthorizedException('Your current password is incorrect.');
     }
@@ -740,8 +746,8 @@ class AuthController {
     const presentedSession = await resolvePresentedSessionUser(token);
     if (!presentedSession.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     const current = await databasePool.query(
-      "SELECT u.id, u.email, u.status, c.password_hash FROM users u JOIN user_credentials c ON c.user_id = u.id WHERE u.id = $1 AND u.status = 'active' LIMIT 1",
-      [presentedSession.rows[0].id],
+      'SELECT user_id AS id, email, password_hash FROM trademate_private.resolve_presented_password_credentials($1)',
+      [tokenDigest(token)],
     );
     if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     if (!current.rows[0].email) throw new ConflictException('Add an email address you can access before requesting account deletion so you can receive the cancellation code.');
