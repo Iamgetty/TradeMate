@@ -425,7 +425,7 @@ class AuthController {
     try {
       await client.query('BEGIN');
       await client.query('UPDATE user_credentials SET password_hash = $1, updated_at = now() WHERE user_id = $2', [nextHash, userId]);
-      await client.query('DELETE FROM user_sessions WHERE user_id = $1 AND token_hash <> $2', [userId, tokenDigest(token)]);
+      await client.query('SELECT trademate_private.revoke_other_presented_sessions($1)', [tokenDigest(token)]);
       await client.query(
         "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.password_changed', 'user', $1, '{}'::jsonb)",
         [userId],
