@@ -69,6 +69,7 @@ GRANT EXECUTE ON FUNCTION trademate_private.resolve_presented_password_credentia
 GRANT EXECUTE ON FUNCTION trademate_private.complete_account_deletion_cancellation(TEXT) TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.discard_password_reset_token(TEXT) TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.rollback_account_deletion_request(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.current_presented_user_id() TO trademate_app;
 
 -- Transfer application tables, sequences and views to the migration owner.
 -- The app login must never own these objects.
