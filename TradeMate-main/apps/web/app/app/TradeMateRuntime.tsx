@@ -81,25 +81,35 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=150';
+    app.src = '/tm/app.js?v=151';
     app.async = false;
     app.dataset.trademateApp = 'true';
     app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=150. Check the deployment and static asset response.');
     app.onload = () => {
       const postAppModules = [
+        'pf-size',
+        'pm-ring-light',
+        'tm-doc-icons',
+        'tm-scout-light',
+        'tm-mk-compact',
+        'tm-tl-acts',
+        'tm-tl-desktop-fit',
+        'tm-tl-noborder',
+        'tm-feed-desktop-fill',
+        'tm-desktop-polish',
         'scout-wallet-fix', 'cards-map-fix', 'feed-x-layout', 'profile-x-layout',
         'scout-spin-fix', 'feed-desktop-media', 'timeline-nav-fix',
         'timeline-chip-small', 'scout-spin-fix-2',
       ];
-      const loadPostAppModule = (index: number) => {
-        if (index >= postAppModules.length) return;
+      // Dynamic classic scripts with async=false execute in insertion order.
+      // Appending the whole queue avoids serial network waits while preserving
+      // the original stylesheet-loader order.
+      postAppModules.forEach((moduleName) => {
         const moduleScript = document.createElement('script');
-        moduleScript.src = `/tm/${postAppModules[index]}.js?v=1`;
+        moduleScript.src = `/tm/${moduleName}-loader.js?v=1`;
         moduleScript.async = false;
-        moduleScript.onload = moduleScript.onerror = () => loadPostAppModule(index + 1);
         document.body.appendChild(moduleScript);
-      };
-      loadPostAppModule(0);
+      });
     };
 
     const loadApp = () => {
