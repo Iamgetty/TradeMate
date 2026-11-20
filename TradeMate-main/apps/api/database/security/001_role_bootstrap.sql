@@ -64,6 +64,8 @@ GRANT EXECUTE ON FUNCTION trademate_private.resolve_totp_enrollment(TEXT) TO tra
 GRANT EXECUTE ON FUNCTION trademate_private.complete_totp_enrollment(TEXT, BIGINT) TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.resolve_enabled_totp(TEXT) TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.disable_totp(TEXT, BIGINT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.resolve_password_login_credentials(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.resolve_presented_password_credentials(TEXT) TO trademate_app;
 
 -- Transfer application tables, sequences and views to the migration owner.
 -- The app login must never own these objects.
@@ -107,6 +109,8 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO trademate_app;
 -- Session bearer-token digests are never readable by the runtime login.
 -- Session identity and metadata are exposed only through SECURITY DEFINER operations.
 REVOKE SELECT ON TABLE public.user_sessions FROM trademate_app;
+REVOKE SELECT ON TABLE public.user_credentials FROM trademate_app;
+GRANT SELECT (user_id) ON TABLE public.user_credentials TO trademate_app;
 GRANT SELECT (user_id) ON TABLE public.user_sessions TO trademate_app;
 
 -- Audit and migration history are not mutable/readable by the runtime role.
