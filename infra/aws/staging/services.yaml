@@ -43,6 +43,9 @@ Parameters:
   MigrationDatabaseUrlSecretArn:
     Type: String
     Description: Separate Secrets Manager ARN whose SecretString is the migrator-role PostgreSQL URL; never use the master or app-role credential.
+  RlsContextHmacKeySecretArn:
+    Type: String
+    Description: Secrets Manager ARN whose SecretString is the shared 64-character hex RLS_CONTEXT_HMAC_KEY; grant only to API and migration task execution roles.
   CloudflareTunnelTokenSecretArn:
     Type: String
     Description: Secrets Manager ARN containing the Cloudflare Tunnel token for this staging environment.
@@ -226,6 +229,7 @@ Resources:
                 Resource:
                   - !Ref ApiDatabaseUrlSecretArn
                   - !Ref TotpEncryptionKeySecretArn
+                  - !Ref RlsContextHmacKeySecretArn
 
   FeedEcsExecutionRole:
     Type: AWS::IAM::Role
@@ -307,6 +311,7 @@ Resources:
                   - secretsmanager:GetSecretValue
                 Resource:
                   - !Ref MigrationDatabaseUrlSecretArn
+                  - !Ref RlsContextHmacKeySecretArn
 
   MigrationTaskRole:
     Type: AWS::IAM::Role
@@ -395,6 +400,8 @@ Resources:
               ValueFrom: !Ref ApiDatabaseUrlSecretArn
             - Name: TOTP_ENCRYPTION_KEY
               ValueFrom: !Ref TotpEncryptionKeySecretArn
+            - Name: RLS_CONTEXT_HMAC_KEY
+              ValueFrom: !Ref RlsContextHmacKeySecretArn
           HealthCheck:
             Command:
               - CMD-SHELL
@@ -439,6 +446,8 @@ Resources:
           Secrets:
             - Name: MIGRATION_DATABASE_URL
               ValueFrom: !Ref MigrationDatabaseUrlSecretArn
+            - Name: RLS_CONTEXT_HMAC_KEY
+              ValueFrom: !Ref RlsContextHmacKeySecretArn
           LogConfiguration:
             LogDriver: awslogs
             Options:
