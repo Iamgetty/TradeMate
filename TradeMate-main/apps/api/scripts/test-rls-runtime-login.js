@@ -126,7 +126,7 @@ async function main() {
     assert.equal(revoked.rows[0].user_id, userIds[1]);
     assert.equal(revoked.rows[0].was_current, false);
     const revokeAudit = await admin.query(
-      "SELECT metadata FROM public.audit_events WHERE event_type = 'auth.session_revoked' AND entity_id = $1 ORDER BY created_at DESC LIMIT 1",
+      "SELECT metadata FROM public.audit_events WHERE event_type = 'auth.session_revoked' AND entity_id = $1",
       [secondarySession.rows[0].id],
     );
     assert.equal(revokeAudit.rowCount, 1, 'Session revocation must append its audit event atomically.');
