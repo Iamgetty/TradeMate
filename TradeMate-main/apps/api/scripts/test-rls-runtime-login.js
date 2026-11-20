@@ -14,7 +14,10 @@ async function main() {
   const sessionIds = [];
   const sessionHashes = [];
   const appPassword = randomBytes(32).toString('hex');
-  const rlsContextHmacKey = randomBytes(32).toString('hex');
+  const rlsContextHmacKey = process.env.RLS_CONTEXT_HMAC_KEY || '';
+  if (!/^[0-9a-f]{64}$/i.test(rlsContextHmacKey)) {
+    throw new Error('RLS_CONTEXT_HMAC_KEY is required for the runtime-login RLS test.');
+  }
   let appPool;
   let appClient;
 
