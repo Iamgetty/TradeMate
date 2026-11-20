@@ -32,3 +32,13 @@ html[data-theme="light"] small:not(.up):not(.dn):not(.pos):not(.neg){color:#6474
 .pfoot .lr svg{width:14px!important;height:14px!important;color:var(--mut)}.pfoot .lr:first-child svg{color:var(--am)}
 .pfoot .lr:active{scale:.97}
 @media(max-width:899px){*{scrollbar-width:none}*::-webkit-scrollbar{display:none}}
+
+/* Explore section typography: align Contracts, Marketplaces and Trending now
+   with the small DM Mono Explore eyebrow. Deliberately inherit each heading's
+   existing color; this changes typography only. */
+html #app .view .tm-sec-title h2,
+html #app .view .mk-trend h2{
+  font:500 10.5px/1 'DM Mono',monospace!important;
+  letter-spacing:.2em!important;
+  text-transform:uppercase!important;
+}
