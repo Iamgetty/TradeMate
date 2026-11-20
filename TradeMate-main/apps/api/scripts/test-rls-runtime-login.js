@@ -139,6 +139,39 @@ async function main() {
       "INSERT INTO public.auth_login_challenges (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '5 minutes')",
       [totpUserId, totpChallengeTokenHash],
     );
+
+    const resolvedTotpChallenge = await appClient.query(
+      'SELECT challenge_user_id::text AS user_id, challenge_attempts AS attempts, challenge_email AS email, encrypted_totp_secret, last_totp_counter FROM trademate_private.resolve_totp_login_challenge($1)',
+      [totpChallengeTokenHash],
+    );
+    assert.equal(resolvedTotpChallenge.rowCount, 1, 'The runtime must resolve a valid TOTP challenge through the scoped operation.');
+    assert.equal(resolvedTotpChallenge.rows[0].user_id, totpUserId);
+    assert.equal(resolvedTotpChallenge.rows[0].email, `rls-totp-login-${suffix}@example.invalid`);
+    assert.equal(resolvedTotpChallenge.rows[0].encrypted_totp_secret, 'test-only-encrypted-secret-placeholder');
+    assert.equal(resolvedTotpChallenge.rows[0].attempts, 0);
+    const unknownTotpChallenge = await appClient.query(
+      'SELECT * FROM trademate_private.resolve_totp_login_challenge($1)',
+      [createHash('sha256').update(randomBytes(32)).digest('hex')],
+    );
+    assert.equal(unknownTotpChallenge.rowCount, 0, 'Unknown TOTP challenges must not reveal account or secret data.');
+
+    const failedTotpChallengeHash = createHash('sha256').update(randomBytes(32)).digest('hex');
+    await admin.query(
+      "INSERT INTO public.auth_login_challenges (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '5 minutes')",
+      [totpUserId, failedTotpChallengeHash],
+    );
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      const failedAttempt = await appClient.query(
+        'SELECT trademate_private.record_totp_login_failure($1) AS attempts',
+        [failedTotpChallengeHash],
+      );
+      assert.equal(failedAttempt.rows[0].attempts, attempt, 'Failed TOTP attempts must increment atomically and monotonically.');
+    }
+    const cappedFailure = await appClient.query(
+      'SELECT trademate_private.record_totp_login_failure($1) AS attempts',
+      [failedTotpChallengeHash],
+    );
+    assert.equal(cappedFailure.rows[0].attempts, 0, 'TOTP challenge attempts must never exceed the five-attempt limit.');
     const totpSessionTokenHash = createHash('sha256').update(randomBytes(32)).digest('hex');
     const matchedTotpCounter = 123456789n;
     const completedTotpLogin = await appClient.query(
