@@ -22,6 +22,7 @@ on:
       - 'TradeMate-main/apps/api/database/**'
       - 'TradeMate-main/apps/api/scripts/test-db-roles.js'
       - 'TradeMate-main/apps/api/scripts/test-rls-pilot.js'
+      - 'TradeMate-main/apps/api/scripts/test-rls-runtime-login.js'
       - 'TradeMate-main/apps/api/scripts/test-database-context.js'
       - 'TradeMate-main/apps/api/src/database-context.ts'
       - 'TradeMate-main/apps/api/package.json'
