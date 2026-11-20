@@ -53,6 +53,11 @@ async function main() {
       sessionHashes.push(sessionHash);
     }
 
+    await admin.query(
+      'INSERT INTO public.user_credentials (user_id, password_hash) VALUES ($1, $2)',
+      [userIds[1], 'scrypt$16384$8$1$test-salt$test-password-verifier-value'],
+    );
+
     const appUrl = new URL(adminConnectionString);
     appUrl.username = 'trademate_app';
     appUrl.password = appPassword;
@@ -564,9 +569,33 @@ async function main() {
     }
     assert.deepEqual(
       exposedCredentialColumns,
-      credentialColumns.filter(([table, column]) => !(table === 'user_sessions' && column === 'token_hash')).map(([table, column]) => `${table}.${column}`),
-      'Only the session bearer-token digest should have been removed from the currently inventoried credential-column exposure.',
+      credentialColumns.filter(([table, column]) => !(
+        (table === 'user_sessions' && column === 'token_hash')
+        || (table === 'user_credentials' && column === 'password_hash')
+      )).map(([table, column]) => `${table}.${column}`),
+      'Session bearer-token digests and password verifiers must not be directly readable by the runtime role.',
     );
+
+    await assert.rejects(
+      appClient.query('SELECT password_hash FROM public.user_credentials WHERE user_id = $1', [userIds[1]]),
+      (error) => error.code === '42501',
+      'The runtime role must not directly read password verifiers.',
+    );
+    const scopedPassword = await appClient.query(
+      'SELECT user_id::text AS user_id, password_hash FROM trademate_private.resolve_presented_password_credentials($1)',
+      [sessionHashes[1]],
+    );
+    assert.equal(scopedPassword.rowCount, 1);
+    assert.equal(scopedPassword.rows[0].user_id, userIds[1]);
+    assert.equal(scopedPassword.rows[0].password_hash, 'scrypt$16384$8$1$test-salt$test-password-verifier-value');
+
+    const loginCredentials = await appClient.query(
+      'SELECT user_id::text AS user_id, password_hash FROM trademate_private.resolve_password_login_credentials($1)',
+      [`rls-login-other-${suffix}@example.invalid`],
+    );
+    assert.equal(loginCredentials.rowCount, 1);
+    assert.equal(loginCredentials.rows[0].user_id, userIds[1]);
+    assert.equal(loginCredentials.rows[0].password_hash, 'scrypt$16384$8$1$test-salt$test-password-verifier-value');
 
     await appClient.query('BEGIN');
     try {
@@ -653,7 +682,7 @@ async function main() {
     assert.equal(malformedReset.rowCount, 0, 'Malformed reset digests must not update credentials.');
 
     console.log(
-      'EXPECTED SECURITY LIMITATIONS CONFIRMED: direct trademate_app LOGIN can forge app.user_id and read another fixture user under the current pilot policy. Session token-hash disclosure is now blocked, while six other inventoried credential-bearing columns remain exposed. Production RLS remains blocked.',
+      'EXPECTED SECURITY LIMITATIONS CONFIRMED: direct trademate_app LOGIN can forge app.user_id and read another fixture user under the current pilot policy. Session token-hash disclosure is now blocked, while five other inventoried credential-bearing columns remain exposed. Production RLS remains blocked.',
     );
   } finally {
     if (appClient) appClient.release();
