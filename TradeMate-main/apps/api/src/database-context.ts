@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import type { Pool, PoolClient } from 'pg';
 
-type DatabaseRequestContext = { sessionTokenHash: string; userId: string; userResolved: boolean };
+type DatabaseRequestContext = { sessionTokenHash: string };
 const requestContext = new AsyncLocalStorage<DatabaseRequestContext>();
 
 export const sessionTokenFromCookieHeader = (cookieHeader?: string): string => {
@@ -21,27 +21,16 @@ export const sessionTokenFromCookieHeader = (cookieHeader?: string): string => {
 export const databaseRequestContextMiddleware = (request: Request, _response: Response, next: NextFunction) => {
   const token = sessionTokenFromCookieHeader(request.headers.cookie);
   const sessionTokenHash = token ? createHash('sha256').update(token).digest('hex') : '';
-  requestContext.run({ sessionTokenHash, userId: '', userResolved: false }, next);
+  requestContext.run({ sessionTokenHash }, next);
 };
 
 const establishTransactionContext = async (client: PoolClient, context: DatabaseRequestContext) => {
   await client.query("SELECT set_config('app.session_token_hash', $1, true)", [context.sessionTokenHash]);
 
-  // Resolve the presented digest through the narrow SECURITY DEFINER entry
-  // point. The API runtime receives the subject only; it cannot read or
-  // enumerate user_sessions.token_hash directly.
-  if (!context.userResolved) {
-    if (context.sessionTokenHash) {
-      const session = await client.query(
-        'SELECT resolved_user_id::text AS user_id FROM trademate_private.resolve_presented_session($1)',
-        [context.sessionTokenHash],
-      );
-      context.userId = session.rows[0]?.user_id || '';
-    }
-    context.userResolved = true;
-  }
-
-  await client.query("SELECT set_config('app.user_id', $1, true)", [context.userId]);
+  // Do not set app.user_id: custom PostgreSQL settings are caller-controlled
+  // by the runtime role and therefore cannot be trusted as an RLS identity.
+  // Policies resolve this opaque, presented bearer digest through a narrow
+  // SECURITY DEFINER function instead.
 };
 
 const matchesSqlCommand = (sql: unknown, command: string) => {
