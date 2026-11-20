@@ -26,10 +26,14 @@ Parameters:
     Type: String
   ApiImageUri:
     Type: String
-    Description: Immutable ECR image URI including a commit-SHA tag.
+    Description: Immutable ECR image URI pinned by sha256 digest; use the exact API artifact tested for this release.
+    AllowedPattern: '^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com/.+@sha256:[a-f0-9]{64}$'
+    ConstraintDescription: "Provide an ECR image URI ending in @sha256: followed by 64 lowercase hexadecimal characters."
   ExchangeFeedImageUri:
     Type: String
-    Description: Immutable ECR image URI including a commit-SHA tag.
+    Description: Immutable ECR image URI pinned by sha256 digest.
+    AllowedPattern: '^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com/.+@sha256:[a-f0-9]{64}$'
+    ConstraintDescription: "Provide an ECR image URI ending in @sha256: followed by 64 lowercase hexadecimal characters."
   ApiDatabaseUrlSecretArn:
     Type: String
     Description: Secrets Manager ARN whose SecretString is the complete staging DATABASE_URL.
@@ -39,6 +43,9 @@ Parameters:
   MigrationDatabaseUrlSecretArn:
     Type: String
     Description: Separate Secrets Manager ARN whose SecretString is the migrator-role PostgreSQL URL; never use the master or app-role credential.
+  RlsContextHmacKeySecretArn:
+    Type: String
+    Description: Secrets Manager ARN whose SecretString is the shared 64-character hex RLS_CONTEXT_HMAC_KEY; grant only to API and migration task execution roles.
   CloudflareTunnelTokenSecretArn:
     Type: String
     Description: Secrets Manager ARN containing the Cloudflare Tunnel token for this staging environment.
@@ -222,6 +229,7 @@ Resources:
                 Resource:
                   - !Ref ApiDatabaseUrlSecretArn
                   - !Ref TotpEncryptionKeySecretArn
+                  - !Ref RlsContextHmacKeySecretArn
 
   FeedEcsExecutionRole:
     Type: AWS::IAM::Role
@@ -303,6 +311,7 @@ Resources:
                   - secretsmanager:GetSecretValue
                 Resource:
                   - !Ref MigrationDatabaseUrlSecretArn
+                  - !Ref RlsContextHmacKeySecretArn
 
   MigrationTaskRole:
     Type: AWS::IAM::Role
@@ -391,6 +400,8 @@ Resources:
               ValueFrom: !Ref ApiDatabaseUrlSecretArn
             - Name: TOTP_ENCRYPTION_KEY
               ValueFrom: !Ref TotpEncryptionKeySecretArn
+            - Name: RLS_CONTEXT_HMAC_KEY
+              ValueFrom: !Ref RlsContextHmacKeySecretArn
           HealthCheck:
             Command:
               - CMD-SHELL
@@ -435,6 +446,8 @@ Resources:
           Secrets:
             - Name: MIGRATION_DATABASE_URL
               ValueFrom: !Ref MigrationDatabaseUrlSecretArn
+            - Name: RLS_CONTEXT_HMAC_KEY
+              ValueFrom: !Ref RlsContextHmacKeySecretArn
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -593,6 +606,14 @@ Outputs:
     Value: !Ref FeedTaskDefinition
   MigrationTaskDefinitionArn:
     Value: !Ref MigrationTaskDefinition
+  MigrationDatabaseUrlSecretArn:
+    Value: !Ref MigrationDatabaseUrlSecretArn
+  RlsContextHmacKeySecretArn:
+    Value: !Ref RlsContextHmacKeySecretArn
+  MigrationEcsExecutionRoleArn:
+    Value: !GetAtt MigrationEcsExecutionRole.Arn
+  MigrationTaskRoleArn:
+    Value: !GetAtt MigrationTaskRole.Arn
   CloudflareTunnelTaskDefinitionArn:
     Value: !Ref CloudflareTunnelTaskDefinition
   CloudflareTunnelServiceName:

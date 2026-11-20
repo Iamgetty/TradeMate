@@ -59,6 +59,63 @@ test('direct app route renders on a real mobile-user-agent context', async ({ br
   }
 });
 
+test('homepage shortcut cards do not use the legacy view-entry animation after load or refresh', async ({ page }) => {
+  await isolateApi(page);
+
+  async function expectHomepageEntranceAnimationRemoved() {
+    const response = await page.request.get('/tm/app.js');
+    expect(response.ok(), 'the deployed legacy app bundle should be available').toBeTruthy();
+    const source = await response.text();
+
+    // The Home view uses .mk-card for its marketplace shortcut tiles. Keep
+    // the market-page animations scoped to their own components, but never
+    // animate those Home tiles through the shared .view.enter class.
+    expect(source).not.toMatch(/\.view\.enter\s+\.mk-card\s*\{/);
+    expect(source).not.toMatch(/\.view\.enter\s*>\s*\*/);
+  }
+
+  await page.goto('/app');
+  await expectPublicLanding(page);
+  await expectHomepageEntranceAnimationRemoved();
+
+  await page.reload();
+  await expectPublicLanding(page);
+  await expectHomepageEntranceAnimationRemoved();
+});
+
+test('CoinGecko metadata helper loads before the app and reports a successful refresh', async ({ page }) => {
+  await isolateApi(page);
+  await page.route('https://api.coingecko.com/**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: '[]',
+  }));
+
+  await page.goto('/app');
+  await expectPublicLanding(page);
+  await expect.poll(() => page.evaluate(() =>
+    (window as Window & { tmMarketMetadataStatus?: { state: string } }).tmMarketMetadataStatus?.state,
+  )).toBe('fresh');
+});
+
+test('the core app remains available and skips CoinGecko when its metadata helper is unavailable', async ({ page }) => {
+  await isolateApi(page);
+  let metadataRequests = 0;
+  await page.route('**/tm/market-metadata.js*', route => route.abort());
+  await page.route('https://api.coingecko.com/**', route => {
+    metadataRequests += 1;
+    return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
+
+  await page.goto('/app');
+  await expectPublicLanding(page);
+  await expect(page.locator('main[role="alert"]')).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() =>
+    (window as Window & { tmMarketMetadataStatus?: { state: string } }).tmMarketMetadataStatus?.state,
+  )).toBe('unavailable');
+  expect(metadataRequests, 'the unguarded legacy provider fallback must not run').toBe(0);
+});
+
 test('the core app still renders when the optional exchange-feed browser helper is unavailable', async ({ page }) => {
   await isolateApi(page);
   await page.route('**/tm/feed-client.js*', route => route.abort());

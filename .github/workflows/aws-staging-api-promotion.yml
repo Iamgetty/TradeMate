@@ -1,0 +1,389 @@
+name: AWS staging API promotion after successful migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_promotion:
+        description: Promote the API image only after the referenced staging migration task succeeded.
+        type: choice
+        required: true
+        options:
+          - "no"
+          - "yes"
+      migration_run_id:
+        description: GitHub Actions run ID of the successful AWS staging database migration task workflow.
+        type: string
+        required: true
+      expected_api_image_uri:
+        description: Exact API ECR image URI pinned by SHA-256 digest and recorded in the successful migration handoff.
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+  attestations: read
+  id-token: write
+
+concurrency:
+  group: trademate-aws-staging-api-promotion
+  cancel-in-progress: false
+
+jobs:
+  validate-migration-handoff:
+    name: Validate successful migration handoff
+    if: ${{ inputs.confirm_promotion == 'yes' && github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      source_sha: ${{ steps.handoff.outputs.source_sha }}
+      image_uri: ${{ steps.handoff.outputs.image_uri }}
+      migration_run_id: ${{ steps.handoff.outputs.migration_run_id }}
+    steps:
+      - name: Validate migration workflow run
+        id: run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MIGRATION_RUN_ID: ${{ inputs.migration_run_id }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$MIGRATION_RUN_ID" =~ ^[0-9]{6,20}$ ]]; then
+            echo "::error::migration_run_id must be a numeric GitHub Actions run ID."
+            exit 1
+          fi
+          RUN_JSON="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$MIGRATION_RUN_ID")"
+          jq -e '
+            .status == "completed" and
+            .conclusion == "success" and
+            .event == "workflow_dispatch" and
+            .head_branch == "main" and
+            (.path | startswith(".github/workflows/aws-staging-migration-task.yml@"))
+          ' <<< "$RUN_JSON" >/dev/null || {
+            echo "::error::The referenced run is not a successful main-branch staging migration workflow run."
+            exit 1
+          }
+          RUN_HEAD_SHA="$(jq -r '.head_sha' <<< "$RUN_JSON")"
+          RUN_ATTEMPT="$(jq -r '.run_attempt' <<< "$RUN_JSON")"
+          if [[ ! "$RUN_HEAD_SHA" =~ ^[a-f0-9]{40}$ || ! "$RUN_ATTEMPT" =~ ^[0-9]+$ ]]; then
+            echo "::error::The migration workflow run did not report a valid source commit and run attempt."
+            exit 1
+          fi
+          {
+            echo "head_sha=$RUN_HEAD_SHA"
+            echo "run_attempt=$RUN_ATTEMPT"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Download successful migration handoff artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: trademate-staging-migration-release
+          path: ${{ runner.temp }}/trademate-migration-handoff
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.migration_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Verify handoff metadata and operator-supplied digest
+        id: handoff
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MIGRATION_RUN_ID: ${{ inputs.migration_run_id }}
+          MIGRATION_HEAD_SHA: ${{ steps.run.outputs.head_sha }}
+          MIGRATION_RUN_ATTEMPT: ${{ steps.run.outputs.run_attempt }}
+          EXPECTED_API_IMAGE_URI: ${{ inputs.expected_api_image_uri }}
+        run: |
+          set -euo pipefail
+          HANDOFF="$RUNNER_TEMP/trademate-migration-handoff/trademate-staging-migration-release.json"
+          if [[ ! -f "$HANDOFF" ]]; then
+            echo "::error::The successful migration run did not provide its required release handoff artifact."
+            exit 1
+          fi
+          if [[ ! "$EXPECTED_API_IMAGE_URI" =~ ^[0-9]{12}\.dkr\.ecr\.eu-north-1\.amazonaws\.com/trademate/api@sha256:[a-f0-9]{64}$ ]]; then
+            echo "::error::The API image must be the staging API ECR repository pinned by a lowercase SHA-256 digest."
+            exit 1
+          fi
+          jq -e \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg run_id "$MIGRATION_RUN_ID" \
+            --arg run_attempt "$MIGRATION_RUN_ATTEMPT" \
+            --arg image "$EXPECTED_API_IMAGE_URI" \
+            '
+              .schema_version == 1 and
+              .repository == $repository and
+              .workflow_path == ".github/workflows/aws-staging-migration-task.yml" and
+              .migration_run_id == $run_id and
+              .migration_run_attempt == $run_attempt and
+              .api_image_uri == $image and
+              (.source_sha | test("^[a-f0-9]{40}$")) and
+              .migration_result == "success" and
+              .container_exit_code == 0 and
+              (.task_definition_arn | startswith("arn:aws:ecs:")) and
+              (.ecs_task_arn | startswith("arn:aws:ecs:"))
+            ' "$HANDOFF" >/dev/null
+          SOURCE_SHA="$(jq -r '.source_sha' "$HANDOFF")"
+          CURRENT_MAIN_SHA="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')"
+          if [[ "$SOURCE_SHA" != "$MIGRATION_HEAD_SHA" ]]; then
+            echo "::error::The migration artifact source SHA does not match the commit that dispatched the migration workflow."
+            exit 1
+          fi
+          if [[ "$SOURCE_SHA" != "$CURRENT_MAIN_SHA" ]]; then
+            echo "::error::The migration artifact is stale because main has advanced since migration; rebuild and rerun the release."
+            exit 1
+          fi
+          {
+            echo "source_sha=$SOURCE_SHA"
+            echo "image_uri=$EXPECTED_API_IMAGE_URI"
+            echo "migration_run_id=$MIGRATION_RUN_ID"
+          } >> "$GITHUB_OUTPUT"
+
+  promote-api:
+    name: Promote attested API image to staging
+    needs: validate-migration-handoff
+    if: ${{ needs.validate-migration-handoff.result == 'success' }}
+    permissions:
+      contents: read
+      attestations: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment:
+      name: aws-staging-api-promotion
+    steps:
+      - name: Validate staging promotion role configuration
+        env:
+          AWS_STAGING_PROMOTE_ROLE_ARN: ${{ vars.AWS_STAGING_PROMOTE_ROLE_ARN }}
+          AWS_STAGING_ACCOUNT_ID: ${{ vars.AWS_STAGING_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$AWS_STAGING_PROMOTE_ROLE_ARN" =~ ^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$ ]]; then
+            echo "::error::Configure AWS_STAGING_PROMOTE_ROLE_ARN in the aws-staging-api-promotion environment."
+            exit 1
+          fi
+          if [[ ! "$AWS_STAGING_ACCOUNT_ID" =~ ^[0-9]{12}$ || "$AWS_STAGING_PROMOTE_ROLE_ARN" != "arn:aws:iam::$AWS_STAGING_ACCOUNT_ID:role/"* ]]; then
+            echo "::error::AWS_STAGING_ACCOUNT_ID must match the account in AWS_STAGING_PROMOTE_ROLE_ARN."
+            exit 1
+          fi
+
+      - name: Configure AWS credentials through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.2.1
+        with:
+          role-to-assume: ${{ vars.AWS_STAGING_PROMOTE_ROLE_ARN }}
+          aws-region: eu-north-1
+          role-session-name: trademate-staging-api-promotion
+
+      - name: Confirm assumed AWS account
+        env:
+          EXPECTED_ACCOUNT_ID: ${{ vars.AWS_STAGING_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          ACTUAL_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          if [[ "$ACTUAL_ACCOUNT_ID" != "$EXPECTED_ACCOUNT_ID" ]]; then
+            echo "::error::The assumed AWS role belongs to an unexpected account."
+            exit 1
+          fi
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@7290e214a610b32bc0eef81748948b6d466a8783 # v2
+
+      - name: Verify image signature and source provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_URI: ${{ needs.validate-migration-handoff.outputs.image_uri }}
+          SOURCE_SHA: ${{ needs.validate-migration-handoff.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          gh attestation verify "oci://$IMAGE_URI" \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/aws-staging-build-images.yml" \
+            --source-digest "$SOURCE_SHA" \
+            --source-ref "refs/heads/main"
+
+      - name: Create, inspect and execute API-only CloudFormation change set
+        id: deployment
+        env:
+          IMAGE_URI: ${{ needs.validate-migration-handoff.outputs.image_uri }}
+          SOURCE_SHA: ${{ needs.validate-migration-handoff.outputs.source_sha }}
+          MIGRATION_RUN_ID: ${{ needs.validate-migration-handoff.outputs.migration_run_id }}
+          EXPECTED_ACCOUNT_ID: ${{ vars.AWS_STAGING_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          SERVICES_STACK="trademate-staging-services"
+          FOUNDATION_STACK="trademate-staging-foundation"
+
+          for stack_name in "$SERVICES_STACK" "$FOUNDATION_STACK"; do
+            stack_status="$(aws cloudformation describe-stacks --stack-name "$stack_name" --query 'Stacks[0].StackStatus' --output text)"
+            if [[ "$stack_status" != "CREATE_COMPLETE" && "$stack_status" != "UPDATE_COMPLETE" ]]; then
+              echo "::error::Stack $stack_name is not stable; refusing to promote."
+              exit 1
+            fi
+          done
+
+          IMAGE_REGISTRY="${IMAGE_URI%%/*}"
+          IMAGE_PATH="${IMAGE_URI#*/}"
+          IMAGE_REPOSITORY="${IMAGE_PATH%@sha256:*}"
+          IMAGE_DIGEST="sha256:${IMAGE_URI##*@sha256:}"
+          REGISTRY_ACCOUNT="${IMAGE_REGISTRY%%.*}"
+          if [[ "$REGISTRY_ACCOUNT" != "$EXPECTED_ACCOUNT_ID" || "$IMAGE_REPOSITORY" != "trademate/api" ]]; then
+            echo "::error::The attested API image is not in the approved staging ECR account/repository."
+            exit 1
+          fi
+          aws ecr describe-images \
+            --registry-id "$REGISTRY_ACCOUNT" \
+            --repository-name "$IMAGE_REPOSITORY" \
+            --image-ids "imageDigest=$IMAGE_DIGEST" >/dev/null
+
+          FOUNDATION_OUTPUTS="$(aws cloudformation describe-stacks --stack-name "$FOUNDATION_STACK" --query 'Stacks[0].Outputs' --output json)"
+          SERVICES_OUTPUTS="$(aws cloudformation describe-stacks --stack-name "$SERVICES_STACK" --query 'Stacks[0].Outputs' --output json)"
+          RLS_HMAC_SECRET_ARN="$(jq -r '.[] | select(.OutputKey=="RlsContextHmacKeySecretArn") | .OutputValue' <<< "$SERVICES_OUTPUTS")"
+          CLUSTER_NAME="$(jq -r '.[] | select(.OutputKey=="EcsClusterName") | .OutputValue' <<< "$FOUNDATION_OUTPUTS")"
+          API_TASK_DEFINITION_ARN="$(aws cloudformation describe-stack-resource --stack-name "$SERVICES_STACK" --logical-resource-id ApiTaskDefinition --query 'StackResourceDetail.PhysicalResourceId' --output text)"
+          API_SERVICE_NAME="$(aws cloudformation describe-stack-resource --stack-name "$SERVICES_STACK" --logical-resource-id ApiService --query 'StackResourceDetail.PhysicalResourceId' --output text)"
+          API_TARGET_GROUP_ARN="$(aws cloudformation describe-stack-resource --stack-name "$SERVICES_STACK" --logical-resource-id ApiTargetGroup --query 'StackResourceDetail.PhysicalResourceId' --output text)"
+          for value in "$CLUSTER_NAME" "$RLS_HMAC_SECRET_ARN" "$API_TASK_DEFINITION_ARN" "$API_SERVICE_NAME" "$API_TARGET_GROUP_ARN"; do
+            if [[ -z "$value" || "$value" == "None" || "$value" == "null" ]]; then
+              echo "::error::A required staging stack resource could not be resolved."
+              exit 1
+            fi
+          done
+
+          CURRENT_TASK_DEFINITION="$(aws ecs describe-task-definition --task-definition "$API_TASK_DEFINITION_ARN" --query taskDefinition --output json)"
+          CURRENT_FAMILY="$(jq -r '.family' <<< "$CURRENT_TASK_DEFINITION")"
+          CURRENT_CONTAINER_COUNT="$(jq '.containerDefinitions | length' <<< "$CURRENT_TASK_DEFINITION")"
+          CURRENT_CONTAINER_NAME="$(jq -r '.containerDefinitions[0].name' <<< "$CURRENT_TASK_DEFINITION")"
+          CURRENT_IMAGE="$(jq -r '.containerDefinitions[0].image' <<< "$CURRENT_TASK_DEFINITION")"
+          CURRENT_SECRET_NAMES="$(jq -r '.containerDefinitions[0].secrets | map(.name) | sort | join(",")' <<< "$CURRENT_TASK_DEFINITION")"
+          CURRENT_RLS_SECRET_ARN="$(jq -r '.containerDefinitions[0].secrets[] | select(.name=="RLS_CONTEXT_HMAC_KEY") | .valueFrom' <<< "$CURRENT_TASK_DEFINITION")"
+          if [[ "$CURRENT_FAMILY" != "trademate-staging-api" || "$CURRENT_CONTAINER_COUNT" != "1" || "$CURRENT_CONTAINER_NAME" != "api" || "$CURRENT_SECRET_NAMES" != "DATABASE_URL,RLS_CONTEXT_HMAC_KEY,TOTP_ENCRYPTION_KEY" || "$CURRENT_RLS_SECRET_ARN" != "$RLS_HMAC_SECRET_ARN" ]]; then
+            echo "::error::The live API task definition does not match the reviewed single-container, runtime-secret-only baseline."
+            exit 1
+          fi
+          if jq -e '.containerDefinitions[].secrets[]? | select(.name=="MIGRATION_DATABASE_URL")' <<< "$CURRENT_TASK_DEFINITION" >/dev/null; then
+            echo "::error::The API task definition must never receive the migration database credential."
+            exit 1
+          fi
+
+          aws ecs wait services-stable --cluster "$CLUSTER_NAME" --services "$API_SERVICE_NAME"
+          CURRENT_SERVICE="$(aws ecs describe-services --cluster "$CLUSTER_NAME" --services "$API_SERVICE_NAME" --query 'services[0]' --output json)"
+          if [[ "$(jq -r '.status' <<< "$CURRENT_SERVICE")" != "ACTIVE" || "$(jq -r '.deploymentConfiguration.deploymentCircuitBreaker.enable' <<< "$CURRENT_SERVICE")" != "true" || "$(jq -r '.deploymentConfiguration.deploymentCircuitBreaker.rollback' <<< "$CURRENT_SERVICE")" != "true" ]]; then
+            echo "::error::The API ECS service is not active or does not have deployment-circuit-breaker rollback enabled."
+            exit 1
+          fi
+          if [[ "$(jq -r '.taskDefinition' <<< "$CURRENT_SERVICE")" != "$API_TASK_DEFINITION_ARN" || "$(jq -r '.pendingCount' <<< "$CURRENT_SERVICE")" != "0" || "$(jq -r '.runningCount' <<< "$CURRENT_SERVICE")" != "$(jq -r '.desiredCount' <<< "$CURRENT_SERVICE")" || "$(jq -r '.desiredCount' <<< "$CURRENT_SERVICE")" -lt 1 ]]; then
+            echo "::error::The active ECS service is not aligned with the CloudFormation task definition or its desired capacity."
+            exit 1
+          fi
+
+          STACK_PARAMETERS="$(aws cloudformation describe-stacks --stack-name "$SERVICES_STACK" --query 'Stacks[0].Parameters' --output json)"
+          if [[ "$(jq '[.[] | select(.ParameterKey=="ApiImageUri")] | length' <<< "$STACK_PARAMETERS")" != "1" ]]; then
+            echo "::error::The services stack does not expose exactly one ApiImageUri parameter."
+            exit 1
+          fi
+          STACK_API_IMAGE="$(jq -r '.[] | select(.ParameterKey=="ApiImageUri") | .ParameterValue' <<< "$STACK_PARAMETERS")"
+          if [[ "$STACK_API_IMAGE" != "$CURRENT_IMAGE" ]]; then
+            echo "::error::CloudFormation's ApiImageUri parameter and the deployed API task definition have drifted; reconcile the stack before promotion."
+            exit 1
+          fi
+          if [[ "$CURRENT_IMAGE" == "$IMAGE_URI" ]]; then
+            echo "The requested attested API digest is already the active CloudFormation task definition."
+            echo "already_promoted=true" >> "$GITHUB_OUTPUT"
+          else
+            PARAMETERS_FILE="$RUNNER_TEMP/trademate-api-promotion-parameters.json"
+            jq --arg image "$IMAGE_URI" '
+              map(
+                if .ParameterKey=="ApiImageUri"
+                then {ParameterKey:"ApiImageUri",ParameterValue:$image}
+                else {ParameterKey:.ParameterKey,UsePreviousValue:true}
+                end
+              )
+            ' <<< "$STACK_PARAMETERS" > "$PARAMETERS_FILE"
+
+            CHANGE_SET_NAME="api-promotion-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+            aws cloudformation create-change-set \
+              --stack-name "$SERVICES_STACK" \
+              --change-set-name "$CHANGE_SET_NAME" \
+              --change-set-type UPDATE \
+              --use-previous-template \
+              --parameters "file://$PARAMETERS_FILE" \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --description "Promote attested API digest after successful migration run $MIGRATION_RUN_ID (source $SOURCE_SHA)" >/dev/null
+            aws cloudformation wait change-set-create-complete --stack-name "$SERVICES_STACK" --change-set-name "$CHANGE_SET_NAME"
+            CHANGE_SET="$(aws cloudformation describe-change-set --stack-name "$SERVICES_STACK" --change-set-name "$CHANGE_SET_NAME" --output json)"
+            jq -e '
+              .Status=="CREATE_COMPLETE" and
+              (.Changes | length)==2 and
+              all(.Changes[]; .ResourceChange.Action=="Modify") and
+              ([.Changes[].ResourceChange.LogicalResourceId] | sort)==["ApiService","ApiTaskDefinition"] and
+              ([.Changes[] | select(.ResourceChange.LogicalResourceId=="ApiService")][0].ResourceChange.Replacement=="False")
+            ' <<< "$CHANGE_SET" >/dev/null || {
+              echo "::error::The reviewed change set is not limited to the expected API task definition and API service updates."
+              jq -c '[.Changes[].ResourceChange | {Action,LogicalResourceId,ResourceType,Replacement}]' <<< "$CHANGE_SET"
+              exit 1
+            }
+
+            aws cloudformation execute-change-set --stack-name "$SERVICES_STACK" --change-set-name "$CHANGE_SET_NAME"
+            {
+              echo "already_promoted=false"
+              echo "change_set_name=$CHANGE_SET_NAME"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wait for API service stability and verify healthy targets
+        env:
+          IMAGE_URI: ${{ needs.validate-migration-handoff.outputs.image_uri }}
+        run: |
+          set -euo pipefail
+          SERVICES_STACK="trademate-staging-services"
+          FOUNDATION_STACK="trademate-staging-foundation"
+          STACK_STATUS="$(aws cloudformation describe-stacks --stack-name "$SERVICES_STACK" --query 'Stacks[0].StackStatus' --output text)"
+          if [[ "$STACK_STATUS" == "UPDATE_IN_PROGRESS" || "$STACK_STATUS" == "UPDATE_COMPLETE_CLEANUP_IN_PROGRESS" ]]; then
+            aws cloudformation wait stack-update-complete --stack-name "$SERVICES_STACK"
+          elif [[ "$STACK_STATUS" != "UPDATE_COMPLETE" && "$STACK_STATUS" != "CREATE_COMPLETE" ]]; then
+            echo "::error::The services stack is not in a successful stable state after promotion."
+            exit 1
+          fi
+
+          FOUNDATION_OUTPUTS="$(aws cloudformation describe-stacks --stack-name "$FOUNDATION_STACK" --query 'Stacks[0].Outputs' --output json)"
+          CLUSTER_NAME="$(jq -r '.[] | select(.OutputKey=="EcsClusterName") | .OutputValue' <<< "$FOUNDATION_OUTPUTS")"
+          API_TASK_DEFINITION_ARN="$(aws cloudformation describe-stack-resource --stack-name "$SERVICES_STACK" --logical-resource-id ApiTaskDefinition --query 'StackResourceDetail.PhysicalResourceId' --output text)"
+          API_SERVICE_NAME="$(aws cloudformation describe-stack-resource --stack-name "$SERVICES_STACK" --logical-resource-id ApiService --query 'StackResourceDetail.PhysicalResourceId' --output text)"
+          API_TARGET_GROUP_ARN="$(aws cloudformation describe-stack-resource --stack-name "$SERVICES_STACK" --logical-resource-id ApiTargetGroup --query 'StackResourceDetail.PhysicalResourceId' --output text)"
+
+          DEPLOYED_TASK_DEFINITION="$(aws ecs describe-task-definition --task-definition "$API_TASK_DEFINITION_ARN" --query taskDefinition --output json)"
+          DEPLOYED_IMAGE="$(jq -r '.containerDefinitions[] | select(.name=="api") | .image' <<< "$DEPLOYED_TASK_DEFINITION")"
+          if [[ "$DEPLOYED_IMAGE" != "$IMAGE_URI" ]]; then
+            echo "::error::CloudFormation's API task definition does not reference the attested image digest."
+            exit 1
+          fi
+
+          aws ecs wait services-stable --cluster "$CLUSTER_NAME" --services "$API_SERVICE_NAME"
+          SERVICE="$(aws ecs describe-services --cluster "$CLUSTER_NAME" --services "$API_SERVICE_NAME" --query 'services[0]' --output json)"
+          DESIRED_COUNT="$(jq -r '.desiredCount' <<< "$SERVICE")"
+          RUNNING_COUNT="$(jq -r '.runningCount' <<< "$SERVICE")"
+          PENDING_COUNT="$(jq -r '.pendingCount' <<< "$SERVICE")"
+          SERVICE_TASK_DEFINITION="$(jq -r '.taskDefinition' <<< "$SERVICE")"
+          if [[ "$DESIRED_COUNT" -lt 1 || "$RUNNING_COUNT" != "$DESIRED_COUNT" || "$PENDING_COUNT" != "0" || "$SERVICE_TASK_DEFINITION" != "$API_TASK_DEFINITION_ARN" ]]; then
+            echo "::error::The API service did not converge to the intended task definition and desired running count."
+            exit 1
+          fi
+
+          TARGET_HEALTH="$(aws elbv2 describe-target-health --target-group-arn "$API_TARGET_GROUP_ARN" --query 'TargetHealthDescriptions' --output json)"
+          HEALTHY_COUNT="$(jq '[.[] | select(.TargetHealth.State=="healthy")] | length' <<< "$TARGET_HEALTH")"
+          UNHEALTHY_COUNT="$(jq '[.[] | select(.TargetHealth.State=="unhealthy")] | length' <<< "$TARGET_HEALTH")"
+          if [[ "$HEALTHY_COUNT" -lt "$DESIRED_COUNT" || "$UNHEALTHY_COUNT" -gt 0 ]]; then
+            echo "::error::The API target group must have at least the desired number of healthy targets and no unhealthy targets after promotion."
+            jq -c '[.[] | {Target: .Target.Id, State: .TargetHealth.State, Reason: .TargetHealth.Reason}]' <<< "$TARGET_HEALTH"
+            exit 1
+          fi
+
+          {
+            echo "## TradeMate staging API promotion"
+            echo
+            echo "- Result: successful; ECS service stable and ALB targets healthy"
+            echo "- API image: $IMAGE_URI"
+            echo "- API task definition: $API_TASK_DEFINITION_ARN"
+            echo "- ECS service: $API_SERVICE_NAME"
+            echo "- Running / desired tasks: $RUNNING_COUNT / $DESIRED_COUNT"
+            echo "- Healthy ALB targets: $HEALTHY_COUNT"
+          } >> "$GITHUB_STEP_SUMMARY"

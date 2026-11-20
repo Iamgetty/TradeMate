@@ -66,12 +66,18 @@ async function main() {
     const base = 'http://127.0.0.1:' + app.getHttpServer().address().port;
     originalFetch = global.fetch;
     let lastVerificationCode = null;
+    let failDeletionEmail = false;
     global.fetch = async (input, options) => {
       if (String(input) === 'https://api.resend.com/emails') {
         const payload = JSON.parse(options.body);
+        if (failDeletionEmail && /account deletion requested/i.test(payload.subject)) {
+          return new Response(JSON.stringify({ error: 'simulated email delivery failure' }), {
+            status: 503, headers: { 'content-type': 'application/json' },
+          });
+        }
         const match = String(payload.html).match(/letter-spacing:8px">([0-9]{6})<\/p>/);
-        assert.ok(match, 'verification email must contain a six-digit code');
-        lastVerificationCode = match[1];
+        if (match) lastVerificationCode = match[1];
+        else assert.match(payload.subject, /Reset your TradeMate password/, 'non-code test email must be the password-reset message');
         return new Response(JSON.stringify({ id: 'test-email-id' }), {
           status: 200, headers: { 'content-type': 'application/json' },
         });
@@ -91,7 +97,7 @@ async function main() {
         CREATE OR REPLACE FUNCTION test_reject_auth_audit() RETURNS trigger
         LANGUAGE plpgsql AS $audit$
         BEGIN
-          IF EXISTS (SELECT 1 FROM test_reject_auth_audit_events WHERE event_type = NEW.event_type) THEN
+          IF EXISTS (SELECT 1 FROM public.test_reject_auth_audit_events WHERE event_type = NEW.event_type) THEN
             RAISE EXCEPTION 'forced auth audit failure';
           END IF;
           RETURN NEW;
@@ -297,6 +303,68 @@ async function main() {
     });
     assert.equal(loginAfterReset.status, 200, 'the new password must authenticate after reset');
 
+
+    // Requesting one account's password reset must not clean up another account's tokens.
+    process.env.TRADEMATE_WEB_ORIGIN = 'https://trademate.example';
+    const unrelatedResetEmail = 'unrelated-reset-' + suffix + '@example.invalid';
+    const unrelatedResetUser = await pool.query(
+      "INSERT INTO users (email, display_name, status, email_verified_at) VALUES ($1, 'Unrelated reset', 'active', now()) RETURNING id",
+      [unrelatedResetEmail],
+    );
+    await pool.query(
+      "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, now() - interval '1 minute'), ($1, $3, now() + interval '30 minutes')",
+      [unrelatedResetUser.rows[0].id, digest('expired-unrelated-reset-' + suffix), digest('used-unrelated-reset-' + suffix)],
+    );
+    await pool.query(
+      'UPDATE password_reset_tokens SET used_at = now() WHERE user_id = $1 AND token_hash = $2',
+      [unrelatedResetUser.rows[0].id, digest('used-unrelated-reset-' + suffix)],
+    );
+    const resetRequest = await fetch(base + '/api/auth/password-reset/request', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'auth-audit-' + suffix + '@example.invalid' }),
+    });
+    assert.equal(resetRequest.status, 200, 'active account must be able to request a password reset');
+    const unrelatedResetTokens = await pool.query(
+      'SELECT token_hash, used_at, expires_at FROM password_reset_tokens WHERE user_id = $1',
+      [unrelatedResetUser.rows[0].id],
+    );
+    assert.equal(unrelatedResetTokens.rowCount, 2, 'requesting another account reset must preserve unrelated reset tokens');
+    assert.ok(unrelatedResetTokens.rows.some((row) => row.token_hash === digest('expired-unrelated-reset-' + suffix) && new Date(row.expires_at).getTime() < Date.now()),
+      'unrelated expired password-reset token must remain untouched');
+    assert.ok(unrelatedResetTokens.rows.some((row) => row.token_hash === digest('used-unrelated-reset-' + suffix) && row.used_at),
+      'unrelated used password-reset token must remain untouched');
+
+    // Failed account-deletion email delivery must atomically restore status and invalidate only this request token.
+    process.env.RESEND_API_KEY = 'test-resend-key';
+    process.env.RESEND_FROM_EMAIL = 'TradeMate Test <test@example.invalid>';
+    const deletionUserEmail = 'deletion-email-failure-' + suffix + '@example.invalid';
+    const deletionUser = await pool.query(
+      "INSERT INTO users (email, display_name, status, email_verified_at) VALUES ($1, 'Deletion email failure', 'active', now()) RETURNING id",
+      [deletionUserEmail],
+    );
+    await pool.query('INSERT INTO user_credentials (user_id, password_hash) VALUES ($1, $2)', [deletionUser.rows[0].id, encodedOldPassword]);
+    const deletionSessionToken = 'deletion-email-failure-session-' + suffix;
+    await pool.query(
+      "INSERT INTO user_sessions (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes')",
+      [deletionUser.rows[0].id, digest(deletionSessionToken)],
+    );
+    failDeletionEmail = true;
+    const deletionFailure = await fetch(base + '/api/auth/account-deletion/request', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'trademate_session=' + encodeURIComponent(deletionSessionToken) },
+      body: JSON.stringify({ password: 'old password for reset test' }),
+    });
+    failDeletionEmail = false;
+    assert.equal(deletionFailure.status, 503, 'failed cancellation-email delivery must report service unavailable');
+    const deletionRecovery = await pool.query(
+      "SELECT u.status, d.cancellation_token_hash, d.cancelled_at FROM users u JOIN user_deletion_requests d ON d.user_id = u.id WHERE u.id = $1",
+      [deletionUser.rows[0].id],
+    );
+    assert.equal(deletionRecovery.rowCount, 1, 'failed email delivery must retain an auditable deletion-request row');
+    assert.equal(deletionRecovery.rows[0].status, 'active', 'failed email delivery must restore the account status');
+    assert.equal(deletionRecovery.rows[0].cancellation_token_hash, null, 'failed email delivery must invalidate its cancellation token');
+    assert.ok(deletionRecovery.rows[0].cancelled_at, 'failed email delivery must mark the request cancelled');
+
     // New registrations remain pending and cannot sign in until the emailed code is confirmed.
     process.env.RESEND_API_KEY = 'test-resend-key';
     process.env.RESEND_FROM_EMAIL = 'TradeMate Test <test@example.invalid>';
@@ -357,11 +425,36 @@ async function main() {
       body: JSON.stringify({ email: attemptsEmail, code: issuedCode }),
     });
     assert.equal(lockedCode.status, 401, 'a code must be locked after five incorrect attempts');
+
+    // Resending one account's code must not clean up another account's expired or used codes.
+    const unrelatedEmail = 'unrelated-verification-' + suffix + '@example.invalid';
+    const unrelatedUser = await pool.query(
+      "INSERT INTO users (email, display_name, status) VALUES ($1, 'Unrelated verification', 'pending') RETURNING id",
+      [unrelatedEmail],
+    );
+    await pool.query(
+      "INSERT INTO email_verification_codes (user_id, code_hash, expires_at) VALUES ($1, $2, now() - interval '1 minute'), ($1, $3, now() + interval '10 minutes')",
+      [unrelatedUser.rows[0].id, digest('expired-unrelated-code'), digest('used-unrelated-code')],
+    );
+    await pool.query(
+      "UPDATE email_verification_codes SET used_at = now() WHERE user_id = $1 AND code_hash = $2",
+      [unrelatedUser.rows[0].id, digest('used-unrelated-code')],
+    );
+
     const resend = await fetch(base + '/api/auth/email-verification/resend', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: attemptsEmail }),
     });
     assert.equal(resend.status, 200, 'pending accounts must be able to request a replacement code');
+    const unrelatedCodes = await pool.query(
+      'SELECT code_hash, used_at, expires_at FROM email_verification_codes WHERE user_id = $1 ORDER BY code_hash',
+      [unrelatedUser.rows[0].id],
+    );
+    assert.equal(unrelatedCodes.rowCount, 2, 'resending another account must preserve unrelated verification rows');
+    assert.ok(unrelatedCodes.rows.some((row) => row.code_hash === digest('expired-unrelated-code') && new Date(row.expires_at).getTime() < Date.now()),
+      'unrelated expired verification code must remain untouched');
+    assert.ok(unrelatedCodes.rows.some((row) => row.code_hash === digest('used-unrelated-code') && row.used_at),
+      'unrelated used verification code must remain untouched');
     const replacementCode = lastVerificationCode;
     const replacementRecord = await pool.query('SELECT code_hash, attempts FROM email_verification_codes WHERE user_id = (SELECT id FROM users WHERE lower(email) = $1) ORDER BY created_at DESC LIMIT 1', [attemptsEmail]);
     assert.equal(replacementRecord.rows[0].code_hash, digest(replacementCode), 'resend must persist the replacement code digest');

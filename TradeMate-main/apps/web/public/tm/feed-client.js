@@ -53,9 +53,12 @@
 
     function aggregate(levels, side) {
       const m = new Map();
-      for (const [p, s] of levels) {
-        const k = bucket(p, side);
-        m.set(k, (m.get(k) || 0) + s);
+      for (const [rawPrice, rawSize] of levels) {
+        const price = Number(rawPrice);
+        const size = Number(rawSize);
+        if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(size) || size <= 0) continue;
+        const k = bucket(price, side);
+        m.set(k, (m.get(k) || 0) + size);
       }
       const rows = [...m.entries()]
         .sort((a, b) => (side === 'bid' ? b[0] - a[0] : a[0] - b[0]))
@@ -112,8 +115,12 @@
         last: trades.length ? trades[0].price : mid,
         trades,                                       // [{ exchange, market, ts, price, qty, side }] newest first
         booksCombined: fresh.length,                  // "N exchange books combined"
-        feedsLive: Number.isFinite(msg.feeds.live) ? msg.feeds.live : 0, // "N/M FEEDS LIVE"
-        feedsTotal: Number.isFinite(msg.feeds.total) ? msg.feeds.total : 0,
+        feedsLive: Array.isArray(msg.feeds)
+          ? msg.feeds.filter((feed) => feed && feed.status === 'live' && feed.stale !== true).length
+          : Number.isFinite(msg.feeds.live) ? msg.feeds.live : 0,
+        feedsTotal: Array.isArray(msg.feeds)
+          ? msg.feeds.length
+          : Number.isFinite(msg.feeds.total) ? msg.feeds.total : 0,
         fxQuotes: Array.isArray(msg.fxQuotes) ? msg.fxQuotes : [],
         // Expose fresh spot best-bid/ask/last data for the market catalogue.
         marketQuotes: Array.isArray(msg.books) ? msg.books.filter((b) => b && b.market === 'spot' && !b.stale).map((b) => ({

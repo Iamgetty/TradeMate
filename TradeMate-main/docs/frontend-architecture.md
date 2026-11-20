@@ -92,3 +92,53 @@ Two independently maintained implementations of the browser-side feed client exi
 
 Treat the web asset as the source of truth for the currently deployed TradeMate browser runtime. Treat the package-side file as a separate reusable/example implementation and test target until its intended distribution contract is clarified. Do not overwrite either copy or claim they are interchangeable. Any future consolidation must first map the extra protections to explicit tests, define whether the package copy is a supported public integration surface, and verify both test suites and the web app-shell regression tests.
 
+
+
+### Exchange-feed sequence integrity and resynchronisation
+
+Order-book freshness and sequence continuity are separate safety properties. A recently received update is not sufficient evidence that no intermediate updates were missed.
+
+- Bybit spot and linear standard order-book messages expose update ID `u` and cross-sequence `seq`; they do not define a `pu` previous-update field. The implementation now validates that `u` is a safe integer and requires consecutive update IDs for deltas. Duplicate/older IDs are ignored. A gap, malformed ID or unexpected reset invalidates the local book, marks it unavailable, closes the upstream socket and waits for a new subscription snapshot. The venue's `seq` is cross-level metadata and is not treated as a consecutive counter.
+- Coinbase uses the classic Exchange WebSocket endpoint `wss://ws-feed.exchange.coinbase.com` and its `level2` channel. The documented classic snapshot and `l2update` payloads do not carry the `sequence_num` field used by other Coinbase feed products. The classic level2 channel documents guaranteed delivery, so this implementation applies its snapshot and changes without claiming per-book sequence verification. Its published `sequenceStatus` is explicitly `unsupported`; a reconnect clears the book and waits for a fresh snapshot.
+- Published venue snapshots expose `sequenceStatus` and the last accepted sequence where the feed contract supports one. Books awaiting a new snapshot or marked with a gap remain stale and are excluded from downstream aggregation. An `unsupported` sequence status is not itself a stale-data signal; normal timestamp freshness still applies.
+- Binance currently uses the partial-depth `depth20@100ms` stream, which does not provide the diff-depth snapshot/update-ID continuity contract needed for equivalent gap detection. Its sequence status is explicitly `unsupported`; do not represent Binance books as sequence-verified. A future Binance implementation must use the documented REST snapshot plus diff-depth stream bridge, including the snapshot `lastUpdateId`, buffered event replay, update-range continuity checks, and restart on gaps.
+
+The current automated tests cover the sequence decision primitive for consecutive Bybit update IDs, duplicates/older frames, reset/gap cases and malformed/unsafe values, as well as prior freshness and stale-book exclusion. They do not yet drive the actual WebSocket handlers through snapshot/delta/gap/reconnect, and they do not establish live venue protocol conformance or end-to-end reconnect timing. Production acceptance still requires recorded fixtures from each venue, integration tests that drive the actual handlers, Binance REST snapshot/diff-depth support, and a safe staging soak.
+
+
+## Exchange-feed order-book freshness
+
+The NestJS market-feed publisher timestamps each venue's latest order-book update. A connected upstream socket is not, by itself, evidence that its last book is still current.
+
+- The publisher now applies a 10-second order-book freshness threshold using the server-side `bookAt` timestamp. Missing timestamps are stale; data exactly at the threshold remains fresh; older data is stale. Small future clock skew is clamped to zero age.
+- Each published venue book and feed summary includes `stale` and `bookAgeMs`. A formerly live/connected venue transitions to `stale` when its book ages out; reconnecting/unavailable transport states remain separately visible.
+- The browser feed client excludes stale books from aggregated depth and from catalogue spot quotes. A stale venue cannot continue contributing its last-known bid/ask to the combined live book.
+- The API publishes `feeds` as a per-venue array, while the browser client previously expected an object with `live` and `total` counters. The client now handles the actual array contract, counts only `status: live` non-stale venues as live, and retains compatibility with the older counter-object shape.
+- Exchange depth quantities and prices arrive as decimal strings. Both maintained browser-client copies now convert and validate them as finite positive numbers before bucketing and summing, preventing string concatenation from corrupting aggregated size and cumulative depth.
+- API unit tests cover missing timestamps, the freshness boundary, expiry and clock skew. Exchange-feed client tests exercise both the package and deployed browser copy and prove stale books do not contribute to depth or catalogue quotes.
+
+The 10-second threshold is an initial engineering policy, not a measured universal optimum. Before production acceptance, validate it against each venue's update cadence, instrument liquidity, market sessions, network latency and user-facing quote requirements. Do not use this threshold as a substitute for provider sequence-gap detection, snapshot resynchronization, cross-venue divergence checks or operational alerting.
+
+Validation evidence: the API TypeScript build and API security test suite passed; the exchange-feed/MT5 test job passed all 28 tests, including stale venue exclusion, feed-array health counts and numeric depth aggregation against both maintained client copies. Full TradeMate CI run 1736 passed all 8/8 jobs on head `19a91443d51af261bd5f1932bc65d86371ad4305` ([run 1736](https://github.com/Iamgetty/TradeMate/actions/runs/44577177274)); Cloudflare compatibility run 548 also passed on that head ([run 548](https://github.com/Iamgetty/TradeMate/actions/runs/44577177026)). This verifies repository behavior in CI only; it does not establish live-venue performance or production acceptance.
+
+## CoinGecko refresh: field-level ownership verified
+
+A direct inspection of the current `liveRefresh()` implementation confirms a narrower contract than a generic “market refresh” description suggests:
+
+- The browser requests CoinGecko's `/coins/markets` endpoint on startup and every 90 seconds while the document is visible and one of the supported tabs is active.
+- For a matching `BASE/USDT` item, the response updates 24-hour percentage change, market capitalization, total volume and (when not embedded) the token image. It does **not** assign CoinGecko's `current_price` to the displayed market price field.
+- The displayed crypto spot price is assigned by the exchange-feed WebSocket path, which derives a midpoint from valid bid/ask values or falls back to a positive last/bid/ask value. The browser records provider and quote timestamp metadata for that feed.
+- Before the isolated refresh helper was introduced, the CoinGecko request swallowed request/HTTP/JSON failures and had no in-flight guard. The current helper coalesces overlapping refresh calls, rejects malformed/non-success responses, discards results when the page is no longer in an eligible visible tab, and exposes `fresh`, `stale` or `unavailable` state plus attempt/success timestamps on `window.tmMarketMetadataStatus`. That status is currently diagnostic state, not a user-facing freshness indicator.
+
+Keep this distinction explicit: CoinGecko is currently a secondary market-metadata source, not the authoritative live spot-price source. Before changing it, add deterministic tests for metadata-only field ownership, overlapping/out-of-order responses, provider failure and recovery, and ensure the exchange-feed quote remains authoritative. Any proxy/cache move must preserve rate-limit behavior, freshness labels, attribution and the existing exchange-feed contract. No provider cutover or runtime change is implied by this audit.
+
+
+### CoinGecko metadata refresh lifecycle — repository implementation
+
+- `apps/web/public/tm/market-metadata.js` now owns request coalescing, response-shape validation, active-page eligibility checks and refresh-health state. `TradeMateRuntime.tsx` loads this helper before `app.js`; if the helper asset fails to load, the legacy direct-fetch fallback remains available so metadata tooling cannot prevent core app startup.
+- `applyCoinGeckoMarketMetadata()` is separately testable and updates only 24-hour change, market capitalization, volume and non-embedded logos. It deliberately does not assign `current_price` or the displayed spot-price field. The exchange-feed remains the spot-price authority.
+- `apps/web/scripts/market-metadata.test.cjs` covers spot-price non-overwrite, in-flight request coalescing, stale-context response discard, unavailable/stale transitions, malformed/non-success responses and recovery. All six tests, `node --check`, and the Next.js production build passed.
+- `apps/web/e2e/app-shell.spec.ts` verifies that the helper loads before the app, a mocked successful CoinGecko response produces `fresh` status, and a missing helper asset marks metadata `unavailable`, makes no CoinGecko request, and does not block the core app. Browser app-shell/live API acceptance passed with these cases.
+- The first full build caught missing `Window` declarations for the two helper globals; those declarations were added and the corrected build passed. Full TradeMate CI run 1720 passed all 8/8 jobs on code-bearing head `e72a28a79b8a60eea9d72c81cb3fa2b118f10d60`: https://github.com/Iamgetty/TradeMate/actions/runs/44575181371. Cloudflare compatibility run 532 also passed on the same head.
+- If the helper asset cannot load, the runtime marks metadata status `unavailable`, keeps the core app running, and skips the CoinGecko request entirely. There is no unguarded direct-fetch fallback; the exchange-feed spot-price path remains independent.
+- No proxy migration, provider change, quote ownership change, production deployment or user-visible status redesign is included in this increment.

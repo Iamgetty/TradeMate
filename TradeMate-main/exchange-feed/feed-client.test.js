@@ -43,8 +43,11 @@ function harness(createFeedClient, random = () => 0.5) {
   return {
     sockets,
     advance,
-    create() {
-      return createFeedClient({ url: 'wss://feed.test', stableConnectionMs: 30000 }, {
+    create(options = {}) {
+      return createFeedClient(Object.assign({
+        url: 'wss://feed.test',
+        stableConnectionMs: 30000,
+      }, options), {
         WebSocket: FakeWebSocket, setTimeout: setTimeoutFn, clearTimeout: clearTimeoutFn, random,
       });
     },
@@ -119,4 +122,103 @@ for (const [label, factory] of [
     assert.equal(h.sockets.length, 2);
     client.close();
   });
+
+  test(label + ': market catalogue quotes contain fresh spot books only and preserve source fields', () => {
+    const h = harness(factory);
+    const updates = [];
+    const client = h.create({ onUpdate: update => updates.push(update) });
+    h.sockets[0].open();
+    h.sockets[0].message({
+      books: [
+        { base: 'BTC', quote: 'USDT', market: 'spot', stale: false, bid: 64000, ask: 64010, last: 64005, exchange: 'binance' },
+        { base: 'ETH', quote: 'USDC', market: 'spot', stale: false, bid: 3200, ask: 3201, last: 3200.5, exchange: 'coinbase' },
+        { base: 'SOL', quote: 'USDT', market: 'spot', stale: true, bid: 140, ask: 141, last: 140.5, exchange: 'bybit' },
+        { base: 'BTC', quote: 'USDT', market: 'futures', stale: false, bid: 64001, ask: 64011, last: 64006, exchange: 'binance' },
+      ],
+      trades: [],
+      feeds: { live: 3, total: 3 },
+      ts: 123,
+    });
+
+    assert.deepEqual(updates.at(-1).marketQuotes, [
+      { base: 'BTC', quote: 'USDT', bid: 64000, ask: 64010, last: 64005, exchange: 'binance', market: 'spot' },
+      { base: 'ETH', quote: 'USDC', bid: 3200, ask: 3201, last: 3200.5, exchange: 'coinbase', market: 'spot' },
+    ]);
+    client.close();
+  });
+
+  test(label + ': feed health counts the server array and excludes stale venues from the live total', () => {
+    const h = harness(factory);
+    const updates = [];
+    const client = h.create({ onUpdate: update => updates.push(update) });
+    h.sockets[0].open();
+    h.sockets[0].message({
+      books: [],
+      trades: [],
+      feeds: [
+        { venue: 'binance', market: 'spot', status: 'live', stale: false },
+        { venue: 'bybit', market: 'spot', status: 'stale', stale: true },
+        { venue: 'coinbase', market: 'spot', status: 'reconnecting', stale: true },
+      ],
+      ts: 789,
+    });
+
+    assert.equal(updates.at(-1).feedsLive, 1);
+    assert.equal(updates.at(-1).feedsTotal, 3);
+    client.close();
+  });
+
+  test(label + ': stale venue books are excluded from aggregated depth and catalogue quotes', () => {
+    const h = harness(factory);
+    const updates = [];
+    const client = h.create({ onUpdate: update => updates.push(update) });
+    h.sockets[0].open();
+    h.sockets[0].message({
+      books: [
+        {
+          base: 'BTC', quote: 'USDT', market: 'spot', stale: false,
+          bids: [['64000', '1']], asks: [['64010', '2']],
+          bid: 64000, ask: 64010, last: 64005, exchange: 'binance',
+        },
+        {
+          base: 'BTC', quote: 'USDT', market: 'spot', stale: true,
+          bids: [['65000', '9']], asks: [['65010', '9']],
+          bid: 65000, ask: 65010, last: 65005, exchange: 'bybit',
+        },
+      ],
+      trades: [],
+      feeds: { live: 1, total: 2 },
+      ts: 456,
+    });
+
+    const update = updates.at(-1);
+    assert.equal(update.booksCombined, 1);
+    assert.deepEqual(update.bids, [{ price: 64000, size: 1, total: 1 }]);
+    assert.deepEqual(update.asks, [{ price: 64010, size: 2, total: 2 }]);
+    assert.deepEqual(update.marketQuotes.map(quote => quote.exchange), ['binance']);
+    client.close();
+  });
+
+  test(label + ': disconnect clears market quotes rather than leaving stale catalogue prices', () => {
+    const h = harness(factory);
+    const updates = [];
+    const client = h.create({ onUpdate: update => updates.push(update) });
+    h.sockets[0].open();
+    h.sockets[0].message({
+      books: [
+        { base: 'BTC', quote: 'USDT', market: 'spot', stale: false, bid: 64000, ask: 64010, last: 64005, exchange: 'binance' },
+      ],
+      trades: [],
+      feeds: { live: 1, total: 1 },
+      ts: 123,
+    });
+    assert.equal(updates.at(-1).marketQuotes.length, 1);
+
+    h.sockets[0].drop();
+    assert.deepEqual(updates.at(-1).marketQuotes, []);
+    assert.equal(updates.at(-1).bestBid, null);
+    assert.equal(updates.at(-1).bestAsk, null);
+    client.close();
+  });
+
 }

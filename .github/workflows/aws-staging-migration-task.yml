@@ -1,0 +1,381 @@
+name: AWS staging database migration task
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_migration:
+        description: Run the one-off staging migration task after environment approval.
+        type: choice
+        required: true
+        options:
+          - "no"
+          - "yes"
+      expected_api_image_uri:
+        description: Exact ECR API image URI, pinned by sha256 digest, built and validated for the next release but not yet promoted.
+        type: string
+        required: true
+      release_source_sha:
+        description: Full Git commit SHA associated with the tested API image.
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  checks: read
+  attestations: read
+  id-token: write
+
+concurrency:
+  group: trademate-aws-staging-database-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Run digest-verified one-off staging migration
+    if: ${{ inputs.confirm_migration == 'yes' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: aws-staging-migrations
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate release inputs
+        id: release
+        env:
+          EXPECTED_API_IMAGE_URI: ${{ inputs.expected_api_image_uri }}
+          RELEASE_SOURCE_SHA: ${{ inputs.release_source_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$EXPECTED_API_IMAGE_URI" =~ ^[0-9]{12}\.dkr\.ecr\.eu-north-1\.amazonaws\.com/.+@sha256:[a-f0-9]{64}$ ]]; then
+            echo "::error::The API image must be an eu-north-1 ECR URI pinned by a lowercase SHA-256 digest."
+            exit 1
+          fi
+          if [[ ! "$RELEASE_SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]; then
+            echo "::error::release_source_sha must be a full 40-character Git commit SHA."
+            exit 1
+          fi
+          if [[ "$RELEASE_SOURCE_SHA" != "$GITHUB_SHA" ]]; then
+            echo "::error::The image source commit must exactly match the main commit that dispatched this migration workflow. Rebuild and rerun from the current main head."
+            exit 1
+          fi
+          git cat-file -e "${RELEASE_SOURCE_SHA}^{commit}"
+
+          CHECK_RUNS="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_SOURCE_SHA/check-runs?per_page=100" --jq '.check_runs')"
+          REQUIRED_CHECKS=(
+            "Browser app-shell and live API acceptance tests"
+            "AWS API and exchange-feed container builds"
+            "Exchange feed and MT5 tests"
+            "Database migration integration"
+            "Security scanning (SAST, SCA and secrets)"
+            "API TypeScript build"
+            "Web build and runtime syntax"
+            "Isolated Cloudflare Workers frontend build and runtime"
+            "Non-destructive vinext compatibility scan"
+            "Generate and validate lockfiles"
+          )
+          for required_check in "${REQUIRED_CHECKS[@]}"; do
+            conclusion="$(jq -r --arg name "$required_check" '[.[] | select(.name==$name)] | sort_by(.completed_at // .started_at) | last | .conclusion // "missing"' <<< "$CHECK_RUNS")"
+            if [[ "$conclusion" != "success" ]]; then
+              echo "::error::Required validation '$required_check' is not successful for release source $RELEASE_SOURCE_SHA (conclusion: $conclusion)."
+              exit 1
+            fi
+          done
+
+          {
+            echo "image_uri=$EXPECTED_API_IMAGE_URI"
+            echo "source_sha=$RELEASE_SOURCE_SHA"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Validate AWS staging role configuration
+        env:
+          AWS_STAGING_DEPLOY_ROLE_ARN: ${{ vars.AWS_STAGING_DEPLOY_ROLE_ARN }}
+          AWS_STAGING_ACCOUNT_ID: ${{ vars.AWS_STAGING_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$AWS_STAGING_DEPLOY_ROLE_ARN" =~ ^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$ ]]; then
+            echo "::error::Configure AWS_STAGING_DEPLOY_ROLE_ARN in the aws-staging-migrations environment."
+            exit 1
+          fi
+          if [[ ! "$AWS_STAGING_ACCOUNT_ID" =~ ^[0-9]{12}$ || "$AWS_STAGING_DEPLOY_ROLE_ARN" != "arn:aws:iam::$AWS_STAGING_ACCOUNT_ID:role/"* ]]; then
+            echo "::error::AWS_STAGING_ACCOUNT_ID must match the account in AWS_STAGING_DEPLOY_ROLE_ARN."
+            exit 1
+          fi
+
+      - name: Configure AWS credentials through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.2.1
+        with:
+          role-to-assume: ${{ vars.AWS_STAGING_DEPLOY_ROLE_ARN }}
+          aws-region: eu-north-1
+          role-session-name: trademate-staging-database-migration
+
+      - name: Confirm assumed AWS account
+        env:
+          EXPECTED_ACCOUNT_ID: ${{ vars.AWS_STAGING_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          ACTUAL_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          if [[ "$ACTUAL_ACCOUNT_ID" != "$EXPECTED_ACCOUNT_ID" ]]; then
+            echo "::error::The assumed AWS role belongs to an unexpected account."
+            exit 1
+          fi
+
+      - name: Authenticate to Amazon ECR for OCI provenance verification
+        uses: aws-actions/amazon-ecr-login@7290e214a610b32bc0eef81748948b6d466a8783 # v2
+
+      - name: Resolve baseline and register next-release migration task definition
+        id: task
+        env:
+          EXPECTED_API_IMAGE_URI: ${{ steps.release.outputs.image_uri }}
+          RELEASE_SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          FOUNDATION_STATUS="$(aws cloudformation describe-stacks \
+            --stack-name trademate-staging-foundation \
+            --query 'Stacks[0].StackStatus' --output text)"
+          SERVICES_STATUS="$(aws cloudformation describe-stacks \
+            --stack-name trademate-staging-services \
+            --query 'Stacks[0].StackStatus' --output text)"
+          for stack_status in "$FOUNDATION_STATUS" "$SERVICES_STATUS"; do
+            if [[ "$stack_status" != "CREATE_COMPLETE" && "$stack_status" != "UPDATE_COMPLETE" ]]; then
+              echo "::error::Both staging CloudFormation stacks must be stable before migration execution."
+              exit 1
+            fi
+          done
+
+          FOUNDATION_OUTPUTS="$(aws cloudformation describe-stacks \
+            --stack-name trademate-staging-foundation \
+            --query 'Stacks[0].Outputs' --output json)"
+          SERVICES_OUTPUTS="$(aws cloudformation describe-stacks \
+            --stack-name trademate-staging-services \
+            --query 'Stacks[0].Outputs' --output json)"
+
+          CLUSTER_NAME="$(jq -r '.[] | select(.OutputKey=="EcsClusterName") | .OutputValue' <<< "$FOUNDATION_OUTPUTS")"
+          PRIVATE_SUBNETS="$(jq -r '.[] | select(.OutputKey=="PrivateAppSubnetIds") | .OutputValue' <<< "$FOUNDATION_OUTPUTS")"
+          MIGRATION_SECURITY_GROUP="$(jq -r '.[] | select(.OutputKey=="MigrationSecurityGroupId") | .OutputValue' <<< "$FOUNDATION_OUTPUTS")"
+          TASK_DEFINITION_ARN="$(jq -r '.[] | select(.OutputKey=="MigrationTaskDefinitionArn") | .OutputValue' <<< "$SERVICES_OUTPUTS")"
+          MIGRATION_SECRET_ARN="$(jq -r '.[] | select(.OutputKey=="MigrationDatabaseUrlSecretArn") | .OutputValue' <<< "$SERVICES_OUTPUTS")"
+          RLS_HMAC_SECRET_ARN="$(jq -r '.[] | select(.OutputKey=="RlsContextHmacKeySecretArn") | .OutputValue' <<< "$SERVICES_OUTPUTS")"
+          MIGRATION_EXECUTION_ROLE_ARN="$(jq -r '.[] | select(.OutputKey=="MigrationEcsExecutionRoleArn") | .OutputValue' <<< "$SERVICES_OUTPUTS")"
+          MIGRATION_TASK_ROLE_ARN="$(jq -r '.[] | select(.OutputKey=="MigrationTaskRoleArn") | .OutputValue' <<< "$SERVICES_OUTPUTS")"
+
+          for value in "$CLUSTER_NAME" "$PRIVATE_SUBNETS" "$MIGRATION_SECURITY_GROUP" "$TASK_DEFINITION_ARN" "$MIGRATION_SECRET_ARN" "$RLS_HMAC_SECRET_ARN" "$MIGRATION_EXECUTION_ROLE_ARN" "$MIGRATION_TASK_ROLE_ARN"; do
+            if [[ -z "$value" || "$value" == "null" ]]; then
+              echo "::error::A required foundation/services CloudFormation output is missing."
+              exit 1
+            fi
+          done
+
+          TASK_DEFINITION="$(aws ecs describe-task-definition --task-definition "$TASK_DEFINITION_ARN" --query taskDefinition --output json)"
+          TASK_FAMILY="$(jq -r '.family' <<< "$TASK_DEFINITION")"
+          NETWORK_MODE="$(jq -r '.networkMode' <<< "$TASK_DEFINITION")"
+          COMPATIBILITIES="$(jq -r '.requiresCompatibilities | join(",")' <<< "$TASK_DEFINITION")"
+          CONTAINER_COUNT="$(jq '.containerDefinitions | length' <<< "$TASK_DEFINITION")"
+          CONTAINER_NAME="$(jq -r '.containerDefinitions[0].name' <<< "$TASK_DEFINITION")"
+          TASK_IMAGE="$(jq -r '.containerDefinitions[0].image' <<< "$TASK_DEFINITION")"
+          TASK_COMMAND="$(jq -r '.containerDefinitions[0].command | join(" ")' <<< "$TASK_DEFINITION")"
+          TASK_SECRET_NAMES="$(jq -r '.containerDefinitions[0].secrets | map(.name) | sort | join(",")' <<< "$TASK_DEFINITION")"
+          TASK_SECRET_ARN="$(jq -r '.containerDefinitions[0].secrets[] | select(.name=="MIGRATION_DATABASE_URL") | .valueFrom' <<< "$TASK_DEFINITION")"
+          TASK_RLS_SECRET_ARN="$(jq -r '.containerDefinitions[0].secrets[] | select(.name=="RLS_CONTEXT_HMAC_KEY") | .valueFrom' <<< "$TASK_DEFINITION")"
+          TASK_EXECUTION_ROLE_ARN="$(jq -r '.executionRoleArn' <<< "$TASK_DEFINITION")"
+          TASK_ROLE_ARN="$(jq -r '.taskRoleArn' <<< "$TASK_DEFINITION")"
+
+          if [[ "$TASK_FAMILY" != "trademate-staging-database-migration" || "$NETWORK_MODE" != "awsvpc" || "$COMPATIBILITIES" != *FARGATE* || "$CONTAINER_COUNT" != "1" || "$CONTAINER_NAME" != "database-migration" ]]; then
+            echo "::error::The deployed baseline task definition does not match the expected single-container Fargate migration task."
+            exit 1
+          fi
+          if [[ ! "$TASK_IMAGE" =~ ^[0-9]{12}\.dkr\.ecr\.eu-north-1\.amazonaws\.com/.+@sha256:[a-f0-9]{64}$ ]]; then
+            echo "::error::The baseline migration task image is not digest-pinned."
+            exit 1
+          fi
+          if [[ "$TASK_COMMAND" != "node scripts/migrate.js" || "$TASK_SECRET_NAMES" != "MIGRATION_DATABASE_URL,RLS_CONTEXT_HMAC_KEY" || "$TASK_SECRET_ARN" != "$MIGRATION_SECRET_ARN" || "$TASK_RLS_SECRET_ARN" != "$RLS_HMAC_SECRET_ARN" ]]; then
+            echo "::error::The migration task command or secret reference does not match the reviewed CloudFormation stack output."
+            exit 1
+          fi
+          if [[ "$TASK_EXECUTION_ROLE_ARN" != "$MIGRATION_EXECUTION_ROLE_ARN" || "$TASK_ROLE_ARN" != "$MIGRATION_TASK_ROLE_ARN" ]]; then
+            echo "::error::The migration task IAM roles do not match the reviewed CloudFormation stack outputs."
+            exit 1
+          fi
+
+          IMAGE_REGISTRY="${EXPECTED_API_IMAGE_URI%%/*}"
+          IMAGE_PATH="${EXPECTED_API_IMAGE_URI#*/}"
+          IMAGE_REPOSITORY="${IMAGE_PATH%@sha256:*}"
+          IMAGE_DIGEST="sha256:${EXPECTED_API_IMAGE_URI##*@sha256:}"
+          REGISTRY_ACCOUNT="${IMAGE_REGISTRY%%.*}"
+          aws ecr describe-images \
+            --registry-id "$REGISTRY_ACCOUNT" \
+            --repository-name "$IMAGE_REPOSITORY" \
+            --image-ids "imageDigest=$IMAGE_DIGEST" >/dev/null
+
+          GH_TOKEN="${GITHUB_TOKEN:?GitHub token is required to verify build provenance}"
+          export GH_TOKEN
+          gh attestation verify "oci://$EXPECTED_API_IMAGE_URI" \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/aws-staging-build-images.yml" \
+            --source-digest "$RELEASE_SOURCE_SHA" \
+            --source-ref "refs/heads/main"
+
+          MIGRATION_TASK_INPUT="$RUNNER_TEMP/trademate-migration-task-definition.json"
+          jq --arg image "$EXPECTED_API_IMAGE_URI" --arg source "$RELEASE_SOURCE_SHA" '
+            del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                .compatibilities, .registeredAt, .registeredBy, .deregisteredAt)
+            | .containerDefinitions[0].image = $image
+            | (.tags //= [])
+            | .tags += [
+                {key:"Project", value:"TradeMate"},
+                {key:"Environment", value:"staging"},
+                {key:"Purpose", value:"pre-migration"},
+                {key:"SourceCommit", value:$source},
+                {key:"ImageDigest", value:$image}
+              ]
+          ' <<< "$TASK_DEFINITION" > "$MIGRATION_TASK_INPUT"
+          REGISTERED_TASK="$(aws ecs register-task-definition \
+            --cli-input-json "file://$MIGRATION_TASK_INPUT" \
+            --query taskDefinition --output json)"
+          REGISTERED_TASK_ARN="$(jq -r '.taskDefinitionArn' <<< "$REGISTERED_TASK")"
+          REGISTERED_TASK_IMAGE="$(jq -r '.containerDefinitions[0].image' <<< "$REGISTERED_TASK")"
+          REGISTERED_SECRET_ARN="$(jq -r '.containerDefinitions[0].secrets[] | select(.name=="MIGRATION_DATABASE_URL") | .valueFrom' <<< "$REGISTERED_TASK")"
+          REGISTERED_RLS_SECRET_ARN="$(jq -r '.containerDefinitions[0].secrets[] | select(.name=="RLS_CONTEXT_HMAC_KEY") | .valueFrom' <<< "$REGISTERED_TASK")"
+          REGISTERED_EXECUTION_ROLE="$(jq -r '.executionRoleArn' <<< "$REGISTERED_TASK")"
+          REGISTERED_TASK_ROLE="$(jq -r '.taskRoleArn' <<< "$REGISTERED_TASK")"
+          if [[ -z "$REGISTERED_TASK_ARN" || "$REGISTERED_TASK_IMAGE" != "$EXPECTED_API_IMAGE_URI" || "$REGISTERED_SECRET_ARN" != "$MIGRATION_SECRET_ARN" || "$REGISTERED_RLS_SECRET_ARN" != "$RLS_HMAC_SECRET_ARN" || "$REGISTERED_EXECUTION_ROLE" != "$MIGRATION_EXECUTION_ROLE_ARN" || "$REGISTERED_TASK_ROLE" != "$MIGRATION_TASK_ROLE_ARN" ]]; then
+            echo "::error::The newly registered migration revision failed its artifact, secret or IAM identity checks."
+            exit 1
+          fi
+
+          IFS=',' read -r -a SUBNET_ARRAY <<< "$PRIVATE_SUBNETS"
+          if [[ "${#SUBNET_ARRAY[@]}" -lt 2 ]]; then
+            echo "::error::At least two private application subnets are required."
+            exit 1
+          fi
+          SUBNETS_JSON="$(printf '%s\n' "${SUBNET_ARRAY[@]}" | jq -R . | jq -s .)"
+          NETWORK_CONFIGURATION="$(jq -cn \
+            --argjson subnets "$SUBNETS_JSON" \
+            --arg security_group "$MIGRATION_SECURITY_GROUP" \
+            '{awsvpcConfiguration:{subnets:$subnets,securityGroups:[$security_group],assignPublicIp:"DISABLED"}}')"
+
+          ACTIVE_RUNNING_TASKS="$(aws ecs list-tasks --cluster "$CLUSTER_NAME" --family "$TASK_FAMILY" --desired-status RUNNING --query 'taskArns' --output json)"
+          ACTIVE_PENDING_TASKS="$(aws ecs list-tasks --cluster "$CLUSTER_NAME" --family "$TASK_FAMILY" --desired-status PENDING --query 'taskArns' --output json)"
+          if [[ "$(jq 'length' <<< "$ACTIVE_RUNNING_TASKS")" != "0" || "$(jq 'length' <<< "$ACTIVE_PENDING_TASKS")" != "0" ]]; then
+            echo "::error::A migration task is already pending or running in this staging cluster."
+            exit 1
+          fi
+
+          {
+            echo "cluster=$CLUSTER_NAME"
+            echo "task_definition=$REGISTERED_TASK_ARN"
+            echo "network_configuration=$NETWORK_CONFIGURATION"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Start the one-off migration task
+        id: run
+        env:
+          CLUSTER_NAME: ${{ steps.task.outputs.cluster }}
+          TASK_DEFINITION_ARN: ${{ steps.task.outputs.task_definition }}
+          NETWORK_CONFIGURATION: ${{ steps.task.outputs.network_configuration }}
+          RELEASE_SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          RESULT="$(aws ecs run-task \
+            --cluster "$CLUSTER_NAME" \
+            --task-definition "$TASK_DEFINITION_ARN" \
+            --launch-type FARGATE \
+            --count 1 \
+            --started-by "tm-migrate-${RELEASE_SOURCE_SHA:0:12}" \
+            --network-configuration "$NETWORK_CONFIGURATION" \
+            --output json)"
+          FAILURE_COUNT="$(jq '.failures | length' <<< "$RESULT")"
+          TASK_ARN="$(jq -r '.tasks[0].taskArn // empty' <<< "$RESULT")"
+          if [[ "$FAILURE_COUNT" != "0" || -z "$TASK_ARN" ]]; then
+            echo "::error::ECS did not accept the migration task."
+            jq -c '{failures:.failures}' <<< "$RESULT"
+            exit 1
+          fi
+          echo "task_arn=$TASK_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for migration task completion and verify exit code
+        id: result
+        env:
+          CLUSTER_NAME: ${{ steps.task.outputs.cluster }}
+          TASK_ARN: ${{ steps.run.outputs.task_arn }}
+          RELEASE_SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
+          EXPECTED_API_IMAGE_URI: ${{ steps.release.outputs.image_uri }}
+          TASK_DEFINITION_ARN: ${{ steps.task.outputs.task_definition }}
+        run: |
+          set -euo pipefail
+          TASK_STATUS=""
+          TASK=""
+          for _ in {1..150}; do
+            TASK="$(aws ecs describe-tasks --cluster "$CLUSTER_NAME" --tasks "$TASK_ARN" --output json)"
+            TASK_STATUS="$(jq -r '.tasks[0].lastStatus // "MISSING"' <<< "$TASK")"
+            if [[ "$TASK_STATUS" == "STOPPED" ]]; then
+              break
+            fi
+            if [[ "$TASK_STATUS" == "MISSING" ]]; then
+              echo "::error::ECS no longer returns the migration task."
+              exit 1
+            fi
+            sleep 10
+          done
+          if [[ "$TASK_STATUS" != "STOPPED" ]]; then
+            echo "::error::Migration task did not stop within the 25-minute observation window. It has not been force-stopped; inspect it before retrying."
+            exit 1
+          fi
+          STOP_CODE="$(jq -r '.tasks[0].stopCode // "unknown"' <<< "$TASK")"
+          STOP_REASON="$(jq -r '.tasks[0].stoppedReason // "unknown"' <<< "$TASK")"
+          EXIT_CODE="$(jq -r '.tasks[0].containers[] | select(.name=="database-migration") | .exitCode // empty' <<< "$TASK")"
+          if [[ "$EXIT_CODE" != "0" ]]; then
+            echo "::error::Migration task did not exit successfully (exit code: ${EXIT_CODE:-missing}; stop code: $STOP_CODE)."
+            echo "Stopped reason: $STOP_REASON"
+            exit 1
+          fi
+          {
+            echo "## AWS staging database migration"
+            echo
+            echo "- Result: successful (container exit code 0)"
+            echo "- Source commit: $RELEASE_SOURCE_SHA"
+            echo "- API image: $EXPECTED_API_IMAGE_URI"
+            echo "- Migration task definition: $TASK_DEFINITION_ARN"
+            echo "- ECS task: $TASK_ARN"
+            echo "- Stop code: $STOP_CODE"
+            echo
+            echo "This workflow runs the migration task only. It does not update or promote the API service."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create verified migration handoff metadata
+        id: handoff
+        env:
+          EXPECTED_API_IMAGE_URI: ${{ steps.release.outputs.image_uri }}
+          RELEASE_SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
+          TASK_DEFINITION_ARN: ${{ steps.task.outputs.task_definition }}
+          TASK_ARN: ${{ steps.run.outputs.task_arn }}
+        run: |
+          set -euo pipefail
+          HANDOFF_PATH="$RUNNER_TEMP/trademate-staging-migration-release.json"
+          jq -n \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg workflow_path ".github/workflows/aws-staging-migration-task.yml" \
+            --arg migration_run_id "$GITHUB_RUN_ID" \
+            --arg migration_run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg source_sha "$RELEASE_SOURCE_SHA" \
+            --arg api_image_uri "$EXPECTED_API_IMAGE_URI" \
+            --arg task_definition_arn "$TASK_DEFINITION_ARN" \
+            --arg ecs_task_arn "$TASK_ARN" \
+            '{schema_version:1, repository:$repository, workflow_path:$workflow_path, migration_run_id:$migration_run_id, migration_run_attempt:$migration_run_attempt, source_sha:$source_sha, api_image_uri:$api_image_uri, task_definition_arn:$task_definition_arn, ecs_task_arn:$ecs_task_arn, migration_result:"success", container_exit_code:0}' \
+            > "$HANDOFF_PATH"
+          jq -e '.schema_version == 1 and .migration_result == "success" and .container_exit_code == 0' "$HANDOFF_PATH" >/dev/null
+          echo "path=$HANDOFF_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Upload successful migration handoff
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: trademate-staging-migration-release
+          path: ${{ steps.handoff.outputs.path }}
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true

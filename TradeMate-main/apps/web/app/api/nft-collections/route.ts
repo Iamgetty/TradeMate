@@ -35,7 +35,8 @@ export async function GET(request: Request) {
     const params = new URLSearchParams({ chains: chain, sort_by: 'seven_days_volume', limit: String(limit) });
     const response = await fetch(`https://api.opensea.io/api/v2/collections/top?${params.toString()}`, {
       headers: { 'x-api-key': apiKey, accept: 'application/json' },
-      next: { revalidate: 60 }
+      next: { revalidate: 60 },
+      signal: AbortSignal.timeout(8000)
     });
     if (!response.ok) return NextResponse.json({ configured: true, collections: [], message: `OpenSea returned status ${response.status} while loading collections.` }, { status: response.status === 429 ? 429 : 502 });
 
@@ -47,7 +48,8 @@ export async function GET(request: Request) {
       try {
         const statsResponse = await fetch(`https://api.opensea.io/api/v2/collections/${encodeURIComponent(slug)}/stats`, {
           headers: { 'x-api-key': apiKey, accept: 'application/json' },
-          next: { revalidate: 300 }
+          next: { revalidate: 300 },
+          signal: AbortSignal.timeout(8000)
         });
         if (statsResponse.ok) stats = await statsResponse.json();
       } catch { /* Keep the collection visible when optional statistics are unavailable. */ }

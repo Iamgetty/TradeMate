@@ -44,6 +44,47 @@ REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC;
 GRANT USAGE, CREATE ON SCHEMA public TO trademate_migrator;
 GRANT USAGE ON SCHEMA public TO trademate_app;
 
+-- The resolver migration runs before this bootstrap creates the runtime role.
+-- Grant only the schema entry point and one narrowly scoped function here.
+GRANT USAGE ON SCHEMA trademate_private TO trademate_app;
+
+-- PostgreSQL grants EXECUTE on newly created functions to PUBLIC by default.
+-- Migrations run as trademate_migrator after this bootstrap, so close that
+-- default for the private schema; each runtime operation must be granted
+-- explicitly below after review.
+ALTER DEFAULT PRIVILEGES FOR ROLE trademate_migrator
+  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION trademate_private.resolve_presented_session(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.touch_presented_session(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.list_presented_user_sessions(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.revoke_presented_user_session(TEXT, UUID) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.logout_presented_session(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.revoke_other_presented_sessions(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.complete_password_reset(TEXT, TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.issue_password_login_session(UUID, TEXT, TEXT, TIMESTAMPTZ, TEXT, TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.complete_email_verification(TEXT, TEXT, TEXT, TIMESTAMPTZ, TEXT, TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.complete_totp_login(TEXT, BIGINT, TEXT, TIMESTAMPTZ, TEXT, TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.resolve_totp_login_challenge(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.record_totp_login_failure(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.issue_totp_login_challenge(UUID, TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.begin_totp_enrollment(TEXT, TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.resolve_totp_enrollment(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.complete_totp_enrollment(TEXT, BIGINT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.resolve_enabled_totp(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.disable_totp(TEXT, BIGINT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.resolve_password_login_credentials(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.resolve_presented_password_credentials(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.complete_account_deletion_cancellation(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.discard_password_reset_token(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.rollback_account_deletion_request(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.register_password_account(TEXT, TEXT, TEXT, TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.change_presented_password(TEXT, TEXT, TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.resend_email_verification_code(TEXT, TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.issue_password_reset(TEXT, TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.request_presented_account_deletion(TEXT, TEXT, TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.current_presented_user_id() TO trademate_app;
+
 -- Transfer application tables, sequences and views to the migration owner.
 -- The app login must never own these objects.
 DO $$
@@ -79,9 +120,71 @@ $$;
 
 ALTER SCHEMA public OWNER TO trademate_migrator;
 
+-- The private schema and its SECURITY DEFINER functions must be owned by the
+-- isolated migration role. This lets future migrations replace reviewed
+-- functions without leaving them owned by the original administrator.
+ALTER SCHEMA trademate_private OWNER TO trademate_migrator;
+DO $private_table_owner$
+BEGIN
+  IF to_regclass('trademate_private.rls_context_hmac_keys') IS NOT NULL THEN
+    ALTER TABLE trademate_private.rls_context_hmac_keys OWNER TO trademate_migrator;
+  END IF;
+END
+$private_table_owner$;
+DO $ownership$
+DECLARE
+  function_record RECORD;
+BEGIN
+  FOR function_record IN
+    SELECT n.nspname, p.proname, pg_get_function_identity_arguments(p.oid) AS identity_arguments
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'trademate_private'
+      AND p.prokind = 'f'
+  LOOP
+    EXECUTE format(
+      'ALTER FUNCTION %I.%I(%s) OWNER TO trademate_migrator',
+      function_record.nspname,
+      function_record.proname,
+      function_record.identity_arguments
+    );
+  END LOOP;
+END
+$ownership$;
+
 -- Runtime CRUD privileges. RLS policies will subsequently restrict rows.
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO trademate_app;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO trademate_app;
+
+-- Session bearer-token digests are never readable by the runtime login.
+-- Session identity and metadata are exposed only through SECURITY DEFINER operations.
+REVOKE SELECT ON TABLE public.user_sessions FROM trademate_app;
+REVOKE SELECT ON TABLE public.user_credentials FROM trademate_app;
+GRANT SELECT (user_id) ON TABLE public.user_credentials TO trademate_app;
+-- Password verifiers are written only by the scoped register_password_account,
+-- change_presented_password and complete_password_reset operations. The runtime
+-- login has no direct write access to credentials.
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.user_credentials FROM trademate_app;
+
+-- Keep only non-secret authentication metadata readable by the API role.
+REVOKE SELECT ON TABLE public.user_auth_security FROM trademate_app;
+GRANT SELECT (user_id, totp_enabled, totp_confirmed_at)
+  ON TABLE public.user_auth_security TO trademate_app;
+REVOKE SELECT ON TABLE public.auth_login_challenges FROM trademate_app;
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.auth_login_challenges FROM trademate_app;
+REVOKE SELECT ON TABLE public.password_reset_tokens FROM trademate_app;
+GRANT SELECT (user_id) ON TABLE public.password_reset_tokens TO trademate_app;
+REVOKE SELECT ON TABLE public.email_verification_codes FROM trademate_app;
+-- Verification/reset/deletion lifecycle writes are performed only by reviewed
+-- SECURITY DEFINER functions; runtime CRUD grants above must not expose them.
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.email_verification_codes FROM trademate_app;
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.password_reset_tokens FROM trademate_app;
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.user_deletion_requests FROM trademate_app;
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.user_sessions FROM trademate_app;
+GRANT SELECT (user_id) ON TABLE public.email_verification_codes TO trademate_app;
+REVOKE SELECT ON TABLE public.user_deletion_requests FROM trademate_app;
+GRANT SELECT (user_id) ON TABLE public.user_deletion_requests TO trademate_app;
+GRANT SELECT (user_id) ON TABLE public.user_sessions TO trademate_app;
 
 -- Audit and migration history are not mutable/readable by the runtime role.
 REVOKE UPDATE, DELETE ON TABLE public.audit_events FROM trademate_app;
@@ -105,8 +208,15 @@ GRANT UPDATE (email, phone_e164, display_name, preferred_locale, country_code, t
 GRANT UPDATE (cancellation_token_hash) ON TABLE public.user_deletion_requests TO trademate_worker;
 GRANT DELETE ON TABLE public.user_sessions, public.user_credentials,
   public.user_preferences, public.user_notifications TO trademate_worker;
+-- PostgreSQL also requires SELECT on columns referenced by DELETE/UPDATE predicates.
+GRANT SELECT (user_id) ON TABLE public.user_sessions, public.user_credentials,
+  public.user_preferences, public.user_notifications TO trademate_worker;
 GRANT UPDATE (sender_user_id, sender_type) ON TABLE public.support_ticket_messages TO trademate_worker;
+GRANT SELECT (sender_user_id) ON TABLE public.support_ticket_messages TO trademate_worker;
+-- sender_type is read by the anonymisation CASE expression as well as updated.
+GRANT SELECT (sender_type) ON TABLE public.support_ticket_messages TO trademate_worker;
 GRANT UPDATE (accepted_by_user_id) ON TABLE public.marketplace_contracts TO trademate_worker;
+GRANT SELECT (accepted_by_user_id) ON TABLE public.marketplace_contracts TO trademate_worker;
 GRANT INSERT ON TABLE public.audit_events TO trademate_worker;
 
 DO $$
