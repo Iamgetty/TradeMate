@@ -10,6 +10,7 @@ on:
       - 'TradeMate-main/apps/api/scripts/test-db-roles.js'
       - 'TradeMate-main/apps/api/scripts/test-rls-pilot.js'
       - 'TradeMate-main/apps/api/scripts/test-rls-runtime-login.js'
+      - 'TradeMate-main/apps/api/scripts/test-rls-hmac-compatibility.js'
       - 'TradeMate-main/apps/api/scripts/test-database-context.js'
       - 'TradeMate-main/apps/api/src/database-context.ts'
       - 'TradeMate-main/apps/api/package.json'
@@ -23,6 +24,7 @@ on:
       - 'TradeMate-main/apps/api/scripts/test-db-roles.js'
       - 'TradeMate-main/apps/api/scripts/test-rls-pilot.js'
       - 'TradeMate-main/apps/api/scripts/test-rls-runtime-login.js'
+      - 'TradeMate-main/apps/api/scripts/test-rls-hmac-compatibility.js'
       - 'TradeMate-main/apps/api/scripts/test-database-context.js'
       - 'TradeMate-main/apps/api/src/database-context.ts'
       - 'TradeMate-main/apps/api/package.json'
@@ -69,6 +71,11 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: npm run db:migrate
+      - name: Verify pgcrypto HMAC-SHA-256 compatibility and tamper rejection
+        working-directory: TradeMate-main/apps/api
+        env:
+          RLS_PILOT_TEST_DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-rls-hmac-compatibility.js
       - name: Verify least-privilege role bootstrap and grants
         working-directory: TradeMate-main/apps/api
         env:
