@@ -12,6 +12,7 @@ const environmentSchema = z.object({
   MIGRATION_DATABASE_URL: postgresUrl.optional(),
   PGSSLMODE: z.enum(['require', 'disable']).optional(),
   TOTP_ENCRYPTION_KEY: z.string().regex(/^[0-9a-f]{64}$/i).optional(),
+  RLS_CONTEXT_HMAC_KEY: z.string().regex(/^[0-9a-f]{64}$/i).optional(),
   WEB_ORIGIN: z.string().max(2048).refine((value) =>
     value.split(',').every((origin) => {
       const parsed = z.string().url().safeParse(origin.trim());
@@ -44,6 +45,7 @@ export const validateEnvironment = (input: Record<string, string | undefined> = 
     const missing = [
       !parsed.data.DATABASE_URL ? 'DATABASE_URL' : null,
       !parsed.data.TOTP_ENCRYPTION_KEY ? 'TOTP_ENCRYPTION_KEY' : null,
+      !parsed.data.RLS_CONTEXT_HMAC_KEY ? 'RLS_CONTEXT_HMAC_KEY' : null,
     ].filter(Boolean);
     if (missing.length) {
       throw new Error('Missing required production environment variables: ' + missing.join(', '));
