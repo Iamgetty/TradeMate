@@ -7,7 +7,7 @@ Branch: `refactor/split-web-app-runtime`
 ### Phase 1 — independent runtime patches
 - 41 standalone runtime modules extracted.
 - Runtime order is preserved by `TradeMateRuntime.tsx`.
-- `app.js` currently contains 681,899 characters, down 23,436 characters from the 705,335-character baseline.
+- `app.js` currently contains 681,706 characters, down 23,629 characters from the 705,335-character baseline.
 - CI and browser acceptance checks passed on the last verified head.
 
 ## Remaining phases
@@ -16,9 +16,11 @@ Branch: `refactor/split-web-app-runtime`
 
 **Additional completed extraction:** NFT and market-quote snapshot storage factories moved to `public/tm/snapshot-utils.js`. Existing localStorage key formats, payload shapes, chain scoping and cache expiry windows are preserved. Runtime startup now waits for this dependency before loading `app.js`.
 
-**Completed:** extracted the FX reference-rate snapshot store into `public/tm/fx-snapshot-utils.js`. It receives the market item array through an explicit factory option and preserves the legacy localStorage key, payload, 14-day expiry and cached/live quote mutation rules. Runtime startup now verifies this module before `app.js` runs. The app cache version is now `v=157`.
+**Completed:** extracted the FX reference-rate snapshot store into `public/tm/fx-snapshot-utils.js`. It receives the market item array through an explicit factory option and preserves the legacy localStorage key, payload, 14-day expiry and cached/live quote mutation rules. Runtime startup now verifies this module before `app.js` runs. The app cache version is now `v=158`.
 
 **Completed:** extracted five pure quote helpers (`quoteTimestampMs`, `mt5SymbolKey`, `mt5QuoteIsFresh`, `mt5QuotePrice`, `mt5NameForQuote`) and their MT5 metadata constants into `public/tm/market-quote-utils.js`. The runtime loads this dependency before `app.js`; the legacy names are bound to the exported helpers to preserve existing call sites. `app.js` cache version is now `v=157`.
+
+**Completed:** extracted the pure NFT collection-result interleaving algorithm into `public/tm/nft-item-utils.js` and reused it in both NFT explore merge passes. This removes duplicate ordering loops while preserving the round-robin ordering of collection results. The same edit corrected a malformed `returnwindow` token in the collection fetch normalizer call. The NFT utility cache is `v=2`; app runtime cache is `v=158`.
 
 **Next safe boundaries:** extract cohesive NFT request orchestration and market quote loading behind explicit context objects. Their request counters, chain selection, caches, UI refreshes and retry timers must move together; do not extract individual callbacks or functions while leaving their mutable state behind. Stateful market-feed managers remain coupled to socket/timer state and must not be extracted until a context interface is defined.
 
