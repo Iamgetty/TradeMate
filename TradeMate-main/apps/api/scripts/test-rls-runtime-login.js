@@ -61,6 +61,33 @@ async function main() {
     assert.equal(identity.rows[0].session_user, 'trademate_app');
     assert.equal(identity.rows[0].current_user, 'trademate_app');
 
+    // Probe column-level SELECT privileges without retrieving credential
+    // values. LIMIT 0 still asks PostgreSQL to authorize every named column,
+    // while ensuring no secret material is returned to this test process.
+    const credentialColumns = [
+      ['user_credentials', 'password_hash'],
+      ['user_sessions', 'token_hash'],
+      ['user_auth_security', 'totp_secret_encrypted'],
+      ['auth_login_challenges', 'token_hash'],
+      ['password_reset_tokens', 'token_hash'],
+      ['email_verification_codes', 'code_hash'],
+      ['user_deletion_requests', 'cancellation_token_hash'],
+    ];
+    const exposedCredentialColumns = [];
+    for (const [table, column] of credentialColumns) {
+      try {
+        await appClient.query(`SELECT ${column} FROM public.${table} LIMIT 0`);
+        exposedCredentialColumns.push(`${table}.${column}`);
+      } catch (error) {
+        if (error.code !== '42501') throw error;
+      }
+    }
+    assert.deepEqual(
+      exposedCredentialColumns,
+      credentialColumns.map(([table, column]) => `${table}.${column}`),
+      'The current broad runtime grants are expected to expose every inventoried credential column; update this expected-vulnerability test when least-privilege grants land.',
+    );
+
     await appClient.query('BEGIN');
     try {
       // Adversarial proof of the known limitation: the actual LOGIN role,
@@ -97,7 +124,7 @@ async function main() {
     }
 
     console.log(
-      'EXPECTED SECURITY LIMITATIONS CONFIRMED: direct trademate_app LOGIN can forge app.user_id, read another fixture user under the current pilot policy, disclose another user session token hash, and use that digest as app.session_token_hash. Production RLS remains blocked.',
+      'EXPECTED SECURITY LIMITATIONS CONFIRMED: direct trademate_app LOGIN can forge app.user_id, read another fixture user under the current pilot policy, disclose another user session token hash, use that digest as app.session_token_hash, and SELECT all seven inventoried credential-bearing columns (the column probes return no values). Production RLS remains blocked.',
     );
   } finally {
     if (appClient) appClient.release();
