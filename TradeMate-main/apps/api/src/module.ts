@@ -492,7 +492,7 @@ class AuthController {
         account.rows[0].email,
         'Reset your TradeMate password',
         '<p>We received a request to reset your TradeMate password.</p><p><a href="' + resetUrl + '" style="display:inline-block;padding:13px 22px;background-color:#F6A43A;color:#17120b;text-decoration:none;font-weight:800;border-radius:9px;">Reset your password</a></p><p>This link expires in 30 minutes and can be used once. If you did not request this, you can ignore this email.</p>',
-      ).then((sent) => sent ? undefined : databasePool?.query('DELETE FROM password_reset_tokens WHERE token_hash = $1', [tokenDigest(rawToken)]).catch(() => undefined));
+      ).then((sent) => sent ? undefined : databasePool?.query('SELECT trademate_private.discard_password_reset_token($1)', [tokenDigest(rawToken)]).catch(() => undefined));
     } else if (account.rowCount && !resetOrigin) {
       console.warn('[auth] Password reset email was not sent because TRADEMATE_WEB_ORIGIN/PUBLIC_APP_URL is not configured with an allowed origin.');
     }
@@ -773,14 +773,13 @@ class AuthController {
       const recovery = await databasePool.connect();
       try {
         await recovery.query('BEGIN');
-        await recovery.query(
-          "UPDATE users u SET status = 'active', updated_at = now() WHERE u.id = $1 AND u.status = 'deletion_pending' AND EXISTS (SELECT 1 FROM user_deletion_requests d WHERE d.user_id = u.id AND d.cancellation_token_hash = $2 AND d.cancelled_at IS NULL)",
-          [current.rows[0].id, tokenDigest(cancelToken)],
+        const rollback = await recovery.query(
+          'SELECT trademate_private.rollback_account_deletion_request($1) AS restored',
+          [tokenDigest(cancelToken)],
         );
-        await recovery.query(
-          "UPDATE user_deletion_requests SET cancellation_token_hash = NULL, cancelled_at = now() WHERE user_id = $1 AND cancellation_token_hash = $2 AND cancelled_at IS NULL",
-          [current.rows[0].id, tokenDigest(cancelToken)],
-        );
+        if (!rollback.rows[0]?.restored) {
+          throw new Error('The pending account deletion could not be rolled back safely.');
+        }
         await recovery.query('COMMIT');
       } catch (error) {
         await recovery.query('ROLLBACK').catch(() => undefined);
