@@ -54,6 +54,7 @@ const MIGRATIONS = [
   '045_restrict_runtime_auth_secret_reads.sql',
   '046_trusted_session_identity_for_rls.sql',
   '047_issue_totp_login_challenge.sql',
+  '048_scoped_user_credential_write_operations.sql',
 ];
 
 async function main() {
