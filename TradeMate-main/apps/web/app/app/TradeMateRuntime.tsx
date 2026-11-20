@@ -40,6 +40,8 @@ declare global {
       mt5QuoteIsFresh: (value: unknown) => boolean;
       mt5QuotePrice: (value: unknown) => number | null;
       mt5NameForQuote: (value: unknown) => string;
+      selectMarketQuoteItems: (items: Array<Record<string, any>>, assetClass: string, isMt5QuoteFresh: (item: Record<string, any>) => boolean) => Array<Record<string, any>>;
+      marketQuoteRequestKey: (assetClass: string, items: Array<Record<string, any>>) => string;
     };
     __tradeMateBooted?: boolean;
     tmMarketMetadataStatus?: {
@@ -121,10 +123,10 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=159';
+    app.src = '/tm/app.js?v=160';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=159. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=160. Check the deployment and static asset response.');
     app.onload = () => {
       const postAppModules = [
         'pm-fix-css-loader',
@@ -403,7 +405,7 @@ export default function TradeMateRuntime() {
 
     // Market quote utilities must be ready before app.js defines the MT5 quote adapters.
     const marketQuoteUtils = document.createElement('script');
-    marketQuoteUtils.src = '/tm/market-quote-utils.js?v=1';
+    marketQuoteUtils.src = '/tm/market-quote-utils.js?v=2';
     marketQuoteUtils.async = false;
     marketQuoteUtils.onload = () => {
       if (!window.TM_MARKET_QUOTE_UTILS) {
@@ -497,7 +499,7 @@ export default function TradeMateRuntime() {
       if (!rendered) {
         fail(
           'TradeMate could not start',
-          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=159 returns successfully.'
+          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=160 returns successfully.'
         );
         return;
       }
