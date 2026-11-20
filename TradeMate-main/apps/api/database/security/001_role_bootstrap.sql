@@ -78,6 +78,8 @@ GRANT EXECUTE ON FUNCTION trademate_private.resolve_presented_password_credentia
 GRANT EXECUTE ON FUNCTION trademate_private.complete_account_deletion_cancellation(TEXT) TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.discard_password_reset_token(TEXT) TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.rollback_account_deletion_request(TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.register_password_account(TEXT, TEXT, TEXT, TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.change_presented_password(TEXT, TEXT, TEXT) TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.current_presented_user_id() TO trademate_app;
 
 -- Transfer application tables, sequences and views to the migration owner.
@@ -149,6 +151,10 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO trademate_app;
 REVOKE SELECT ON TABLE public.user_sessions FROM trademate_app;
 REVOKE SELECT ON TABLE public.user_credentials FROM trademate_app;
 GRANT SELECT (user_id) ON TABLE public.user_credentials TO trademate_app;
+-- Password verifiers are written only by the scoped register_password_account,
+-- change_presented_password and complete_password_reset operations. The runtime
+-- login has no direct write access to credentials.
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.user_credentials FROM trademate_app;
 
 -- Keep only non-secret authentication metadata readable by the API role.
 REVOKE SELECT ON TABLE public.user_auth_security FROM trademate_app;
