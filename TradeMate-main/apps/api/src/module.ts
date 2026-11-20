@@ -856,26 +856,10 @@ class AuthController {
     const token = sessionTokenFrom(request);
     response.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' });
     if (databasePool && token) {
-      const client = await databasePool.connect();
-      try {
-        await client.query('BEGIN');
-        const removed = await client.query(
-          'DELETE FROM user_sessions WHERE token_hash = $1 RETURNING user_id',
-          [tokenDigest(token)],
-        );
-        if (removed.rowCount) {
-          await client.query(
-            "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.logout', 'user', $1, '{}'::jsonb)",
-            [removed.rows[0].user_id],
-          );
-        }
-        await client.query('COMMIT');
-      } catch (error) {
-        await client.query('ROLLBACK').catch(() => undefined);
-        throw error;
-      } finally {
-        client.release();
-      }
+      await databasePool.query(
+        'SELECT logged_out_user_id FROM trademate_private.logout_presented_session($1)',
+        [tokenDigest(token)],
+      );
     }
     return { success: true };
   }
