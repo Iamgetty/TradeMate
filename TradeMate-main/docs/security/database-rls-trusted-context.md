@@ -340,3 +340,55 @@ CI must verify migration application and grants on PostgreSQL 16 and 18, then ex
 The API request-context wrapper now calls `trademate_private.resolve_presented_session($1)` to resolve the presented cookie digest, rather than directly querying `user_sessions.token_hash`. The narrow function preserves digest-format, expiry and active-account checks and returns only the user ID. This change is source-verified in commit `af9532360b74d51e2f52744c09050cdb90a90c18`; exact-head CI remains pending.
 
 This is not a completed least-privilege boundary: the module still contains 39 direct `user_sessions` references for other authentication/session lifecycle operations, broad runtime CRUD/default grants remain, and request-local custom GUCs remain caller-settable. Do not revoke table privileges or enable production RLS until those call sites are migrated and real-login positive/negative lifecycle tests pass.
+
+
+## Implemented HMAC verifier candidate — 20 Nov 2026
+
+The PR branch now contains migration
+`050_signed_transaction_rls_identity.sql` and the matching API context
+signer. This is a bounded implementation of the approved symmetric-key
+trade-off, not approval to enable production RLS.
+
+- The API signs the opaque SHA-256 digest of the presented session cookie with
+  HMAC-SHA-256. The signed canonical payload includes a version, PostgreSQL
+  transaction ID, backend PID and session digest.
+- The API obtains the transaction ID and PID from the same checked-out
+  connection after beginning the transaction. The database verifier independently
+  checks the live transaction ID and backend PID; it does not trust caller
+  settings for those values.
+- PostgreSQL verifies the MAC with `pgcrypto.hmac` and a 256-bit key held in
+  `trademate_private.rls_context_hmac_keys`. The table has no runtime grants.
+  The migration task provisions the verifier key from
+  `RLS_CONTEXT_HMAC_KEY`; the API receives the same value through its secret
+  manager environment. The key is not stored in a GUC or repository file.
+- `current_presented_user_id()` now fails closed for missing, malformed,
+  altered, wrong-transaction or wrong-backend assertions, then resolves the
+  session digest through the existing narrow session resolver.
+- The AWS staging template gives the key secret to the API and one-off
+  migration task execution roles only. The runtime database login cannot read
+  or mutate the verifier table.
+- PostgreSQL CI provisions pgcrypto in the public schema and generates a
+  disposable random HMAC key for each workflow run. Tests cover Node/PostgreSQL
+  HMAC compatibility, real-login GUC forgery, transaction replay, and request
+  context isolation.
+
+### Preconditions and remaining review
+
+The migration deliberately does not attempt to install pgcrypto. A database
+administrator must provision the supported extension in the `public` schema
+before migration 050; the migration fails closed with a clear error if
+`public.hmac(bytea,bytea,text)` is unavailable. On RDS this must be completed
+by the appropriately privileged database administrator, not by granting
+extension-creation privileges to the application role.
+
+The HMAC secret must be the same 32-byte value in the API secret manager and
+the migration task secret. Key rotation is a coordinated release operation:
+update the database verifier and API tasks together, with a tested rollout
+plan. Do not rotate it independently while old API tasks are still serving
+requests. A fully compromised API process can mint valid assertions; this
+design does not protect against that threat.
+
+The CI-only RLS pilot remains disabled in production. The current PR does not
+enable RLS on production tables, complete the full table-policy inventory,
+remove broad runtime grants, prove every worker/system identity, or perform
+the AWS staging rehearsal. Keep PR #219 draft until those separate gates pass.
