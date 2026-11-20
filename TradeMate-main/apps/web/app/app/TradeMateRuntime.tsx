@@ -5,6 +5,16 @@ import { useEffect, useState } from 'react';
 declare global {
   interface Window {
     TM_CONFIG?: { api: string };
+    TM_MARKET_QUOTE_UTILS?: {
+      MT5_PUBLIC_QUOTE_MAX_AGE_MS: number;
+      MT5_CATEGORY_BY_TYPE: Record<string, string>;
+      MT5_DISPLAY_NAMES: Record<string, string>;
+      quoteTimestampMs: (value: unknown) => number;
+      mt5SymbolKey: (value: unknown) => string;
+      mt5QuoteIsFresh: (value: unknown) => boolean;
+      mt5QuotePrice: (value: unknown) => number | null;
+      mt5NameForQuote: (value: unknown) => string;
+    };
     __tradeMateBooted?: boolean;
     tmMarketMetadataStatus?: {
       state: 'fresh' | 'stale' | 'unavailable';
