@@ -644,11 +644,12 @@ class AuthController {
     const client = await databasePool.connect();
     try {
       await client.query('BEGIN');
+      const challengeHash = tokenDigest(challengeToken);
       const challenge = await client.query(
-        "SELECT c.id,c.user_id,c.attempts,u.email,u.display_name,u.country_code FROM auth_login_challenges c JOIN users u ON u.id=c.user_id WHERE c.token_hash=$1 AND c.expires_at>now() AND c.consumed_at IS NULL AND u.status='active' FOR UPDATE OF c",
-        [tokenDigest(challengeToken)],
+        'SELECT challenge_user_id AS user_id, challenge_attempts AS attempts, challenge_email AS email, challenge_display_name AS display_name, challenge_country_code AS country_code, encrypted_totp_secret, last_totp_counter FROM trademate_private.resolve_totp_login_challenge($1)',
+        [challengeHash],
       );
-      if (!challenge.rowCount || challenge.rows[0].attempts >= 5) throw new UnauthorizedException('This verification attempt has expired. Sign in again.');
+      if (!challenge.rowCount) throw new UnauthorizedException('This verification attempt has expired. Sign in again.');
       const totpRateKey = tokenDigest((request.ip || 'unknown') + '|totp|' + challenge.rows[0].user_id);
       const totpRate = await client.query(
         "INSERT INTO auth_rate_limits (key_hash, window_started_at, attempts, blocked_until) VALUES ($1, now(), 1, NULL) ON CONFLICT (key_hash) DO UPDATE SET attempts = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END, window_started_at = CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN now() ELSE auth_rate_limits.window_started_at END, blocked_until = CASE WHEN (CASE WHEN auth_rate_limits.window_started_at < now() - interval '15 minutes' THEN 1 ELSE auth_rate_limits.attempts + 1 END) >= 10 THEN now() + interval '15 minutes' ELSE auth_rate_limits.blocked_until END RETURNING attempts, blocked_until",
@@ -658,14 +659,13 @@ class AuthController {
         await client.query('COMMIT');
         throw new HttpException('Too many authenticator attempts. Please wait 15 minutes before trying again.', HttpStatus.TOO_MANY_REQUESTS);
       }
-      const secretResult = await client.query('SELECT totp_secret_encrypted,totp_enabled,last_totp_counter FROM user_auth_security WHERE user_id=$1 FOR UPDATE', [challenge.rows[0].user_id]);
       let matchedCounter: number | null = null;
       try {
-        if (secretResult.rows[0]?.totp_enabled) matchedCounter = verifyTotp(decryptTotpSecret(secretResult.rows[0].totp_secret_encrypted), code);
+        matchedCounter = verifyTotp(decryptTotpSecret(challenge.rows[0].encrypted_totp_secret), code);
       } catch { matchedCounter = null; }
-      const lastCounter = secretResult.rows[0]?.last_totp_counter == null ? null : BigInt(secretResult.rows[0].last_totp_counter);
+      const lastCounter = challenge.rows[0].last_totp_counter == null ? null : BigInt(challenge.rows[0].last_totp_counter);
       if (matchedCounter === null || (lastCounter !== null && BigInt(matchedCounter) <= lastCounter)) {
-        await client.query('UPDATE auth_login_challenges SET attempts=attempts+1 WHERE id=$1', [challenge.rows[0].id]);
+        await client.query('SELECT trademate_private.record_totp_login_failure($1)', [challengeHash]);
         await client.query('COMMIT');
         throw new UnauthorizedException('The authenticator code is incorrect or has already been used.');
       }
@@ -683,7 +683,7 @@ class AuthController {
         ],
       );
       if (!completedLogin.rowCount) {
-        await client.query('UPDATE auth_login_challenges SET attempts=attempts+1 WHERE id=$1 AND attempts < 5', [challenge.rows[0].id]);
+        await client.query('SELECT trademate_private.record_totp_login_failure($1)', [challengeHash]);
         await client.query('COMMIT');
         throw new UnauthorizedException('The authenticator code is incorrect or has already been used.');
       }
