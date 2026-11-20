@@ -52,7 +52,7 @@ async function main() {
     assert.equal(altered.rows[0].valid, false, 'A modified message must not validate.');
 
     const wrongKey = await pool.query(
-      "SELECT crypto_test.hmac(convert_to($1, 'UTF8'), decode($2, 'hex'), 'sha256') = decode($3, 'hex') AS valid",
+      `SELECT ${hmacFunction}(convert_to($1, 'UTF8'), decode($2, 'hex'), 'sha256'::text) = decode($3, 'hex') AS valid`,
       [message, randomBytes(32).toString('hex'), expected],
     );
     assert.equal(wrongKey.rows[0].valid, false, 'A different key must not validate.');
