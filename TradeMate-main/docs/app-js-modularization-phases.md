@@ -7,7 +7,7 @@ Branch: `refactor/split-web-app-runtime`
 ### Phase 1 — independent runtime patches
 - 41 standalone runtime modules extracted.
 - Runtime order is preserved by `TradeMateRuntime.tsx`.
-- `app.js` currently contains 681,706 characters, down 23,629 characters from the 705,335-character baseline.
+- `app.js` currently contains 669,881 characters, down 35,454 characters from the 705,335-character baseline.
 - CI and browser acceptance checks passed on the last verified head.
 
 ## Remaining phases
@@ -26,6 +26,9 @@ Branch: `refactor/split-web-app-runtime`
 
 **Completed:** extracted the market-quote candidate filter and deterministic request-key builder into `public/tm/market-quote-utils.js`. The filter retains the Twelve Data exclusion and fresh Exness MT5 quote bypass; the key retains the exact `assetClass:symbol,symbol` format used by both request de-duplication and follow-up refresh checks. Market utility cache is `v=2`; app runtime cache is `v=160`.
 
+
+**Completed:** extracted six self-contained decorative SVG renderers (`prmArt`, `dpArt`, `dxArt`, `tfArt`, `tfCoin`, `cxArt`) into `public/tm/art-utils.js`. The module has no app-state, network, timer or DOM dependencies; `TradeMateRuntime.tsx` verifies it is initialized before loading `app.js`. The app cache is now `v=161`.
+
 **Next safe boundaries:** extract cohesive NFT request orchestration and market quote loading behind explicit context objects. Their request counters, chain selection, caches, UI refreshes and retry timers must move together; do not extract individual callbacks or functions while leaving their mutable state behind. Stateful market-feed managers remain coupled to socket/timer state and must not be extracted until a context interface is defined.
 
 **Remaining targets:**
@@ -36,7 +39,7 @@ Target groups identified in the remaining `app.js`:
 4. Market-feed lifecycle and venue adapters (`clearMarketFeedTimers`, `closeMarketSocket`, `resetMarketLevels`, `stopMarketFeed`, `retryMarketFeed`, `activate*`, `openMarketFeed`, `ensureCryptoFeed`).
 5. Central feed snapshots, multi-feed coordination and MT5/FX quote adapters (`tmSnapshot*`, `tmConnectCentral`, `ensureMultiFeeds`, `applyMt5MarketQuotes`, expiry and FX feed helpers).
 
-**Estimated output:** up to 30 modules per accelerated batch, subject to dependency audit and safe boundaries. Do not split a function from state it mutates unless that state is moved behind an explicit context interface. Keep spot-price authority and feed sequencing unchanged.
+**Estimated output:** up to 90 modules per accelerated batch, subject to dependency audit and safe boundaries. Do not split a function from state it mutates unless that state is moved behind an explicit context interface. Keep spot-price authority and feed sequencing unchanged.
 
 ### Phase 3 — trading and portfolio workflows
 - Trade page and trade-core rendering.
