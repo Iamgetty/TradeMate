@@ -681,8 +681,48 @@ async function main() {
     );
     assert.equal(malformedReset.rowCount, 0, 'Malformed reset digests must not update credentials.');
 
+    const deletionEmail = `rls-deletion-cancel-${suffix}@example.invalid`;
+    const deletionUser = await admin.query(
+      "INSERT INTO public.users (email, display_name, status) VALUES ($1, 'Deletion cancellation fixture', 'deletion_pending') RETURNING id::text AS id",
+      [deletionEmail],
+    );
+    userIds.push(deletionUser.rows[0].id);
+    const cancellationTokenHash = createHash('sha256').update(randomBytes(32)).digest('hex');
+    await admin.query(
+      "INSERT INTO public.user_deletion_requests (user_id, cancellation_token_hash, requested_at, scheduled_for) VALUES ($1, $2, now(), now() + interval '30 days')",
+      [deletionUser.rows[0].id, cancellationTokenHash],
+    );
+    const restoredAccount = await appClient.query(
+      'SELECT restored_user_id::text AS user_id, restored_email AS email FROM trademate_private.complete_account_deletion_cancellation($1)',
+      [cancellationTokenHash],
+    );
+    assert.equal(restoredAccount.rowCount, 1, 'A valid cancellation token must restore the account.');
+    assert.equal(restoredAccount.rows[0].user_id, deletionUser.rows[0].id);
+    assert.equal(restoredAccount.rows[0].email, deletionEmail);
+    const restoredStatus = await admin.query(
+      'SELECT status FROM public.users WHERE id = $1',
+      [deletionUser.rows[0].id],
+    );
+    assert.equal(restoredStatus.rows[0].status, 'active');
+    const consumedCancellation = await admin.query(
+      'SELECT cancellation_token_hash, cancelled_at FROM public.user_deletion_requests WHERE user_id = $1',
+      [deletionUser.rows[0].id],
+    );
+    assert.equal(consumedCancellation.rows[0].cancellation_token_hash, null);
+    assert.ok(consumedCancellation.rows[0].cancelled_at);
+    const cancellationAudit = await admin.query(
+      "SELECT actor_user_id::text AS actor_id FROM public.audit_events WHERE event_type = 'account.deletion_cancelled' AND entity_id = $1",
+      [deletionUser.rows[0].id],
+    );
+    assert.equal(cancellationAudit.rowCount, 1, 'Account restoration must append its audit event atomically.');
+    const replayedCancellation = await appClient.query(
+      'SELECT restored_user_id FROM trademate_private.complete_account_deletion_cancellation($1)',
+      [cancellationTokenHash],
+    );
+    assert.equal(replayedCancellation.rowCount, 0, 'A consumed account deletion cancellation token must not be reusable.');
+
     console.log(
-      'EXPECTED SECURITY LIMITATIONS CONFIRMED: direct trademate_app LOGIN can forge app.user_id and read another fixture user under the current pilot policy. Session token-hash disclosure is now blocked, while five other inventoried credential-bearing columns remain exposed. Production RLS remains blocked.',
+      'EXPECTED SECURITY LIMITATIONS CONFIRMED: direct trademate_app LOGIN can forge app.user_id and read another fixture user under the current pilot policy. Session token-hash disclosure is now blocked, while five other inventoried credential-bearing columns remain exposed. Account-deletion cancellation now consumes its token through an atomic scoped operation. Production RLS remains blocked.',
     );
   } finally {
     if (appClient) appClient.release();
