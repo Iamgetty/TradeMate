@@ -78,6 +78,22 @@ async function main() {
     );
     assert.equal(malformed.rowCount, 0);
 
+    await admin.query("UPDATE public.user_sessions SET expires_at = now() - interval '1 minute' WHERE id = $1", [sessionIds[1]]);
+    const expired = await appClient.query(
+      'SELECT resolved_user_id FROM trademate_private.resolve_presented_session($1)',
+      [sessionHashes[1]],
+    );
+    assert.equal(expired.rowCount, 0, 'Expired sessions must not resolve.');
+    await admin.query("UPDATE public.user_sessions SET expires_at = now() + interval '10 minutes' WHERE id = $1", [sessionIds[1]]);
+
+    await admin.query("UPDATE public.users SET status = 'suspended' WHERE id = $1", [userIds[1]]);
+    const inactive = await appClient.query(
+      'SELECT resolved_user_id FROM trademate_private.resolve_presented_session($1)',
+      [sessionHashes[1]],
+    );
+    assert.equal(inactive.rowCount, 0, 'Inactive accounts must not resolve.');
+    await admin.query("UPDATE public.users SET status = 'active' WHERE id = $1", [userIds[1]]);
+
     // Probe column-level SELECT privileges without retrieving credential
     // values. LIMIT 0 still asks PostgreSQL to authorize every named column,
     // while ensuring no secret material is returned to this test process.
