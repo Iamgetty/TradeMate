@@ -188,3 +188,34 @@ Required remediation before any session-based RLS policy is enabled:
 - Review password hashes, reset/verification tokens, TOTP secrets, API keys and other credential-bearing tables under the same least-privilege inventory.
 
 The existing `database-context.ts` sets `app.session_token_hash` and then directly queries `user_sessions`; this must be refactored to the reviewed narrow lookup path before production RLS. Do not solve this by granting the API process elevated migrator ownership or by exposing a SECURITY DEFINER helper with broad arbitrary-hash enumeration.
+
+
+## Runtime authentication-data access-path audit (2026-11-20)
+
+### Confirmed repository paths
+
+The current bootstrap in `apps/api/database/security/001_role_bootstrap.sql` grants `SELECT, INSERT, UPDATE, DELETE` on every table in `public` to `trademate_app`, then only removes selected privileges from `audit_events` and `schema_migrations`. Its default privileges repeat the broad CRUD grant for future tables created by `trademate_migrator`. Consequently, the exposure is not limited to `user_sessions.token_hash`: the same grant model makes credential-bearing tables readable unless an explicit table/column revoke exists.
+
+The direct session paths currently include:
+
+- `apps/api/src/database-context.ts`: every contextual query sets caller-writable `app.session_token_hash`, then directly selects `user_sessions.token_hash` joined to `users` to resolve the subject.
+- `apps/api/src/module.ts`: authentication/session endpoints independently query `user_sessions` for session validation and session management; logout and revocation paths delete by `token_hash`, and password-change logic deletes other sessions. These paths must be inventoried and migrated together, not patched only in the pool wrapper.
+- `apps/api/scripts/test-rls-runtime-login.js`: the actual LOGIN-role test now reproduces cross-user session-hash disclosure and reuse as a caller-controlled context value on disposable PostgreSQL.
+
+The schema and application also contain sensitive authentication material outside sessions. The role bootstrap's blanket SELECT grant potentially exposes `user_credentials.password_hash`, encrypted authenticator material in `user_auth_security`, verification/reset challenge data, and other credential-bearing columns in public tables. This is a grant-surface finding; each table and column must be confirmed against the live migration inventory before an allowlist is finalized.
+
+### Safe remediation sequence
+
+Do **not** simply revoke SELECT on `user_sessions` or `user_credentials` in isolation. Current authentication handlers and the database-context wrapper still depend on direct reads, and revocation/logout/password-change operations depend on direct mutations. A premature revoke would break login, request authentication, session revocation or password changes.
+
+1. Build a complete table/column inventory from migrations and SQL call sites for password hashes, session hashes, TOTP secrets, email-verification codes, password-reset tokens, API credentials, recovery codes and other authentication challenges.
+2. Define narrow database operations for each required flow (at minimum session resolution, current-session revocation, other-session revocation, password verification material retrieval, TOTP verification material retrieval, and one-time verification/reset challenge consumption). Each operation must preserve expiry, revocation, account-status, one-time-use, audit and transaction-atomicity semantics.
+3. Prefer a dedicated non-login function owner and a private schema. Revoke function EXECUTE from PUBLIC by default; grant only specific entry points to `trademate_app`. Fix `search_path`, schema-qualify every referenced object, prevent dynamic SQL where possible, and prove the runtime role cannot call internal helpers or access backing tables directly.
+4. Avoid a general SECURITY DEFINER lookup accepting arbitrary user IDs or returning hashes. Session resolution must accept only the presented digest, return the minimum identity/status data, and avoid a caller-visible session enumeration capability. Consider rate/abuse controls and uniform failure behavior at the API boundary.
+5. Replace all direct API SQL call sites before tightening table grants. Then replace blanket future-table default privileges with explicit grants by table/column or a reviewed grant manifest; otherwise newly added secret tables will silently inherit broad access.
+6. Add actual-login negative tests proving the runtime role cannot SELECT sensitive tables/columns, enumerate sessions, read hashes or secrets, or call internal helpers. Add positive HTTP/API tests proving valid login, session resolution, logout, revocation, password change, TOTP and verification flows still work. Include audit rollback and expiry/replay cases.
+7. Run PostgreSQL 16 and 18 clean-migration tests, browser two-account acceptance, and the full API auth regression suite before any role-grant migration is considered. Production changes require separate explicit approval and a rehearsed rollback.
+
+### Current disposition
+
+This is a source-level audit and remediation design only. No grants, migrations, API code, production roles or credentials were changed. The existing expected-vulnerability tests remain intentionally red-team oriented (they pass when the known weakness is reproduced); they must be replaced by denial assertions after the complete narrow-access design is implemented. Production RLS remains blocked.
