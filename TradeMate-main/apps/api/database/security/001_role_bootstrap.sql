@@ -55,6 +55,7 @@ GRANT EXECUTE ON FUNCTION trademate_private.logout_presented_session(TEXT) TO tr
 GRANT EXECUTE ON FUNCTION trademate_private.revoke_other_presented_sessions(TEXT) TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.complete_password_reset(TEXT, TEXT) TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.issue_password_login_session(UUID, TEXT, TEXT, TIMESTAMPTZ, TEXT, TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.complete_email_verification(TEXT, TEXT, TEXT, TIMESTAMPTZ, TEXT, TEXT) TO trademate_app;
 
 -- Transfer application tables, sequences and views to the migration owner.
 -- The app login must never own these objects.
