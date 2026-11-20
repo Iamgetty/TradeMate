@@ -124,6 +124,81 @@ async function main() {
     );
     assert.equal(replayedEmailVerification.rowCount, 0, 'A consumed email verification code must not be replayable.');
 
+    const totpUserResult = await admin.query(
+      "INSERT INTO public.users (email, display_name, status, email_verified_at) VALUES ($1, 'TOTP login fixture', 'active', now()) RETURNING id::text AS id",
+      [`rls-totp-login-${suffix}@example.invalid`],
+    );
+    const totpUserId = totpUserResult.rows[0].id;
+    userIds.push(totpUserId);
+    await admin.query(
+      "INSERT INTO public.user_auth_security (user_id, totp_secret_encrypted, totp_enabled, totp_confirmed_at) VALUES ($1, 'test-only-encrypted-secret-placeholder', true, now())",
+      [totpUserId],
+    );
+    const totpChallengeTokenHash = createHash('sha256').update(randomBytes(32)).digest('hex');
+    await admin.query(
+      "INSERT INTO public.auth_login_challenges (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '5 minutes')",
+      [totpUserId, totpChallengeTokenHash],
+    );
+    const totpSessionTokenHash = createHash('sha256').update(randomBytes(32)).digest('hex');
+    const matchedTotpCounter = 123456789n;
+    const completedTotpLogin = await appClient.query(
+      'SELECT verified_user_id::text AS user_id, verified_email AS email FROM trademate_private.complete_totp_login($1, $2, $3, now() + interval \'10 minutes\', $4, $5)',
+      [totpChallengeTokenHash, matchedTotpCounter.toString(), totpSessionTokenHash, '192.0.2.12', 'TradeMate TOTP login test'],
+    );
+    assert.equal(completedTotpLogin.rowCount, 1, 'A valid, unconsumed TOTP challenge and fresh counter must issue a session.');
+    assert.equal(completedTotpLogin.rows[0].user_id, totpUserId);
+    assert.equal(completedTotpLogin.rows[0].email, `rls-totp-login-${suffix}@example.invalid`);
+    const consumedTotpState = await admin.query(
+      'SELECT c.consumed_at, s.last_totp_counter FROM public.auth_login_challenges c JOIN public.user_auth_security s ON s.user_id = c.user_id WHERE c.token_hash = $1',
+      [totpChallengeTokenHash],
+    );
+    assert.ok(consumedTotpState.rows[0].consumed_at, 'Successful TOTP login must consume its challenge.');
+    assert.equal(consumedTotpState.rows[0].last_totp_counter.toString(), matchedTotpCounter.toString(), 'Successful TOTP login must atomically advance the replay counter.');
+    const totpSession = await admin.query(
+      'SELECT id::text AS id FROM public.user_sessions WHERE token_hash = $1',
+      [totpSessionTokenHash],
+    );
+    assert.equal(totpSession.rowCount, 1);
+    sessionIds.push(totpSession.rows[0].id);
+    sessionHashes.push(totpSessionTokenHash);
+    const totpAudit = await admin.query(
+      "SELECT actor_user_id::text AS actor_id FROM public.audit_events WHERE event_type = 'auth.login_succeeded' AND entity_id = $1",
+      [totpUserId],
+    );
+    assert.equal(totpAudit.rowCount, 1, 'TOTP login must append its audit event atomically.');
+    assert.equal(totpAudit.rows[0].actor_id, totpUserId);
+    const totpNotification = await admin.query(
+      "SELECT id FROM public.user_notifications WHERE user_id = $1 AND title = 'New sign-in'",
+      [totpUserId],
+    );
+    assert.equal(totpNotification.rowCount, 1, 'TOTP login must create its sign-in notification atomically.');
+    const replayedTotpLogin = await appClient.query(
+      'SELECT verified_user_id FROM trademate_private.complete_totp_login($1, $2, $3, now() + interval \'10 minutes\', $4, $5)',
+      [totpChallengeTokenHash, (matchedTotpCounter + 1n).toString(), createHash('sha256').update(randomBytes(32)).digest('hex'), '192.0.2.12', 'TradeMate TOTP login test'],
+    );
+    assert.equal(replayedTotpLogin.rowCount, 0, 'A consumed TOTP challenge must not be replayable, even with a newer counter.');
+
+    const expiredChallengeHash = createHash('sha256').update(randomBytes(32)).digest('hex');
+    await admin.query(
+      "INSERT INTO public.auth_login_challenges (user_id, token_hash, expires_at) VALUES ($1, $2, now() - interval '1 minute')",
+      [totpUserId, expiredChallengeHash],
+    );
+    const expiredTotpLogin = await appClient.query(
+      'SELECT verified_user_id FROM trademate_private.complete_totp_login($1, $2, $3, now() + interval \'10 minutes\', $4, $5)',
+      [expiredChallengeHash, (matchedTotpCounter + 1n).toString(), createHash('sha256').update(randomBytes(32)).digest('hex'), '192.0.2.12', 'TradeMate TOTP login test'],
+    );
+    assert.equal(expiredTotpLogin.rowCount, 0, 'An expired TOTP challenge must not issue a session.');
+    const staleCounterHash = createHash('sha256').update(randomBytes(32)).digest('hex');
+    await admin.query(
+      "INSERT INTO public.auth_login_challenges (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '5 minutes')",
+      [totpUserId, staleCounterHash],
+    );
+    const staleTotpCounter = await appClient.query(
+      'SELECT verified_user_id FROM trademate_private.complete_totp_login($1, $2, $3, now() + interval \'10 minutes\', $4, $5)',
+      [staleCounterHash, matchedTotpCounter.toString(), createHash('sha256').update(randomBytes(32)).digest('hex'), '192.0.2.12', 'TradeMate TOTP login test'],
+    );
+    assert.equal(staleTotpCounter.rowCount, 0, 'A TOTP counter that has already been consumed must not issue a session.');
+
     const verifiedPasswordHash = 'argon2id$verified-login-test-password-hash';
     await admin.query(
       "UPDATE public.users SET email_verified_at = now() WHERE id = $1",
