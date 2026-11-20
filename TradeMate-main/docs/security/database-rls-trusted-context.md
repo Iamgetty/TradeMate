@@ -219,3 +219,20 @@ Do **not** simply revoke SELECT on `user_sessions` or `user_credentials` in isol
 ### Current disposition
 
 This is a source-level audit and remediation design only. No grants, migrations, API code, production roles or credentials were changed. The existing expected-vulnerability tests remain intentionally red-team oriented (they pass when the known weakness is reproduced); they must be replaced by denial assertions after the complete narrow-access design is implemented. Production RLS remains blocked.
+
+
+### Confirmed credential-bearing schema inventory (migration review)
+
+The following columns/tables are confirmed in checked-in migrations and must be included in the grant manifest and positive/negative test matrix:
+
+- `user_credentials.password_hash` — password verifier material (`002_authentication.sql`). Login needs a narrowly scoped verification path; ordinary runtime queries do not need general table reads.
+- `user_sessions.token_hash` — session bearer-token digest (`002_authentication.sql`). Resolution, logout and revocation need narrowly scoped operations; no session enumeration.
+- `user_auth_security.totp_secret_encrypted` — encrypted TOTP secret (`015_authenticator_2fa.sql`). The API needs controlled TOTP verification/enrollment operations, not general read access.
+- `auth_login_challenges.token_hash` — short-lived TOTP/login challenge digest, with attempts, expiry and consumption state (`015_authenticator_2fa.sql`). Consumption must remain atomic and one-time.
+- `password_reset_tokens.token_hash` — one-time password-reset digest (`022_password_reset_tokens.sql`). Preserve expiry and used-at semantics and atomically update the password/audit record.
+- `email_verification_codes.code_hash` — email verification code digest, attempts, expiry and used state (`023_email_verification.sql`). Preserve bounded attempts and one-time consumption.
+- `user_deletion_requests.cancellation_token_hash` — cancellation-token digest. The worker currently has a narrow UPDATE grant, but the broad runtime CRUD grant still exposes it unless separately constrained.
+
+The application also holds `TOTP_ENCRYPTION_KEY` outside PostgreSQL. This key must remain exclusively in the API secret manager/runtime boundary; it must never be placed in SQL, GUCs, logs, migrations or database rows. Encrypted TOTP rows remain sensitive because the API process can decrypt them.
+
+This inventory is grounded in migrations 002, 015, 022 and 023 plus the role bootstrap. It is not yet a complete assertion that no other secret-bearing columns exist: continue reviewing all migrations, JSON payloads, support/admin tables and future schema changes before finalizing the grant manifest.
