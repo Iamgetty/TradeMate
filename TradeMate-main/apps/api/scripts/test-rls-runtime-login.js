@@ -12,6 +12,7 @@ async function main() {
   const suffix = randomUUID();
   const userIds = [];
   const sessionIds = [];
+  const sessionHashes = [];
   const appPassword = randomBytes(32).toString('hex');
   let appPool;
   let appClient;
@@ -49,6 +50,7 @@ async function main() {
         [userId, sessionHash],
       );
       sessionIds.push(session.rows[0].id);
+      sessionHashes.push(sessionHash);
     }
 
     const appUrl = new URL(adminConnectionString);
@@ -60,6 +62,21 @@ async function main() {
     const identity = await appClient.query('SELECT session_user, current_user');
     assert.equal(identity.rows[0].session_user, 'trademate_app');
     assert.equal(identity.rows[0].current_user, 'trademate_app');
+
+    // The new narrow resolver can resolve only a caller-presented digest and
+    // returns an identity, never the credential itself. This does not yet
+    // remove the legacy direct grants or migrate API call sites.
+    const resolved = await appClient.query(
+      'SELECT resolved_user_id::text AS user_id FROM trademate_private.resolve_presented_session($1)',
+      [sessionHashes[1]],
+    );
+    assert.equal(resolved.rowCount, 1);
+    assert.equal(resolved.rows[0].user_id, userIds[1]);
+    const malformed = await appClient.query(
+      'SELECT resolved_user_id FROM trademate_private.resolve_presented_session($1)',
+      ['not-a-sha256-digest'],
+    );
+    assert.equal(malformed.rowCount, 0);
 
     // Probe column-level SELECT privileges without retrieving credential
     // values. LIMIT 0 still asks PostgreSQL to authorize every named column,
