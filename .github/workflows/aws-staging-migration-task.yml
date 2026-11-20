@@ -160,10 +160,11 @@ jobs:
           MIGRATION_SECURITY_GROUP="$(jq -r '.[] | select(.OutputKey=="MigrationSecurityGroupId") | .OutputValue' <<< "$FOUNDATION_OUTPUTS")"
           TASK_DEFINITION_ARN="$(jq -r '.[] | select(.OutputKey=="MigrationTaskDefinitionArn") | .OutputValue' <<< "$SERVICES_OUTPUTS")"
           MIGRATION_SECRET_ARN="$(jq -r '.[] | select(.OutputKey=="MigrationDatabaseUrlSecretArn") | .OutputValue' <<< "$SERVICES_OUTPUTS")"
+          RLS_HMAC_SECRET_ARN="$(jq -r '.[] | select(.OutputKey=="RlsContextHmacKeySecretArn") | .OutputValue' <<< "$SERVICES_OUTPUTS")"
           MIGRATION_EXECUTION_ROLE_ARN="$(jq -r '.[] | select(.OutputKey=="MigrationEcsExecutionRoleArn") | .OutputValue' <<< "$SERVICES_OUTPUTS")"
           MIGRATION_TASK_ROLE_ARN="$(jq -r '.[] | select(.OutputKey=="MigrationTaskRoleArn") | .OutputValue' <<< "$SERVICES_OUTPUTS")"
 
-          for value in "$CLUSTER_NAME" "$PRIVATE_SUBNETS" "$MIGRATION_SECURITY_GROUP" "$TASK_DEFINITION_ARN" "$MIGRATION_SECRET_ARN" "$MIGRATION_EXECUTION_ROLE_ARN" "$MIGRATION_TASK_ROLE_ARN"; do
+          for value in "$CLUSTER_NAME" "$PRIVATE_SUBNETS" "$MIGRATION_SECURITY_GROUP" "$TASK_DEFINITION_ARN" "$MIGRATION_SECRET_ARN" "$RLS_HMAC_SECRET_ARN" "$MIGRATION_EXECUTION_ROLE_ARN" "$MIGRATION_TASK_ROLE_ARN"; do
             if [[ -z "$value" || "$value" == "null" ]]; then
               echo "::error::A required foundation/services CloudFormation output is missing."
               exit 1
@@ -180,6 +181,7 @@ jobs:
           TASK_COMMAND="$(jq -r '.containerDefinitions[0].command | join(" ")' <<< "$TASK_DEFINITION")"
           TASK_SECRET_NAMES="$(jq -r '.containerDefinitions[0].secrets | map(.name) | sort | join(",")' <<< "$TASK_DEFINITION")"
           TASK_SECRET_ARN="$(jq -r '.containerDefinitions[0].secrets[] | select(.name=="MIGRATION_DATABASE_URL") | .valueFrom' <<< "$TASK_DEFINITION")"
+          TASK_RLS_SECRET_ARN="$(jq -r '.containerDefinitions[0].secrets[] | select(.name=="RLS_CONTEXT_HMAC_KEY") | .valueFrom' <<< "$TASK_DEFINITION")"
           TASK_EXECUTION_ROLE_ARN="$(jq -r '.executionRoleArn' <<< "$TASK_DEFINITION")"
           TASK_ROLE_ARN="$(jq -r '.taskRoleArn' <<< "$TASK_DEFINITION")"
 
@@ -191,7 +193,7 @@ jobs:
             echo "::error::The baseline migration task image is not digest-pinned."
             exit 1
           fi
-          if [[ "$TASK_COMMAND" != "node scripts/migrate.js" || "$TASK_SECRET_NAMES" != "MIGRATION_DATABASE_URL" || "$TASK_SECRET_ARN" != "$MIGRATION_SECRET_ARN" ]]; then
+          if [[ "$TASK_COMMAND" != "node scripts/migrate.js" || "$TASK_SECRET_NAMES" != "MIGRATION_DATABASE_URL,RLS_CONTEXT_HMAC_KEY" || "$TASK_SECRET_ARN" != "$MIGRATION_SECRET_ARN" || "$TASK_RLS_SECRET_ARN" != "$RLS_HMAC_SECRET_ARN" ]]; then
             echo "::error::The migration task command or secret reference does not match the reviewed CloudFormation stack output."
             exit 1
           fi
@@ -238,9 +240,10 @@ jobs:
           REGISTERED_TASK_ARN="$(jq -r '.taskDefinitionArn' <<< "$REGISTERED_TASK")"
           REGISTERED_TASK_IMAGE="$(jq -r '.containerDefinitions[0].image' <<< "$REGISTERED_TASK")"
           REGISTERED_SECRET_ARN="$(jq -r '.containerDefinitions[0].secrets[] | select(.name=="MIGRATION_DATABASE_URL") | .valueFrom' <<< "$REGISTERED_TASK")"
+          REGISTERED_RLS_SECRET_ARN="$(jq -r '.containerDefinitions[0].secrets[] | select(.name=="RLS_CONTEXT_HMAC_KEY") | .valueFrom' <<< "$REGISTERED_TASK")"
           REGISTERED_EXECUTION_ROLE="$(jq -r '.executionRoleArn' <<< "$REGISTERED_TASK")"
           REGISTERED_TASK_ROLE="$(jq -r '.taskRoleArn' <<< "$REGISTERED_TASK")"
-          if [[ -z "$REGISTERED_TASK_ARN" || "$REGISTERED_TASK_IMAGE" != "$EXPECTED_API_IMAGE_URI" || "$REGISTERED_SECRET_ARN" != "$MIGRATION_SECRET_ARN" || "$REGISTERED_EXECUTION_ROLE" != "$MIGRATION_EXECUTION_ROLE_ARN" || "$REGISTERED_TASK_ROLE" != "$MIGRATION_TASK_ROLE_ARN" ]]; then
+          if [[ -z "$REGISTERED_TASK_ARN" || "$REGISTERED_TASK_IMAGE" != "$EXPECTED_API_IMAGE_URI" || "$REGISTERED_SECRET_ARN" != "$MIGRATION_SECRET_ARN" || "$REGISTERED_RLS_SECRET_ARN" != "$RLS_HMAC_SECRET_ARN" || "$REGISTERED_EXECUTION_ROLE" != "$MIGRATION_EXECUTION_ROLE_ARN" || "$REGISTERED_TASK_ROLE" != "$MIGRATION_TASK_ROLE_ARN" ]]; then
             echo "::error::The newly registered migration revision failed its artifact, secret or IAM identity checks."
             exit 1
           fi
