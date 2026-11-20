@@ -333,3 +333,10 @@ Migration 031 introduces `trademate_private.resolve_presented_session(text)` as 
 This is deliberately not yet a complete identity boundary. The API request-context middleware still performs its legacy direct lookup and sets caller-settable `app.session_token_hash` / `app.user_id` GUCs; broad runtime table grants remain in place. Do not enable RLS or revoke direct grants until request-context and all session lifecycle/credential callers have been migrated and tested under the real runtime LOGIN. HMAC feasibility remains a separate trust-design decision; this resolver does not sign or attest caller identity.
 
 CI must verify migration application and grants on PostgreSQL 16 and 18, then exercise valid, expired, inactive and malformed digests using the actual `trademate_app` LOGIN. Follow-on work must add negative tests proving the runtime role cannot enumerate or read token hashes after grant reduction, while preserving login, session activity, listing, revoke, logout, password reset/change, TOTP and deletion transaction semantics. No production grants, roles, RLS policies, database or deployment were changed by this migration source change.
+
+
+## Request-context integration update (2026-11-20)
+
+The API request-context wrapper now calls `trademate_private.resolve_presented_session($1)` to resolve the presented cookie digest, rather than directly querying `user_sessions.token_hash`. The narrow function preserves digest-format, expiry and active-account checks and returns only the user ID. This change is source-verified in commit `af9532360b74d51e2f52744c09050cdb90a90c18`; exact-head CI remains pending.
+
+This is not a completed least-privilege boundary: the module still contains 39 direct `user_sessions` references for other authentication/session lifecycle operations, broad runtime CRUD/default grants remain, and request-local custom GUCs remain caller-settable. Do not revoke table privileges or enable production RLS until those call sites are migrated and real-login positive/negative lifecycle tests pass.
