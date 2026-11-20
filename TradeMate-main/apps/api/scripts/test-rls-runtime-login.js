@@ -156,6 +156,44 @@ async function main() {
     );
     assert.equal(invalidLogout.rowCount, 0, 'Malformed logout digests must not revoke a session.');
 
+    const additionalToken = randomBytes(32).toString('hex');
+    const additionalHash = createHash('sha256').update(additionalToken).digest('hex');
+    const additionalSession = await admin.query(
+      "INSERT INTO public.user_sessions (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes') RETURNING id::text AS id",
+      [userIds[1], additionalHash],
+    );
+    sessionIds.push(additionalSession.rows[0].id);
+    sessionHashes.push(additionalHash);
+
+    const revokedOthers = await appClient.query(
+      'SELECT trademate_private.revoke_other_presented_sessions($1) AS revoked_count',
+      [sessionHashes[1]],
+    );
+    assert.equal(Number(revokedOthers.rows[0].revoked_count), 1, 'Password-change revocation must remove every other active session.');
+    const retainedCurrent = await admin.query(
+      'SELECT id FROM public.user_sessions WHERE token_hash = $1',
+      [sessionHashes[1]],
+    );
+    assert.equal(retainedCurrent.rowCount, 1, 'The session that presented the authenticated digest must remain active.');
+    const removedOther = await admin.query(
+      'SELECT id FROM public.user_sessions WHERE id = $1',
+      [additionalSession.rows[0].id],
+    );
+    assert.equal(removedOther.rowCount, 0, 'Other sessions for the authenticated account must be revoked.');
+    const sessionsRevokedAudit = await admin.query(
+      "SELECT actor_user_id::text AS actor_id, metadata FROM public.audit_events WHERE event_type = 'auth.sessions_revoked' AND entity_id = $1",
+      [userIds[1]],
+    );
+    assert.equal(sessionsRevokedAudit.rowCount, 1, 'Bulk session revocation must append one audit event.');
+    assert.equal(sessionsRevokedAudit.rows[0].actor_id, userIds[1]);
+    assert.deepEqual(sessionsRevokedAudit.rows[0].metadata, { reason: 'password_changed', revoked_count: 1 });
+
+    const invalidBulkRevoke = await appClient.query(
+      'SELECT trademate_private.revoke_other_presented_sessions($1) AS revoked_count',
+      ['not-a-sha256-digest'],
+    );
+    assert.equal(Number(invalidBulkRevoke.rows[0].revoked_count), 0, 'Malformed digests must not revoke sessions.');
+
     const malformed = await appClient.query(
       'SELECT resolved_user_id FROM trademate_private.resolve_presented_session($1)',
       ['not-a-sha256-digest'],
