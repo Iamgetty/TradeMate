@@ -144,7 +144,8 @@ BEGIN
      OR NOT has_function_privilege('trademate_app', 'trademate_private.touch_presented_session(text)', 'EXECUTE')
      OR NOT has_function_privilege('trademate_app', 'trademate_private.list_presented_user_sessions(text)', 'EXECUTE')
      OR NOT has_function_privilege('trademate_app', 'trademate_private.revoke_presented_user_session(text,uuid)', 'EXECUTE')
-     OR NOT has_function_privilege('trademate_app', 'trademate_private.logout_presented_session(text)', 'EXECUTE') THEN
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.logout_presented_session(text)', 'EXECUTE')
+     OR NOT has_function_privilege('trademate_app', 'trademate_private.revoke_other_presented_sessions(text)', 'EXECUTE') THEN
     RAISE EXCEPTION 'trademate_app must have the reviewed narrow session operations.';
   END IF;
 
