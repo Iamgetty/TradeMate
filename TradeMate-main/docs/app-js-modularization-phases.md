@@ -12,11 +12,13 @@ Branch: `refactor/split-web-app-runtime`
 
 ## Remaining phases
 
-**Completed in this phase:** extracted five pure quote helpers (`quoteTimestampMs`, `mt5SymbolKey`, `mt5QuoteIsFresh`, `mt5QuotePrice`, `mt5NameForQuote`) and their MT5 metadata constants into `public/tm/market-quote-utils.js`. The runtime loads this dependency before `app.js`; the legacy names are bound to the exported helpers to preserve existing call sites. `app.js` cache version is now `v=154`.
+### Phase 2 — market data and NFT services (in progress)
+
+**Completed:** extracted five pure quote helpers (`quoteTimestampMs`, `mt5SymbolKey`, `mt5QuoteIsFresh`, `mt5QuotePrice`, `mt5NameForQuote`) and their MT5 metadata constants into `public/tm/market-quote-utils.js`. The runtime loads this dependency before `app.js`; the legacy names are bound to the exported helpers to preserve existing call sites. `app.js` cache version is now `v=154`.
 
 **Next safe boundaries:** audit NFT snapshot storage, market quote snapshots, then the stateful feed managers. The latter remain coupled to socket/timer state and must not be extracted until a context interface is defined.
 
-### Phase 2 — market data and NFT services
+**Remaining targets:**
 Target groups identified in the remaining `app.js`:
 1. Market metadata refresh and FX snapshot helpers (`tmApplyFxRates`, `tmRestoreFxSnapshot`, `tmSaveFxSnapshot`, `liveRefresh`).
 2. NFT snapshot and loading services (`nftSnap*`, `loadLiveNFTs`, `loadNFTCollections`, `loadNFTCollectionItems`, `loadNFTExploreItems`).
