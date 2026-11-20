@@ -41,8 +41,14 @@ REVOKE ALL ON FUNCTION trademate_private.resolve_password_login_credentials(TEXT
 REVOKE ALL ON FUNCTION trademate_private.resolve_presented_password_credentials(TEXT) FROM PUBLIC;
 
 -- Runtime callers must use the narrowly scoped credential resolvers.
-REVOKE SELECT ON TABLE public.user_credentials FROM trademate_app;
-GRANT SELECT (user_id) ON TABLE public.user_credentials TO trademate_app;
+DO $migration$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'trademate_app') THEN
+    REVOKE SELECT ON TABLE public.user_credentials FROM trademate_app;
+    GRANT SELECT (user_id) ON TABLE public.user_credentials TO trademate_app;
+  END IF;
+END;
+$migration$;
 
 COMMENT ON FUNCTION trademate_private.resolve_password_login_credentials(TEXT) IS
   'Returns the password verifier and minimal account fields for one email lookup used by the rate-limited password-login flow.';
