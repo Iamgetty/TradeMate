@@ -53,11 +53,6 @@ async function main() {
       sessionHashes.push(sessionHash);
     }
 
-    await admin.query(
-      'INSERT INTO public.user_credentials (user_id, password_hash) VALUES ($1, $2)',
-      [userIds[1], 'scrypt$16384$8$1$test-salt$test-password-verifier-value'],
-    );
-
     const appUrl = new URL(adminConnectionString);
     appUrl.username = 'trademate_app';
     appUrl.password = appPassword;
@@ -587,7 +582,7 @@ async function main() {
     );
     assert.equal(scopedPassword.rowCount, 1);
     assert.equal(scopedPassword.rows[0].user_id, userIds[1]);
-    assert.equal(scopedPassword.rows[0].password_hash, 'scrypt$16384$8$1$test-salt$test-password-verifier-value');
+    assert.equal(scopedPassword.rows[0].password_hash, 'argon2id$verified-login-test-password-hash');
 
     const loginCredentials = await appClient.query(
       'SELECT user_id::text AS user_id, password_hash FROM trademate_private.resolve_password_login_credentials($1)',
@@ -595,7 +590,7 @@ async function main() {
     );
     assert.equal(loginCredentials.rowCount, 1);
     assert.equal(loginCredentials.rows[0].user_id, userIds[1]);
-    assert.equal(loginCredentials.rows[0].password_hash, 'scrypt$16384$8$1$test-salt$test-password-verifier-value');
+    assert.equal(loginCredentials.rows[0].password_hash, 'argon2id$verified-login-test-password-hash');
 
     await appClient.query('BEGIN');
     try {
