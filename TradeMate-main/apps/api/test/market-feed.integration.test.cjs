@@ -146,14 +146,32 @@ test('Bybit book lifecycle applies ordered deltas, ignores duplicates, and recov
     firstSocket.message({
       topic: 'orderbook.50.BTCUSD',
       type: 'snapshot',
-      data: { u: 100, b: [['100', '2']], a: [['101', '3']] },
+      data: {
+        u: 100,
+        b: [['100', '2'], ['Infinity', '9'], ['NaN', '8'], ['99', 'Infinity']],
+        a: [['101', '3'], ['102', 'NaN']],
+      },
     });
     let snapshot = await waitForSnapshot(client, (payload) =>
       payload.feeds.some((feed) => feed.venue === 'bybit' && feed.market === 'spot' &&
         feed.sequenceStatus === 'synchronized' && feed.sequence === 100));
     let book = snapshot.books.find((feed) => feed.venue === 'bybit' && feed.market === 'spot');
+    assert.equal(book.bids.length, 1, 'non-finite prices and quantities must be discarded');
+    assert.equal(book.asks.length, 1, 'non-finite prices and quantities must be discarded');
     assert.equal(book.bids[0].q, '2');
     assert.equal(book.asks[0].q, '3');
+
+    firstSocket.message({
+      topic: 'publicTrade.BTCUSD',
+      data: [
+        { i: 'infinite-price', p: 'Infinity', v: '1', T: Date.now(), S: 'Buy' },
+        { i: 'infinite-size', p: '100', v: 'Infinity', T: Date.now(), S: 'Buy' },
+        { i: 'valid-trade', p: '100', v: '0.5', T: Date.now(), S: 'Buy' },
+      ],
+    });
+    snapshot = await waitForSnapshot(client, (payload) =>
+      payload.trades.some((trade) => trade.id.endsWith(':valid-trade')));
+    assert.deepEqual(snapshot.trades.map((trade) => trade.id), ['bybit:spot:valid-trade']);
 
     firstSocket.message({
       topic: 'orderbook.50.BTCUSD',
