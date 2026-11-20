@@ -152,7 +152,7 @@ For the current Render-managed PostgreSQL target, the only built-in candidate wo
 
 ### CI primitive test
 
-Added `apps/api/scripts/test-rls-hmac-compatibility.js` and wired it into the PostgreSQL 16/18 compatibility workflow. It uses an ephemeral random key, compares PostgreSQL `pgcrypto.hmac(..., 'sha256')` byte-for-byte with Node.js `crypto.createHmac('sha256', ...)`, and checks modified-message and wrong-key rejection. This test proves primitive interoperability only; it does not approve the token format, key provisioning, verifier functions, transaction binding or production RLS. The new workflow run must pass before recording this as verified.
+Added `apps/api/scripts/test-rls-hmac-compatibility.js` and wired it into the PostgreSQL 16/18 compatibility workflow. It uses an ephemeral random key, compares PostgreSQL `pgcrypto.hmac(..., 'sha256')` byte-for-byte with Node.js `crypto.createHmac('sha256', ...)`, and checks modified-message and wrong-key rejection. This test proves primitive interoperability only; it does not approve the token format, key provisioning, verifier functions, transaction binding or production RLS. The primitive test passed on both PostgreSQL 16 and 18 in [PostgreSQL security compatibility run 44688695316](https://github.com/Iamgetty/TradeMate/actions/runs/44688695316), against code-bearing head `37550648a9ab71468ba58079c438eea8c20d0f99`. The test was corrected after its first attempt exposed an extension-schema assumption; the final version discovers the installed `pgcrypto` extension schema from PostgreSQL catalogs and qualifies the HMAC function there.
 
 ### Open design gates before implementation
 
@@ -165,3 +165,10 @@ Added `apps/api/scripts/test-rls-hmac-compatibility.js` and wired it into the Po
 - Replace the expected-vulnerability test with denial assertions only after the trusted verifier is implemented and the real-login suite proves forged `app.user_id`, altered tokens, expired tokens, replay and cross-transaction transplantation are rejected.
 
 No verifier function, key, private schema, migration or production setting is introduced by this feasibility review. Production RLS remains blocked.
+
+
+### CI result for the primitive test (2026-11-20)
+
+The corrected test passed on PostgreSQL 16 and 18 in [run 44688695316](https://github.com/Iamgetty/TradeMate/actions/runs/44688695316). The same code-bearing head `37550648a9ab71468ba58079c438eea8c20d0f99` passed all five workflow suites: TradeMate CI [44688695305](https://github.com/Iamgetty/TradeMate/actions/runs/44688695305) (8/8 jobs, including browser two-account acceptance), Cloudflare compatibility [44688695300](https://github.com/Iamgetty/TradeMate/actions/runs/44688695300), npm lockfile validation [44688695352](https://github.com/Iamgetty/TradeMate/actions/runs/44688695352), and AWS infrastructure validation [44688695344](https://github.com/Iamgetty/TradeMate/actions/runs/44688695344).
+
+The first HMAC test iteration failed because it hard-coded the requested extension schema even when PostgreSQL had already installed `pgcrypto` elsewhere. The test now discovers the extension's actual namespace from `pg_extension`/`pg_namespace` and quotes that trusted catalog value before calling `hmac`. Both major versions now pass the byte-for-byte Node/PostgreSQL comparison, altered-message rejection and wrong-key rejection.
