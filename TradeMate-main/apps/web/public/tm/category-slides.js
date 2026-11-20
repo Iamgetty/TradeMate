@@ -64,23 +64,25 @@
     '.tm-cs .dot{fill:var(--am);opacity:0}',
     '.tm-cs .pulse{fill:none;stroke:var(--am);stroke-width:1.5;opacity:0;transform-box:fill-box;transform-origin:center}',
     '.tm-cs .ar{opacity:0}',
-    '.tm-cs-s.live .ln:not(.flat){animation:tmcsDraw 1.3s cubic-bezier(.4,0,.2,1) forwards}',
-    '.tm-cs-s.live .ar{animation:tmcsFade .9s .5s both}',
-    '.tm-cs-s.live .dot{animation:tmcsFade .4s 1.2s both}',
-    '.tm-cs-s.live .pulse{animation:tmcsFade .4s 1.2s both,tmcsPulse 1.9s 1.6s ease-out infinite}',
-    '.tm-cs-s.live .tbn-copy>*,.tm-cs-s.live .tm-cs-chart,.tm-cs-s.live .tbn-list>*{animation:tmcsUp .55s both}',
-    '.tm-cs-s.live .tbn-copy>*:nth-child(2){animation-delay:.08s}',
-    '.tm-cs-s.live .tbn-copy>*:nth-child(3){animation-delay:.16s}',
-    '.tm-cs-s.live .tm-cs-chart{animation-delay:.2s}',
-    '.tm-cs-s.live .tbn-list>*{animation-delay:.3s}',
-    '.tm-cs-s.live .tbn-list>*:nth-child(2){animation-delay:.38s}',
-    '.tm-cs-s.live .tbn-list>*:nth-child(3){animation-delay:.46s}',
-    '.tm-cs-s.live .tbn-list>*:nth-child(4){animation-delay:.54s}',
+    /* --el = time already played. When the app rebuilds the page and the banner is put back, the animations
+       resume from where they were (negative delay) instead of restarting. */
+    '.tm-cs-s.live .ln:not(.flat){animation:tmcsDraw 1.3s calc(0s - var(--el,0s)) cubic-bezier(.4,0,.2,1) forwards}',
+    '.tm-cs-s.live .ar{animation:tmcsFade .9s calc(.5s - var(--el,0s)) both}',
+    '.tm-cs-s.live .dot{animation:tmcsFade .4s calc(1.2s - var(--el,0s)) both}',
+    '.tm-cs-s.live .pulse{animation:tmcsFade .4s calc(1.2s - var(--el,0s)) both,tmcsPulse 1.9s calc(1.6s - var(--el,0s)) ease-out 2}',
+    '.tm-cs-s.live .tbn-copy>*,.tm-cs-s.live .tm-cs-chart,.tm-cs-s.live .tbn-list>*{animation:tmcsUp .55s calc(0s - var(--el,0s)) both}',
+    '.tm-cs-s.live .tbn-copy>*:nth-child(2){animation-delay:calc(.08s - var(--el,0s))}',
+    '.tm-cs-s.live .tbn-copy>*:nth-child(3){animation-delay:calc(.16s - var(--el,0s))}',
+    '.tm-cs-s.live .tm-cs-chart{animation-delay:calc(.2s - var(--el,0s))}',
+    '.tm-cs-s.live .tbn-list>*{animation-delay:calc(.3s - var(--el,0s))}',
+    '.tm-cs-s.live .tbn-list>*:nth-child(2){animation-delay:calc(.38s - var(--el,0s))}',
+    '.tm-cs-s.live .tbn-list>*:nth-child(3){animation-delay:calc(.46s - var(--el,0s))}',
+    '.tm-cs-s.live .tbn-list>*:nth-child(4){animation-delay:calc(.54s - var(--el,0s))}',
     /* a slide that has already played (or was rebuilt by a data refresh) shows its final state */
     '.tm-cs-s.done .ln{stroke-dashoffset:0;stroke-dasharray:none;animation:none}',
     '.tm-cs-s.done .ln.flat{stroke-dasharray:4 5}',
     '.tm-cs-s.done .ar,.tm-cs-s.done .dot{opacity:1;animation:none}',
-    '.tm-cs-s.done .pulse{animation:tmcsPulse 1.9s ease-out infinite}',
+    '.tm-cs-s.done .pulse{animation:none}',
     '.tm-cs-s.done .tbn-copy>*,.tm-cs-s.done .tm-cs-chart,.tm-cs-s.done .tbn-list>*{animation:none}',
     '@keyframes tmcsDraw{to{stroke-dashoffset:0}}',
     '@keyframes tmcsFade{from{opacity:0}to{opacity:1}}',
@@ -399,11 +401,15 @@
     var dots = inst.root.querySelectorAll('.tbn-dots i');
     for (var k = 0; k < dots.length; k++) dots[k].className = k === i ? 'on' : '';
     var slides = inst.track.children;
+    // play the entrance only once the real data is in, so it runs once (not on the empty loading card and again on the data)
+    var ready = inst.root.getAttribute('data-ready') === '1';
     for (var s = 0; s < slides.length; s++) {
       if (s === i) {
-        if (!slides[s].classList.contains('live')) {
+        if (ready && !slides[s].classList.contains('live')) {
           slides[s].classList.remove('done');
           void slides[s].offsetWidth; // restart the animations each time the slide comes into view
+          slides[s].style.removeProperty('--el');
+          slides[s].__t0 = performance.now();
           slides[s].classList.add('live');
           countUp(slides[s]);
           (function (node) { setTimeout(function () { node.classList.add('done'); }, 2400); })(slides[s]);
@@ -411,11 +417,45 @@
       } else slides[s].classList.remove('live');
     }
   }
+  // The app rebuilds the open page several times a second, which would cut a native smooth scroll short.
+  // This glide is driven by code against the same (re-used) track node, so a rebuild cannot interrupt it.
+  function cancelGlide(inst) {
+    if (inst.glide) {
+      inst.glide = null;
+      inst.track.style.scrollSnapType = '';
+    }
+  }
   function goTo(inst, i, smooth) {
-    if (!inst.track.clientWidth) return;
+    var track = inst.track, w = track.clientWidth;
+    if (!w) return;
     inst.index = (i % 3 + 3) % 3;
-    inst.track.scrollTo({ left: inst.index * inst.track.clientWidth, behavior: smooth ? 'smooth' : 'auto' });
     setActive(inst, inst.index);
+    if (!smooth || reduced) { cancelGlide(inst); track.scrollLeft = inst.index * w; return; }
+    inst.glide = { from: track.scrollLeft, t0: performance.now(), dur: 480 };
+    track.style.scrollSnapType = 'none'; // snapping would fight the glide frame by frame
+    if (inst.glideRaf) return;
+    inst.glideRaf = requestAnimationFrame(function step(now) {
+      var g = inst.glide;
+      if (!g) { inst.glideRaf = 0; return; }
+      var width = inst.track.clientWidth, target = inst.index * width;
+      var p = Math.min(1, (now - g.t0) / g.dur);
+      var e = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+      inst.track.scrollLeft = p < 1 ? g.from + (target - g.from) * e : target;
+      if (p < 1) { inst.glideRaf = requestAnimationFrame(step); return; }
+      inst.glideRaf = 0;
+      cancelGlide(inst);
+    });
+  }
+  // put the track at the current slide, unless a glide is moving it right now
+  function place(inst) {
+    if (!inst.glide) inst.track.scrollLeft = inst.index * inst.track.clientWidth;
+  }
+  // after the banner is put back into a rebuilt page: keep the active slide's entrance animation going from where it was
+  function resume(inst) {
+    var slide = inst.track.children[inst.index];
+    if (slide && slide.__t0 && slide.classList.contains('live') && !slide.classList.contains('done')) {
+      slide.style.setProperty('--el', Math.max(0, (performance.now() - slide.__t0) / 1000).toFixed(3) + 's');
+    }
   }
 
   function render(inst, settled) {
@@ -425,7 +465,7 @@
       if (settled) { s.classList.add('done'); countFinal(s); }
       inst.track.appendChild(s);
     });
-    inst.track.scrollLeft = keep;
+    if (!inst.glide) inst.track.scrollLeft = keep;
     if (!settled) { inst.root.removeAttribute('data-ready'); }
   }
   function countFinal(slide) {
@@ -462,13 +502,13 @@
       if (raf) return;
       raf = requestAnimationFrame(function () {
         raf = 0;
-        if (!inst.track.clientWidth) return;
+        if (inst.glide || !inst.track.clientWidth) return;
         var i = Math.round(inst.track.scrollLeft / inst.track.clientWidth);
         if (i !== inst.index) { inst.index = i; setActive(inst, i); }
       });
     }, { passive: true });
     ['pointerdown', 'touchstart', 'wheel'].forEach(function (ev) {
-      root.addEventListener(ev, function () { pausedUntil = Date.now() + 10000; }, { passive: true });
+      root.addEventListener(ev, function () { pausedUntil = Date.now() + 10000; cancelGlide(inst); }, { passive: true });
     });
     render(inst, false);
     load(inst);
@@ -492,7 +532,7 @@
     var settled = inst.root.getAttribute('data-ready') === '1';
     render(inst, settled);
     inst.root.setAttribute('data-ready', '1');
-    if (inst.root.isConnected) { inst.track.scrollLeft = inst.index * inst.track.clientWidth; if (!settled) setActive(inst, inst.index); }
+    if (inst.root.isConnected) { place(inst); if (!settled) setActive(inst, inst.index); }
   }
 
   // The Home screen stores the height of its slide card; using it makes these cards exactly the same size.
@@ -538,8 +578,9 @@
     applyHeight(inst.root);
     parent.insertBefore(inst.root, anchor);
     if (hero) hero.remove();
-    // a node that was detached by a redraw starts back at slide 1: put it where it was
-    inst.track.scrollLeft = inst.index * inst.track.clientWidth;
+    // a node that was detached by a redraw starts back at slide 1: put it where it was, and keep its animation going
+    place(inst);
+    resume(inst);
     setActive(inst, inst.index);
     if (cfg.kind === 'rows') refreshRows(inst, host);
   }
@@ -547,14 +588,17 @@
   // Crypto and Forex have no API of their own here: read the rows on the page.
   function refreshRows(inst, host) {
     var rows = readRows(host);
-    var sig = rows.map(function (r) { return r.name + ':' + r.pct; }).join('|');
+    // compare at 1 decimal, and rebuild at most once every 5s: prices tick many times a second
+    var sig = rows.map(function (r) { return r.name + ':' + (r.pct == null ? '' : r.pct.toFixed(1)); }).join('|');
     if (sig === inst.sig) return;
-    inst.sig = sig;
-    inst.data = rows;
     var settled = inst.root.getAttribute('data-ready') === '1';
+    if (settled && Date.now() - (inst.rowsAt || 0) < 5000) return;
+    inst.sig = sig;
+    inst.rowsAt = Date.now();
+    inst.data = rows;
     render(inst, settled);
     inst.root.setAttribute('data-ready', '1');
-    inst.track.scrollLeft = inst.index * inst.track.clientWidth;
+    place(inst);
     // the slides were just rebuilt: play the active one now (the next redraw may be seconds away)
     if (!settled) setActive(inst, inst.index);
   }
