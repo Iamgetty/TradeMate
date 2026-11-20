@@ -25,5 +25,21 @@
       };
     });
   }
-  root.TM_NFT_ITEM_UTILS = Object.freeze({ normalizeItems: normalizeItems });
+  function interleaveItems(groups) {
+    var result = [], maxLength = 0;
+    (Array.isArray(groups) ? groups : []).forEach(function (group) {
+      maxLength = Math.max(maxLength, Array.isArray(group) ? group.length : 0);
+    });
+    for (var index = 0; index < maxLength; index++) {
+      for (var groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+        var item = Array.isArray(groups[groupIndex]) ? groups[groupIndex][index] : null;
+        if (item) result.push(item);
+      }
+    }
+    return result;
+  }
+  root.TM_NFT_ITEM_UTILS = Object.freeze({
+    normalizeItems: normalizeItems,
+    interleaveItems: interleaveItems
+  });
 })(window);
