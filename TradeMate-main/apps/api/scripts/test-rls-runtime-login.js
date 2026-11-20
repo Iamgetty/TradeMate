@@ -283,6 +283,55 @@ async function main() {
       throw error;
     }
 
+    await admin.query(
+      'INSERT INTO public.user_credentials (user_id, password_hash) VALUES ($1, $2)',
+      [userIds[1], 'previous-test-password-hash-value'],
+    );
+    const resetToken = randomBytes(32).toString('base64url');
+    const resetHash = createHash('sha256').update(resetToken).digest('hex');
+    await admin.query(
+      "INSERT INTO public.password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '10 minutes')",
+      [userIds[1], resetHash],
+    );
+    const completedReset = await appClient.query(
+      'SELECT reset_user_id::text AS user_id, reset_email AS email FROM trademate_private.complete_password_reset($1, $2)',
+      [resetHash, 'argon2id$test-only-new-password-hash-value'],
+    );
+    assert.equal(completedReset.rowCount, 1, 'A valid reset token must complete the password reset.');
+    assert.equal(completedReset.rows[0].user_id, userIds[1]);
+    assert.equal(completedReset.rows[0].email, `rls-login-other-${suffix}@example.invalid`);
+    const resetCredential = await admin.query(
+      'SELECT password_hash FROM public.user_credentials WHERE user_id = $1',
+      [userIds[1]],
+    );
+    assert.equal(resetCredential.rows[0].password_hash, 'argon2id$test-only-new-password-hash-value');
+    const remainingResetSessions = await admin.query(
+      'SELECT id FROM public.user_sessions WHERE user_id = $1',
+      [userIds[1]],
+    );
+    assert.equal(remainingResetSessions.rowCount, 0, 'Password reset must revoke every session for the account.');
+    const consumedReset = await admin.query(
+      'SELECT used_at FROM public.password_reset_tokens WHERE token_hash = $1',
+      [resetHash],
+    );
+    assert.ok(consumedReset.rows[0].used_at, 'Password reset must consume its one-time token.');
+    const resetAudit = await admin.query(
+      "SELECT actor_user_id::text AS actor_id FROM public.audit_events WHERE event_type = 'auth.password_reset_completed' AND entity_id = $1",
+      [userIds[1]],
+    );
+    assert.equal(resetAudit.rowCount, 1, 'Password reset must append its audit event atomically.');
+    assert.equal(resetAudit.rows[0].actor_id, userIds[1]);
+    const replayedReset = await appClient.query(
+      'SELECT reset_user_id FROM trademate_private.complete_password_reset($1, $2)',
+      [resetHash, 'argon2id$another-test-only-password-hash'],
+    );
+    assert.equal(replayedReset.rowCount, 0, 'A consumed password-reset token must not be reusable.');
+    const malformedReset = await appClient.query(
+      'SELECT reset_user_id FROM trademate_private.complete_password_reset($1, $2)',
+      ['not-a-sha256-digest', 'argon2id$another-test-only-password-hash'],
+    );
+    assert.equal(malformedReset.rowCount, 0, 'Malformed reset digests must not update credentials.');
+
     console.log(
       'EXPECTED SECURITY LIMITATIONS CONFIRMED: direct trademate_app LOGIN can forge app.user_id, read another fixture user under the current pilot policy, disclose another user session token hash, use that digest as app.session_token_hash, and SELECT all seven inventoried credential-bearing columns (the column probes return no values). Production RLS remains blocked.',
     );
