@@ -124,6 +124,9 @@ jobs:
             exit 1
           fi
 
+      - name: Authenticate to Amazon ECR for OCI provenance verification
+        uses: aws-actions/amazon-ecr-login@7290e214a610b32bc0eef81748948b6d466a8783 # v2
+
       - name: Resolve baseline and register next-release migration task definition
         id: task
         env:
