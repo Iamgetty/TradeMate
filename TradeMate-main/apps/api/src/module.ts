@@ -747,8 +747,8 @@ class AuthController {
     if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
     await databasePool.query('SELECT touched_user_id FROM trademate_private.touch_presented_session($1)', [digest]);
     const result = await databasePool.query(
-      'SELECT id, created_at, last_seen_at, expires_at, ip_address, user_agent, (token_hash = $2) AS is_current FROM user_sessions WHERE user_id = $1 AND expires_at > now() ORDER BY is_current DESC, last_seen_at DESC LIMIT 50',
-      [current.rows[0].id, digest],
+      'SELECT session_id AS id, created_at, last_seen_at, expires_at, ip_address, user_agent, is_current FROM trademate_private.list_presented_user_sessions($1)',
+      [digest],
     );
     return { sessions: result.rows };
   }
@@ -761,32 +761,15 @@ class AuthController {
     if (!token) throw new UnauthorizedException('Please sign in to manage sessions.');
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid session identifier.');
     const digest = tokenDigest(token);
-    const client = await databasePool.connect();
-    let isCurrent = false;
-    try {
-      await client.query('BEGIN');
-      const current = await client.query(
-        "SELECT u.id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1 FOR UPDATE OF s",
-        [digest],
-      );
-      if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
-      const result = await client.query(
-        'DELETE FROM user_sessions WHERE id = $1 AND user_id = $2 RETURNING (token_hash = $3) AS is_current',
-        [id, current.rows[0].id, digest],
-      );
-      if (!result.rowCount) throw new NotFoundException('Session not found.');
-      isCurrent = Boolean(result.rows[0].is_current);
-      await client.query(
-        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.session_revoked', 'user_session', $2, $3::jsonb)",
-        [current.rows[0].id, id, JSON.stringify({ current: isCurrent })],
-      );
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally {
-      client.release();
-    }
+    const digest = tokenDigest(token);
+    const current = await resolvePresentedSessionUserDigest(digest);
+    if (!current.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    const result = await databasePool.query(
+      'SELECT revoked_session_id, revoked_user_id, was_current FROM trademate_private.revoke_presented_user_session($1, $2)',
+      [digest, id],
+    );
+    if (!result.rowCount) throw new NotFoundException('Session not found.');
+    const isCurrent = Boolean(result.rows[0].was_current);
     if (isCurrent) response.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' });
     return { success: true, current: isCurrent };
   }
