@@ -40,6 +40,7 @@ const MIGRATIONS = [
   '031_narrow_presented_session_resolver.sql',
   '032_touch_presented_session.sql',
   '033_presented_session_management.sql',
+  '034_logout_presented_session.sql',
 ];
 
 async function main() {
