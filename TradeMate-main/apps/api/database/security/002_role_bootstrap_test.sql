@@ -194,11 +194,33 @@ BEGIN
     JOIN pg_namespace n ON n.oid = p.pronamespace
     CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) AS acl
     WHERE n.nspname = 'trademate_private'
-      AND p.proname IN ('resolve_presented_session', 'touch_presented_session', 'list_presented_user_sessions', 'revoke_presented_user_session', 'logout_presented_session', 'revoke_other_presented_sessions', 'complete_password_reset', 'issue_password_login_session', 'complete_email_verification', 'complete_totp_login', 'resolve_totp_login_challenge', 'record_totp_login_failure', 'begin_totp_enrollment', 'resolve_totp_enrollment', 'complete_totp_enrollment', 'resolve_enabled_totp', 'disable_totp', 'resolve_password_login_credentials', 'resolve_presented_password_credentials', 'complete_account_deletion_cancellation', 'discard_password_reset_token', 'rollback_account_deletion_request', 'current_presented_user_id')
       AND acl.grantee = 0
       AND acl.privilege_type = 'EXECUTE'
   ) THEN
-    RAISE EXCEPTION 'PUBLIC must not execute the presented-session resolver.';
+    RAISE EXCEPTION 'No function in trademate_private may be executable by PUBLIC.';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_default_acl d
+    JOIN pg_namespace n ON n.oid = d.defaclnamespace
+    JOIN pg_roles r ON r.oid = d.defaclrole
+    CROSS JOIN LATERAL aclexplode(d.defaclacl) AS acl
+    WHERE n.nspname = 'trademate_private'
+      AND r.rolname = 'trademate_migrator'
+      AND d.defaclobjtype = 'f'
+      AND acl.grantee = 0
+      AND acl.privilege_type = 'EXECUTE'
+  ) AND NOT EXISTS (
+    SELECT 1
+    FROM pg_default_acl d
+    JOIN pg_namespace n ON n.oid = d.defaclnamespace
+    JOIN pg_roles r ON r.oid = d.defaclrole
+    WHERE n.nspname = 'trademate_private'
+      AND r.rolname = 'trademate_migrator'
+      AND d.defaclobjtype = 'f'
+  ) THEN
+    RAISE EXCEPTION 'Expected explicit private-function default privilege policy for trademate_migrator.';
   END IF;
 
   IF (
