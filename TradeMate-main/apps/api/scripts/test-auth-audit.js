@@ -97,7 +97,7 @@ async function main() {
         CREATE OR REPLACE FUNCTION test_reject_auth_audit() RETURNS trigger
         LANGUAGE plpgsql AS $audit$
         BEGIN
-          IF EXISTS (SELECT 1 FROM test_reject_auth_audit_events WHERE event_type = NEW.event_type) THEN
+          IF EXISTS (SELECT 1 FROM public.test_reject_auth_audit_events WHERE event_type = NEW.event_type) THEN
             RAISE EXCEPTION 'forced auth audit failure';
           END IF;
           RETURN NEW;
