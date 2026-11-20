@@ -4,8 +4,6 @@
 -- trusted app.user_id context by itself.
 CREATE SCHEMA IF NOT EXISTS trademate_private;
 REVOKE ALL ON SCHEMA trademate_private FROM PUBLIC;
-GRANT USAGE ON SCHEMA trademate_private TO trademate_app;
-
 CREATE OR REPLACE FUNCTION trademate_private.resolve_presented_session(p_token_hash TEXT)
 RETURNS TABLE (resolved_user_id UUID)
 LANGUAGE sql
@@ -24,7 +22,6 @@ AS $function$
 $function$;
 
 REVOKE ALL ON FUNCTION trademate_private.resolve_presented_session(TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION trademate_private.resolve_presented_session(TEXT) TO trademate_app;
 
 COMMENT ON FUNCTION trademate_private.resolve_presented_session(TEXT) IS
   'Resolves one presented SHA-256 session-token digest to an active user ID; never returns token material. Runtime callers must not have direct token_hash access.';
