@@ -25,6 +25,9 @@ declare global {
         restoreAll: () => void;
       };
     };
+    TM_NFT_ITEM_UTILS?: {
+      normalizeItems: (items: unknown[], chain: string, color?: string) => Array<Record<string, any>>;
+    };
     TM_MARKET_QUOTE_UTILS?: {
       MT5_PUBLIC_QUOTE_MAX_AGE_MS: number;
       MT5_CATEGORY_BY_TYPE: Record<string, string>;
@@ -78,6 +81,7 @@ export default function TradeMateRuntime() {
     let marketQuoteUtilsReady = false;
     let snapshotUtilsReady = false;
     let fxSnapshotUtilsReady = false;
+    let nftItemUtilsReady = false;
     let cssReady = false;
     let layoutCssReady = false;
     let patchesCssReady = false;
@@ -114,10 +118,10 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=156';
+    app.src = '/tm/app.js?v=157';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=155. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=157. Check the deployment and static asset response.');
     app.onload = () => {
       const postAppModules = [
         'pm-fix-css-loader',
@@ -166,7 +170,7 @@ export default function TradeMateRuntime() {
     };
 
     const loadApp = () => {
-      if (!feedReady || !feedMediaReady || !viewportModuleReady || !metadataReady || !marketQuoteUtilsReady || !snapshotUtilsReady || !fxSnapshotUtilsReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !feedMediaReady || !viewportModuleReady || !metadataReady || !marketQuoteUtilsReady || !snapshotUtilsReady || !fxSnapshotUtilsReady || !nftItemUtilsReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -363,6 +367,21 @@ export default function TradeMateRuntime() {
     };
     snapshotUtils.onerror = () => fail('TradeMate could not load', 'The required snapshot utility module failed to load.');
     document.body.appendChild(snapshotUtils);
+
+    // Pure NFT item normalization is loaded before app.js binds the legacy call sites.
+    const nftItemUtils = document.createElement('script');
+    nftItemUtils.src = '/tm/nft-item-utils.js?v=1';
+    nftItemUtils.async = false;
+    nftItemUtils.onload = () => {
+      if (!window.TM_NFT_ITEM_UTILS) {
+        fail('TradeMate could not start', 'The NFT item utility module loaded without initialising.');
+        return;
+      }
+      nftItemUtilsReady = true;
+      loadApp();
+    };
+    nftItemUtils.onerror = () => fail('TradeMate could not load', 'The required NFT item utility module failed to load.');
+    document.body.appendChild(nftItemUtils);
 
     // FX snapshot helpers receive the market item collection explicitly; no app globals leak into the module.
     const fxSnapshotUtils = document.createElement('script');
