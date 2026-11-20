@@ -564,8 +564,8 @@ async function main() {
     }
     assert.deepEqual(
       exposedCredentialColumns,
-      credentialColumns.map(([table, column]) => `${table}.${column}`),
-      'The current broad runtime grants are expected to expose every inventoried credential column; update this expected-vulnerability test when least-privilege grants land.',
+      credentialColumns.filter(([table, column]) => !(table === 'user_sessions' && column === 'token_hash')).map(([table, column]) => `${table}.${column}`),
+      'Only the session bearer-token digest should have been removed from the currently inventoried credential-column exposure.',
     );
 
     await appClient.query('BEGIN');
@@ -582,21 +582,19 @@ async function main() {
       assert.equal(visible.rows[0].user_id, userIds[1]);
       assert.deepEqual(visible.rows[0].preferences, { fixture: 'other' });
 
-      // The role bootstrap currently grants broad SELECT on user_sessions.
-      // Prove the real runtime login can disclose another user's bearer-token
-      // digest, then place that digest in the caller-settable session context.
-      const stolenSession = await appClient.query(
-        'SELECT user_id::text AS user_id, token_hash FROM public.user_sessions WHERE user_id = $1',
-        [userIds[1]],
+      // Session bearer-token digests are now inaccessible to the runtime
+      // login. The account's identity must be obtained through the presented
+      // session resolver, not by reading the backing credential column.
+      await assert.rejects(
+        appClient.query('SELECT token_hash FROM public.user_sessions WHERE user_id = $1', [userIds[1]]),
+        (error) => error.code === '42501',
+        'The runtime login must not disclose another account session digest.',
       );
-      assert.equal(stolenSession.rowCount, 1, 'The current broad grants expose the victim session hash.');
-      assert.equal(stolenSession.rows[0].user_id, userIds[1]);
-      await appClient.query("SELECT set_config('app.session_token_hash', $1, true)", [stolenSession.rows[0].token_hash]);
-      const sessionLookup = await appClient.query(
-        'SELECT user_id::text AS user_id FROM public.user_sessions WHERE token_hash = current_setting(\'app.session_token_hash\', true)',
+      const presentedIdentity = await appClient.query(
+        'SELECT resolved_user_id::text AS user_id FROM trademate_private.resolve_presented_session($1)',
+        [sessionHashes[1]],
       );
-      assert.equal(sessionLookup.rowCount, 1);
-      assert.equal(sessionLookup.rows[0].user_id, userIds[1]);
+      assert.equal(presentedIdentity.rows[0].user_id, userIds[1]);
       await appClient.query('COMMIT');
     } catch (error) {
       await appClient.query('ROLLBACK').catch(() => undefined);
@@ -653,7 +651,7 @@ async function main() {
     assert.equal(malformedReset.rowCount, 0, 'Malformed reset digests must not update credentials.');
 
     console.log(
-      'EXPECTED SECURITY LIMITATIONS CONFIRMED: direct trademate_app LOGIN can forge app.user_id, read another fixture user under the current pilot policy, disclose another user session token hash, use that digest as app.session_token_hash, and SELECT all seven inventoried credential-bearing columns (the column probes return no values). Production RLS remains blocked.',
+      'EXPECTED SECURITY LIMITATIONS CONFIRMED: direct trademate_app LOGIN can forge app.user_id and read another fixture user under the current pilot policy. Session token-hash disclosure is now blocked, while six other inventoried credential-bearing columns remain exposed. Production RLS remains blocked.',
     );
   } finally {
     if (appClient) appClient.release();
