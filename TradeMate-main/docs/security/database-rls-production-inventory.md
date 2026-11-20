@@ -132,3 +132,41 @@ Reviewed the current PR-branch API source (not just the database catalog):
 2. Do not enable RLS on `listings` or `organizations` until aggregate/highlight routes and anonymous published-data routes are explicitly classified.
 3. Review `p2p_public_book`, `p2p_public_completed_trades` and `marketplace_public_completed_trades` definitions and view security options before exposing them to the runtime role.
 4. Continue mapping the remaining sports/transfer, feed moderation, audit, authentication lifecycle and worker paths before drafting production policies.
+
+
+## 7. Second source-level access-path review: feed, Sports Transfer and authentication
+
+Reviewed the current PR-branch apps/api/src/module.ts and the domain migrations.
+
+### Community feed and moderation
+
+- Feed post reads filter to published rows; comments and attachments join through the parent post and require it to be published. Reaction and reshare writes require an existing published post. These child tables must inherit parent-post visibility under RLS.
+- Post creation and ordinary feed interactions use the authenticated session user. Pinning is limited to the post author in the current route; the database policy must not permit a user to pin another author's post.
+- Feed report creation records the authenticated reporter. The moderation queue and report review do not use an end-user session: they require the shared TRADEMATE_REVIEW_API_KEY header. The reviewer identifier written to audit metadata is a short hash-derived key ID, not a human staff identity.
+- Announcement creation also uses the shared review key. This is a distinct privileged identity and cannot safely be mapped to current_presented_user_id(). If retained, isolate these operations behind a narrow moderation function/role and improve individual reviewer attribution and key rotation/audit controls.
+- The report-review transaction locks the open report, optionally hides its post/comment, updates review state and writes an audit event. Ensure the future policy/function preserves atomicity and prevents the reporter or ordinary feed user from reading all reports or setting review fields.
+
+### Sports Transfer
+
+- Profile list/create/update routes are session-authenticated and constrain profile ownership to sports_profiles.user_id. The profile visibility field is returned but the reviewed identity controller does not itself provide a general public profile-discovery route in this path.
+- Consent listing and grant/revoke are player-profile-owner operations. Consent grant verifies the recipient exists and limits expiry; revoke also revokes associated representative mandates and sends notifications. RLS must cover those dependent writes and reads atomically.
+- Mandate listing distinguishes player ownership from the named representative or active organization owner/admin. Creation requires an exact, current representative_access consent for the target and checks scope; acceptance/rejection is limited to the named representative or eligible organization role; revocation is player-owned.
+- Opportunity drafts are private: player-owned drafts or organization recruitment-scoped memberships are the permitted creation/listing paths. The route explicitly creates draft status and says the opportunity is not published/discoverable. Do not infer public-read access from the visibility column or future status values.
+- Migrations 027, 029 and 030 describe private identity, consent/mandate, opportunity-draft and sourced-discovery foundations. Migration 030 intentionally omits contact columns and states that public discovery routes are not enabled. Source-governance records and external-player history require separate privileged ingestion/review policies; no worker authorization was certified here.
+
+### Authentication and session lifecycle
+
+- Login obtains password verifier material only through trademate_private.resolve_password_login_credentials(email); session issuance, email verification, TOTP challenges, session listing/revocation and account deletion use dedicated trademate_private functions. These paths must remain function-scoped; do not grant runtime direct SELECT on credential, session-token digest, challenge or reset-token tables.
+- Session listing/revocation is bound to the presented session digest. RLS identity must continue to derive from the verified presented session, not caller-controlled user IDs or raw GUC values.
+- The authentication rate-limit table is updated by the login route and is system state, not user-owned data. A future role split must preserve narrowly scoped access without opening general CRUD.
+- This review confirms the route/function pattern only; function definitions, SECURITY DEFINER ownership/search_path, direct grants, and every caller still require a complete migration-level audit.
+
+### Remaining gaps
+
+1. The shared review-key model needs a deliberate database identity strategy and attributable reviewer controls before production RLS is designed.
+2. Feed child-table policies must inherit post visibility; report/reviewer fields must remain privileged.
+3. Sports consent/mandate policies must enforce parent ownership, exact grantee, active membership, permission scope, expiry and revocation—not only row ownership.
+4. Sports external discovery ingestion/review workers and all scheduled/background jobs remain unmapped.
+5. Audit-event writers across domains, P2P transitions, view definitions and every SECURITY DEFINER function still need a complete operation-to-role inventory.
+
+**This remains a source-path review, not an exhaustive authorization certification. No production policy, grant, role, secret or data was changed.**
