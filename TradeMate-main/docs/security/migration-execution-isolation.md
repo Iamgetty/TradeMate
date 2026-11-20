@@ -92,3 +92,16 @@ The next implementation must first establish a separately credentialed migration
 6. Rehearse the full sequence against a disposable/staging database, capture logs without credentials, verify forward-fix/rollback compatibility, and obtain accountable approval before any production change.
 
 No code, production configuration, secret, database, migration or deployment was changed during this review. The status remains proposed/partial, not implemented or production accepted.
+
+
+## API/runtime credential boundary correction — 20 Nov 2026
+
+The API production environment validator has now been changed to require only `DATABASE_URL` and `TOTP_ENCRYPTION_KEY`. It no longer requires `MIGRATION_DATABASE_URL`, because the API bootstrap does not execute migrations and the AWS API task definition intentionally does not receive the migrator secret. The migration entry point remains independently fail-closed: with `NODE_ENV=production`, `scripts/migrate.js` requires `MIGRATION_DATABASE_URL` and never falls back to `DATABASE_URL`.
+
+The staging CloudFormation template already separates the credentials by task boundary:
+- The long-running API task receives only `DATABASE_URL` and `TOTP_ENCRYPTION_KEY`.
+- The one-off migration task receives only `MIGRATION_DATABASE_URL` and runs `node scripts/migrate.js`.
+
+This corrects the source-level startup mismatch that would otherwise prevent the AWS API task from starting. It does **not** isolate the current Render service: `render.yaml` still injects the migration credential into the API service and starts `npm run db:migrate && npm run start:prod`. Do not claim Render credential isolation or production migration acceptance. The AWS task definitions/workflows remain templates until a protected staging environment, secrets, OIDC/IAM, network access, backups and an end-to-end staging rehearsal are verified.
+
+Regression coverage now asserts that the production API environment validates without a migration credential, while the production migration runner still refuses to run when `MIGRATION_DATABASE_URL` is absent. No secret, database, cloud resource, Render service or deployment was changed by this code correction.
