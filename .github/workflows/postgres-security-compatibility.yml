@@ -85,7 +85,9 @@ jobs:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: |
           set -euo pipefail
-          echo "RLS_CONTEXT_HMAC_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          RLS_CONTEXT_HMAC_KEY="$(openssl rand -hex 32)"
+          echo "::add-mask::$RLS_CONTEXT_HMAC_KEY"
+          echo "RLS_CONTEXT_HMAC_KEY=$RLS_CONTEXT_HMAC_KEY" >> "$GITHUB_ENV"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;'
       - name: Apply migrations to clean PostgreSQL
         working-directory: TradeMate-main/apps/api
