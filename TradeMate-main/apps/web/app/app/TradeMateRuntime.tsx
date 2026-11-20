@@ -56,6 +56,7 @@ export default function TradeMateRuntime() {
     let viewportModuleReady = false;
     let metadataReady = false;
     let marketQuoteUtilsReady = false;
+    let snapshotUtilsReady = false;
     let cssReady = false;
     let layoutCssReady = false;
     let patchesCssReady = false;
@@ -92,10 +93,10 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=154';
+    app.src = '/tm/app.js?v=155';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=154. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=155. Check the deployment and static asset response.');
     app.onload = () => {
       const postAppModules = [
         'pm-fix-css-loader',
@@ -144,7 +145,7 @@ export default function TradeMateRuntime() {
     };
 
     const loadApp = () => {
-      if (!feedReady || !feedMediaReady || !viewportModuleReady || !metadataReady || !marketQuoteUtilsReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !feedMediaReady || !viewportModuleReady || !metadataReady || !marketQuoteUtilsReady || !snapshotUtilsReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -326,6 +327,21 @@ export default function TradeMateRuntime() {
     earnPreload.onload = () => { earnCssReady = true; loadApp(); };
     earnPreload.onerror = () => { earnCssReady = true; loadApp(); };
     document.head.appendChild(earnPreload);
+
+    // Snapshot factories must be ready before app.js binds legacy snapshot helpers.
+    const snapshotUtils = document.createElement('script');
+    snapshotUtils.src = '/tm/snapshot-utils.js?v=1';
+    snapshotUtils.async = false;
+    snapshotUtils.onload = () => {
+      if (!window.TM_SNAPSHOT_UTILS) {
+        fail('TradeMate could not start', 'The snapshot utility module loaded without initialising.');
+        return;
+      }
+      snapshotUtilsReady = true;
+      loadApp();
+    };
+    snapshotUtils.onerror = () => fail('TradeMate could not load', 'The required snapshot utility module failed to load.');
+    document.body.appendChild(snapshotUtils);
 
     // Market quote utilities must be ready before app.js defines the MT5 quote adapters.
     const marketQuoteUtils = document.createElement('script');
