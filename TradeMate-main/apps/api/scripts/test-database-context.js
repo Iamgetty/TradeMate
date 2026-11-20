@@ -33,7 +33,7 @@ async function main() {
     }
 
     const inspect = () => database.query(
-      "SELECT current_setting('app.session_token_hash', true) AS session_hash, current_setting('app.user_id', true) AS user_id",
+      "SELECT current_setting('app.session_token_hash', true) AS session_hash, current_setting('app.user_id', true) AS user_id, trademate_private.current_presented_user_id()::text AS resolved_user_id",
     );
 
     const [a, b] = await Promise.all([
@@ -41,13 +41,16 @@ async function main() {
       runRequest(`trademate_session=${users[1].token}`, inspect),
     ]);
     assert.equal(a.rows[0].session_hash, sessionHash(users[0].token));
-    assert.equal(a.rows[0].user_id, users[0].userId);
+    assert.equal(a.rows[0].user_id, '');
+    assert.equal(a.rows[0].resolved_user_id, users[0].userId);
     assert.equal(b.rows[0].session_hash, sessionHash(users[1].token));
-    assert.equal(b.rows[0].user_id, users[1].userId);
+    assert.equal(b.rows[0].user_id, '');
+    assert.equal(b.rows[0].resolved_user_id, users[1].userId);
 
     const anonymous = await runRequest('', inspect);
     assert.equal(anonymous.rows[0].session_hash, '');
     assert.equal(anonymous.rows[0].user_id, '');
+    assert.equal(anonymous.rows[0].resolved_user_id, null);
 
     console.log('PostgreSQL transaction-local user context and single-connection isolation passed.');
   } finally {
