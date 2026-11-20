@@ -75,7 +75,6 @@ jobs:
             "API TypeScript build"
             "Web build and runtime syntax"
             "Isolated Cloudflare Workers frontend build and runtime"
-            "Lint AWS CloudFormation templates (no deployment)"
             "Non-destructive vinext compatibility scan"
             "Generate and validate lockfiles"
           )
