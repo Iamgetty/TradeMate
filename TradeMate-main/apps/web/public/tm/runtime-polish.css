@@ -33,18 +33,19 @@ html[data-theme="light"] small:not(.up):not(.dn):not(.pos):not(.neg){color:#6474
 .pfoot .lr:active{scale:.97}
 @media(max-width:899px){*{scrollbar-width:none}*::-webkit-scrollbar{display:none}}
 
-/* Explore headings: use the same type treatment as the .dk-eye label.
-   Existing text colors are intentionally inherited. */
-html #app .view .tm-sec-title h2,
-html #app .view .mk-trend h2{
-  font:500 10.5px 'DM Mono',monospace!important;
+/* Explore section headings: mirror .dk-eye typography without touching
+   each heading's existing color. The heading is a sibling of its content grid/list. */
+html #app .view .mk-sec:has(+ .mk-grid) h2,
+html #app .view .mk-sec:has(+ .mk-list.mk-trend) h2{
+  font-family:'DM Mono',monospace!important;
+  font-size:10.5px!important;
+  font-weight:500!important;
   letter-spacing:.2em!important;
-  line-height:normal!important;
   text-transform:uppercase!important;
 }
 @media(min-width:900px){
-  html #app .view .tm-sec-title h2,
-  html #app .view .mk-trend h2{
+  html #app .view .mk-sec:has(+ .mk-grid) h2,
+  html #app .view .mk-sec:has(+ .mk-list.mk-trend) h2{
     font-size:11px!important;
   }
 }
