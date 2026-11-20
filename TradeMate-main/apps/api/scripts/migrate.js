@@ -47,6 +47,7 @@ const MIGRATIONS = [
   '038_complete_email_verification.sql',
   '039_complete_totp_login.sql',
   '040_resolve_totp_login_challenge.sql',
+  '041_scoped_totp_enrollment_operations.sql',
 ];
 
 async function main() {
