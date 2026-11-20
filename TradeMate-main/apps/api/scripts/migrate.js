@@ -50,6 +50,7 @@ const MIGRATIONS = [
   '041_scoped_totp_enrollment_operations.sql',
   '042_restrict_runtime_session_token_reads.sql',
   '043_scoped_password_credential_resolution.sql',
+  '044_complete_account_deletion_cancellation.sql',
 ];
 
 async function main() {
