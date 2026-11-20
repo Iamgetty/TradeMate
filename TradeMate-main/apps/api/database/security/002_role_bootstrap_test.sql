@@ -46,6 +46,12 @@ BEGIN
     RAISE EXCEPTION 'trademate_app is missing required runtime table privileges.';
   END IF;
 
+  IF has_table_privilege('trademate_app', 'public.user_sessions', 'SELECT')
+     OR NOT has_column_privilege('trademate_app', 'public.user_sessions', 'user_id', 'SELECT')
+     OR has_column_privilege('trademate_app', 'public.user_sessions', 'token_hash', 'SELECT') THEN
+    RAISE EXCEPTION 'trademate_app must not read session bearer-token digests; only the user_id predicate column is available.';
+  END IF;
+
   IF NOT has_table_privilege('trademate_app', 'public.audit_events', 'INSERT')
      OR has_table_privilege('trademate_app', 'public.audit_events', 'UPDATE')
      OR has_table_privilege('trademate_app', 'public.audit_events', 'DELETE') THEN
