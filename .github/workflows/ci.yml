@@ -67,6 +67,11 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: npm run db:migrate
+      - name: Verify routine migrations cannot rotate the RLS HMAC verifier key
+        working-directory: TradeMate-main/apps/api
+        env:
+          RLS_PILOT_TEST_DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-migration-hmac-key-immutability.js
       - name: Verify Sports Transfer identity, consent, mandate and guardian constraints
         working-directory: TradeMate-main/apps/api
         env:
