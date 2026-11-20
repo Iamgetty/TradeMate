@@ -585,11 +585,13 @@ async function main() {
       // Session bearer-token digests are now inaccessible to the runtime
       // login. The account's identity must be obtained through the presented
       // session resolver, not by reading the backing credential column.
+      await appClient.query('SAVEPOINT session_token_read_probe');
       await assert.rejects(
         appClient.query('SELECT token_hash FROM public.user_sessions WHERE user_id = $1', [userIds[1]]),
         (error) => error.code === '42501',
         'The runtime login must not disclose another account session digest.',
       );
+      await appClient.query('ROLLBACK TO SAVEPOINT session_token_read_probe');
       const presentedIdentity = await appClient.query(
         'SELECT resolved_user_id::text AS user_id FROM trademate_private.resolve_presented_session($1)',
         [sessionHashes[1]],
