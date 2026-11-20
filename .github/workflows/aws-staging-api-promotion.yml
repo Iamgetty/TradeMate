@@ -367,8 +367,9 @@ jobs:
 
           TARGET_HEALTH="$(aws elbv2 describe-target-health --target-group-arn "$API_TARGET_GROUP_ARN" --query 'TargetHealthDescriptions' --output json)"
           HEALTHY_COUNT="$(jq '[.[] | select(.TargetHealth.State=="healthy")] | length' <<< "$TARGET_HEALTH")"
-          if [[ "$HEALTHY_COUNT" -lt "$DESIRED_COUNT" ]]; then
-            echo "::error::The API target group does not have enough healthy targets after promotion."
+          UNHEALTHY_COUNT="$(jq '[.[] | select(.TargetHealth.State=="unhealthy")] | length' <<< "$TARGET_HEALTH")"
+          if [[ "$HEALTHY_COUNT" -lt "$DESIRED_COUNT" || "$UNHEALTHY_COUNT" -gt 0 ]]; then
+            echo "::error::The API target group must have at least the desired number of healthy targets and no unhealthy targets after promotion."
             jq -c '[.[] | {Target: .Target.Id, State: .TargetHealth.State, Reason: .TargetHealth.Reason}]' <<< "$TARGET_HEALTH"
             exit 1
           fi
