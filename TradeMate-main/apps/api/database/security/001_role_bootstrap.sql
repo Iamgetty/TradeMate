@@ -80,6 +80,9 @@ GRANT EXECUTE ON FUNCTION trademate_private.discard_password_reset_token(TEXT) T
 GRANT EXECUTE ON FUNCTION trademate_private.rollback_account_deletion_request(TEXT) TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.register_password_account(TEXT, TEXT, TEXT, TEXT) TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.change_presented_password(TEXT, TEXT, TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.resend_email_verification_code(TEXT, TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.issue_password_reset(TEXT, TEXT) TO trademate_app;
+GRANT EXECUTE ON FUNCTION trademate_private.request_presented_account_deletion(TEXT, TEXT, TEXT) TO trademate_app;
 GRANT EXECUTE ON FUNCTION trademate_private.current_presented_user_id() TO trademate_app;
 
 -- Transfer application tables, sequences and views to the migration owner.
@@ -165,6 +168,12 @@ REVOKE INSERT, UPDATE, DELETE ON TABLE public.auth_login_challenges FROM tradema
 REVOKE SELECT ON TABLE public.password_reset_tokens FROM trademate_app;
 GRANT SELECT (user_id) ON TABLE public.password_reset_tokens TO trademate_app;
 REVOKE SELECT ON TABLE public.email_verification_codes FROM trademate_app;
+-- Verification/reset/deletion lifecycle writes are performed only by reviewed
+-- SECURITY DEFINER functions; runtime CRUD grants above must not expose them.
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.email_verification_codes FROM trademate_app;
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.password_reset_tokens FROM trademate_app;
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.user_deletion_requests FROM trademate_app;
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.user_sessions FROM trademate_app;
 GRANT SELECT (user_id) ON TABLE public.email_verification_codes TO trademate_app;
 REVOKE SELECT ON TABLE public.user_deletion_requests FROM trademate_app;
 GRANT SELECT (user_id) ON TABLE public.user_deletion_requests TO trademate_app;
