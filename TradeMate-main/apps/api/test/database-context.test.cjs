@@ -29,8 +29,8 @@ const createMockPool = ({ failOnSql, failOnceOnSql } = {}) => {
             throw new Error('simulated one-time database rollback failure');
           }
           if (sql.includes("set_config('app.session_token_hash'")) this.sessionHash = values[0];
-          if (sql.includes('FROM user_sessions')) {
-            const userId = identityByHash.get(this.sessionHash);
+          if (sql.includes('trademate_private.resolve_presented_session')) {
+            const userId = identityByHash.get(values[0]);
             return { rows: userId ? [{ user_id: userId }] : [], rowCount: userId ? 1 : 0 };
           }
           if (sql.includes("set_config('app.user_id'")) this.userId = values[0];
@@ -64,7 +64,7 @@ test('pool queries set hashed session and resolved user identity transaction-loc
   assert.deepEqual(clients[0].calls.map((call) => call.sql), [
     'BEGIN',
     "SELECT set_config('app.session_token_hash', $1, true)",
-    "SELECT s.user_id::text AS user_id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+    'SELECT resolved_user_id::text AS user_id FROM trademate_private.resolve_presented_session($1)',
     "SELECT set_config('app.user_id', $1, true)",
     'SELECT 1',
     'COMMIT',
@@ -87,7 +87,7 @@ test('explicit transactions keep request identity until commit', async () => {
   assert.deepEqual(clients[0].calls.map((call) => call.sql), [
     'BEGIN',
     "SELECT set_config('app.session_token_hash', $1, true)",
-    "SELECT s.user_id::text AS user_id FROM user_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.status = 'active' LIMIT 1",
+    'SELECT resolved_user_id::text AS user_id FROM trademate_private.resolve_presented_session($1)',
     "SELECT set_config('app.user_id', $1, true)",
     'UPDATE user_preferences SET language=$1',
     'COMMIT',
