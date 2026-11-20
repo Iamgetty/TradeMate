@@ -154,3 +154,12 @@ Only use **★ Production accepted** when the exact deployed release has passed 
 - The HMAC test's first attempt exposed an extension-schema assumption and failed on both versions. The script was corrected to discover the installed extension namespace; the final test then passed on both versions. The failure and correction are retained in CI history, not hidden.
 - **Architecture remains a proposal, not implementation:** the HMAC option duplicates one secret across API signer and database verifier trust domains. It only addresses arbitrary SQL execution under the runtime role if that role cannot read verifier material; it does not protect against full API-process compromise. If asymmetric separation is a hard requirement, this option is insufficient and the hosting platform must provide a supported asymmetric verifier. No signing key, verifier function, private schema, migration or production configuration has been added.
 - Status: ✓ PostgreSQL HMAC primitive interoperability verified on 16/18; ✓ cryptographic feasibility constraints documented; ◐ signed assertion format, secret provisioning/rotation, transaction binding, security-owner grants, performance, real-login denial tests, staging and production acceptance remain outstanding. Production RLS remains disabled.
+
+
+## Runtime authentication credential exposure regression gate (finding confirmed; remediation pending)
+
+- Extended `TradeMate-main/apps/api/scripts/test-rls-runtime-login.js` to create disposable sessions for two fixture users, connect using the actual `trademate_app` LOGIN, and prove the runtime role can read another user's `user_sessions.token_hash` under the current broad table grants.
+- The test then sets the caller-controlled `app.session_token_hash` to that disclosed digest and confirms it resolves to the other fixture user. This is an expected-vulnerability regression test; it does not claim that the hash is a browser bearer token.
+- This confirms the current direct `database-context.ts` session lookup design cannot be treated as a trusted DB identity boundary while the runtime role has broad SELECT on `user_sessions`.
+- Required remediation: remove raw session-hash visibility from `trademate_app`, provide a narrow reviewed session-resolution path, and add negative real-login tests for session enumeration and GUC forgery. Audit all password/reset/TOTP/verification/API credential tables as well.
+- No production grants, credentials, database, roles, policies or deployment were changed. Production RLS remains blocked.
