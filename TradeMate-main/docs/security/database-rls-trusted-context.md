@@ -117,3 +117,10 @@ Before choosing a cryptographic implementation, explicitly validate these additi
 - **Migration lifecycle.** Create verifier objects and rotate verification material only through the isolated migrator/release path. The long-running API must not inherit migration ownership or verification-key administration privileges.
 
 No trusted-context function, secret, schema, grant, migration or application code is introduced by this review. The current `app.user_id` pilot remains unsafe against identity forgery and production RLS remains blocked.
+
+
+## Real-login adversarial evidence (2026-11-20)
+
+The new disposable CI test, `apps/api/scripts/test-rls-runtime-login.js`, provisions a random password for `trademate_app` only inside the ephemeral PostgreSQL service, connects with that role as the actual `session_user` and `current_user`, then attempts to forge `app.user_id` to another fixture user's UUID. It confirms the current pilot policy permits that cross-user read. The test is intentionally an expected-vulnerability regression gate: it passes only while the known weakness is reproducible, and must be inverted or replaced when a trusted-context design is implemented.
+
+The test passed on both PostgreSQL 16 and 18 in [PostgreSQL security compatibility run 44686680871](https://github.com/Iamgetty/TradeMate/actions/runs/44686680871), and in the database integration job of [TradeMate CI run 44686680868](https://github.com/Iamgetty/TradeMate/actions/runs/44686680868), against code-bearing head `3d8529b837f9863f9270266d76379f2b9abd245f`. It does not claim that the vulnerability is fixed. It demonstrates why production RLS must remain disabled until the trusted identity design and the full adversarial acceptance suite pass.
