@@ -325,24 +325,19 @@ class AuthController {
     await databasePool.query('DELETE FROM auth_rate_limits WHERE key_hash = $1', [rateKey]);
     const token = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
-    const client = await databasePool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query('INSERT INTO user_sessions (user_id, token_hash, expires_at, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5)', [user.id, tokenDigest(token), expiresAt, request.ip || null, request.get('user-agent')?.slice(0, 500) || null]);
-      await client.query(
-        "INSERT INTO user_notifications (user_id, category, title, body, icon, action_url) VALUES ($1, 'System', 'New sign-in', 'A sign-in to your TradeMate account was completed. If this was not you, review your active sessions and secure your account.', 'shield-check', '/settings/security')",
-        [user.id],
-      );
-      await client.query(
-        "INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata) VALUES ($1, 'auth.login_succeeded', 'user', $1, '{}'::jsonb)",
-        [user.id],
-      );
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally {
-      client.release();
+    const issuedSession = await databasePool.query(
+      'SELECT trademate_private.issue_password_login_session($1, $2, $3, $4, $5, $6) AS session_id',
+      [
+        user.id,
+        user.password_hash,
+        tokenDigest(token),
+        expiresAt,
+        request.ip || null,
+        request.get('user-agent')?.slice(0, 500) || null,
+      ],
+    );
+    if (!issuedSession.rows[0]?.session_id) {
+      throw new UnauthorizedException('Email or password is incorrect.');
     }
     void sendTransactionalEmail(user.email, 'New sign-in to your TradeMate account', '<p>A sign-in to your TradeMate account was completed.</p><p>If this was not you, change your password and review your active sessions immediately.</p>');
     response.cookie(SESSION_COOKIE, token, cookieOptions());
