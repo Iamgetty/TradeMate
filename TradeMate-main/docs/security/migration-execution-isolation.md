@@ -105,3 +105,26 @@ The staging CloudFormation template already separates the credentials by task bo
 This corrects the source-level startup mismatch that would otherwise prevent the AWS API task from starting. It does **not** isolate the current Render service: `render.yaml` still injects the migration credential into the API service and starts `npm run db:migrate && npm run start:prod`. Do not claim Render credential isolation or production migration acceptance. The AWS task definitions/workflows remain templates until a protected staging environment, secrets, OIDC/IAM, network access, backups and an end-to-end staging rehearsal are verified.
 
 Regression coverage now asserts that the production API environment validates without a migration credential, while the production migration runner still refuses to run when `MIGRATION_DATABASE_URL` is absent. No secret, database, cloud resource, Render service or deployment was changed by this code correction.
+
+
+## Signed RLS identity key boundary — 20 Nov 2026
+
+Migration 050 adds a separate 256-bit `RLS_CONTEXT_HMAC_KEY` requirement. The
+long-running API and the isolated migration task must receive the same
+32-byte-hex value from their respective secret-manager references. The
+migration task writes the verifier copy to the private
+`trademate_private.rls_context_hmac_keys` table; the runtime database role has
+no table privileges. The AWS staging CloudFormation template now references
+this secret only from the API and migration task execution roles.
+
+The migration runner fails closed if the key is missing or malformed. The API
+production environment validator also requires it. The PostgreSQL compatibility
+workflow creates a fresh ephemeral key per run and installs pgcrypto into the
+public schema before applying migrations.
+
+Provision `pgcrypto` in the database `public` schema as the database
+administrator before migration 050; the migration role is not granted
+extension-creation authority. Coordinate key rotation with API task rollout:
+the database verifier and all serving API tasks must use the same key. This is
+a symmetric HMAC design and does not protect against a fully compromised API
+process. No production secret, database or deployment has been changed.
