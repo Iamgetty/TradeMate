@@ -358,11 +358,12 @@ jobs:
             --arg repository "$GITHUB_REPOSITORY" \
             --arg workflow_path ".github/workflows/aws-staging-migration-task.yml" \
             --arg migration_run_id "$GITHUB_RUN_ID" \
+            --arg migration_run_attempt "$GITHUB_RUN_ATTEMPT" \
             --arg source_sha "$RELEASE_SOURCE_SHA" \
             --arg api_image_uri "$EXPECTED_API_IMAGE_URI" \
             --arg task_definition_arn "$TASK_DEFINITION_ARN" \
             --arg ecs_task_arn "$TASK_ARN" \
-            '{schema_version:1, repository:$repository, workflow_path:$workflow_path, migration_run_id:$migration_run_id, source_sha:$source_sha, api_image_uri:$api_image_uri, task_definition_arn:$task_definition_arn, ecs_task_arn:$ecs_task_arn, migration_result:"success", container_exit_code:0}' \
+            '{schema_version:1, repository:$repository, workflow_path:$workflow_path, migration_run_id:$migration_run_id, migration_run_attempt:$migration_run_attempt, source_sha:$source_sha, api_image_uri:$api_image_uri, task_definition_arn:$task_definition_arn, ecs_task_arn:$ecs_task_arn, migration_result:"success", container_exit_code:0}' \
             > "$HANDOFF_PATH"
           jq -e '.schema_version == 1 and .migration_result == "success" and .container_exit_code == 0' "$HANDOFF_PATH" >/dev/null
           echo "path=$HANDOFF_PATH" >> "$GITHUB_OUTPUT"
@@ -374,3 +375,4 @@ jobs:
           path: ${{ steps.handoff.outputs.path }}
           if-no-files-found: error
           retention-days: 7
+          overwrite: true
