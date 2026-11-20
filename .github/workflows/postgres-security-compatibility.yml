@@ -15,6 +15,7 @@ on:
       - 'TradeMate-main/apps/api/src/database-context.ts'
       - 'TradeMate-main/apps/api/package.json'
       - 'TradeMate-main/apps/api/package-lock.json'
+      - 'TradeMate-main/docs/security/database-rls-trusted-context.md'
   push:
     branches:
       - main
@@ -29,6 +30,7 @@ on:
       - 'TradeMate-main/apps/api/src/database-context.ts'
       - 'TradeMate-main/apps/api/package.json'
       - 'TradeMate-main/apps/api/package-lock.json'
+      - 'TradeMate-main/docs/security/database-rls-trusted-context.md'
 
 permissions:
   contents: read
