@@ -24,17 +24,29 @@ async function main() {
   const expected = createHmac('sha256', key).update(message, 'utf8').digest('hex');
 
   try {
-    await pool.query('CREATE SCHEMA IF NOT EXISTS crypto_test');
-    await pool.query('CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA crypto_test');
+    let extension = await pool.query(
+      "SELECT namespace.nspname AS schema_name FROM pg_extension installed JOIN pg_namespace namespace ON namespace.oid = installed.extnamespace WHERE installed.extname = 'pgcrypto'",
+    );
+    if (extension.rowCount === 0) {
+      await pool.query('CREATE SCHEMA IF NOT EXISTS crypto_test');
+      await pool.query('CREATE EXTENSION pgcrypto WITH SCHEMA crypto_test');
+      extension = await pool.query(
+        "SELECT namespace.nspname AS schema_name FROM pg_extension installed JOIN pg_namespace namespace ON namespace.oid = installed.extnamespace WHERE installed.extname = 'pgcrypto'",
+      );
+    }
+    assert.equal(extension.rowCount, 1, 'pgcrypto must be installed in the disposable database.');
+    const extensionSchema = extension.rows[0].schema_name;
+    const quotedSchema = '"' + extensionSchema.replaceAll('"', '""') + '"';
+    const hmacFunction = quotedSchema + '.hmac';
 
     const valid = await pool.query(
-      "SELECT encode(crypto_test.hmac(convert_to($1, 'UTF8'), decode($2, 'hex'), 'sha256'), 'hex') AS mac",
+      `SELECT encode(${hmacFunction}(convert_to($1, 'UTF8'), decode($2, 'hex'), 'sha256'::text), 'hex') AS mac`,
       [message, keyHex],
     );
     assert.equal(valid.rows[0].mac, expected, 'PostgreSQL pgcrypto HMAC must match Node.js HMAC-SHA-256.');
 
     const altered = await pool.query(
-      "SELECT crypto_test.hmac(convert_to($1, 'UTF8'), decode($2, 'hex'), 'sha256') = decode($3, 'hex') AS valid",
+`SELECT ${hmacFunction}(convert_to($1, 'UTF8'), decode($2, 'hex'), 'sha256'::text) = decode($3, 'hex') AS valid`,
       [message + ' ', keyHex, expected],
     );
     assert.equal(altered.rows[0].valid, false, 'A modified message must not validate.');
