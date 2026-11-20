@@ -114,6 +114,31 @@ $$;
 
 ALTER SCHEMA public OWNER TO trademate_migrator;
 
+-- The private schema and its SECURITY DEFINER functions must be owned by the
+-- isolated migration role. This lets future migrations replace reviewed
+-- functions without leaving them owned by the original administrator.
+ALTER SCHEMA trademate_private OWNER TO trademate_migrator;
+DO $
+DECLARE
+  function_record RECORD;
+BEGIN
+  FOR function_record IN
+    SELECT n.nspname, p.proname, pg_get_function_identity_arguments(p.oid) AS identity_arguments
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'trademate_private'
+      AND p.prokind = 'f'
+  LOOP
+    EXECUTE format(
+      'ALTER FUNCTION %I.%I(%s) OWNER TO trademate_migrator',
+      function_record.nspname,
+      function_record.proname,
+      function_record.identity_arguments
+    );
+  END LOOP;
+END
+$;
+
 -- Runtime CRUD privileges. RLS policies will subsequently restrict rows.
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO trademate_app;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO trademate_app;
