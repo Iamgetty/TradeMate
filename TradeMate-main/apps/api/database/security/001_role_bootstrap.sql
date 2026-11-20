@@ -104,6 +104,11 @@ ALTER SCHEMA public OWNER TO trademate_migrator;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO trademate_app;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO trademate_app;
 
+-- Session bearer-token digests are never readable by the runtime login.
+-- Session identity and metadata are exposed only through SECURITY DEFINER operations.
+REVOKE SELECT ON TABLE public.user_sessions FROM trademate_app;
+GRANT SELECT (user_id) ON TABLE public.user_sessions TO trademate_app;
+
 -- Audit and migration history are not mutable/readable by the runtime role.
 REVOKE UPDATE, DELETE ON TABLE public.audit_events FROM trademate_app;
 REVOKE ALL ON TABLE public.schema_migrations FROM trademate_app;
