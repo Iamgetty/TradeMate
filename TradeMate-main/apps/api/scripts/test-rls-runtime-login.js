@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { createHash, randomBytes, randomUUID } = require('node:crypto');
+const { createHash, createHmac, randomBytes, randomUUID } = require('node:crypto');
 const { Pool } = require('pg');
 
 async function main() {
@@ -14,6 +14,7 @@ async function main() {
   const sessionIds = [];
   const sessionHashes = [];
   const appPassword = randomBytes(32).toString('hex');
+  const rlsContextHmacKey = randomBytes(32).toString('hex');
   let appPool;
   let appClient;
 
@@ -31,6 +32,12 @@ async function main() {
     // This password is generated only for the disposable CI database. It is
     // never read from or written to a production environment or repository.
     await admin.query(`ALTER ROLE trademate_app PASSWORD '${appPassword}'`);
+    await admin.query(
+      `INSERT INTO trademate_private.rls_context_hmac_keys (singleton, key_bytes, updated_at)
+       VALUES (TRUE, decode($1, 'hex'), now())
+       ON CONFLICT (singleton) DO UPDATE SET key_bytes = EXCLUDED.key_bytes, updated_at = now()`,
+      [rlsContextHmacKey],
+    );
 
     for (const label of ['owner', 'other']) {
       const user = await admin.query(
@@ -597,12 +604,29 @@ async function main() {
     sessionIds.push(spoofTestSession.rows[0].id);
 
     await appClient.query('BEGIN');
+    let signedContext;
     try {
-      // The real LOGIN role can set arbitrary custom GUCs. A conflicting
-      // app.user_id must not change the identity derived from its presented
-      // session digest or permit cross-account reads.
-      await appClient.query("SELECT set_config('app.session_token_hash', $1, true)", [spoofTestSessionHash]);
-      await appClient.query("SELECT set_config('app.user_id', $1, true)", [userIds[1]]);
+      // The real LOGIN role can set arbitrary custom GUCs. An unsigned
+      // session digest and a forged app.user_id must resolve to no identity.
+      const tx = await appClient.query('SELECT txid_current()::text AS transaction_id, pg_backend_pid()::text AS backend_pid');
+      const transactionId = tx.rows[0].transaction_id;
+      const backendPid = tx.rows[0].backend_pid;
+      const payload = `trademate-rls-context:v1|${transactionId}|${backendPid}|${spoofTestSessionHash}`;
+      const signature = createHmac('sha256', Buffer.from(rlsContextHmacKey, 'hex')).update(payload, 'utf8').digest('hex');
+      signedContext = { transactionId, backendPid, signature, sessionHash: spoofTestSessionHash };
+
+      await appClient.query(
+        "SELECT set_config('app.session_token_hash', $1, true), set_config('app.session_transaction_id', $2, true), set_config('app.session_backend_pid', $3, true), set_config('app.session_signature', $4, true), set_config('app.user_id', $5, true)",
+        [spoofTestSessionHash, transactionId, backendPid, '0'.repeat(64), userIds[1]],
+      );
+      const rejectedUnsignedIdentity = await appClient.query(
+        'SELECT trademate_private.current_presented_user_id()::text AS user_id',
+      );
+      assert.equal(rejectedUnsignedIdentity.rows[0].user_id, null, 'A caller-set session digest without a valid HMAC must not establish identity.');
+      await appClient.query(
+        "SELECT set_config('app.session_signature', $1, true)",
+        [signature],
+      );
       const activePresentedSession = await admin.query(
         'SELECT user_id::text AS user_id, expires_at > now() AS active FROM public.user_sessions WHERE token_hash = $1',
         [spoofTestSessionHash],
@@ -621,7 +645,7 @@ async function main() {
       const forgedIdentity = await appClient.query(
         'SELECT trademate_private.current_presented_user_id()::text AS user_id',
       );
-      assert.equal(forgedIdentity.rows[0].user_id, userIds[0]);
+      assert.equal(forgedIdentity.rows[0].user_id, userIds[0], 'A valid API HMAC must resolve only the bound presented session.');
       const crossAccountRows = await appClient.query(
         'SELECT user_id::text AS user_id FROM public.user_preferences WHERE user_id = $1',
         [userIds[1]],
@@ -643,6 +667,19 @@ async function main() {
       );
       await appClient.query('ROLLBACK TO SAVEPOINT session_token_read_probe');
       await appClient.query('COMMIT');
+
+      // A valid assertion captured in one transaction cannot be replayed in
+      // a different transaction on the same backend connection.
+      await appClient.query('BEGIN');
+      await appClient.query(
+        "SELECT set_config('app.session_token_hash', $1, true), set_config('app.session_transaction_id', $2, true), set_config('app.session_backend_pid', $3, true), set_config('app.session_signature', $4, true)",
+        [signedContext.sessionHash, signedContext.transactionId, signedContext.backendPid, signedContext.signature],
+      );
+      const replayedIdentity = await appClient.query(
+        'SELECT trademate_private.current_presented_user_id()::text AS user_id',
+      );
+      assert.equal(replayedIdentity.rows[0].user_id, null, 'A signed identity assertion must not replay across transactions.');
+      await appClient.query('ROLLBACK');
     } catch (error) {
       await appClient.query('ROLLBACK').catch(() => undefined);
       throw error;
