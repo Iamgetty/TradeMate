@@ -283,7 +283,7 @@ async function main() {
     );
     assert.equal(listed.rowCount, 3, 'Session listing must include only the authenticated user’s active sessions.');
     assert.equal(listed.rows.filter((row) => row.is_current).length, 1);
-    assert.ok(listed.rows.every((row) => [sessionIds[1], sessionIds[3], secondarySession.rows[0].id].includes(row.id)));
+    assert.ok(listed.rows.every((row) => [sessionIds[1], sessionIds[4], secondarySession.rows[0].id].includes(row.id)));
 
     const crossAccountRevoke = await appClient.query(
       'SELECT revoked_session_id FROM trademate_private.revoke_presented_user_session($1, $2)',
@@ -368,7 +368,7 @@ async function main() {
     assert.equal(removedOther.rowCount, 0, 'Other sessions for the authenticated account must be revoked.');
     const removedIssuedLogin = await admin.query(
       'SELECT id FROM public.user_sessions WHERE id = $1',
-      [sessionIds[3]],
+      [sessionIds[4]],
     );
     assert.equal(removedIssuedLogin.rowCount, 0, 'The additional password-login session must also be revoked.');
     const sessionsRevokedAudit = await admin.query(
