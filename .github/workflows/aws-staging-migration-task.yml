@@ -22,6 +22,7 @@ on:
 permissions:
   contents: read
   checks: read
+  attestations: read
   id-token: write
 
 concurrency:
@@ -129,6 +130,7 @@ jobs:
         env:
           EXPECTED_API_IMAGE_URI: ${{ steps.release.outputs.image_uri }}
           RELEASE_SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           FOUNDATION_STATUS="$(aws cloudformation describe-stacks \
@@ -205,6 +207,14 @@ jobs:
             --registry-id "$REGISTRY_ACCOUNT" \
             --repository-name "$IMAGE_REPOSITORY" \
             --image-ids "imageDigest=$IMAGE_DIGEST" >/dev/null
+
+          GH_TOKEN="${GITHUB_TOKEN:?GitHub token is required to verify build provenance}"
+          export GH_TOKEN
+          gh attestation verify "oci://$EXPECTED_API_IMAGE_URI" \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/aws-staging-build-images.yml" \
+            --source-digest "$RELEASE_SOURCE_SHA" \
+            --source-ref "refs/heads/main"
 
           MIGRATION_TASK_INPUT="$RUNNER_TEMP/trademate-migration-task-definition.json"
           jq --arg image "$EXPECTED_API_IMAGE_URI" --arg source "$RELEASE_SOURCE_SHA" '
