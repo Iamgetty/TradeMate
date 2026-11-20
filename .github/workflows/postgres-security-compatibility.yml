@@ -1,0 +1,84 @@
+name: PostgreSQL security compatibility
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/postgres-security-compatibility.yml'
+      - 'TradeMate-main/apps/api/database/**'
+      - 'TradeMate-main/apps/api/scripts/test-db-roles.js'
+      - 'TradeMate-main/apps/api/scripts/test-rls-pilot.js'
+      - 'TradeMate-main/apps/api/scripts/test-database-context.js'
+      - 'TradeMate-main/apps/api/src/database-context.ts'
+      - 'TradeMate-main/apps/api/package.json'
+      - 'TradeMate-main/apps/api/package-lock.json'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/postgres-security-compatibility.yml'
+      - 'TradeMate-main/apps/api/database/**'
+      - 'TradeMate-main/apps/api/scripts/test-db-roles.js'
+      - 'TradeMate-main/apps/api/scripts/test-rls-pilot.js'
+      - 'TradeMate-main/apps/api/scripts/test-database-context.js'
+      - 'TradeMate-main/apps/api/src/database-context.ts'
+      - 'TradeMate-main/apps/api/package.json'
+      - 'TradeMate-main/apps/api/package-lock.json'
+
+permissions:
+  contents: read
+
+jobs:
+  database-security:
+    name: PostgreSQL ${{ matrix.postgres-version }} role and RLS checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres-version: ['16', '18']
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres-version }}
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: trademate_test
+          POSTGRES_DB: trademate_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d trademate_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.22.1
+      - name: Install API dependencies
+        working-directory: TradeMate-main/apps/api
+        run: npm ci --no-audit --no-fund
+      - name: Apply migrations to clean PostgreSQL
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: npm run db:migrate
+      - name: Verify least-privilege role bootstrap and grants
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-db-roles.js
+      - name: Verify CI-only RLS pilot policy behavior
+        working-directory: TradeMate-main/apps/api
+        env:
+          RLS_PILOT_TEST_DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-rls-pilot.js
+      - name: Verify request-context and connection-pool isolation behavior
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-database-context.js
