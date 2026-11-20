@@ -219,7 +219,7 @@ async function main() {
       'SELECT trademate_private.revoke_other_presented_sessions($1) AS revoked_count',
       [sessionHashes[1]],
     );
-    assert.equal(Number(revokedOthers.rows[0].revoked_count), 1, 'Password-change revocation must remove every other active session.');
+    assert.equal(Number(revokedOthers.rows[0].revoked_count), 2, 'Password-change revocation must remove every other active session.');
     const retainedCurrent = await admin.query(
       'SELECT id FROM public.user_sessions WHERE token_hash = $1',
       [sessionHashes[1]],
@@ -230,13 +230,18 @@ async function main() {
       [additionalSession.rows[0].id],
     );
     assert.equal(removedOther.rowCount, 0, 'Other sessions for the authenticated account must be revoked.');
+    const removedIssuedLogin = await admin.query(
+      'SELECT id FROM public.user_sessions WHERE id = $1',
+      [sessionIds[2]],
+    );
+    assert.equal(removedIssuedLogin.rowCount, 0, 'The additional password-login session must also be revoked.');
     const sessionsRevokedAudit = await admin.query(
       "SELECT actor_user_id::text AS actor_id, metadata FROM public.audit_events WHERE event_type = 'auth.sessions_revoked' AND entity_id = $1",
       [userIds[1]],
     );
     assert.equal(sessionsRevokedAudit.rowCount, 1, 'Bulk session revocation must append one audit event.');
     assert.equal(sessionsRevokedAudit.rows[0].actor_id, userIds[1]);
-    assert.deepEqual(sessionsRevokedAudit.rows[0].metadata, { reason: 'password_changed', revoked_count: 1 });
+    assert.deepEqual(sessionsRevokedAudit.rows[0].metadata, { reason: 'password_changed', revoked_count: 2 });
 
     const victimSessionBeforeBulkRevoke = await admin.query(
       'SELECT id FROM public.user_sessions WHERE token_hash = $1',
