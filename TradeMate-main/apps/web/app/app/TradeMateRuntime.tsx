@@ -87,16 +87,16 @@ export default function TradeMateRuntime() {
     app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=150. Check the deployment and static asset response.');
     app.onload = () => {
       const postAppModules = [
-        'pf-size',
-        'pm-ring-light',
-        'tm-doc-icons',
-        'tm-scout-light',
-        'tm-mk-compact',
-        'tm-tl-acts',
-        'tm-tl-desktop-fit',
-        'tm-tl-noborder',
-        'tm-feed-desktop-fill',
-        'tm-desktop-polish',
+        'pf-size-loader',
+        'pm-ring-light-loader',
+        'tm-doc-icons-loader',
+        'tm-scout-light-loader',
+        'tm-mk-compact-loader',
+        'tm-tl-acts-loader',
+        'tm-tl-desktop-fit-loader',
+        'tm-tl-noborder-loader',
+        'tm-feed-desktop-fill-loader',
+        'tm-desktop-polish-loader',
         'scout-wallet-fix', 'cards-map-fix', 'feed-x-layout', 'profile-x-layout',
         'scout-spin-fix', 'feed-desktop-media', 'timeline-nav-fix',
         'timeline-chip-small', 'scout-spin-fix-2',
@@ -106,7 +106,7 @@ export default function TradeMateRuntime() {
       // the original stylesheet-loader order.
       postAppModules.forEach((moduleName) => {
         const moduleScript = document.createElement('script');
-        moduleScript.src = `/tm/${moduleName}-loader.js?v=1`;
+        moduleScript.src = `/tm/${moduleName}.js?v=1`;
         moduleScript.async = false;
         document.body.appendChild(moduleScript);
       });
