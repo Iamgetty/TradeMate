@@ -56,6 +56,7 @@ const MIGRATIONS = [
   '047_issue_totp_login_challenge.sql',
   '048_scoped_user_credential_write_operations.sql',
   '049_scoped_auth_lifecycle_operations.sql',
+  '050_signed_transaction_rls_identity.sql',
 ];
 
 async function main() {
@@ -80,6 +81,11 @@ async function main() {
     throw new Error(isProduction
       ? 'MIGRATION_DATABASE_URL is required in production; refusing to run migrations with the runtime DATABASE_URL role.'
       : 'MIGRATION_DATABASE_URL (or DATABASE_URL for local development) is required to run database migrations.');
+  }
+
+  const rlsContextHmacKey = process.env.RLS_CONTEXT_HMAC_KEY || '';
+  if (!/^[0-9a-f]{64}$/i.test(rlsContextHmacKey)) {
+    throw new Error('RLS_CONTEXT_HMAC_KEY must be configured as 64 hexadecimal characters before database migrations can run.');
   }
 
   const pool = new Pool({
@@ -120,6 +126,17 @@ async function main() {
       );
       console.log(`Migration applied successfully: ${migrationName}`);
     }
+
+    // The migration task provisions the verifier key separately from the API
+    // role. The table is private and has no runtime grants; only the migration
+    // owner can rotate this value. API and migration tasks must share this key.
+    await client.query(
+      `INSERT INTO trademate_private.rls_context_hmac_keys (singleton, key_bytes, updated_at)
+       VALUES (TRUE, decode($1, 'hex'), now())
+       ON CONFLICT (singleton) DO UPDATE
+       SET key_bytes = EXCLUDED.key_bytes, updated_at = now()`,
+      [rlsContextHmacKey],
+    );
 
     await client.query('COMMIT');
   } catch (error) {
