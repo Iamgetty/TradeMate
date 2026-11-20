@@ -52,6 +52,7 @@ const MIGRATIONS = [
   '043_scoped_password_credential_resolution.sql',
   '044_complete_account_deletion_cancellation.sql',
   '045_restrict_runtime_auth_secret_reads.sql',
+  '046_trusted_session_identity_for_rls.sql',
 ];
 
 async function main() {
