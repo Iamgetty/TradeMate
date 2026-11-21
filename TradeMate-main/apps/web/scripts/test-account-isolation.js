@@ -168,10 +168,16 @@ function section(startMark, endMark) {
 })();
 
 (function legacyMarketplaceUsesB2BApiContracts() {
-  assert.match(source, /ORD=\[[^\]]*"B2B"/,
-    "the deployed runtime must include a dedicated B2B marketplace division");
-  assert.match(source, /CONTRACT_CATS=\[[^\]]*"B2B"/,
-    "B2B must remain a contract category");
+  const configPath = path.join(scriptDirectory, "../public/tm/market-config.js");
+  const configSource = fs.readFileSync(configPath, "utf8");
+  assert.match(configSource, /var ORD=\[[^\]]*"B2B"/,
+    "the market configuration module must include a dedicated B2B marketplace division");
+  assert.match(configSource, /var CONTRACT_CATS=\[[^\]]*"B2B"/,
+    "B2B must remain a contract category in the market configuration module");
+  assert.match(source, /ORD=TM_MARKET_CONFIG\.ORD/,
+    "app.js must bind the extracted marketplace divisions before use");
+  assert.match(source, /CONTRACT_CATS=TM_MARKET_CONFIG\.CONTRACT_CATS/,
+    "app.js must bind the extracted contract categories before use");
   assert.ok(source.includes('SRV={Services:"service",B2B:"b2b"}'),
     "the live publishing flow must use the supported service and b2b API types");
   const wizardStart = find("function wzCfg(");
