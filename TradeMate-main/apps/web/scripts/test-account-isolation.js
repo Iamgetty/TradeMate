@@ -182,7 +182,7 @@ function section(startMark, endMark) {
     "the live publishing flow must use the supported service and b2b API types");
   const wizardConfigPath = path.join(scriptDirectory, "../public/tm/wizard-config.js");
   const wizardConfigSource = fs.readFileSync(wizardConfigPath, "utf8");
-  assert.match(source, /function wzCfg\\([\\w$]+\\)\\{return tmWizardConfig\\.wzCfg\\([\\w$]+\\)\\}/,
+  assert.ok(source.includes("function wzCfg(t){return tmWizardConfig.wzCfg(t)}"),
     "app.js must preserve the legacy wizard function as a delegate to the extracted module");
   assert.ok(wizardConfigSource.includes('B2B:[{n:"Basics"'),
     "the extracted live wizard must expose the B2B contract form");
