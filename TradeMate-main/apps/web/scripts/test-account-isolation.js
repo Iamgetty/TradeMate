@@ -180,13 +180,14 @@ function section(startMark, endMark) {
     "app.js must bind the extracted contract categories before use");
   assert.ok(source.includes('SRV={Services:"service",B2B:"b2b"}'),
     "the live publishing flow must use the supported service and b2b API types");
-  const wizardStart = find("function wzCfg(");
-  assert.notEqual(wizardStart, -1, "missing source section: function wzCfg(");
-  const wizard = source.slice(wizardStart, wizardStart + 4000);
-  assert.match(wizard, /B2B:\[\{n:"Basics"/,
-    "the live wizard must expose the B2B contract form");
-  assert.match(wizard, /T\("qty","Quantity \/ scope"/,
-    "the B2B wizard must collect quantity or non-numeric scope");
+  const wizardConfigPath = path.join(scriptDirectory, "../public/tm/wizard-config.js");
+  const wizardConfigSource = fs.readFileSync(wizardConfigPath, "utf8");
+  assert.match(source, /function wzCfg\\([\\w$]+\\)\\{return tmWizardConfig\\.wzCfg\\([\\w$]+\\)\\}/,
+    "app.js must preserve the legacy wizard function as a delegate to the extracted module");
+  assert.match(wizardConfigSource, /B2B:\\[\\{n:"Basics"/,
+    "the extracted live wizard must expose the B2B contract form");
+  assert.match(wizardConfigSource, /T\\("qty","Quantity \\/ scope"/,
+    "the extracted B2B wizard must collect quantity or non-numeric scope");
   const publish = section("function publishServer(", '"/submit"');
   assert.match(publish, /"B2B"===[\w$]+&&\/\^\\d\{1,12\}\$\/\.test\([\w$]+\)&&\([\w$]+=[\w$]+\)/,
     "only a whole-number B2B quantity may populate quantityAvailable");
