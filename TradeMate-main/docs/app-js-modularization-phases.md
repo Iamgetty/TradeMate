@@ -29,14 +29,14 @@ Branch: `refactor/split-web-app-runtime`
 
 **Completed:** extracted ten pure decorative SVG/coin/globe renderers (`prmArt`, `dpArt`, `dxArt`, `tfArt`, `tfCoin`, `cxArt`, `scoutArt`, `scoutGlobe`, `dxCoin`, `dpCoin`) into `public/tm/art-utils.js`. The module has no app-state, network, timer or DOM dependencies; `TradeMateRuntime.tsx` verifies it is initialized before loading `app.js`. The app cache is now `v=162`.
 
-**Next safe boundaries:** extract cohesive NFT request orchestration and market quote loading behind explicit context objects. Their request counters, chain selection, caches, UI refreshes and retry timers must move together; do not extract individual callbacks or functions while leaving their mutable state behind. Stateful market-feed managers remain coupled to socket/timer state and must not be extracted until a context interface is defined.
+**Next safe boundaries:** extract cohesive NFT request orchestration and market quote loading behind explicit context objects. Their request counters, chain selection, caches, UI refreshes and retry timers must move together; do not extract individual callbacks or functions while leaving their mutable state behind. The Binance/Bybit/Coinbase exchange-feed lifecycle has now been extracted behind an explicit context factory; central multi-feed coordination and MT5/FX adapters remain separate, stateful targets.
 
 **Remaining targets:**
 Target groups identified in the remaining `app.js`:
 1. Market metadata refresh and FX snapshot helpers (`tmApplyFxRates`, `tmRestoreFxSnapshot`, `tmSaveFxSnapshot`, `liveRefresh`).
 2. NFT snapshot and loading services (`nftSnap*`, `loadLiveNFTs`, `loadNFTCollections`, `loadNFTCollectionItems`, `loadNFTExploreItems`).
 3. Market quote snapshot and loading services (`tmQuoteSnapshot*`, `loadMarketQuotes`).
-4. Market-feed lifecycle and venue adapters (`clearMarketFeedTimers`, `closeMarketSocket`, `resetMarketLevels`, `stopMarketFeed`, `retryMarketFeed`, `activate*`, `openMarketFeed`, `ensureCryptoFeed`).
+4. Central multi-feed coordination and MT5/FX quote adapters (`tmSnapshot*`, `tmConnectCentral`, `ensureMultiFeeds`, `applyMt5MarketQuotes`, expiry and FX feed helpers); the standalone exchange-feed lifecycle is now extracted.
 5. Central feed snapshots, multi-feed coordination and MT5/FX quote adapters (`tmSnapshot*`, `tmConnectCentral`, `ensureMultiFeeds`, `applyMt5MarketQuotes`, expiry and FX feed helpers).
 
 **Estimated output:** up to 90 modules per accelerated batch, subject to dependency audit and safe boundaries. Do not split a function from state it mutates unless that state is moved behind an explicit context interface. Keep spot-price authority and feed sequencing unchanged.
