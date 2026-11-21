@@ -83,6 +83,35 @@ test('homepage shortcut cards do not use the legacy view-entry animation after l
   await expectHomepageEntranceAnimationRemoved();
 });
 
+test('Scout map image is preloaded before the legacy app bundle', async ({ page }) => {
+  await isolateApi(page);
+  const requestedAssets: string[] = [];
+  page.on('request', request => {
+    const pathname = new URL(request.url()).pathname;
+    if (pathname === '/tm/img/scout-map.jpg' || pathname === '/tm/app.js') {
+      requestedAssets.push(pathname);
+    }
+  });
+  const mapResponsePromise = page.waitForResponse(response =>
+    new URL(response.url()).pathname === '/tm/img/scout-map.jpg',
+  );
+
+  await page.goto('/app');
+  await expectPublicLanding(page);
+
+  const preload = page.locator('link[rel="preload"][as="image"][href="/tm/img/scout-map.jpg?v=2"]');
+  await expect(preload).toHaveCount(1);
+  await expect(preload).toHaveAttribute('fetchpriority', 'high');
+
+  const mapResponse = await mapResponsePromise;
+  expect(mapResponse.ok(), 'the Scout map image should load successfully').toBeTruthy();
+  expect(mapResponse.headers()['content-type']).toMatch(/^image\//);
+  expect(requestedAssets.indexOf('/tm/img/scout-map.jpg')).toBeGreaterThanOrEqual(0);
+  expect(requestedAssets.indexOf('/tm/img/scout-map.jpg')).toBeLessThan(
+    requestedAssets.indexOf('/tm/app.js'),
+  );
+});
+
 test('CoinGecko metadata helper loads before the app and reports a successful refresh', async ({ page }) => {
   await isolateApi(page);
   await page.route('https://api.coingecko.com/**', route => route.fulfill({

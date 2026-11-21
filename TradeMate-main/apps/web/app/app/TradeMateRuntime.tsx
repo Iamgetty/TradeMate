@@ -144,6 +144,15 @@ export default function TradeMateRuntime() {
     // render watchdog below are the startup-specific diagnostics.
     window.addEventListener('error', onError);
 
+    // Preload the exact image used by Scout's CSS background before the legacy
+    // app starts. This avoids a late image fetch when the Scout screen is opened.
+    const scoutMapPreload = document.createElement('link');
+    scoutMapPreload.rel = 'preload';
+    scoutMapPreload.as = 'image';
+    scoutMapPreload.href = '/tm/img/scout-map.jpg?v=2';
+    scoutMapPreload.setAttribute('fetchpriority', 'high');
+    document.head.appendChild(scoutMapPreload);
+
     const app = document.createElement('script');
     app.src = '/tm/app.js?v=173';
     app.async = false;
