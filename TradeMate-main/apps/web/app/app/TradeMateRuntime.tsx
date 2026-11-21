@@ -7,6 +7,7 @@ declare global {
     TM_CONFIG?: { api: string };
     TM_MARKETPLACE_MAPPERS?: { create: (dependencies: Record<string, any>) => { mapListing: (listing: Record<string, any>, index: number) => Record<string, any>; dealFromEnq: (enquiry: Record<string, any>) => Record<string, any>; contractStatusLabel: (status: string) => string } };
     TM_MARKET_CONFIG?: Record<string, any>;
+    TM_MARKET_FEED_MANAGER?: { create: (context: { items: Array<Record<string, any>>; st: Record<string, any>; softDraw: () => void }) => { scheduleMarketDraw: () => void } };
     TM_CONTRACT_UI?: { create: (ctx: Record<string, any>) => Record<string, (...args: any[]) => any> };
     TM_MARKET_UI?: { markets: (ctx: Record<string, any>, page: boolean) => string; tradeCore: (ctx: Record<string, any>) => string };
     TM_SCOUT_STYLES?: { ensure: () => void };
