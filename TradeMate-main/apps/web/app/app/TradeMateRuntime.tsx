@@ -7,7 +7,7 @@ declare global {
     TM_CONFIG?: { api: string };
     TM_MARKETPLACE_MAPPERS?: { create: (dependencies: Record<string, any>) => { mapListing: (listing: Record<string, any>, index: number) => Record<string, any>; dealFromEnq: (enquiry: Record<string, any>) => Record<string, any>; contractStatusLabel: (status: string) => string } };
     TM_MARKET_CONFIG?: Record<string, any>;
-    TM_APP_SHELL_ASSETS?: { baseCss: string; scoutTemplate: string };
+    TM_APP_SHELL_ASSETS?: { baseCss: string; scoutTemplate: string; lightThemeCss: string };
     TM_MARKET_FEED_MANAGER?: { create: (context: { items: Array<Record<string, any>>; st: Record<string, any>; softDraw: () => void }) => { scheduleMarketDraw: () => void } };
     TM_CONTRACT_UI?: { create: (ctx: Record<string, any>) => Record<string, (...args: any[]) => any> };
     TM_MARKET_UI?: { markets: (ctx: Record<string, any>, page: boolean) => string; tradeCore: (ctx: Record<string, any>) => string };
@@ -141,10 +141,10 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=170';
+    app.src = '/tm/app.js?v=171';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=170. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=171. Check the deployment and static asset response.');
     app.onload = () => {
       const postAppModules = [
         'pm-fix-css-loader',
@@ -442,7 +442,7 @@ export default function TradeMateRuntime() {
     appShellAssets.async = false;
     appShellAssets.onload = () => {
       const assets = window.TM_APP_SHELL_ASSETS;
-      if (!assets || typeof assets.baseCss !== 'string' || typeof assets.scoutTemplate !== 'string') {
+      if (!assets || typeof assets.baseCss !== 'string' || typeof assets.scoutTemplate !== 'string' || typeof assets.lightThemeCss !== 'string') {
         fail('TradeMate could not start', 'The app-shell assets module loaded without initializing.');
         return;
       }
@@ -653,7 +653,7 @@ export default function TradeMateRuntime() {
       if (!rendered) {
         fail(
           'TradeMate could not start',
-          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=170 returns successfully.'
+          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=171 returns successfully.'
         );
         return;
       }
