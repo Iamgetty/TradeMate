@@ -6,6 +6,7 @@ declare global {
   interface Window {
     TM_CONFIG?: { api: string };
     TM_MARKETPLACE_MAPPERS?: { create: (dependencies: Record<string, any>) => { mapListing: (listing: Record<string, any>, index: number) => Record<string, any>; dealFromEnq: (enquiry: Record<string, any>) => Record<string, any>; contractStatusLabel: (status: string) => string } };
+    TM_MARKET_CONFIG?: Record<string, any>;
     TM_CONTRACT_UI?: { create: (ctx: Record<string, any>) => Record<string, (...args: any[]) => any> };
     TM_MARKET_UI?: { markets: (ctx: Record<string, any>, page: boolean) => string; tradeCore: (ctx: Record<string, any>) => string };
     TM_SCOUT_STYLES?: { ensure: () => void };
@@ -98,6 +99,7 @@ export default function TradeMateRuntime() {
     let scoutStylesReady = false;
     let marketUiReady = false;
     let contractUiReady = false;
+    let marketConfigReady = false;
     let marketplaceMappersReady = false;
     let cssReady = false;
     let layoutCssReady = false;
@@ -135,10 +137,10 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=167';
+    app.src = '/tm/app.js?v=168';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=167. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=168. Check the deployment and static asset response.');
     app.onload = () => {
       const postAppModules = [
         'pm-fix-css-loader',
@@ -187,7 +189,7 @@ export default function TradeMateRuntime() {
     };
 
     const loadApp = () => {
-      if (!feedReady || !feedMediaReady || !viewportModuleReady || !metadataReady || !marketQuoteUtilsReady || !snapshotUtilsReady || !fxSnapshotUtilsReady || !nftItemUtilsReady || !artUtilsReady || !formatUtilsReady || !scoutStylesReady || !marketUiReady || !contractUiReady || !marketplaceMappersReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !feedMediaReady || !viewportModuleReady || !metadataReady || !marketQuoteUtilsReady || !snapshotUtilsReady || !fxSnapshotUtilsReady || !nftItemUtilsReady || !artUtilsReady || !formatUtilsReady || !scoutStylesReady || !marketUiReady || !contractUiReady || !marketConfigReady || !marketplaceMappersReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -415,6 +417,21 @@ export default function TradeMateRuntime() {
     formatUtils.onerror = () => fail('TradeMate could not load', 'The required formatting utility module failed to load.');
     document.body.appendChild(formatUtils);
 
+    // Static marketplace, home-screen and theme configuration is initialized before app.js.
+    const marketConfig = document.createElement('script');
+    marketConfig.src = '/tm/market-config.js?v=1';
+    marketConfig.async = false;
+    marketConfig.onload = () => {
+      if (!window.TM_MARKET_CONFIG || typeof window.TM_MARKET_CONFIG.mkL !== 'function' || !window.TM_MARKET_CONFIG.TM_THEMES) {
+        fail('TradeMate could not start', 'The market configuration module loaded without initializing.');
+        return;
+      }
+      marketConfigReady = true;
+      loadApp();
+    };
+    marketConfig.onerror = () => fail('TradeMate could not load', 'The required market configuration module failed to load.');
+    document.body.appendChild(marketConfig);
+
     // Contract, agreement and conversation renderers are initialized before app.js.
     const contractUi = document.createElement('script');
     contractUi.src = '/tm/contract-ui.js?v=1';
@@ -601,7 +618,7 @@ export default function TradeMateRuntime() {
       if (!rendered) {
         fail(
           'TradeMate could not start',
-          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=167 returns successfully.'
+          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=168 returns successfully.'
         );
         return;
       }
