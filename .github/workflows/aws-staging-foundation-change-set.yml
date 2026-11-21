@@ -60,22 +60,29 @@ jobs:
           set -euo pipefail
           STACK_NAME="trademate-staging-foundation"
           CHANGE_SET_NAME="${STACK_NAME}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          PARAMETERS_FILE="$RUNNER_TEMP/trademate-cfn-parameters.json"
+
+          # JSON preserves the comma-separated subnet IDs as one string value.
+          cat > "$PARAMETERS_FILE" <<'PARAMETERS'
+          [
+            {"ParameterKey":"EnvironmentName","ParameterValue":"trademate-staging"},
+            {"ParameterKey":"ExistingVpcId","ParameterValue":"vpc-09fcbb52e99d9ddf1"},
+            {"ParameterKey":"NatPublicSubnetId","ParameterValue":"subnet-0f0650548512fe17f"},
+            {"ParameterKey":"ExistingDatabaseSecurityGroupId","ParameterValue":"sg-0b8c91288a83085e"},
+            {"ParameterKey":"ExistingDatabaseSubnetIds","ParameterValue":"subnet-0f0650548512fe17f,subnet-0b06dab6a814e941d,subnet-0f2479f01e7482953"},
+            {"ParameterKey":"AppAvailabilityZoneA","ParameterValue":"eu-north-1a"},
+            {"ParameterKey":"AppAvailabilityZoneB","ParameterValue":"eu-north-1b"},
+            {"ParameterKey":"PrivateAppSubnetACidr","ParameterValue":"172.31.48.0/24"},
+            {"ParameterKey":"PrivateAppSubnetBCidr","ParameterValue":"172.31.49.0/24"}
+          ]
+          PARAMETERS
 
           CHANGE_SET_ID="$(aws cloudformation create-change-set \
             --stack-name "$STACK_NAME" \
             --change-set-name "$CHANGE_SET_NAME" \
             --change-set-type CREATE \
             --template-body file://infra/aws/staging/foundation.yaml \
-            --parameters \
-              ParameterKey=EnvironmentName,ParameterValue=trademate-staging \
-              ParameterKey=ExistingVpcId,ParameterValue=vpc-09fcbb52e99d9ddf1 \
-              ParameterKey=NatPublicSubnetId,ParameterValue=subnet-0f0650548512fe17f \
-              ParameterKey=ExistingDatabaseSecurityGroupId,ParameterValue=sg-0b8c91288a83085e \
-              ParameterKey=ExistingDatabaseSubnetIds,ParameterValue=subnet-0f0650548512fe17f,subnet-0b06dab6a814e941d,subnet-0f2479f01e7482953 \
-              ParameterKey=AppAvailabilityZoneA,ParameterValue=eu-north-1a \
-              ParameterKey=AppAvailabilityZoneB,ParameterValue=eu-north-1b \
-              ParameterKey=PrivateAppSubnetACidr,ParameterValue=172.31.48.0/24 \
-              ParameterKey=PrivateAppSubnetBCidr,ParameterValue=172.31.49.0/24 \
+            --parameters "file://$PARAMETERS_FILE" \
             --tags Key=Environment,Value=staging Key=Project,Value=TradeMate Key=ManagedBy,Value=CloudFormation \
             --region eu-north-1 \
             --query Id --output text)"
