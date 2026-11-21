@@ -1,0 +1,36 @@
+name: AWS Self-Hosted Runner Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-runner:
+    name: Verify EC2 runner and AWS identity
+    runs-on: [self-hosted, Linux, X64, aws-staging]
+    timeout-minutes: 5
+    env:
+      AWS_REGION: eu-north-1
+      AWS_DEFAULT_REGION: eu-north-1
+
+    steps:
+      - name: Confirm this job is running on the EC2 runner
+        run: |
+          echo "TradeMate self-hosted runner received the job."
+          echo "Runner hostname: $(hostname)"
+          echo "Runner user: $(whoami)"
+          uname -a
+
+      - name: Check AWS CLI
+        run: |
+          if ! command -v aws >/dev/null 2>&1; then
+            echo "::error::AWS CLI is not installed on the runner."
+            exit 1
+          fi
+          aws --version
+
+      - name: Verify EC2 instance-role credentials
+        run: |
+          aws sts get-caller-identity
