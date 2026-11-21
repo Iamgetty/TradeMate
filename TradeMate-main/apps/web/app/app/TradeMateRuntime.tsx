@@ -146,7 +146,7 @@ export default function TradeMateRuntime() {
     app.src = '/tm/app.js?v=172';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=171. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=172. Check the deployment and static asset response.');
     app.onload = () => {
       const postAppModules = [
         'pm-fix-css-loader',
@@ -670,7 +670,7 @@ export default function TradeMateRuntime() {
       if (!rendered) {
         fail(
           'TradeMate could not start',
-          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=171 returns successfully.'
+          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=172 returns successfully.'
         );
         return;
       }
