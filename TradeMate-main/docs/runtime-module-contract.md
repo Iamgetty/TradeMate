@@ -44,8 +44,9 @@ The getters are deliberate: the runtime owns mutable state, and the page must ob
 2. The module does not mutate runtime state while rendering.
 3. Selection changes remain owned by existing `PC.cftoggle`, `PC.cfpick`, `PC.cfnone`, and `PC.cfbrowse` handlers.
 4. No new global state, `eval`, string splitting, or source-code execution.
-5. If the module is unavailable or its contract is invalid, startup fails with a useful diagnostic; do not silently render an empty page.
-6. The module is loaded before the runtime registers page renderers. First-use loading must not be attempted until this contract is tested.
+5. If the module is unavailable, the existing inline Pick renderer remains the compatibility fallback; this preserves behavior during the post-app script fetch and on asset failure.
+6. The module is appended to the post-app script queue after `app.js` loads. It is therefore a separate runtime file, but it is not first-navigation lazy-loaded and may not be available for the earliest Pick render. The inline fallback covers that window.
+7. The module contract is tested independently; full renderer parity and navigation/back-stack acceptance remain required before removing the fallback or introducing first-use loading.
 
 ## Acceptance tests before extraction
 
