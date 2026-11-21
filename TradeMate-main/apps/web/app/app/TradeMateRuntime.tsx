@@ -154,7 +154,7 @@ export default function TradeMateRuntime() {
     document.head.appendChild(scoutMapPreload);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=173';
+    app.src = '/tm/app.js?v=174';
     app.async = false;
     app.dataset.trademateApp = 'true';
     app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=173. Check the deployment and static asset response.');
