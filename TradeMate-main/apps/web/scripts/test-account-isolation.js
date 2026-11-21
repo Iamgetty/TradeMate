@@ -172,7 +172,7 @@ function section(startMark, endMark) {
   const configSource = fs.readFileSync(configPath, "utf8");
   assert.match(configSource, /var ORD=\[[^\]]*"B2B"/,
     "the market configuration module must include a dedicated B2B marketplace division");
-  assert.match(configSource, /var CONTRACT_CATS=\[[^\]]*"B2B"/,
+  assert.match(configSource, /CONTRACT_CATS=\[[^\]]*"B2B"/,
     "B2B must remain a contract category in the market configuration module");
   assert.match(source, /ORD=TM_MARKET_CONFIG\.ORD/,
     "app.js must bind the extracted marketplace divisions before use");
