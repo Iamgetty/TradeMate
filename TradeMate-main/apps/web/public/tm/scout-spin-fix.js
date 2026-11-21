@@ -1,0 +1,3 @@
+/* Extracted from app.js: Scout scanning animation styling. */
+/* Contract Scout: logo is part of scout-map.jpg; keep the scanning rings/sweep turning smoothly */
+!function(){if(document.getElementById("scSpinFix"))return;var s=document.createElement("style");s.id="scSpinFix";s.textContent=".sc-gl .sc-lc .r,.sc-gl .sc-lc .w{will-change:transform;-webkit-backface-visibility:hidden;backface-visibility:hidden}@media(prefers-reduced-motion:reduce){.sc-gl .sc-lc .r{animation:scRot 26s linear infinite!important}.sc-gl .sc-lc .w{animation:scRot 5s linear infinite!important}}";document.head.appendChild(s)}();

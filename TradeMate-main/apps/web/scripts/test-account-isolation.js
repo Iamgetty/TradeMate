@@ -168,19 +168,26 @@ function section(startMark, endMark) {
 })();
 
 (function legacyMarketplaceUsesB2BApiContracts() {
-  assert.match(source, /ORD=\[[^\]]*"B2B"/,
-    "the deployed runtime must include a dedicated B2B marketplace division");
-  assert.match(source, /CONTRACT_CATS=\[[^\]]*"B2B"/,
-    "B2B must remain a contract category");
+  const configPath = path.join(scriptDirectory, "../public/tm/market-config.js");
+  const configSource = fs.readFileSync(configPath, "utf8");
+  assert.match(configSource, /var ORD=\[[^\]]*"B2B"/,
+    "the market configuration module must include a dedicated B2B marketplace division");
+  assert.match(configSource, /CONTRACT_CATS=\[[^\]]*"B2B"/,
+    "B2B must remain a contract category in the market configuration module");
+  assert.match(source, /ORD=TM_MARKET_CONFIG\.ORD/,
+    "app.js must bind the extracted marketplace divisions before use");
+  assert.match(source, /CONTRACT_CATS=TM_MARKET_CONFIG\.CONTRACT_CATS/,
+    "app.js must bind the extracted contract categories before use");
   assert.ok(source.includes('SRV={Services:"service",B2B:"b2b"}'),
     "the live publishing flow must use the supported service and b2b API types");
-  const wizardStart = find("function wzCfg(");
-  assert.notEqual(wizardStart, -1, "missing source section: function wzCfg(");
-  const wizard = source.slice(wizardStart, wizardStart + 4000);
-  assert.match(wizard, /B2B:\[\{n:"Basics"/,
-    "the live wizard must expose the B2B contract form");
-  assert.match(wizard, /T\("qty","Quantity \/ scope"/,
-    "the B2B wizard must collect quantity or non-numeric scope");
+  const wizardConfigPath = path.join(scriptDirectory, "../public/tm/wizard-config.js");
+  const wizardConfigSource = fs.readFileSync(wizardConfigPath, "utf8");
+  assert.ok(source.includes("function wzCfg(t){return tmWizardConfig.wzCfg(t)}"),
+    "app.js must preserve the legacy wizard function as a delegate to the extracted module");
+  assert.ok(wizardConfigSource.includes('B2B:[{n:"Basics"'),
+    "the extracted live wizard must expose the B2B contract form");
+  assert.ok(wizardConfigSource.includes('T("qty","Quantity / scope"'),
+    "the extracted B2B wizard must collect quantity or non-numeric scope");
   const publish = section("function publishServer(", '"/submit"');
   assert.match(publish, /"B2B"===[\w$]+&&\/\^\\d\{1,12\}\$\/\.test\([\w$]+\)&&\([\w$]+=[\w$]+\)/,
     "only a whole-number B2B quantity may populate quantityAvailable");
@@ -188,11 +195,19 @@ function section(startMark, endMark) {
     "numeric inventory must be removed from description text when sent separately");
   assert.match(publish, /listingType:"B2B"===[\w$]+\?"b2b":"service",division:DIVISION_SLUG\[[\w$]+\][^}]*quantityAvailable:[\w$]+/,
     "all contract divisions must send their category while B2B retains its API listing type and inventory field");
-  const browse = section("function mapListing(", "function loadMarket(");
+  const mapperPath = path.join(scriptDirectory, "../public/tm/marketplace-mappers.js");
+  const mapperSource = fs.readFileSync(mapperPath, "utf8");
+  const browseStart = mapperSource.indexOf("function mapListing(");
+  const browseEnd = mapperSource.indexOf("function dealFromEnq(", browseStart + 1);
+  assert.ok(browseStart !== -1 && browseEnd !== -1,
+    "marketplace mapper module must expose the listing response mapper");
+  const browse = mapperSource.slice(browseStart, browseEnd);
   assert.match(browse, /DIVISION_LABEL\[[\w$]+\.division\]\|\|\("b2b"===[\w$]+\.listing_type\?"B2B":"Services"\)/,
     "public listings must be mapped to their saved Contract Category");
   assert.match(browse, /[\w$]+\+" opportunity"/,
     "public listing details must identify the saved Contract Category");
+  assert.match(source, /mapListing=TM_MARKETPLACE_MAPPERS\.create/,
+    "app.js must bind the extracted mapper without changing its legacy call site");
   assert.match(source, /SELL=\{Services:\["contract"\],B2B:\["contract"\]\}/,
     "B2B listings must use contract proposal actions");
 })();

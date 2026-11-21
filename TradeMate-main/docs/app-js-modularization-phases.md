@@ -2,12 +2,20 @@
 
 Branch: `refactor/split-web-app-runtime`
 
+## Latest audit status — 2026-11-21
+- Latest PR head before this audit: `dd0e19a7a6160af2c78c6260978d8772bd153d23`; regression-test repair commit: `fd242247f2dcb101d9e1c17bf70ad155c7b438a8`.
+- Audited 73 distinct JavaScript/CSS asset references in `TradeMateRuntime.tsx`; every referenced file exists in `public/tm/`.
+- Browser app-shell/live API acceptance, Cloudflare compatibility, API, database, exchange-feed and security jobs passed on the audited head.
+- TradeMate CI exposed a stale B2B wizard assertion: it searched for the schema inside `app.js` after the schema had moved to `wizard-config.js`. The test now reads the extracted module and verifies that `app.js` retains its legacy delegate.
+- The CI run triggered by the repair commit is in progress. Production web build is not yet confirmed; do not treat the PR as merge-ready until that run passes.
+- No application runtime behavior was changed in the regression-test repair.
+
 ## Completed
 
 ### Phase 1 — independent runtime patches
 - 41 standalone runtime modules extracted.
 - Runtime order is preserved by `TradeMateRuntime.tsx`.
-- `app.js` reduced from 705,335 to 684,937 characters (20,398 characters).
+- `app.js` currently contains 438,693 characters, down 266,642 characters (37.8%) from the 705,335-character baseline.
 - CI and browser acceptance checks passed on the last verified head.
 
 ## Remaining phases
@@ -16,23 +24,30 @@ Branch: `refactor/split-web-app-runtime`
 
 **Additional completed extraction:** NFT and market-quote snapshot storage factories moved to `public/tm/snapshot-utils.js`. Existing localStorage key formats, payload shapes, chain scoping and cache expiry windows are preserved. Runtime startup now waits for this dependency before loading `app.js`.
 
-**Completed:** extracted the FX reference-rate snapshot store into `public/tm/fx-snapshot-utils.js`. It receives the market item array through an explicit factory option and preserves the legacy localStorage key, payload, 14-day expiry and cached/live quote mutation rules. Runtime startup now verifies this module before `app.js` runs. The app cache version is now `v=157`.
+**Completed:** extracted the FX reference-rate snapshot store into `public/tm/fx-snapshot-utils.js`. It receives the market item array through an explicit factory option and preserves the legacy localStorage key, payload, 14-day expiry and cached/live quote mutation rules. Runtime startup now verifies this module before `app.js` runs. The app cache version is now `v=158`.
 
-**Completed:** extracted five pure quote helpers (`quoteTimestampMs`, `mt5SymbolKey`, `mt5QuoteIsFresh`, `mt5QuotePrice`, `mt5NameForQuote`) and their MT5 metadata constants into `public/tm/market-quote-utils.js`. The runtime loads this dependency before `app.js`; the legacy names are bound to the exported helpers to preserve existing call sites. `app.js` cache version is now `v=154`.
+**Completed:** extracted five pure quote helpers (`quoteTimestampMs`, `mt5SymbolKey`, `mt5QuoteIsFresh`, `mt5QuotePrice`, `mt5NameForQuote`) and their MT5 metadata constants into `public/tm/market-quote-utils.js`. The runtime loads this dependency before `app.js`; the legacy names are bound to the exported helpers to preserve existing call sites. `app.js` cache version is now `v=157`.
 
-**Completed:** extracted the pure NFT API-item normalizer into `public/tm/nft-item-utils.js`. Search results, collection items and top-collection exploration now share the same mapping helper. It preserves every legacy output field and chain fallback; the runtime verifies the helper before starting `app.js` (cache `v=157`).
+**Completed:** extracted the pure NFT collection-result interleaving algorithm into `public/tm/nft-item-utils.js` and reused it in both NFT explore merge passes. This removes duplicate ordering loops while preserving the round-robin ordering of collection results. The same edit corrected a malformed `returnwindow` token in the collection fetch normalizer call. The NFT utility cache is `v=2`; app runtime cache is `v=158`.
 
-**Next safe boundaries:** audit NFT loading boundaries and market quote loading; the stateful feed managers remain coupled to socket/timer state and must not be extracted until a context interface is defined.
+**Completed:** moved NFT result sorting (price and 24-hour sales, including the existing missing-value fallbacks) and NFT favorite-key generation into the pure NFT utility module. The renderer now calls these shared helpers without changing the sorting defaults or favorite key format. NFT utility cache is `v=3`; app runtime cache is `v=159`.
+
+**Completed:** extracted the market-quote candidate filter and deterministic request-key builder into `public/tm/market-quote-utils.js`. The filter retains the Twelve Data exclusion and fresh Exness MT5 quote bypass; the key retains the exact `assetClass:symbol,symbol` format used by both request de-duplication and follow-up refresh checks. Market utility cache is `v=2`; app runtime cache is `v=160`.
+
+
+**Completed:** extracted ten pure decorative SVG/coin/globe renderers (`prmArt`, `dpArt`, `dxArt`, `tfArt`, `tfCoin`, `cxArt`, `scoutArt`, `scoutGlobe`, `dxCoin`, `dpCoin`) into `public/tm/art-utils.js`. The module has no app-state, network, timer or DOM dependencies; `TradeMateRuntime.tsx` verifies it is initialized before loading `app.js`. The app cache is now `v=162`.
+
+**Next safe boundaries:** extract cohesive NFT request orchestration and market quote loading behind explicit context objects. Their request counters, chain selection, caches, UI refreshes and retry timers must move together; do not extract individual callbacks or functions while leaving their mutable state behind. The Binance/Bybit/Coinbase exchange-feed lifecycle has now been extracted behind an explicit context factory; central multi-feed coordination and MT5/FX adapters remain separate, stateful targets.
 
 **Remaining targets:**
 Target groups identified in the remaining `app.js`:
 1. Market metadata refresh and FX snapshot helpers (`tmApplyFxRates`, `tmRestoreFxSnapshot`, `tmSaveFxSnapshot`, `liveRefresh`).
 2. NFT snapshot and loading services (`nftSnap*`, `loadLiveNFTs`, `loadNFTCollections`, `loadNFTCollectionItems`, `loadNFTExploreItems`).
 3. Market quote snapshot and loading services (`tmQuoteSnapshot*`, `loadMarketQuotes`).
-4. Market-feed lifecycle and venue adapters (`clearMarketFeedTimers`, `closeMarketSocket`, `resetMarketLevels`, `stopMarketFeed`, `retryMarketFeed`, `activate*`, `openMarketFeed`, `ensureCryptoFeed`).
+4. Central multi-feed coordination and MT5/FX quote adapters (`tmSnapshot*`, `tmConnectCentral`, `ensureMultiFeeds`, `applyMt5MarketQuotes`, expiry and FX feed helpers); the standalone exchange-feed lifecycle is now extracted.
 5. Central feed snapshots, multi-feed coordination and MT5/FX quote adapters (`tmSnapshot*`, `tmConnectCentral`, `ensureMultiFeeds`, `applyMt5MarketQuotes`, expiry and FX feed helpers).
 
-**Estimated output:** 10–15 modules, subject to dependency audit. Do not split a function from state it mutates unless that state is moved behind an explicit context interface. Keep spot-price authority and feed sequencing unchanged.
+**Estimated output:** up to 90 modules per accelerated batch, subject to dependency audit and safe boundaries. Do not split a function from state it mutates unless that state is moved behind an explicit context interface. Keep spot-price authority and feed sequencing unchanged.
 
 ### Phase 3 — trading and portfolio workflows
 - Trade page and trade-core rendering.
@@ -66,3 +81,32 @@ Target groups identified in the remaining `app.js`:
 5. Verify the PR checks before starting the next phase. Do not merge or deploy as part of this refactor without explicit approval.
 
 Counts are estimates, not a promise to split tightly coupled code. The first phase-2 audit may narrow or reorder these boundaries if the source proves more coupled than the initial scan suggests.
+
+**Completed:** extracted the three pure shared formatting helpers (`esc`, `fmt`, `fx2`) into `public/tm/format-utils.js`. `TradeMateRuntime.tsx` verifies the module is initialized before `app.js` loads; legacy call sites retain the same helper names and formatting behavior. The app cache is now `v=163`.
+
+
+**Completed:** extracted the pure marketplace API-to-view mappers (`mapListing`, `dealFromEnq`, `contractStatusLabel`) into `marketplace-mappers.js`. The module receives formatting helpers and lookup tables explicitly; legacy call sites keep their names. `TradeMateRuntime.tsx` now verifies the module before allowing `app.js` to start. App cache advanced to `v=164`.
+
+
+**Completed:** extracted the 23,184-character Scout stylesheet installer into `public/tm/scout-styles.js`. The extracted module receives the existing `SCMAP` asset URL explicitly, preserves the `scStyles` duplicate-injection guard, and is loaded and initialization-checked by `TradeMateRuntime.tsx` before `app.js`. The legacy `scoutCss()` call sites remain intact; app cache is now `v=165`.
+
+
+**Completed:** extracted the `markets()` and `tradeCore()` renderers (11,213 source characters) into `public/tm/market-ui.js`. Their shared runtime values and callbacks are injected at call time; the legacy function signatures remain as delegates. `TradeMateRuntime.tsx` now loads and validates the module before app startup. App cache is `v=166`.
+
+
+**Completed:** extracted 22 contract, agreement and conversation UI renderers/helpers (13,162 source characters) into `public/tm/contract-ui.js`. A lazy factory receives the legacy runtime dependencies once, and the original function signatures remain as delegates. Runtime startup validates the module before loading `app.js`; app cache is `v=167`.
+
+
+**Completed:** extracted 14,693 characters of static marketplace, home-screen and theme configuration into `public/tm/market-config.js`. The module has no app-state or DOM dependencies; it exports the existing constants, market seed items, home-navigation helpers and theme definitions through a runtime-validated configuration object. `app.js` binds the original names before use. Runtime startup waits for the module; app cache advanced to `v=168`. Net `app.js` reduction: 14,069 characters.
+
+**Completed:** extracted the stateful exchange market-feed lifecycle (socket ownership, venue failover, retry/recovery timers, and throttled redraw scheduling) into `public/tm/market-feed-manager.js`. The module receives `items`, `st` and `softDraw` through an explicit factory context; the legacy `scheduleMarketDraw` call sites remain bound to the returned function. The runtime validates the factory before starting `app.js`. Net `app.js` reduction: 10,692 characters; cache advanced to `v=169`.
+
+**Completed:** extracted the static base application stylesheet payload and Scout shadow-root template into `public/tm/app-shell-assets.js`. Both assets are literal-only strings with no app-state or DOM dependencies; their evaluated contents were compared against the pre-extraction source and match exactly. `TradeMateRuntime.tsx` now loads and validates the asset module before `app.js`; app cache advanced to `v=170`. Net `app.js` reduction: 111,337 characters.
+
+
+
+
+**Completed:** extracted the new-contract wizard schema builder (`wzCfg`, 4,804 source characters) into `public/tm/wizard-config.js`. The factory receives all field constructors and category/payment/currency lookup tables through an explicit context; it has no independent app-state, DOM, network or timer ownership. The runtime validates and gates startup on the module before `app.js`, which retains the legacy `wzCfg(type)` signature as a delegate. The app cache is now `v=172`. Net `app.js` reduction: 4,614 characters (446,447 → 441,833). Syntax checks for `app.js` and the new module passed; the factory smoke test returned the expected four-step KYC schema.
+**Completed:** extracted the remaining 38,642-character literal light-theme stylesheet from the app-shell CSS composition into `public/tm/app-shell-assets.js` as `lightThemeCss`. The payload remains byte-for-byte identical and is appended at the same position in the stylesheet composition. Runtime startup validates the additional asset before loading `app.js`; app cache advanced to `v=171`. Net `app.js` reduction: 38,602 characters.
+
+**Completed:** extracted the four NFT request orchestration functions (`loadLiveNFTs`, `loadNFTCollections`, `loadNFTCollectionItems`, `loadNFTExploreItems`) into `public/tm/nft-loaders.js`. The factory receives the existing NFT state through explicit getter/setter properties, plus the snapshot, normalization, and redraw dependencies. Legacy function names and call signatures remain in `app.js`; request counters, stale-cache behavior, batching, per-request abort timeouts, chain guards, and redraw conditions are preserved. Runtime validates the module before app startup. Net `app.js` reduction: 3,140 characters (441,833 → 438,693); cache advanced to `v=173`. JavaScript syntax checks passed for both files, and a factory smoke test confirmed all four loader exports. Full CI and browser checks remain outstanding.

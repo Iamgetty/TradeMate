@@ -5,6 +5,55 @@ import { useEffect, useState } from 'react';
 declare global {
   interface Window {
     TM_CONFIG?: { api: string };
+    TM_MARKETPLACE_MAPPERS?: { create: (dependencies: Record<string, any>) => { mapListing: (listing: Record<string, any>, index: number) => Record<string, any>; dealFromEnq: (enquiry: Record<string, any>) => Record<string, any>; contractStatusLabel: (status: string) => string } };
+    TM_MARKET_CONFIG?: Record<string, any>;
+    TM_APP_SHELL_ASSETS?: { baseCss: string; scoutTemplate: string; lightThemeCss: string };
+    TM_MARKET_FEED_MANAGER?: { create: (context: { items: Array<Record<string, any>>; st: Record<string, any>; softDraw: () => void }) => { scheduleMarketDraw: () => void } };
+    TM_CONTRACT_UI?: { create: (ctx: Record<string, any>) => Record<string, (...args: any[]) => any> };
+    TM_MARKET_UI?: { markets: (ctx: Record<string, any>, page: boolean) => string; tradeCore: (ctx: Record<string, any>) => string };
+    TM_SCOUT_STYLES?: { ensure: () => void };
+    TM_FORMAT_UTILS?: { esc: (value: unknown) => string; fmt: (value: number, digits?: number) => string; fx2: (value: number, digits: number) => string };
+    TM_ART_UTILS?: { prmArt: () => string; dpArt: () => string; dxArt: () => string; tfArt: () => string; tfCoin: () => string; cxArt: () => string; scoutArt: (...args: any[]) => string; scoutGlobe: (...args: any[]) => string; dxCoin: (...args: any[]) => string; dpCoin: (...args: any[]) => string };
+    TM_FX_SNAPSHOT_UTILS?: {
+      createFxSnapshotStore: (options: { items: Array<Record<string, any>> }) => {
+        apply: (rates: Record<string, number>, mode?: string, timestamp?: string, savedAt?: number) => boolean;
+        restore: () => boolean;
+        save: (payload: { rates?: Record<string, number>; time_last_update_utc?: string }) => void;
+      };
+    };
+    TM_SNAPSHOT_UTILS?: {
+      createNftSnapshotStore: (options: { prefix: string; getChain: () => string }) => {
+        key: (term: string) => string;
+        save: (term: string, items: unknown[]) => void;
+        load: (term: string) => unknown[] | null;
+      };
+      createMarketQuoteSnapshotStore: (options: { prefix: string; items: Array<Record<string, any>> }) => {
+        key: (item: Record<string, any>) => string;
+        save: (item: Record<string, any>, quote: Record<string, any>) => void;
+        restore: (item: Record<string, any>) => boolean;
+        restoreAll: () => void;
+      };
+    };
+    TM_NFT_ITEM_UTILS?: {
+      normalizeItems: (items: unknown[], chain: string, color?: string) => Array<Record<string, any>>;
+      interleaveItems: (groups: Array<Array<Record<string, any>>>) => Array<Record<string, any>>;
+      sortItems: (items: Array<Record<string, any>>, sort: string) => Array<Record<string, any>>;
+      favoriteKey: (item: Record<string, any>) => string;
+    };
+    TM_NFT_LOADERS?: { create: (ctx: Record<string, any>) => Record<string, (...args: any[]) => any> };
+    TM_WIZARD_CONFIG?: { create: (ctx: Record<string, any>) => { wzCfg: (type: string) => Record<string, any> } };
+    TM_MARKET_QUOTE_UTILS?: {
+      MT5_PUBLIC_QUOTE_MAX_AGE_MS: number;
+      MT5_CATEGORY_BY_TYPE: Record<string, string>;
+      MT5_DISPLAY_NAMES: Record<string, string>;
+      quoteTimestampMs: (value: unknown) => number;
+      mt5SymbolKey: (value: unknown) => string;
+      mt5QuoteIsFresh: (value: unknown) => boolean;
+      mt5QuotePrice: (value: unknown) => number | null;
+      mt5NameForQuote: (value: unknown) => string;
+      selectMarketQuoteItems: (items: Array<Record<string, any>>, assetClass: string, isMt5QuoteFresh: (item: Record<string, any>) => boolean) => Array<Record<string, any>>;
+      marketQuoteRequestKey: (assetClass: string, items: Array<Record<string, any>>) => string;
+    };
     __tradeMateBooted?: boolean;
     tmMarketMetadataStatus?: {
       state: 'fresh' | 'stale' | 'unavailable';
@@ -42,7 +91,24 @@ export default function TradeMateRuntime() {
 
     let settled = false;
     let feedReady = false;
+    let feedMediaReady = false;
+    let viewportModuleReady = false;
     let metadataReady = false;
+    let marketQuoteUtilsReady = false;
+    let wizardConfigReady = false;
+    let nftLoadersReady = false;
+    let snapshotUtilsReady = false;
+    let fxSnapshotUtilsReady = false;
+    let nftItemUtilsReady = false;
+    let artUtilsReady = false;
+    let formatUtilsReady = false;
+    let scoutStylesReady = false;
+    let marketUiReady = false;
+    let contractUiReady = false;
+    let marketConfigReady = false;
+    let appShellAssetsReady = false;
+    let marketFeedManagerReady = false;
+    let marketplaceMappersReady = false;
     let cssReady = false;
     let layoutCssReady = false;
     let patchesCssReady = false;
@@ -79,13 +145,59 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=148';
+    app.src = '/tm/app.js?v=173';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=148. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=173. Check the deployment and static asset response.');
+    app.onload = () => {
+      const postAppModules = [
+        'pm-fix-css-loader',
+        'pm-card-height-sync',
+        'pm-ring-css-loader',
+        'pm-final-css-loader',
+        'pm-final2-css-loader',
+        'pm-tiles-css-loader',
+        'pm-contract-card-loader',
+        'pm-final3-css-loader',
+        'tm-top-redesign-loader',
+        'tm-unify-loader',
+        'tm-consistency-css-loader',
+        'pm-mobile-size-css-loader',
+        'pm-calm-css-loader',
+        'tm-home-svc-css-loader',
+        'tm-home-grid-css-loader',
+        'tm-home-more-css-loader',
+        'tm-home-explore-size-loader',
+        'pm-docs-css-loader',
+        'tm-light-solid-patch',
+        'tm-light-palette-patch',
+        'pf-size-loader',
+        'pm-ring-light-loader',
+        'tm-doc-icons-loader',
+        'tm-scout-light-loader',
+        'tm-mk-compact-loader',
+        'tm-tl-acts-loader',
+        'tm-tl-desktop-fit-loader',
+        'tm-tl-noborder-loader',
+        'tm-feed-desktop-fill-loader',
+        'tm-desktop-polish-loader',
+        'scout-wallet-fix', 'cards-map-fix', 'feed-x-layout', 'profile-x-layout',
+        'scout-spin-fix', 'feed-desktop-media', 'timeline-nav-fix',
+        'timeline-chip-small', 'scout-spin-fix-2',
+      ];
+      // Dynamic classic scripts with async=false execute in insertion order.
+      // Appending the whole queue avoids serial network waits while preserving
+      // the original stylesheet-loader order.
+      postAppModules.forEach((moduleName) => {
+        const moduleScript = document.createElement('script');
+        moduleScript.src = `/tm/${moduleName}.js?v=1`;
+        moduleScript.async = false;
+        document.body.appendChild(moduleScript);
+      });
+    };
 
     const loadApp = () => {
-      if (!feedReady || !metadataReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !feedMediaReady || !viewportModuleReady || !metadataReady || !marketQuoteUtilsReady || !wizardConfigReady || !nftLoadersReady || !snapshotUtilsReady || !fxSnapshotUtilsReady || !nftItemUtilsReady || !artUtilsReady || !formatUtilsReady || !scoutStylesReady || !marketUiReady || !contractUiReady || !marketConfigReady || !appShellAssetsReady || !marketFeedManagerReady || !marketplaceMappersReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -268,6 +380,232 @@ export default function TradeMateRuntime() {
     earnPreload.onerror = () => { earnCssReady = true; loadApp(); };
     document.head.appendChild(earnPreload);
 
+    // Snapshot factories must be ready before app.js binds legacy snapshot helpers.
+    const snapshotUtils = document.createElement('script');
+    snapshotUtils.src = '/tm/snapshot-utils.js?v=1';
+    snapshotUtils.async = false;
+    snapshotUtils.onload = () => {
+      if (!window.TM_SNAPSHOT_UTILS) {
+        fail('TradeMate could not start', 'The snapshot utility module loaded without initialising.');
+        return;
+      }
+      snapshotUtilsReady = true;
+      loadApp();
+    };
+    snapshotUtils.onerror = () => fail('TradeMate could not load', 'The required snapshot utility module failed to load.');
+    document.body.appendChild(snapshotUtils);
+
+    // Marketplace API-to-view mappers are pure and receive formatting/constants explicitly.
+    const marketplaceMappers = document.createElement('script');
+    marketplaceMappers.src = '/tm/marketplace-mappers.js?v=1';
+    marketplaceMappers.async = false;
+    marketplaceMappers.onload = () => {
+      if (!window.TM_MARKETPLACE_MAPPERS) {
+        fail('TradeMate could not start', 'The marketplace mapper module loaded without initialising.');
+        return;
+      }
+      marketplaceMappersReady = true;
+      loadApp();
+    };
+    marketplaceMappers.onerror = () => fail('TradeMate could not load', 'The required marketplace mapper module failed to load.');
+    document.body.appendChild(marketplaceMappers);
+
+    // Pure display-formatting helpers must be ready before app.js binds their legacy names.
+    const formatUtils = document.createElement('script');
+    formatUtils.src = '/tm/format-utils.js?v=1';
+    formatUtils.async = false;
+    formatUtils.onload = () => {
+      if (!window.TM_FORMAT_UTILS) {
+        fail('TradeMate could not start', 'The formatting utility module loaded without initialising.');
+        return;
+      }
+      formatUtilsReady = true;
+      loadApp();
+    };
+    formatUtils.onerror = () => fail('TradeMate could not load', 'The required formatting utility module failed to load.');
+    document.body.appendChild(formatUtils);
+
+    // Static marketplace, home-screen and theme configuration is initialized before app.js.
+    const marketConfig = document.createElement('script');
+    marketConfig.src = '/tm/market-config.js?v=1';
+    marketConfig.async = false;
+    marketConfig.onload = () => {
+      if (!window.TM_MARKET_CONFIG || typeof window.TM_MARKET_CONFIG.mkL !== 'function' || !window.TM_MARKET_CONFIG.TM_THEMES) {
+        fail('TradeMate could not start', 'The market configuration module loaded without initializing.');
+        return;
+      }
+      marketConfigReady = true;
+      loadApp();
+    };
+    marketConfig.onerror = () => fail('TradeMate could not load', 'The required market configuration module failed to load.');
+    document.body.appendChild(marketConfig);
+
+    // Static base styles and Scout template are loaded before app.js consumes them.
+    const appShellAssets = document.createElement('script');
+    appShellAssets.src = '/tm/app-shell-assets.js?v=1';
+    appShellAssets.async = false;
+    appShellAssets.onload = () => {
+      const assets = window.TM_APP_SHELL_ASSETS;
+      if (!assets || typeof assets.baseCss !== 'string' || typeof assets.scoutTemplate !== 'string' || typeof assets.lightThemeCss !== 'string') {
+        fail('TradeMate could not start', 'The app-shell assets module loaded without initializing.');
+        return;
+      }
+      appShellAssetsReady = true;
+      loadApp();
+    };
+    appShellAssets.onerror = () => fail('TradeMate could not load', 'The required app-shell assets module failed to load.');
+    document.body.appendChild(appShellAssets);
+
+    // Stateful exchange sockets and retry timers are encapsulated behind a context factory.
+    const marketFeedManager = document.createElement('script');
+    marketFeedManager.src = '/tm/market-feed-manager.js?v=1';
+    marketFeedManager.async = false;
+    marketFeedManager.onload = () => {
+      if (!window.TM_MARKET_FEED_MANAGER || typeof window.TM_MARKET_FEED_MANAGER.create !== 'function') {
+        fail('TradeMate could not start', 'The market-feed manager loaded without initializing.');
+        return;
+      }
+      marketFeedManagerReady = true;
+      loadApp();
+    };
+    marketFeedManager.onerror = () => fail('TradeMate could not load', 'The required market-feed manager failed to load.');
+    document.body.appendChild(marketFeedManager);
+
+    // Contract, agreement and conversation renderers are initialized before app.js.
+    const contractUi = document.createElement('script');
+    contractUi.src = '/tm/contract-ui.js?v=1';
+    contractUi.async = false;
+    contractUi.onload = () => {
+      if (!window.TM_CONTRACT_UI || typeof window.TM_CONTRACT_UI.create !== 'function') {
+        fail('TradeMate could not start', 'The contract UI module loaded without initialising.');
+        return;
+      }
+      contractUiReady = true;
+      loadApp();
+    };
+    contractUi.onerror = () => fail('TradeMate could not load', 'The required contract UI module failed to load.');
+    document.body.appendChild(contractUi);
+
+    // Market UI renderers are loaded before app.js; their shared state is passed at call time.
+    const marketUi = document.createElement('script');
+    marketUi.src = '/tm/market-ui.js?v=1';
+    marketUi.async = false;
+    marketUi.onload = () => {
+      if (!window.TM_MARKET_UI || typeof window.TM_MARKET_UI.markets !== 'function' || typeof window.TM_MARKET_UI.tradeCore !== 'function') {
+        fail('TradeMate could not start', 'The market UI module loaded without initialising.');
+        return;
+      }
+      marketUiReady = true;
+      loadApp();
+    };
+    marketUi.onerror = () => fail('TradeMate could not load', 'The required market UI module failed to load.');
+    document.body.appendChild(marketUi);
+
+    // Scout's large static stylesheet installer is isolated and initialized before app.js.
+    const scoutStyles = document.createElement('script');
+    scoutStyles.src = '/tm/scout-styles.js?v=1';
+    scoutStyles.async = false;
+    scoutStyles.onload = () => {
+      if (!window.TM_SCOUT_STYLES || typeof window.TM_SCOUT_STYLES.ensure !== 'function') {
+        fail('TradeMate could not start', 'The Scout styles module loaded without initialising.');
+        return;
+      }
+      scoutStylesReady = true;
+      loadApp();
+    };
+    scoutStyles.onerror = () => fail('TradeMate could not load', 'The required Scout styles module failed to load.');
+    document.body.appendChild(scoutStyles);
+
+    // Static decorative SVG renderers are isolated from app state and must be ready before app.js.
+    const artUtils = document.createElement('script');
+    artUtils.src = '/tm/art-utils.js?v=2';
+    artUtils.async = false;
+    artUtils.onload = () => {
+      if (!window.TM_ART_UTILS) {
+        fail('TradeMate could not start', 'The decorative art utility module loaded without initialising.');
+        return;
+      }
+      artUtilsReady = true;
+      loadApp();
+    };
+    artUtils.onerror = () => fail('TradeMate could not load', 'The required decorative art utility module failed to load.');
+    document.body.appendChild(artUtils);
+
+    // Pure NFT item normalization is loaded before app.js binds the legacy call sites.
+    const nftItemUtils = document.createElement('script');
+    nftItemUtils.src = '/tm/nft-item-utils.js?v=3';
+    nftItemUtils.async = false;
+    nftItemUtils.onload = () => {
+      if (!window.TM_NFT_ITEM_UTILS) {
+        fail('TradeMate could not start', 'The NFT item utility module loaded without initialising.');
+        return;
+      }
+      nftItemUtilsReady = true;
+      loadApp();
+    };
+    nftItemUtils.onerror = () => fail('TradeMate could not load', 'The required NFT item utility module failed to load.');
+    document.body.appendChild(nftItemUtils);
+
+    // FX snapshot helpers receive the market item collection explicitly; no app globals leak into the module.
+    const fxSnapshotUtils = document.createElement('script');
+    fxSnapshotUtils.src = '/tm/fx-snapshot-utils.js?v=1';
+    fxSnapshotUtils.async = false;
+    fxSnapshotUtils.onload = () => {
+      if (!window.TM_FX_SNAPSHOT_UTILS) {
+        fail('TradeMate could not start', 'The FX snapshot utility module loaded without initialising.');
+        return;
+      }
+      fxSnapshotUtilsReady = true;
+      loadApp();
+    };
+    fxSnapshotUtils.onerror = () => fail('TradeMate could not load', 'The required FX snapshot utility module failed to load.');
+    document.body.appendChild(fxSnapshotUtils);
+
+    // Market quote utilities must be ready before app.js defines the MT5 quote adapters.
+    const marketQuoteUtils = document.createElement('script');
+    marketQuoteUtils.src = '/tm/market-quote-utils.js?v=2';
+    marketQuoteUtils.async = false;
+    marketQuoteUtils.onload = () => {
+      if (!window.TM_MARKET_QUOTE_UTILS) {
+        fail('TradeMate could not start', 'The market quote utility module loaded without initialising.');
+        return;
+      }
+      marketQuoteUtilsReady = true;
+      loadApp();
+    };
+    marketQuoteUtils.onerror = () => fail('TradeMate could not load', 'The required market quote utility module failed to load.');
+    document.body.appendChild(marketQuoteUtils);
+
+    // New-contract wizard schemas are pure configuration and are initialized before app.js.
+    const wizardConfig = document.createElement('script');
+    wizardConfig.src = '/tm/wizard-config.js?v=1';
+    wizardConfig.async = false;
+    wizardConfig.onload = () => {
+      if (!window.TM_WIZARD_CONFIG || typeof window.TM_WIZARD_CONFIG.create !== 'function') {
+        fail('TradeMate could not start', 'The wizard configuration module loaded without initializing.');
+        return;
+      }
+      wizardConfigReady = true;
+      loadApp();
+    };
+    wizardConfig.onerror = () => fail('TradeMate could not load', 'The required wizard configuration module failed to load.');
+    document.body.appendChild(wizardConfig);
+
+    // NFT request orchestration is loaded before app.js binds the legacy loader names.
+    const nftLoaders = document.createElement('script');
+    nftLoaders.src = '/tm/nft-loaders.js?v=1';
+    nftLoaders.async = false;
+    nftLoaders.onload = () => {
+      if (!window.TM_NFT_LOADERS || typeof window.TM_NFT_LOADERS.create !== 'function') {
+        fail('TradeMate could not start', 'The NFT loader module loaded without initializing.');
+        return;
+      }
+      nftLoadersReady = true;
+      loadApp();
+    };
+    nftLoaders.onerror = () => fail('TradeMate could not load', 'The required NFT loader module failed to load.');
+    document.body.appendChild(nftLoaders);
+
     // Load the independently tested market-metadata lifecycle helper before
     // app.js. If it is unavailable, app.js retains its conservative legacy
     // fallback so a public metadata dependency cannot block core startup.
@@ -314,6 +652,31 @@ export default function TradeMateRuntime() {
     };
     document.body.appendChild(feed);
 
+    // Feed media lightbox is isolated from app state and is optional for core startup.
+    const feedMedia = document.createElement('script');
+    feedMedia.src = '/tm/feed-media-lightbox.js?v=1';
+    feedMedia.async = false;
+    feedMedia.onload = () => {
+      feedMediaReady = true;
+      loadApp();
+    };
+    feedMedia.onerror = () => {
+      feedMediaReady = true;
+      loadApp();
+    };
+    document.body.appendChild(feedMedia);
+
+
+    // Viewport setup is the only extracted patch that must run before app.js.
+    const viewportModule = document.createElement('script');
+    viewportModule.src = '/tm/viewport-meta.js?v=1';
+    viewportModule.async = false;
+    viewportModule.onload = viewportModule.onerror = () => {
+      viewportModuleReady = true;
+      loadApp();
+    };
+    document.body.appendChild(viewportModule);
+
     // The Next.js /app route does not execute public/tm/index.html, so it needs
     // its own rendered-shell and landing-overlay watchdog.
     window.setTimeout(() => {
@@ -324,7 +687,7 @@ export default function TradeMateRuntime() {
       if (!rendered) {
         fail(
           'TradeMate could not start',
-          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=141 returns successfully.'
+          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=173 returns successfully.'
         );
         return;
       }
