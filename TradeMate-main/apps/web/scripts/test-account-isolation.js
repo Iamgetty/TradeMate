@@ -184,9 +184,9 @@ function section(startMark, endMark) {
   const wizardConfigSource = fs.readFileSync(wizardConfigPath, "utf8");
   assert.match(source, /function wzCfg\\([\\w$]+\\)\\{return tmWizardConfig\\.wzCfg\\([\\w$]+\\)\\}/,
     "app.js must preserve the legacy wizard function as a delegate to the extracted module");
-  assert.match(wizardConfigSource, /B2B:\\[\\{n:"Basics"/,
+  assert.ok(wizardConfigSource.includes('B2B:[{n:"Basics"'),
     "the extracted live wizard must expose the B2B contract form");
-  assert.match(wizardConfigSource, /T\\("qty","Quantity \\/ scope"/,
+  assert.ok(wizardConfigSource.includes('T("qty","Quantity / scope"'),
     "the extracted B2B wizard must collect quantity or non-numeric scope");
   const publish = section("function publishServer(", '"/submit"');
   assert.match(publish, /"B2B"===[\w$]+&&\/\^\\d\{1,12\}\$\/\.test\([\w$]+\)&&\([\w$]+=[\w$]+\)/,
