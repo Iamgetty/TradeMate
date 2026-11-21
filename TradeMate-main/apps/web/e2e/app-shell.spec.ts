@@ -258,7 +258,7 @@ test('P2P page module uses explicit live state and cache dependencies', async ({
       icon: () => '<svg></svg>',
     });
     const html = pageModule.render();
-    state.amt = '700';
+    state.amt = '550';
     const changed = pageModule.render();
     return { html, changed, loads };
   });
