@@ -171,3 +171,59 @@ test('an unrelated unhandled promise rejection does not replace the rendered app
   await expect(page.locator('main[role="alert"]')).toHaveCount(0);
   await expect(page.locator('#land')).toBeVisible();
 });
+
+
+test('Pick page module uses explicit live-state dependencies', async ({ page }) => {
+  await page.goto('/app');
+  await page.addScriptTag({ url: '/tm/pick-page-module.js' });
+
+  const result = await page.evaluate(() => {
+    const renderCalls: Array<{ offer: unknown; pageMode: boolean; eligible: unknown[] }> = [];
+    let connected = true;
+    let items: Array<{ name: string; srv?: boolean }> = [
+      { name: 'Private', srv: false },
+      { name: 'First service', srv: true },
+      { name: 'Second service', srv: true },
+    ];
+    let selected = 'Second service';
+    const module = window.TM_PICK_PAGE_MODULE;
+    if (!module || typeof module.create !== 'function') throw new Error('Pick module did not initialize');
+
+    const pageModule = module.create({
+      isConnected: () => connected,
+      getItems: () => items,
+      getSelectedOffer: () => selected,
+      resolveOffer: (name: unknown) => items.find(item => item.name === name) || null,
+      renderProposal: (offer: unknown, pageMode: boolean, eligible: unknown[]) => {
+        renderCalls.push({ offer, pageMode, eligible });
+        return 'rendered';
+      },
+    });
+
+    const first = pageModule.render();
+    selected = 'missing';
+    const second = pageModule.render();
+    connected = false;
+    const third = pageModule.render();
+
+    return {
+      first,
+      second,
+      third,
+      calls: renderCalls.map(call => ({
+        offer: call.offer && (call.offer as { name: string }).name,
+        pageMode: call.pageMode,
+        eligible: call.eligible.map(item => (item as { name: string }).name),
+      })),
+    };
+  });
+
+  expect(result.first).toBe('rendered');
+  expect(result.second).toBe('rendered');
+  expect(result.third).toBe('rendered');
+  expect(result.calls).toEqual([
+    { offer: 'Second service', pageMode: true, eligible: ['First service', 'Second service'] },
+    { offer: 'First service', pageMode: true, eligible: ['First service', 'Second service'] },
+    { offer: null, pageMode: true, eligible: [] },
+  ]);
+});
