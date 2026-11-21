@@ -2,7 +2,7 @@
 
 Status: design baseline for issue #149. This document does not claim that any page is independently lazy-loadable yet.
 
-## Why Pick is first
+## First boundary: Pick; second boundary: P2P
 
 The current runtime registers `PG.pick` inside the private `app.js` IIFE. The renderer reads shared runtime state and services directly:
 
@@ -12,7 +12,7 @@ The current runtime registers `PG.pick` inside the private `app.js` IIFE. The re
 - `byName`: resolves the selected listing.
 - `cfProposal`: shared contract-proposal renderer/service.
 
-This is a useful first boundary because it is narrower than Deal, P2P, or Scout. It is not yet a standalone module: extracting only the function body would leave implicit closure dependencies.
+Pick was selected as the narrowest first boundary. P2P is now the second boundary; its rendering path also depends on shared cache and formatting services, so it receives those through an explicit contract. Deal and Scout remain in the monolith. Extracting only either function body would leave implicit closure dependencies.
 
 ## Proposed explicit contract
 
