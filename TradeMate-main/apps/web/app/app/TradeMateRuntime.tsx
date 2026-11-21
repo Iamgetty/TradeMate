@@ -100,6 +100,7 @@ export default function TradeMateRuntime() {
     let marketUiReady = false;
     let contractUiReady = false;
     let marketConfigReady = false;
+    let marketFeedManagerReady = false;
     let marketplaceMappersReady = false;
     let cssReady = false;
     let layoutCssReady = false;
@@ -137,10 +138,10 @@ export default function TradeMateRuntime() {
     window.addEventListener('error', onError);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=168';
+    app.src = '/tm/app.js?v=169';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=168. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=169. Check the deployment and static asset response.');
     app.onload = () => {
       const postAppModules = [
         'pm-fix-css-loader',
@@ -189,7 +190,7 @@ export default function TradeMateRuntime() {
     };
 
     const loadApp = () => {
-      if (!feedReady || !feedMediaReady || !viewportModuleReady || !metadataReady || !marketQuoteUtilsReady || !snapshotUtilsReady || !fxSnapshotUtilsReady || !nftItemUtilsReady || !artUtilsReady || !formatUtilsReady || !scoutStylesReady || !marketUiReady || !contractUiReady || !marketConfigReady || !marketplaceMappersReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
+      if (!feedReady || !feedMediaReady || !viewportModuleReady || !metadataReady || !marketQuoteUtilsReady || !snapshotUtilsReady || !fxSnapshotUtilsReady || !nftItemUtilsReady || !artUtilsReady || !formatUtilsReady || !scoutStylesReady || !marketUiReady || !contractUiReady || !marketConfigReady || !marketFeedManagerReady || !marketplaceMappersReady || !cssReady || !layoutCssReady || !patchesCssReady || !portfolioCssReady || !polishCssReady || !nftCssReady || !searchCssReady || !contractfCssReady || !contractf2CssReady || !helpCssReady || !headerCssReady || !feedbackCssReady || !learnCssReady || !earnCssReady || settled || document.querySelector('script[data-trademate-app]')) return;
       document.body.appendChild(app);
     };
 
@@ -432,6 +433,21 @@ export default function TradeMateRuntime() {
     marketConfig.onerror = () => fail('TradeMate could not load', 'The required market configuration module failed to load.');
     document.body.appendChild(marketConfig);
 
+    // Stateful exchange sockets and retry timers are encapsulated behind a context factory.
+    const marketFeedManager = document.createElement('script');
+    marketFeedManager.src = '/tm/market-feed-manager.js?v=1';
+    marketFeedManager.async = false;
+    marketFeedManager.onload = () => {
+      if (!window.TM_MARKET_FEED_MANAGER || typeof window.TM_MARKET_FEED_MANAGER.create !== 'function') {
+        fail('TradeMate could not start', 'The market-feed manager loaded without initializing.');
+        return;
+      }
+      marketFeedManagerReady = true;
+      loadApp();
+    };
+    marketFeedManager.onerror = () => fail('TradeMate could not load', 'The required market-feed manager failed to load.');
+    document.body.appendChild(marketFeedManager);
+
     // Contract, agreement and conversation renderers are initialized before app.js.
     const contractUi = document.createElement('script');
     contractUi.src = '/tm/contract-ui.js?v=1';
@@ -618,7 +634,7 @@ export default function TradeMateRuntime() {
       if (!rendered) {
         fail(
           'TradeMate could not start',
-          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=168 returns successfully.'
+          'The app shell did not render within 8 seconds. Check the browser console and confirm /tm/app.js?v=169 returns successfully.'
         );
         return;
       }
