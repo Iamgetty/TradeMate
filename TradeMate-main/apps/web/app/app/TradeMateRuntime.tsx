@@ -154,10 +154,10 @@ export default function TradeMateRuntime() {
     document.head.appendChild(scoutMapPreload);
 
     const app = document.createElement('script');
-    app.src = '/tm/app.js?v=173';
+    app.src = '/tm/app.js?v=174';
     app.async = false;
     app.dataset.trademateApp = 'true';
-    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=173. Check the deployment and static asset response.');
+    app.onerror = () => fail('TradeMate could not load', 'The app script failed to load from /tm/app.js?v=174. Check the deployment and static asset response.');
     app.onload = () => {
       const postAppModules = [
         'pm-fix-css-loader',
@@ -193,6 +193,8 @@ export default function TradeMateRuntime() {
         'scout-wallet-fix', 'cards-map-fix', 'feed-x-layout', 'profile-x-layout',
         'scout-spin-fix', 'feed-desktop-media', 'timeline-nav-fix',
         'timeline-chip-small', 'scout-spin-fix-2',
+        'pick-page-module',
+        'p2p-page-module',
       ];
       // Dynamic classic scripts with async=false execute in insertion order.
       // Appending the whole queue avoids serial network waits while preserving
