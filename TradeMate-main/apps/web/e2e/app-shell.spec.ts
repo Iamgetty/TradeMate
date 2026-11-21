@@ -186,7 +186,7 @@ test('Pick page module uses explicit live-state dependencies', async ({ page }) 
       { name: 'Second service', srv: true },
     ];
     let selected = 'Second service';
-    const module = window.TM_PICK_PAGE_MODULE;
+    const module = (window as Window & { TM_PICK_PAGE_MODULE?: { create: (deps: Record<string, unknown>) => { render: () => string } } }).TM_PICK_PAGE_MODULE;
     if (!module || typeof module.create !== 'function') throw new Error('Pick module did not initialize');
 
     const pageModule = module.create({
