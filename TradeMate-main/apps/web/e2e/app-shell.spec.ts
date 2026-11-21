@@ -227,3 +227,45 @@ test('Pick page module uses explicit live-state dependencies', async ({ page }) 
     { offer: null, pageMode: true, eligible: [] },
   ]);
 });
+
+test('P2P page module uses explicit live state and cache dependencies', async ({ page }) => {
+  await page.goto('/app');
+  await page.addScriptTag({ url: '/tm/p2p-page-module.js' });
+  const result = await page.evaluate(() => {
+    const state = { side: 'Buy', coin: 'USDT', fiat: 'NGN', amt: '500', };
+    const cache = {
+      loading: false,
+      updated: 0,
+      book: [
+        { id: 'excluded', side: 'buy', asset_code: 'USDT', fiat_code: 'NGN', min_fiat_amount: 100, max_fiat_amount: 1000, price: 1500, quantity: 2, created_at: '2026-01-01T00:00:00Z' },
+        { id: 'included', side: 'sell', asset_code: 'USDT', fiat_code: 'NGN', min_fiat_amount: 200, max_fiat_amount: 800, price: 1500, quantity: 2, created_at: '2026-01-01T00:00:00Z', payment_methods: ['Bank transfer'] },
+        { id: 'out-of-range', side: 'sell', asset_code: 'USDT', fiat_code: 'NGN', min_fiat_amount: 600, max_fiat_amount: 900, price: 1500, quantity: 2, created_at: '2026-01-01T00:00:00Z' },
+      ],
+    };
+    let loads = 0;
+    const module = (window as Window & { TM_P2P_PAGE_MODULE?: { create: (deps: Record<string, unknown>) => { render: () => string } } }).TM_P2P_PAGE_MODULE;
+    if (!module) throw new Error('P2P module did not initialize');
+    const pageModule = module.create({
+      getState: () => state,
+      getCache: () => cache,
+      loadP2P: () => { loads += 1; },
+      header: (title: string) => '<header>' + title + '</header>',
+      formatFiat: (value: number) => String(value),
+      formatAmount: (value: number) => String(value),
+      formatTime: () => 'time',
+      escapeHtml: (value: unknown) => String(value ?? ''),
+      emptyState: () => '<div>empty</div>',
+      icon: () => '<svg></svg>',
+    });
+    const html = pageModule.render();
+    state.amt = '700';
+    const changed = pageModule.render();
+    return { html, changed, loads };
+  });
+  expect(result.loads).toBe(2);
+  expect(result.html).toContain('data-arg="included"');
+  expect(result.html).not.toContain('data-arg="excluded"');
+  expect(result.html).not.toContain('data-arg="out-of-range"');
+  expect(result.changed).toContain('data-arg="included"');
+  expect(result.changed).not.toContain('data-arg="out-of-range"');
+});
