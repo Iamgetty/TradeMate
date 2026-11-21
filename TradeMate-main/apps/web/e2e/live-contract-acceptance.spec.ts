@@ -150,6 +150,78 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
 });
 
 
+test('buyer creates a B2B contract proposal from the public listing and both parties complete it', async ({ browser }) => {
+  test.setTimeout(90_000);
+  const fixturePath = process.env.TRADEMATE_E2E_FIXTURE;
+  if (!fixturePath) throw new Error('TRADEMATE_E2E_FIXTURE must point to the disposable database fixture.');
+  const fixture = JSON.parse(await readFile(fixturePath, 'utf8')) as Fixture;
+
+  let buyerContext: BrowserContext | undefined;
+  let sellerContext: BrowserContext | undefined;
+  try {
+    const buyerSession = await openAuthenticatedApp(browser, fixture.buyer);
+    buyerContext = buyerSession.context;
+    const buyer = buyerSession.page;
+    await buyer.goto('/market/' + fixture.b2bListingId);
+    await expect(buyer.getByRole('heading', { name: fixture.b2bListingTitle })).toBeVisible({ timeout: 20_000 });
+    await buyer.getByLabel(/Proposed amount/).fill('1250.00');
+    await buyer.getByLabel('Scope and deliverables').fill('Supply the agreed B2B inventory and coordinate delivery to the buyer.');
+    await buyer.getByLabel('Contract terms').fill('Delivery within five business days after both parties agree. Confirm receipt before closing.');
+    const proposalResponsePromise = buyer.waitForResponse(response =>
+      response.url().includes('/api/market/contracts') && response.request().method() === 'POST'
+    );
+    await buyer.getByRole('button', { name: 'Send contract proposal' }).click();
+    const proposalResponse = await proposalResponsePromise;
+    expect(proposalResponse.status(), 'the public listing must submit the proposal to the real API').toBe(201);
+    const proposalPayload = await proposalResponse.json();
+    const contractId = proposalPayload.data.id as string;
+    expect(contractId).toBeTruthy();
+    await expect(buyer.getByRole('status')).toContainText('Your contract proposal has been sent');
+
+    const persistedProposal = await buyer.request.get('/api/market/contracts/' + contractId);
+    expect(persistedProposal.status()).toBe(200);
+    const proposalRecord = (await persistedProposal.json()).data;
+    expect(proposalRecord.status).toBe('proposed');
+    const contractTitle = proposalRecord.title as string;
+    expect(contractTitle).toBeTruthy();
+
+    const sellerSession = await openAuthenticatedApp(browser, fixture.seller);
+    sellerContext = sellerSession.context;
+    const seller = sellerSession.page;
+    await seller.locator('#app .top button[data-pg="profile"]').click();
+    await seller.locator('[data-act="mode"]').click();
+    await openContract(seller, contractTitle);
+    await seller.setViewportSize({ width: 390, height: 844 });
+    await expectNoHorizontalOverflow(seller, 'Alpha newly proposed contract');
+    await seller.getByRole('button', { name: 'Accept and agree' }).click();
+    await expect(seller.getByText('Accepted', { exact: true })).toBeVisible();
+    await seller.getByRole('button', { name: 'Reconfirm agreement and confirm fulfilment' }).click();
+    await expect(seller.getByText('Waiting for the other party')).toBeVisible();
+
+    await buyer.goto('/app');
+    await expect(buyer.locator('#app .view')).toBeVisible();
+    await openContract(buyer, contractTitle);
+    await buyer.setViewportSize({ width: 390, height: 844 });
+    await expectNoHorizontalOverflow(buyer, 'Clients newly proposed contract');
+    await buyer.getByRole('button', { name: 'Reconfirm agreement and confirm fulfilment' }).click();
+    await expect(buyer.getByText('Completed', { exact: true }).first()).toBeVisible();
+
+    const finalBuyerRecord = await buyer.request.get('/api/market/contracts/' + contractId);
+    const finalSellerRecord = await seller.request.get('/api/market/contracts/' + contractId);
+    expect(finalBuyerRecord.status()).toBe(200);
+    expect(finalSellerRecord.status()).toBe(200);
+    for (const response of [finalBuyerRecord, finalSellerRecord]) {
+      const record = (await response.json()).data;
+      expect(record.status).toBe('completed');
+      expect(record.buyer_confirmed_at).toBeTruthy();
+      expect(record.seller_confirmed_at).toBeTruthy();
+    }
+  } finally {
+    await Promise.allSettled([buyerContext?.close(), sellerContext?.close()]);
+  }
+});
+
+
 test('two real browser sessions exchange a PostgreSQL-backed B2B listing enquiry and reply', async ({ browser }) => {
   test.setTimeout(90_000);
   const fixturePath = process.env.TRADEMATE_E2E_FIXTURE;
