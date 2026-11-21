@@ -87,3 +87,6 @@ Counts are estimates, not a promise to split tightly coupled code. The first pha
 
 
 **Completed:** extracted 22 contract, agreement and conversation UI renderers/helpers (13,162 source characters) into `public/tm/contract-ui.js`. A lazy factory receives the legacy runtime dependencies once, and the original function signatures remain as delegates. Runtime startup validates the module before loading `app.js`; app cache is `v=167`.
+
+
+**Completed:** extracted 14,693 characters of static marketplace, home-screen and theme configuration into `public/tm/market-config.js`. The module has no app-state or DOM dependencies; it exports the existing constants, market seed items, home-navigation helpers and theme definitions through a runtime-validated configuration object. `app.js` binds the original names before use. Runtime startup waits for the module; app cache advanced to `v=168`. Net `app.js` reduction: 14,069 characters.
