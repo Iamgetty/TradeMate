@@ -37,12 +37,12 @@ jobs:
           echo "Runner host: $(hostname)"
           echo "Runner user: $(whoami)"
           aws --version
-          IDENTITY="$(aws sts get-caller-identity --output json)"
-          ACCOUNT="$(jq -r '.Account' <<< "$IDENTITY")"
-          ARN="$(jq -r '.Arn' <<< "$IDENTITY")"
+          ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
+          ARN="$(aws sts get-caller-identity --query Arn --output text)"
           if [[ "$ACCOUNT" != "661406600284" || "$ARN" != arn:aws:sts::661406600284:assumed-role/TradeMateEC2SSMRole/* ]]; then
             echo "::error::Runner is not using the expected TradeMateEC2SSMRole in the staging AWS account."
-            echo "$IDENTITY"
+            echo "Account: $ACCOUNT"
+            echo "ARN: $ARN"
             exit 1
           fi
           echo "Verified AWS identity: $ARN"
