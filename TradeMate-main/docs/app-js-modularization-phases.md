@@ -2,12 +2,20 @@
 
 Branch: `refactor/split-web-app-runtime`
 
+## Latest audit status — 2026-11-21
+- Latest PR head before this audit: `dd0e19a7a6160af2c78c6260978d8772bd153d23`; regression-test repair commit: `fd242247f2dcb101d9e1c17bf70ad155c7b438a8`.
+- Audited 73 distinct JavaScript/CSS asset references in `TradeMateRuntime.tsx`; every referenced file exists in `public/tm/`.
+- Browser app-shell/live API acceptance, Cloudflare compatibility, API, database, exchange-feed and security jobs passed on the audited head.
+- TradeMate CI exposed a stale B2B wizard assertion: it searched for the schema inside `app.js` after the schema had moved to `wizard-config.js`. The test now reads the extracted module and verifies that `app.js` retains its legacy delegate.
+- The CI run triggered by the repair commit is in progress. Production web build is not yet confirmed; do not treat the PR as merge-ready until that run passes.
+- No application runtime behavior was changed in the regression-test repair.
+
 ## Completed
 
 ### Phase 1 — independent runtime patches
 - 41 standalone runtime modules extracted.
 - Runtime order is preserved by `TradeMateRuntime.tsx`.
-- `app.js` currently contains 596,386 characters, down 108,949 characters from the 705,335-character baseline.
+- `app.js` currently contains 438,693 characters, down 266,642 characters (37.8%) from the 705,335-character baseline.
 - CI and browser acceptance checks passed on the last verified head.
 
 ## Remaining phases
