@@ -90,3 +90,5 @@ Counts are estimates, not a promise to split tightly coupled code. The first pha
 
 
 **Completed:** extracted 14,693 characters of static marketplace, home-screen and theme configuration into `public/tm/market-config.js`. The module has no app-state or DOM dependencies; it exports the existing constants, market seed items, home-navigation helpers and theme definitions through a runtime-validated configuration object. `app.js` binds the original names before use. Runtime startup waits for the module; app cache advanced to `v=168`. Net `app.js` reduction: 14,069 characters.
+
+**Completed:** extracted the stateful exchange market-feed lifecycle (socket ownership, venue failover, retry/recovery timers, and throttled redraw scheduling) into `public/tm/market-feed-manager.js`. The module receives `items`, `st` and `softDraw` through an explicit factory context; the legacy `scheduleMarketDraw` call sites remain bound to the returned function. The runtime validates the factory before starting `app.js`. Net `app.js` reduction: 10,692 characters; cache advanced to `v=169`.
