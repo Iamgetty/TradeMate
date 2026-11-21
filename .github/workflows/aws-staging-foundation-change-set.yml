@@ -10,14 +10,6 @@ on:
         options:
           - "no"
           - "yes"
-      nat_gateway_count:
-        description: NAT gateways for staging (1 is cheaper; 2 improves AZ independence).
-        type: choice
-        required: true
-        default: "1"
-        options:
-          - "1"
-          - "2"
 
 permissions:
   contents: read
@@ -66,7 +58,14 @@ jobs:
             --no-execute-changeset \
             --parameter-overrides \
               EnvironmentName=trademate-staging \
-              NatGatewayCount="${{ inputs.nat_gateway_count }}" \
+              ExistingVpcId=vpc-09fcbb52e99d9ddf1 \
+              NatPublicSubnetId=subnet-0f0650548512fe17f \
+              ExistingDatabaseSecurityGroupId=sg-0b8c91288a83085e3 \
+              ExistingDatabaseSubnetIds=subnet-0f0650548512fe17f,subnet-0b06dab6a814e941d,subnet-0f2479f01e7482953 \
+              AppAvailabilityZoneA=eu-north-1a \
+              AppAvailabilityZoneB=eu-north-1b \
+              PrivateAppSubnetACidr=172.31.48.0/24 \
+              PrivateAppSubnetBCidr=172.31.49.0/24 \
             --tags Environment=staging Project=TradeMate ManagedBy=CloudFormation
 
       - name: Print pending foundation change sets

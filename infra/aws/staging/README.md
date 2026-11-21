@@ -212,3 +212,53 @@ database `public` schema. Rotate the secret only through a coordinated
 migration/API release so no serving API task uses a key different from the
 database verifier. Do not place the key in CloudFormation parameters, Git,
 logs or task plaintext environment configuration.
+
+
+## Existing AWS account integration (eu-north-1)
+
+The staging account already contains a VPC, a private PostgreSQL RDS instance and an EC2 administration host. The foundation template has therefore been adapted to **reuse** those resources rather than create a second VPC or database.
+
+Confirmed existing resources (21 November 2026):
+
+| Resource | Existing ID / value |
+|---|---|
+| VPC | `vpc-09fcbb52e99d9ddf1` |
+| VPC CIDR | `172.31.0.0/16` |
+| Existing RDS | `trademate-db` |
+| RDS security group | `sg-0b8c91288a83085e3` |
+| Existing public-routed subnet for NAT placement | `subnet-0f0650548512fe17f` (eu-north-1a) |
+| Existing RDS subnet A | `subnet-0f0650548512fe17f` (eu-north-1a) |
+| Existing RDS subnet B | `subnet-0b06dab6a814e941d` (eu-north-1b) |
+| Existing RDS subnet C | `subnet-0f2479f01e7482953` (eu-north-1c) |
+
+The existing subnets occupy `172.31.0.0/20`, `172.31.16.0/20` and `172.31.32.0/20`. The new application subnet defaults are `172.31.48.0/24` in eu-north-1a and `172.31.49.0/24` in eu-north-1b. These ranges do not overlap the three inspected existing subnets. Recheck the full subnet inventory immediately before deployment; do not assume the ranges remain free if other infrastructure has been added.
+
+The adapted `foundation.yaml` creates only:
+- Two dedicated private application subnets and their dedicated route tables.
+- One NAT Gateway and Elastic IP in the existing public-routed subnet.
+- Private-subnet default routes through that NAT Gateway.
+- ECS cluster, ECR repositories, log groups and workload security groups.
+- Two narrowly scoped TCP/5432 ingress rules on the **existing** RDS security group, sourced only from the new API and migration security groups.
+
+It does **not** create, replace, modify or delete the VPC, Internet Gateway, existing subnets, existing EC2 host, RDS instance or RDS subnet group. The pre-existing EC2-to-RDS security-group rule is preserved. Removing the foundation stack later would remove its two added RDS ingress rules; review stack deletion impact first.
+
+### Required foundation stack parameters
+
+Use these values only after a fresh AWS inventory confirms the IDs and CIDRs are unchanged:
+
+- `ExistingVpcId=vpc-09fcbb52e99d9ddf1`
+- `NatPublicSubnetId=subnet-0f0650548512fe17f`
+- `ExistingDatabaseSecurityGroupId=sg-0b8c91288a83085e3`
+- `ExistingDatabaseSubnetIds=subnet-0f0650548512fe17f,subnet-0b06dab6a814e941d,subnet-0f2479f01e7482953`
+- `AppAvailabilityZoneA=eu-north-1a`
+- `AppAvailabilityZoneB=eu-north-1b`
+- `PrivateAppSubnetACidr=172.31.48.0/24`
+- `PrivateAppSubnetBCidr=172.31.49.0/24`
+
+**Cost and availability:** one NAT Gateway is a deliberate staging-cost compromise. Both private application subnets route through the NAT in eu-north-1a, so outbound connectivity is not AZ-independent. NAT Gateway hourly, data-processing and Elastic IP charges apply. This is required for the private Cloudflare Tunnel tasks to reach Cloudflare; S3 gateway access alone cannot provide general internet egress.
+
+### Existing database: do not deploy database.yaml
+
+`database.yaml` remains a reusable template for a separately approved, greenfield database build. It is **not part of this existing-account deployment path**. Do not create a `trademate-staging-database` stack from it: the account already has `trademate-db`, and creating another RDS instance would duplicate cost and data. The existing RDS subnet group and instance remain unchanged. The services and migration workflows must use the existing database endpoint and the already provisioned secret values.
+
+No AWS resources have been created or modified by this repository change. CloudFormation deployment, NAT creation, security-group ingress changes, migrations, Cloudflare routing and traffic cutover remain separate gated operations.
