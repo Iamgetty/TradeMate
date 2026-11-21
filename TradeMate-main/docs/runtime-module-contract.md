@@ -85,3 +85,16 @@ This scan is limited to style-element creation. It does not classify every inlin
 The P2P page now has a standalone `TM_P2P_PAGE_MODULE` with an explicit dependency contract for live state, the P2P cache, loading, header rendering, formatting, escaping, empty-state rendering, and icons. The legacy renderer remains as a fallback if the module asset is unavailable. The module is queued after app bootstrap, not loaded on first navigation; the fallback preserves the first-render window and asset-failure behavior.
 
 The module retains the existing buy/sell direction mapping, amount-range filter, loading/error/empty states, offer data attributes, payment-method display, and database-source notice. A browser contract test covers offer filtering and re-rendering from changed live state. Full end-to-end P2P interaction and authenticated API acceptance still need to be exercised before removing the fallback.
+
+## Scout boundary audit (before extraction)
+
+Scout is not a renderer-only page. Its current boundary spans:
+
+- Mutable controller state: `SC.phase`, `SC.step`, `SC.tab`, `SC.full`, and `SC.t`.
+- A timer lifecycle: `scoutReset()` starts/clears an interval; `scoutTick()` checks the active navigation stack, updates live DOM progress indicators, and calls `drawPage()` when results are ready.
+- Responsive rendering: `PG.scout` selects `scoutPage()` or `scoutMobile()` based on desktop mode and viewport width.
+- Market data and selection: `items`, `byName`, `scoutFeat()`, `scoutRows()`, and `scoutMobRows()`.
+- Shared rendering services: `hdr`, `esc`, `px`, `lg`, `isPlainAsset`, `window.TM_ART_UTILS`, and `window.TM_SCOUT_STYLES`.
+- Global delegated interactions: the click listener changes Scout tabs, resets the scan, expands recommendations, and invokes native share; it depends on `drawPage()`, `toast()`, and the browser share API.
+
+Moving only `scoutPage()` and `scoutMobile()` would leave timer ownership, navigation lifecycle, and delegated events inside the app closure. The next Scout step must first define a controller contract with explicit `start`, `stop`, `reset`, `tick`, and `render` operations, with timer ownership and navigation visibility controlled by the host. Preserve the current responsive renderer and event semantics until that contract has dedicated lifecycle tests. No Scout source was moved in this pass.
