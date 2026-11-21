@@ -1,14 +1,9 @@
 name: Generate and validate npm lockfiles
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/generate-lockfiles.yml"
-      - "TradeMate-main/apps/api/package.json"
-      - "TradeMate-main/apps/web/package.json"
-      - "TradeMate-main/exchange-feed/package.json"
+  # This workflow is intentionally scoped to the lockfile-remediation branch.
+  # Do not trigger it for unrelated dependency PRs: its job checks out and pushes
+  # to that dedicated branch, so running it on other PRs only creates skipped jobs.
   push:
     branches:
       - fix/audit-remediation-2026-11-18
