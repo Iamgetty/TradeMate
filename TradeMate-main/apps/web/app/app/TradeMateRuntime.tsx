@@ -193,6 +193,7 @@ export default function TradeMateRuntime() {
         'scout-wallet-fix', 'cards-map-fix', 'feed-x-layout', 'profile-x-layout',
         'scout-spin-fix', 'feed-desktop-media', 'timeline-nav-fix',
         'timeline-chip-small', 'scout-spin-fix-2',
+        'pick-page-module',
       ];
       // Dynamic classic scripts with async=false execute in insertion order.
       // Appending the whole queue avoids serial network waits while preserving
