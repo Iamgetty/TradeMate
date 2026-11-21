@@ -69,3 +69,13 @@ The getters are deliberate: the runtime owns mutable state, and the page must ob
 ## CSS extraction guardrail
 
 The runtime currently has both extracted stylesheet assets and styles inserted dynamically by the IIFE. A style block is eligible for extraction only after confirming it is static and that its original insertion point, media conditions, theme behavior, and feature activation timing are preserved. Conditional, theme-specific, and feature-on-demand styles remain dynamic unless browser tests prove an equivalent replacement.
+
+## Initial injected-style audit (app.js at this revision)
+
+The first source scan found three runtime `createElement("style")` sites. None is safe to bulk-extract as-is:
+
+1. The early app style element is assembled from multiple CSS string groups and a theme-dependent token block. Its content and cascade placement are coupled to runtime initialization; keep it dynamic until the groups are separated and light/dark plus responsive parity is proven.
+2. The environment stylesheet helper copies an embedded style element when present, otherwise it inserts desktop/mobile stylesheet links and applies a media condition for mobile-web CSS. Preserve this environment branch and media behavior; do not replace it with an unconditional link.
+3. The auth-gate style is inserted only when `CONNECTED` is true and removed by `releaseAuthGate()`. It is state/feature conditional and must remain dynamic.
+
+This scan is limited to style-element creation. It does not classify every inline `style` attribute or stylesheets loaded by page-specific modules. The existing external runtime CSS assets should be audited separately for duplicate rules and exact insertion order before any further extraction.
