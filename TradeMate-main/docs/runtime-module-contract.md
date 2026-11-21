@@ -79,3 +79,9 @@ The first source scan found three runtime `createElement("style")` sites. None i
 3. The auth-gate style is inserted only when `CONNECTED` is true and removed by `releaseAuthGate()`. It is state/feature conditional and must remain dynamic.
 
 This scan is limited to style-element creation. It does not classify every inline `style` attribute or stylesheets loaded by page-specific modules. The existing external runtime CSS assets should be audited separately for duplicate rules and exact insertion order before any further extraction.
+
+## Second page boundary: P2P
+
+The P2P page now has a standalone `TM_P2P_PAGE_MODULE` with an explicit dependency contract for live state, the P2P cache, loading, header rendering, formatting, escaping, empty-state rendering, and icons. The legacy renderer remains as a fallback if the module asset is unavailable. The module is queued after app bootstrap, not loaded on first navigation; the fallback preserves the first-render window and asset-failure behavior.
+
+The module retains the existing buy/sell direction mapping, amount-range filter, loading/error/empty states, offer data attributes, payment-method display, and database-source notice. A browser contract test covers offer filtering and re-rendering from changed live state. Full end-to-end P2P interaction and authenticated API acceptance still need to be exercised before removing the fallback.
