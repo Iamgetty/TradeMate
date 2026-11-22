@@ -1,0 +1,31 @@
+schemaVersion: '2.2'
+description: 'TradeMate fixed read-only diagnostics for the staging EC2 host. No parameters are accepted.'
+platformTypes:
+  - Linux
+mainSteps:
+  - action: aws:runShellScript
+    name: collectReadOnlyDiagnostics
+    inputs:
+      runCommand:
+        - set -eu
+        - echo '=== Host and operating system ==='
+        - hostnamectl --static 2>/dev/null || hostname
+        - grep -E '^(NAME|VERSION|PRETTY_NAME)=' /etc/os-release
+        - uname -r
+        - echo '=== Uptime and resource capacity ==='
+        - uptime
+        - nproc
+        - free -h
+        - df -h /
+        - echo '=== Runtime availability (versions only) ==='
+        - node --version 2>/dev/null || echo 'Node.js not installed'
+        - npm --version 2>/dev/null || echo 'npm not installed'
+        - cloudflared --version 2>/dev/null || echo 'cloudflared not installed'
+        - echo '=== Relevant service states ==='
+        - systemctl is-active amazon-ssm-agent 2>/dev/null || true
+        - systemctl is-active trademate-api 2>/dev/null || true
+        - systemctl is-active exchange-feed 2>/dev/null || true
+        - systemctl is-active cloudflared 2>/dev/null || true
+        - echo '=== Listening TCP ports (no process arguments) ==='
+        - ss -lnt 2>/dev/null || true
+        - echo '=== End of read-only diagnostics ==='
