@@ -1,23 +1,25 @@
 # AWS backend and Cloudflare frontend foundation
 
+> **Superseded cost decision — 22 November 2026:** ECS/Fargate is removed from the active TradeMate migration roadmap because it adds recurring cost. The ECS/Fargate, ALB, NAT Gateway and related CloudFormation templates/workflows in this directory are retained as historical, un-deployed design artifacts only. **Do not execute either existing change set or provision any of these resources.** The current investigation is limited to Cloudflare Workers for the web frontend and potential reuse of the existing EC2 host plus existing RDS for backend workloads, subject to capacity/security acceptance. Keep Render online until a replacement is fully tested and explicitly approved. No new paid AWS resource is authorized.
+
 ## Architecture decision
 
 TradeMate uses a split-cloud architecture:
 
-- **AWS is the primary application and data platform** for production backend workloads.
+- **Existing AWS resources are a candidate backend/data platform**, subject to a no-new-cost constraint and capacity/security acceptance. No new ECS/Fargate or paid networking resources are approved.
 - **Cloudflare hosts and serves the frontend** and provides DNS, WAF, DDoS protection and edge traffic controls.
 - **Render is retained as a secondary environment for staging, testing, QA and pre-release validation**. It is not the production source of truth or the primary production rollback platform.
 - **Google Cloud Platform (GCP)** is recognized in TradeMate's longer-term cloud strategy. AWS remains the primary backend/data platform for the initial migration; GCP is not a duplicate primary production stack in this phase. Any GCP workload requires a separately documented use case, security/data-flow review, operational owner and approved budget.
 
-This directory is the implementation entry point for the AWS backend staging environment. This is a design and repository change only; it does not provision or modify cloud resources.
+This directory contains historical AWS backend staging design artifacts. The ECS/Fargate deployment path is not the active roadmap and must not be provisioned under the current no-new-cost decision. The existing-EC2 alternative is still under investigation and is not approved for cutover. This documentation change does not provision or modify cloud resources.
 
 ## Workload placement
 
 | Existing workload | Target platform |
 |---|---|
 | `trademate-web` (Next.js 16, React 19) | Cloudflare Workers; evaluate vinext (Cloudflare's current recommended path for Next.js 16+) against the OpenNext adapter using compatibility and production-build tests before choosing; Cloudflare serves the frontend and static assets |
-| `trademate-api` (NestJS, Node.js) | AWS ECS Fargate behind an Application Load Balancer |
-| `exchange-feed` (Node.js WebSocket service) | AWS ECS Fargate behind WebSocket-capable ALB routing, subject to connection, idle-timeout and drain testing |
+| `trademate-api` (NestJS, Node.js) | Existing EC2 host via existing Cloudflare Tunnel — provisional; capacity and security acceptance required |
+| `exchange-feed` (Node.js WebSocket service) | Existing EC2 host via existing Cloudflare Tunnel — provisional; capacity and WebSocket acceptance required |
 | PostgreSQL 18 | Amazon RDS for PostgreSQL, private subnets, encrypted storage, automated backups and tested restore |
 | Backend secrets and configuration | AWS Secrets Manager for secrets; task environment only for non-secret configuration |
 | Backend deploy history/logs | GitHub Actions release pipeline and CloudWatch logs/metrics/alarms |
