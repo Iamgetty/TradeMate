@@ -58,8 +58,7 @@ jobs:
           backup_file="$backup_dir/render-trademate-$timestamp.dump"
           partial_file="$backup_file.partial"
           trap 'rm -f "$partial_file"' EXIT
-          export PGDATABASE="$RENDER_DATABASE_URL"
-          pg_dump --no-password --format=custom --compress=6 --no-owner --no-acl --file="$partial_file"
+          pg_dump --no-password --dbname="$RENDER_DATABASE_URL" --format=custom --compress=6 --no-owner --no-acl --file="$partial_file"
           test -s "$partial_file"
           pg_restore --list "$partial_file" >/dev/null
           mv "$partial_file" "$backup_file"
@@ -74,7 +73,7 @@ jobs:
           echo "SHA-256: $checksum"
           echo "Private backup location: $backup_file"
           echo "Database changes: NONE (pg_dump only)"
-          unset PGDATABASE RENDER_DATABASE_URL
+          unset RENDER_DATABASE_URL
 
       - name: Confirm backup files and permissions
         shell: bash
