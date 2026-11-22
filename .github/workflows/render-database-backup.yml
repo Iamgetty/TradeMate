@@ -76,6 +76,7 @@ jobs:
           unset RENDER_DATABASE_URL
 
       - name: Confirm backup files and permissions
+        id: verify
         shell: bash
         run: |
           set -euo pipefail
@@ -85,4 +86,13 @@ jobs:
           test -s "$latest.sha256"
           (cd "$(dirname "$latest")" && sha256sum -c "$(basename "$latest").sha256")
           stat -c 'File permissions: %a; owner: %U; size: %s bytes' "$latest"
-          echo "Backup is stored locally on the existing EC2 runner. It was not uploaded to GitHub or a public artifact store."
+          echo "backup_file=$latest" >> "$GITHUB_OUTPUT"
+          echo "Backup verified on the existing EC2 runner."
+
+      - name: Publish short-lived private workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: trademate-render-db-backup
+          path: ${{ steps.verify.outputs.backup_file }}*
+          if-no-files-found: error
+          retention-days: 7
