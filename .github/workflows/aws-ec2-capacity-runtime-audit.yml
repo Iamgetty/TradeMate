@@ -36,8 +36,8 @@ jobs:
           ulimit -n
           ps -eo comm,rss,%cpu,%mem --sort=-rss | head -15
           echo "=== Runner service resource policy ==="
-          UNIT="$(systemctl list-units --type=service --all --no-legend | awk '/actions\.runner\..*trademate-aws-staging/ {print $1; exit}')"
-          if [ -n "$UNIT" ]; then
+          UNIT="actions.runner.Iamgetty-TradeMate.trademate-aws-staging.service"
+          if systemctl show "$UNIT" >/dev/null 2>&1; then
             systemctl show "$UNIT" --property=MemoryMax --property=CPUQuotaPerSecUSec --property=TasksMax --property=Restart --no-pager
             PID="$(systemctl show "$UNIT" --property=MainPID --value)"
             if [ "$PID" != "0" ] && [ -r "/proc/$PID/cwd" ]; then
