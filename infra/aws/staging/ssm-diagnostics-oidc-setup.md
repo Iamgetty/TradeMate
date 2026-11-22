@@ -46,7 +46,7 @@ Do not reuse `AWS_STAGING_DEPLOY_ROLE_ARN`: the existing staging OIDC workflows 
 
 In Systems Manager → Documents, create a document named `TradeMate-ReadOnly-EC2-Diagnostics`, document type **Command**, using the exact contents of [the checked-in document definition](./ssm-documents/TradeMate-ReadOnly-EC2-Diagnostics.yml).
 
-This custom document contains the read-only diagnostic commands and accepts no parameters. Do not grant this GitHub role permission to create or update SSM documents. Only an administrator should update the document after review.
+This custom document contains the read-only diagnostic commands and accepts no parameters. Create it as version **1** and leave version 1 unchanged; the workflow explicitly pins version 1 rather than using the mutable default. Do not grant this GitHub role permission to create or update SSM documents. If a future change is needed, review it as a new version and update the workflow pin deliberately.
 
 ## 3. Attach this least-privilege inline permissions policy
 
