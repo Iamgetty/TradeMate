@@ -1,0 +1,41 @@
+name: AWS EC2 Read-Only SSM Management Capability Audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aws-ec2-ssm-capability-audit
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    name: Inspect existing SSM management path
+    runs-on: [self-hosted, linux, x64, aws-staging]
+    timeout-minutes: 10
+    steps:
+      - name: Check local SSM agent and AWS read-only identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== Local SSM agent ==="
+          command -v amazon-ssm-agent || true
+          systemctl is-active amazon-ssm-agent 2>&1 || true
+          systemctl is-enabled amazon-ssm-agent 2>&1 || true
+          echo "=== AWS CLI availability ==="
+          command -v aws || true
+          if command -v aws >/dev/null 2>&1; then
+            echo "=== Instance role identity (no credentials displayed) ==="
+            aws sts get-caller-identity --query '{Account:Account,Arn:Arn}' --output json 2>&1 || true
+            echo "=== SSM managed instance registration ==="
+            aws ssm describe-instance-information \
+              --filters Key=InstanceIds,Values=i-035b1f1d00052c77e \
+              --query 'InstanceInformationList[].{InstanceId:InstanceId,PingStatus:PingStatus,PlatformName:PlatformName,AgentVersion:AgentVersion}' \
+              --output table 2>&1 || true
+          fi
+          echo "=== Runner privilege boundary ==="
+          id
+          sudo -n -l 2>&1 || true
+          echo "Read-only audit complete. No SSM commands were sent, no packages or services were changed, and no secrets or credential values were read."
