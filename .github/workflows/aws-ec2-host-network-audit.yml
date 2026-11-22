@@ -1,0 +1,89 @@
+name: AWS EC2 Host and Network Audit (Read Only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aws-ec2-host-network-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Inspect existing EC2 host and network
+    runs-on: [self-hosted, Linux, X64, aws-staging]
+    timeout-minutes: 5
+    env:
+      AWS_REGION: eu-north-1
+      AWS_DEFAULT_REGION: eu-north-1
+    steps:
+      - name: Confirm runner and instance identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== Host ==="
+          hostname
+          id
+          uname -r
+          echo "=== Instance identity (metadata only) ==="
+          TOKEN="$(curl -fsS -X PUT 'http://169.254.169.254/latest/api/token' -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' || true)"
+          if [ -n "$TOKEN" ]; then
+            for FIELD in instance-id instance-type placement/availability-zone local-ipv4 public-ipv4; do
+              VALUE="$(curl -fsS -H "X-aws-ec2-metadata-token: $TOKEN" "http://169.254.169.254/latest/meta-data/$FIELD" 2>/dev/null || true)"
+              printf '%s: %s\n' "$FIELD" "${VALUE:-not available}"
+            done
+          else
+            echo "IMDSv2 metadata unavailable; no metadata settings changed."
+          fi
+          echo "=== Resources ==="
+          nproc
+          free -h
+          df -h /
+          uptime
+          echo "=== Runtime ==="
+          node --version 2>/dev/null || true
+          npm --version 2>/dev/null || true
+          for BIN in node24 nodejs24 cloudflared docker podman; do
+            command -v "$BIN" 2>/dev/null || true
+          done
+          echo "=== Running TradeMate-related processes (names/commands only) ==="
+          pgrep -af 'node|cloudflared|docker|trademate' | head -40 || true
+          echo "=== Listening TCP sockets ==="
+          ss -lnt 2>/dev/null || true
+          echo "=== Service unit names/status only ==="
+          systemctl list-units --type=service --all --no-legend 2>/dev/null | grep -Ei 'cloudflared|trademate|docker|runner' || true
+      - name: Read EC2 network metadata through AWS API
+        shell: bash
+        run: |
+          set -u
+          INSTANCE_ID="$(curl -fsS -X PUT 'http://169.254.169.254/latest/api/token' -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' 2>/dev/null | xargs -r -I{} sh -c 'curl -fsS -H "X-aws-ec2-metadata-token: {}" http://169.254.169.254/latest/meta-data/instance-id' 2>/dev/null || true)"
+          if [ -z "$INSTANCE_ID" ]; then
+            echo "Instance ID unavailable; skipping EC2 API metadata lookup."
+            exit 0
+          fi
+          echo "Instance ID: $INSTANCE_ID"
+          aws sts get-caller-identity
+          aws ec2 describe-instances --instance-ids "$INSTANCE_ID" --region "$AWS_REGION" \
+            --query 'Reservations[0].Instances[0].{State:State.Name,Type:InstanceType,VpcId:VpcId,SubnetId:SubnetId,PrivateIp:PrivateIpAddress,PublicIp:PublicIpAddress,SecurityGroups:SecurityGroups[*].{Id:GroupId,Name:GroupName},IamProfile:IamInstanceProfile.Arn,MetadataOptions:MetadataOptions,SourceDestCheck:SourceDestCheck}' \
+            --output json || echo "EC2 describe permission unavailable; no permissions or resources were changed."
+      - name: Verify outbound paths without changing configuration
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import socket
+          tests = [
+              ("RDS", "trademate-db.cnoaequa8k6z.eu-north-1.rds.amazonaws.com", 5432),
+              ("Cloudflare tunnel", "region1.v2.argotunnel.com", 7844),
+              ("HTTPS", "github.com", 443),
+          ]
+          for label, host, port in tests:
+              try:
+                  addrs = sorted({x[4][0] for x in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)})
+                  with socket.create_connection((host, port), timeout=5):
+                      print(f"{label}: TCP reachable; addresses={','.join(addrs)}")
+              except Exception as exc:
+                  print(f"{label}: unavailable ({type(exc).__name__})")
+          print("Connectivity probes only; no credentials, SQL, installs, or configuration changes.")
+          PY
