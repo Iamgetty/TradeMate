@@ -1,0 +1,57 @@
+name: AWS EC2 Read-Only SSM Region and Endpoint Audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aws-ec2-ssm-region-audit
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    name: Verify SSM regional configuration and endpoints
+    runs-on: [self-hosted, linux, x64, aws-staging]
+    timeout-minutes: 10
+    steps:
+      - name: Inspect instance region and regional SSM connectivity
+        shell: bash
+        run: |
+          set -euo pipefail
+          REGION="eu-north-1"
+          echo "=== Instance metadata region (IMDSv2) ==="
+          TOKEN="$(curl -fsS -X PUT 'http://169.254.169.254/latest/api/token' -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')"
+          META_REGION="$(curl -fsS -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/region)"
+          echo "IMDS region: $META_REGION"
+          echo "Expected region: $REGION"
+          unset TOKEN
+          echo "=== AWS CLI configured region (non-secret config only) ==="
+          aws configure get region 2>/dev/null || true
+          echo "AWS_REGION=${AWS_REGION-<unset>}"
+          echo "AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION-<unset>}"
+          echo "=== Regional endpoint DNS and HTTPS reachability ==="
+          for SERVICE in ssm ssmmessages ec2messages; do
+            HOST="$SERVICE.$REGION.amazonaws.com"
+            echo "--- $HOST ---"
+            getent ahosts "$HOST" | head -4 || true
+            curl -sS -o /dev/null --connect-timeout 5 --max-time 10 -w 'HTTP status: %{http_code}; TLS/connection result: %{errormsg}\n' "https://$HOST/" || true
+          done
+          echo "=== SSM agent service region-related environment (values only) ==="
+          systemctl show amazon-ssm-agent --property=Environment 2>/dev/null | sed -E 's/(AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|AWS_SESSION_TOKEN)=[^ ]+/\1=[REDACTED]/g' || true
+          echo "=== Agent configuration metadata ==="
+          for FILE in /etc/amazon/ssm/amazon-ssm-agent.json /etc/amazon/ssm/seelog.xml; do
+            if [ -r "$FILE" ]; then
+              echo "Readable config file exists: $FILE"
+              grep -Ei 'region|endpoint|proxy' "$FILE" | sed -E 's/(key|token|secret|password)[^=:]*[:=].*/\1=[REDACTED]/I' | head -30 || true
+            else
+              echo "Not readable or absent: $FILE"
+            fi
+          done
+          echo "=== AWS SSM read-only API check in the correct region ==="
+          aws ssm describe-instance-information --region "$REGION" \
+            --filters Key=InstanceIds,Values=i-035b1f1d00052c77e \
+            --query 'InstanceInformationList[].{InstanceId:InstanceId,PingStatus:PingStatus,PlatformName:PlatformName,AgentVersion:AgentVersion}' \
+            --output table 2>&1 || true
+          echo "Read-only regional audit complete. No commands were sent through SSM; no IAM, package, service, network, database, or secret changes were made."
