@@ -59,7 +59,7 @@ jobs:
           if ! aws ssm wait command-executed \
             --command-id "$COMMAND_ID" \
             --instance-id i-035b1f1d00052c77e \
-            --plugin-name collectReadOnlyDiagnostics \\
+            --plugin-name collectReadOnlyDiagnostics \
             --waiter-config Delay=5,MaxAttempts=36; then
             echo "SSM command did not reach a successful terminal state; retrieving available output."
           fi
