@@ -19,72 +19,48 @@ jobs:
       AWS_REGION: eu-north-1
       AWS_DEFAULT_REGION: eu-north-1
       SECRET_ID: trademate/staging/api
-      PGSSLMODE: require
     steps:
-      - name: Check local PostgreSQL client
+      - name: Retrieve credentials safely and run read-only SQL inventory
         shell: bash
         run: |
           set -euo pipefail
-          if ! command -v psql >/dev/null 2>&1; then
-            echo "::error::psql is not installed on the existing staging runner. No package was installed."
-            exit 1
-          fi
-          psql --version
+          command -v psql >/dev/null 2>&1 || { echo "::error::psql is not installed; no package was installed."; exit 1; }
 
-      - name: Retrieve staging DB URL without printing secret values
-        shell: bash
-        run: |
-          set -euo pipefail
-          secret_json="$(aws secretsmanager get-secret-value \
-            --secret-id "$SECRET_ID" \
-            --query SecretString \
-            --output text)"
-          if [[ -z "$secret_json" || "$secret_json" == "None" ]]; then
-            echo "::error::SecretString is empty or unavailable."
-            exit 1
-          fi
+          secret_json="$(aws secretsmanager get-secret-value --secret-id "$SECRET_ID" --query SecretString --output text)"
+          [[ -n "$secret_json" && "$secret_json" != "None" ]] || { echo "::error::SecretString is empty or unavailable."; exit 1; }
 
-          # Parse only the connection fields into the runner's temporary environment.
-          # Never print the secret JSON, URL, username, or password.
-          SECRET_JSON="$secret_json" python3 - "$GITHUB_ENV" "$GITHUB_OUTPUT" <<'PY'
+          # Parse into process-local shell variables; never write credentials to GITHUB_ENV or step outputs.
+          mapfile -t fields < <(SECRET_JSON="$secret_json" python3 - <<'PY'
           import json, os, sys
           from urllib.parse import urlsplit, unquote
-
-          env_path, output_path = sys.argv[1], sys.argv[2]
           data = json.loads(os.environ["SECRET_JSON"])
           url = data.get("DATABASE_URL")
           if not isinstance(url, str) or not url:
-              raise SystemExit("DATABASE_URL is missing from the secret.")
-          parsed = urlsplit(url)
-          if parsed.scheme not in ("postgres", "postgresql") or not parsed.hostname:
+              raise SystemExit("DATABASE_URL is missing.")
+          p = urlsplit(url)
+          if p.scheme not in ("postgres", "postgresql") or not p.hostname:
               raise SystemExit("DATABASE_URL is not a valid PostgreSQL URL.")
-          values = {
-              "PGHOST": parsed.hostname,
-              "PGPORT": str(parsed.port or 5432),
-              "PGUSER": unquote(parsed.username or ""),
-              "PGPASSWORD": unquote(parsed.password or ""),
-              "PGDATABASE": unquote(parsed.path.lstrip("/")),
-              "PGSSLMODE": data.get("PGSSLMODE") or "require",
-          }
-          if not all(values[k] for k in ("PGUSER", "PGPASSWORD", "PGDATABASE")):
+          values = [p.hostname, str(p.port or 5432), unquote(p.username or ""),
+                    unquote(p.password or ""), unquote(p.path.lstrip("/")),
+                    data.get("PGSSLMODE") or "require"]
+          if values[0] != "trademate-db.cnoaequa8k6z.eu-north-1.rds.amazonaws.com":
+              raise SystemExit("DATABASE_URL host does not match approved staging RDS.")
+          if not all(values[i] for i in (2, 3, 4)):
               raise SystemExit("DATABASE_URL is missing required connection fields.")
-          if values["PGHOST"] != "trademate-db.cnoaequa8k6z.eu-north-1.rds.amazonaws.com":
-              raise SystemExit("DATABASE_URL host does not match the approved staging RDS endpoint.")
-          with open(env_path, "a", encoding="utf-8") as f:
-              for key, value in values.items():
-                  f.write(f"{key}={value}\n")
-          with open(output_path, "a", encoding="utf-8") as f:
-              f.write("connection_ready=true\n")
+          if "\n" in "\n".join(values) or any("\r" in x for x in values):
+              raise SystemExit("Unexpected newline in connection fields.")
+          for value in values:
+              print(value)
           PY
+          )
           unset secret_json
+          [[ "${#fields[@]}" -eq 6 ]] || { echo "::error::Could not safely parse database connection fields."; exit 1; }
 
-      - name: Mask credentials and run read-only SQL inventory
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "::add-mask::$PGPASSWORD"
-          echo "::add-mask::$PGUSER"
-          echo "::add-mask::$PGHOST"
+          for value in "${fields[@]}"; do echo "::add-mask::$value"; done
+          export PGHOST="${fields[0]}" PGPORT="${fields[1]}" PGUSER="${fields[2]}"
+          export PGPASSWORD="${fields[3]}" PGDATABASE="${fields[4]}" PGSSLMODE="${fields[5]}"
+          unset fields
+
           psql --no-psqlrc --no-align --tuples-only --set=ON_ERROR_STOP=1 <<'SQL'
           BEGIN READ ONLY;
           SELECT 'DATABASE' AS section, current_database() AS database_name,
