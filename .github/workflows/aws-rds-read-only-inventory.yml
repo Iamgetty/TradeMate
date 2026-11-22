@@ -1,0 +1,113 @@
+name: AWS RDS Read-Only Inventory
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aws-rds-read-only-inventory
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    name: Inspect staging RDS without modifying it
+    runs-on: [self-hosted, linux, x64, aws-staging]
+    timeout-minutes: 8
+    env:
+      AWS_REGION: eu-north-1
+      AWS_DEFAULT_REGION: eu-north-1
+      SECRET_ID: trademate/staging/api
+      PGSSLMODE: require
+    steps:
+      - name: Check local PostgreSQL client
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null 2>&1; then
+            echo "::error::psql is not installed on the existing staging runner. No package was installed."
+            exit 1
+          fi
+          psql --version
+
+      - name: Retrieve staging DB URL without printing secret values
+        shell: bash
+        run: |
+          set -euo pipefail
+          secret_json="$(aws secretsmanager get-secret-value \
+            --secret-id "$SECRET_ID" \
+            --query SecretString \
+            --output text)"
+          if [[ -z "$secret_json" || "$secret_json" == "None" ]]; then
+            echo "::error::SecretString is empty or unavailable."
+            exit 1
+          fi
+
+          # Parse only the connection fields into the runner's temporary environment.
+          # Never print the secret JSON, URL, username, or password.
+          python3 - "$GITHUB_ENV" "$GITHUB_OUTPUT" <<'PY' <<< "$secret_json"
+          import json, os, sys
+          from urllib.parse import urlsplit, unquote
+
+          env_path, output_path = sys.argv[1], sys.argv[2]
+          raw = sys.stdin.read()
+          data = json.loads(raw)
+          url = data.get("DATABASE_URL")
+          if not isinstance(url, str) or not url:
+              raise SystemExit("DATABASE_URL is missing from the secret.")
+          parsed = urlsplit(url)
+          if parsed.scheme not in ("postgres", "postgresql") or not parsed.hostname:
+              raise SystemExit("DATABASE_URL is not a valid PostgreSQL URL.")
+          values = {
+              "PGHOST": parsed.hostname,
+              "PGPORT": str(parsed.port or 5432),
+              "PGUSER": unquote(parsed.username or ""),
+              "PGPASSWORD": unquote(parsed.password or ""),
+              "PGDATABASE": unquote(parsed.path.lstrip("/")),
+              "PGSSLMODE": data.get("PGSSLMODE") or "require",
+          }
+          if not all(values[k] for k in ("PGUSER", "PGPASSWORD", "PGDATABASE")):
+              raise SystemExit("DATABASE_URL is missing required connection fields.")
+          if values["PGHOST"] != "trademate-db.cnoaequa8k6z.eu-north-1.rds.amazonaws.com":
+              raise SystemExit("DATABASE_URL host does not match the approved staging RDS endpoint.")
+          with open(env_path, "a", encoding="utf-8") as f:
+              for key, value in values.items():
+                  f.write(f"{key}={value}\n")
+          with open(output_path, "a", encoding="utf-8") as f:
+              f.write("connection_ready=true\n")
+          PY
+          unset secret_json
+
+      - name: Mask credentials and run read-only SQL inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$PGPASSWORD"
+          echo "::add-mask::$PGUSER"
+          echo "::add-mask::$PGHOST"
+          psql --no-psqlrc --no-align --tuples-only --set=ON_ERROR_STOP=1 <<'SQL'
+          BEGIN READ ONLY;
+          SELECT 'DATABASE' AS section, current_database() AS database_name,
+                 current_user AS connected_role, current_setting('server_version') AS postgres_version;
+          SELECT 'RDS_HOST' AS section, current_setting('ssl') AS ssl_in_use;
+          SELECT 'APPLICATION_ROLES' AS section, rolname, rolcanlogin, rolsuper,
+                 rolcreatedb, rolcreaterole, rolbypassrls
+          FROM pg_roles
+          WHERE rolname IN ('trademate_app','trademate_migrator','trademate_worker')
+          ORDER BY rolname;
+          SELECT 'EXTENSIONS' AS section, e.extname, e.extversion, n.nspname AS extension_schema
+          FROM pg_extension e
+          JOIN pg_namespace n ON n.oid = e.extnamespace
+          ORDER BY e.extname;
+          SELECT 'MIGRATION_TABLE' AS section, to_regclass('public.schema_migrations') AS table_name;
+          SELECT 'PUBLIC_TABLE_COUNTS' AS section,
+                 count(*) AS application_tables,
+                 count(*) FILTER (WHERE c.relrowsecurity) AS rls_enabled,
+                 count(*) FILTER (WHERE c.relforcerowsecurity) AS rls_forced
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = 'public' AND c.relkind IN ('r','p');
+          ROLLBACK;
+          SQL
+          echo "Read-only inventory completed. No schema or data changes were made."
