@@ -1,0 +1,54 @@
+name: Database Network Reachability Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      render_db_host:
+        description: "Render PostgreSQL external hostname (hostname only; no URL or credentials)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  check-database-network:
+    name: Check Render and AWS RDS network paths
+    runs-on: [self-hosted, Linux, X64, aws-staging]
+    timeout-minutes: 5
+    env:
+      AWS_RDS_HOST: trademate-db.cnoaequa8k6z.eu-north-1.rds.amazonaws.com
+      RENDER_DB_HOST: ${{ inputs.render_db_host }}
+    steps:
+      - name: Check both PostgreSQL endpoints without authenticating
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          import socket
+          import sys
+
+          targets = [
+              ("Render PostgreSQL", os.environ["RENDER_DB_HOST"], 5432),
+              ("AWS RDS PostgreSQL", os.environ["AWS_RDS_HOST"], 5432),
+          ]
+          failed = False
+          for label, host, port in targets:
+              print(f"\n{label}: {host}:{port}")
+              try:
+                  addresses = sorted({item[4][0] for item in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)})
+                  print("DNS: OK (" + ", ".join(addresses) + ")")
+              except Exception as exc:
+                  print(f"DNS: FAILED ({type(exc).__name__})")
+                  failed = True
+                  continue
+              try:
+                  with socket.create_connection((host, port), timeout=8):
+                      print("TCP port 5432: REACHABLE")
+              except Exception as exc:
+                  print(f"TCP port 5432: NOT REACHABLE ({type(exc).__name__})")
+                  failed = True
+          if failed:
+              sys.exit(1)
+          print("\nBoth PostgreSQL endpoints accepted TCP connections. No database login or SQL was attempted.")
+          PY
