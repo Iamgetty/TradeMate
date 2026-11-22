@@ -57,7 +57,7 @@ Policy name: `TradeMateSSMReadOnlyCommandExecution`
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "SendRunShellScriptToOnlyTradeMateStagingInstance",
+      "Sid": "SendFixedDiagnosticsDocumentToOnlyTradeMateStagingInstance",
       "Effect": "Allow",
       "Action": "ssm:SendCommand",
       "Resource": [
