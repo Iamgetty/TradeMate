@@ -1,0 +1,65 @@
+name: Install Node.js 24 on AWS EC2 Staging
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aws-ec2-node24-install
+  cancel-in-progress: false
+
+jobs:
+  install:
+    name: Install namespaced Node.js 24 runtime
+    runs-on: [self-hosted, Linux, X64, aws-staging]
+    timeout-minutes: 10
+    steps:
+      - name: Preflight and install Node.js 24 without switching the default runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "=== Confirm target host and OS ==="
+          . /etc/os-release
+          echo "OS: ${PRETTY_NAME:-unknown}"
+          test "${ID:-}" = "amzn"
+          test "$(uname -m)" = "x86_64"
+
+          echo "=== Capture current default runtimes ==="
+          command -v node >/dev/null
+          command -v npm >/dev/null
+          DEFAULT_NODE="$(node --version)"
+          DEFAULT_NPM="$(npm --version)"
+          echo "Default Node before: $DEFAULT_NODE"
+          echo "Default npm before: $DEFAULT_NPM"
+
+          echo "=== Confirm non-interactive sudo and disk headroom ==="
+          sudo -n true
+          AVAILABLE_KB="$(df -Pk / | awk 'NR==2 {print $4}')"
+          test "$AVAILABLE_KB" -ge 524288
+          echo "Available root disk: ${AVAILABLE_KB} KiB"
+
+          echo "=== Install namespaced AL2023 Node.js 24 packages ==="
+          sudo -n dnf install -y --setopt=install_weak_deps=False nodejs24 nodejs24-npm
+
+          echo "=== Verify application runtime ==="
+          command -v node-24
+          command -v npm-24
+          NODE24_VERSION="$(node-24 --version)"
+          NPM24_VERSION="$(npm-24 --version)"
+          echo "Node 24: $NODE24_VERSION"
+          echo "npm 24: $NPM24_VERSION"
+          node -e 'const [major, minor, patch] = process.versions.node.split(".").map(Number); if (major !== 24 || (minor * 1000000 + patch) < (22 * 1000000 + 1)) process.exit(1)'
+          node-24 -e 'const [major, minor, patch] = process.versions.node.split(".").map(Number); if (major !== 24 || minor < 22 || (minor === 22 && patch < 1)) process.exit(1)'
+
+          echo "=== Ensure existing default runtime was not switched ==="
+          test "$(node --version)" = "$DEFAULT_NODE"
+          test "$(npm --version)" = "$DEFAULT_NPM"
+          echo "Default Node remains: $(node --version)"
+          echo "Default npm remains: $(npm --version)"
+
+          echo "=== Installed RPM package versions ==="
+          rpm -q nodejs24 nodejs24-npm
+          echo "Installation complete. No application services were started or restarted."
