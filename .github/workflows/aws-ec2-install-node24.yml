@@ -12,53 +12,75 @@ concurrency:
 
 jobs:
   install:
-    name: Install namespaced Node.js 24 runtime
+    name: Install isolated Node.js 24 runtime
     runs-on: [self-hosted, Linux, X64, aws-staging]
     timeout-minutes: 10
     steps:
-      - name: Preflight and install Node.js 24 without switching the default runtime
+      - name: Install verified Node.js 24 under runner home without sudo
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "=== Confirm target host and OS ==="
+          NODE_VERSION="v24.22.1"
+          ARCHIVE="node-${NODE_VERSION}-linux-x64.tar.xz"
+          BASE_URL="https://nodejs.org/dist/${NODE_VERSION}"
+          NODE_HOME="$HOME/.local/opt/node-${NODE_VERSION}"
+
+          echo "=== Verify target and unprivileged install location ==="
           . /etc/os-release
           echo "OS: ${PRETTY_NAME:-unknown}"
           test "${ID:-}" = "amzn"
           test "$(uname -m)" = "x86_64"
+          test "$(id -u)" -ne 0
+          test -n "${HOME:-}"
+          test -w "$HOME"
+          for BIN in curl sha256sum tar xz awk df; do command -v "$BIN" >/dev/null; done
 
-          echo "=== Capture current default runtimes ==="
-          command -v node >/dev/null
-          command -v npm >/dev/null
-          DEFAULT_NODE="$(node --version)"
-          DEFAULT_NPM="$(npm --version)"
-          echo "Default Node before: $DEFAULT_NODE"
-          echo "Default npm before: $DEFAULT_NPM"
+          echo "=== Confirm disk headroom ==="
+          AVAILABLE_KB="$(df -Pk "$HOME" | awk 'NR==2 {print $4}')"
+          test "$AVAILABLE_KB" -ge 307200
+          echo "Available home filesystem: ${AVAILABLE_KB} KiB"
 
-          echo "=== Confirm non-interactive sudo and disk headroom ==="
-          sudo -n true
-          AVAILABLE_KB="$(df -Pk / | awk 'NR==2 {print $4}')"
-          test "$AVAILABLE_KB" -ge 524288
-          echo "Available root disk: ${AVAILABLE_KB} KiB"
+          echo "=== Capture existing system runtime ==="
+          SYSTEM_NODE="$(node --version 2>/dev/null || true)"
+          SYSTEM_NPM="$(npm --version 2>/dev/null || true)"
+          echo "System Node before: ${SYSTEM_NODE:-not on PATH}"
+          echo "System npm before: ${SYSTEM_NPM:-not on PATH}"
 
-          echo "=== Install namespaced AL2023 Node.js 24 packages ==="
-          sudo -n dnf install -y --setopt=install_weak_deps=False nodejs24 nodejs24-npm
+          mkdir -p "$HOME/.local/opt"
+          if [ -x "$NODE_HOME/bin/node" ]; then
+            echo "Existing isolated runtime found; verifying it."
+            test "$("$NODE_HOME/bin/node" --version)" = "$NODE_VERSION"
+          else
+            WORK_DIR="$(mktemp -d "$HOME/.local/node24-install.XXXXXX")"
+            trap 'rm -rf "$WORK_DIR"' EXIT
 
-          echo "=== Verify application runtime ==="
-          command -v node-24
-          command -v npm-24
-          NODE24_VERSION="$(node-24 --version)"
-          NPM24_VERSION="$(npm-24 --version)"
-          echo "Node 24: $NODE24_VERSION"
-          echo "npm 24: $NPM24_VERSION"
-          node-24 -e 'const [major, minor, patch] = process.versions.node.split(".").map(Number); if (major !== 24 || minor < 22 || (minor === 22 && patch < 1)) process.exit(1)'
+            echo "=== Download official Node.js archive and checksum manifest ==="
+            curl --fail --location --silent --show-error --retry 3 "${BASE_URL}/${ARCHIVE}" -o "$WORK_DIR/$ARCHIVE"
+            curl --fail --location --silent --show-error --retry 3 "${BASE_URL}/SHASUMS256.txt" -o "$WORK_DIR/SHASUMS256.txt"
 
-          echo "=== Ensure existing default runtime was not switched ==="
-          test "$(node --version)" = "$DEFAULT_NODE"
-          test "$(npm --version)" = "$DEFAULT_NPM"
-          echo "Default Node remains: $(node --version)"
-          echo "Default npm remains: $(npm --version)"
+            EXPECTED_SHA="$(awk -v file="$ARCHIVE" '$2 == file {print $1}' "$WORK_DIR/SHASUMS256.txt")"
+            test "${#EXPECTED_SHA}" -eq 64
+            printf '%s  %s\n' "$EXPECTED_SHA" "$WORK_DIR/$ARCHIVE" | sha256sum --check -
 
-          echo "=== Installed RPM package versions ==="
-          rpm -q nodejs24 nodejs24-npm
-          echo "Installation complete. No application services were started or restarted."
+            echo "=== Extract into isolated user-owned directory ==="
+            mkdir "$WORK_DIR/extracted"
+            tar -xJf "$WORK_DIR/$ARCHIVE" -C "$WORK_DIR/extracted" --strip-components=1
+            test -x "$WORK_DIR/extracted/bin/node"
+            test -x "$WORK_DIR/extracted/bin/npm"
+            mv "$WORK_DIR/extracted" "$NODE_HOME"
+          fi
+
+          echo "=== Verify installed application runtime ==="
+          "$NODE_HOME/bin/node" --version
+          "$NODE_HOME/bin/npm" --version
+          "$NODE_HOME/bin/node" -e 'const [major, minor, patch] = process.versions.node.split(".").map(Number); if (major !== 24 || minor < 22 || (minor === 22 && patch < 1)) process.exit(1)'
+          "$NODE_HOME/bin/npm" --prefix "$NODE_HOME" --version
+
+          echo "=== Confirm system default was not changed ==="
+          test "$(node --version 2>/dev/null || true)" = "$SYSTEM_NODE"
+          test "$(npm --version 2>/dev/null || true)" = "$SYSTEM_NPM"
+          echo "System Node remains: ${SYSTEM_NODE:-not on PATH}"
+          echo "System npm remains: ${SYSTEM_NPM:-not on PATH}"
+          echo "Isolated Node runtime: $NODE_HOME"
+          echo "Installation complete. No sudo, system PATH changes, service restarts, or application launches."
