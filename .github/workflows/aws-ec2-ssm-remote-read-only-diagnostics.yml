@@ -33,50 +33,21 @@ jobs:
           test "$ACCOUNT" = "661406600284"
           echo "Authenticated to the expected AWS account."
 
-      - name: Send the fixed read-only diagnostic script
+      - name: Send the fixed read-only diagnostic document
         id: send
         shell: bash
         run: |
           set -euo pipefail
-          cat > "$RUNNER_TEMP/ssm-parameters.json" <<'JSON'
-          {
-            "commands": [
-              "set -eu",
-              "echo '=== Host and operating system ==='",
-              "hostnamectl --static 2>/dev/null || hostname",
-              "grep -E '^(NAME|VERSION|PRETTY_NAME)=' /etc/os-release",
-              "uname -r",
-              "echo '=== Uptime and resource capacity ==='",
-              "uptime",
-              "nproc",
-              "free -h",
-              "df -h /",
-              "echo '=== Runtime availability (versions only) ==='",
-              "node --version 2>/dev/null || echo 'Node.js not installed'",
-              "npm --version 2>/dev/null || echo 'npm not installed'",
-              "cloudflared --version 2>/dev/null || echo 'cloudflared not installed'",
-              "echo '=== Relevant service states ==='",
-              "systemctl is-active amazon-ssm-agent 2>/dev/null || true",
-              "systemctl is-active trademate-api 2>/dev/null || true",
-              "systemctl is-active exchange-feed 2>/dev/null || true",
-              "systemctl is-active cloudflared 2>/dev/null || true",
-              "echo '=== Listening TCP ports (no process arguments) ==='",
-              "ss -lnt 2>/dev/null || true",
-              "echo '=== End of read-only diagnostics ==='"
-            ]
-          }
-          JSON
           COMMAND_ID="$(aws ssm send-command \
-            --document-name AWS-RunShellScript \
+            --document-name TradeMate-ReadOnly-EC2-Diagnostics \
             --instance-ids i-035b1f1d00052c77e \
-            --parameters "file://$RUNNER_TEMP/ssm-parameters.json" \
             --timeout-seconds 120 \
             --comment "TradeMate fixed read-only EC2 diagnostics" \
             --query 'Command.CommandId' \
             --output text)"
           test -n "$COMMAND_ID"
           echo "command_id=$COMMAND_ID" >> "$GITHUB_OUTPUT"
-          echo "Submitted the fixed diagnostic script to the single approved instance."
+          echo "Submitted the fixed, parameter-free SSM diagnostic document to the single approved instance."
 
       - name: Wait for completion and print diagnostic output
         shell: bash
@@ -105,5 +76,5 @@ jobs:
       - name: Confirm the safety boundary
         if: always()
         run: |
-          echo "This workflow targets only i-035b1f1d00052c77e and runs a fixed read-only script."
-          echo "It does not install software, edit files, restart services, open sessions, change IAM, or provision infrastructure."
+          echo "This workflow targets only i-035b1f1d00052c77e and runs a fixed, parameter-free read-only SSM document."
+          echo "The IAM role cannot submit arbitrary shell commands because it is restricted to the fixed custom SSM document. The document does not accept parameters. This workflow does not install software, edit files, restart services, open sessions, change IAM, or provision infrastructure."
