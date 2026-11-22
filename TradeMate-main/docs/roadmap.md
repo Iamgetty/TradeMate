@@ -2,6 +2,8 @@
 
 This roadmap records the current product direction. It is not a claim that each item is already implemented or deployed.
 
+> **Infrastructure cost decision — 22 November 2026:** AWS ECS/Fargate is removed from the active migration roadmap. Do not execute the existing ECS/Fargate CloudFormation change sets or provision an ALB, NAT Gateway, EKS cluster, or other new paid compute/networking resource. The active investigation is Cloudflare Workers for the web frontend and reuse of the existing EC2 host and RDS for backend workloads, only if capacity and security checks pass. Render remains online until a replacement is fully tested and explicitly approved. Any new recurring cost requires a separate cost estimate and explicit approval.
+
 ## Production data integrity baseline — 15 November 2026
 
 A production data-integrity contract has been added at [docs/data-integrity.md](data-integrity.md). It prohibits synthetic production business records and fabricated market values, requires explicit source/provenance/freshness, isolates test fixtures from production, and treats unavailable/empty states as valid. The initial source audit identifies local-mode configuration, direct browser CoinGecko refresh, 14-day FX snapshots, 30-day non-FX market snapshots and exchange-feed reconnect/freshness verification as priority gates. These are audit findings, not claims that all production journeys have been verified.
