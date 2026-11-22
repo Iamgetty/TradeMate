@@ -1,0 +1,89 @@
+name: Backup Render PostgreSQL (backup only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_backup:
+        description: "Type BACKUP to create a private local backup on the existing EC2 runner"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  backup-render-db:
+    name: Create and verify private Render database backup
+    if: ${{ inputs.confirm_backup == 'BACKUP' }}
+    runs-on: [self-hosted, Linux, X64, aws-staging]
+    timeout-minutes: 20
+    env:
+      RENDER_DATABASE_URL: ${{ secrets.RENDER_DATABASE_URL }}
+    steps:
+      - name: Validate tools, source access, and local storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${RENDER_DATABASE_URL:-}" ]]; then
+            echo "::error::RENDER_DATABASE_URL is missing."
+            exit 1
+          fi
+          command -v pg_dump >/dev/null || { echo "::error::pg_dump is not installed on this runner. No backup was created."; exit 1; }
+          command -v pg_restore >/dev/null || { echo "::error::pg_restore is not installed on this runner. No backup was created."; exit 1; }
+          dump_major="$(pg_dump --version | grep -oE '[0-9]+' | head -1)"
+          restore_major="$(pg_restore --version | grep -oE '[0-9]+' | head -1)"
+          if [[ "$dump_major" -lt 18 || "$restore_major" -lt 18 ]]; then
+            echo "::error::PostgreSQL 18 client tools are required for this PostgreSQL 18 source. No backup was created."
+            exit 1
+          fi
+          free_kb="$(df -Pk "$HOME" | awk 'NR==2 {print $4}')"
+          if [[ "$free_kb" -lt 1048576 ]]; then
+            echo "::error::Less than 1 GiB free in runner home. No backup was created."
+            exit 1
+          fi
+          echo "PostgreSQL client tools: OK (pg_dump $dump_major)"
+          echo "Available local storage: at least 1 GiB"
+          echo "Backup destination: private directory under runner home"
+          echo "No database changes will be made."
+
+      - name: Create private custom-format backup and verify archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          backup_dir="$HOME/trademate-backups"
+          mkdir -p "$backup_dir"
+          chmod 700 "$backup_dir"
+          timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          backup_file="$backup_dir/render-trademate-$timestamp.dump"
+          partial_file="$backup_file.partial"
+          trap 'rm -f "$partial_file"' EXIT
+          export PGDATABASE="$RENDER_DATABASE_URL"
+          pg_dump --no-password --format=custom --compress=6 --no-owner --no-acl --file="$partial_file"
+          test -s "$partial_file"
+          pg_restore --list "$partial_file" >/dev/null
+          mv "$partial_file" "$backup_file"
+          chmod 600 "$backup_file"
+          sha256sum "$backup_file" > "$backup_file.sha256"
+          chmod 600 "$backup_file.sha256"
+          bytes="$(stat -c '%s' "$backup_file")"
+          checksum="$(cut -d ' ' -f1 "$backup_file.sha256")"
+          echo "Backup: SUCCESS"
+          echo "Archive verification: SUCCESS (pg_restore --list)"
+          echo "Backup size: $bytes bytes"
+          echo "SHA-256: $checksum"
+          echo "Private backup location: $backup_file"
+          echo "Database changes: NONE (pg_dump only)"
+          unset PGDATABASE RENDER_DATABASE_URL
+
+      - name: Confirm backup files and permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest="$(find "$HOME/trademate-backups" -maxdepth 1 -type f -name 'render-trademate-*.dump' -printf '%T@ %p\n' | sort -nr | head -1 | cut -d ' ' -f2-)"
+          test -n "$latest"
+          test -s "$latest"
+          test -s "$latest.sha256"
+          (cd "$(dirname "$latest")" && sha256sum -c "$(basename "$latest").sha256")
+          stat -c 'File permissions: %a; owner: %U; size: %s bytes' "$latest"
+          echo "Backup is stored locally on the existing EC2 runner. It was not uploaded to GitHub or a public artifact store."
