@@ -8,20 +8,74 @@ permissions:
 
 jobs:
   verify-runner:
-    name: Verify EC2 runner and AWS identity
+    name: Read-only EC2 readiness and AWS identity
     runs-on: [self-hosted, Linux, X64, aws-staging]
     timeout-minutes: 5
     env:
       AWS_REGION: eu-north-1
       AWS_DEFAULT_REGION: eu-north-1
+      AWS_RDS_HOST: trademate-db.cnoaequa8k6z.eu-north-1.rds.amazonaws.com
 
     steps:
       - name: Confirm this job is running on the EC2 runner
         run: |
-          echo "TradeMate self-hosted runner received the job."
+          echo "TradeMate EC2 runner received the job."
           echo "Runner hostname: $(hostname)"
           echo "Runner user: $(whoami)"
           uname -a
+
+      - name: Inspect available EC2 resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== CPU ==="
+          nproc
+          echo "=== Load average ==="
+          cat /proc/loadavg
+          echo "=== Memory ==="
+          free -h
+          echo "=== Root filesystem ==="
+          df -h /
+          echo "=== Uptime ==="
+          uptime
+          echo "=== Node.js ==="
+          if command -v node >/dev/null 2>&1; then
+            node --version
+            npm --version
+          else
+            echo "Node.js is not installed on PATH."
+          fi
+          echo "=== Docker ==="
+          if command -v docker >/dev/null 2>&1; then
+            docker --version
+          else
+            echo "Docker is not installed on PATH."
+          fi
+          echo "=== Runner process ==="
+          if pgrep -af 'Runner.Listener' >/dev/null; then
+            echo "GitHub Actions runner listener process is present."
+          else
+            echo "Runner listener process was not found by pgrep."
+          fi
+
+      - name: Check private RDS TCP connectivity without database login
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          import socket
+          host = os.environ["AWS_RDS_HOST"]
+          print(f"Checking private RDS endpoint {host}:5432")
+          try:
+              addresses = sorted({item[4][0] for item in socket.getaddrinfo(host, 5432, type=socket.SOCK_STREAM)})
+              print("DNS: OK (" + ", ".join(addresses) + ")")
+              with socket.create_connection((host, 5432), timeout=8):
+                  print("TCP 5432: REACHABLE")
+          except Exception as exc:
+              print(f"RDS network check failed: {type(exc).__name__}")
+              raise SystemExit(1)
+          print("No database credentials, authentication, or SQL were used.")
+          PY
 
       - name: Check AWS CLI
         run: |
