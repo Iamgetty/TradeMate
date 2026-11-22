@@ -44,7 +44,7 @@ jobs:
             --document-name AWS-RunShellScript \
             --comment "TradeMate approved read-only EC2 capability audit" \
             --timeout-seconds 180 \
-            --parameters 'commands=["set -eu","printf \\\"HOST\\\\n\\\"; hostname","printf \\\"OS\\\\n\\\"; cat /etc/os-release","printf \\\"IDENTITY\\\\n\\\"; id","printf \\\"CPU_AND_MEMORY\\\\n\\\"; nproc; free -h","printf \\\"DISK\\\\n\\\"; df -h /","printf \\\"RUNTIME_BINARIES\\\\n\\\"; for x in node npm cloudflared nginx caddy docker podman; do command -v \\\"$x\\\" || true; done","printf \\\"RELEVANT_SERVICES\\\\n\\\"; systemctl is-active amazon-ssm-agent 2>/dev/null || true; systemctl is-enabled amazon-ssm-agent 2>/dev/null || true"]' \
+            --parameters 'commands=["set -eu","echo HOST; hostname","echo OS; cat /etc/os-release","echo IDENTITY; id","echo CPU_AND_MEMORY; nproc; free -h","echo DISK; df -h /","echo RUNTIME_BINARIES; for x in node npm cloudflared nginx caddy docker podman; do command -v $x || true; done","echo RELEVANT_SERVICES; systemctl is-active amazon-ssm-agent 2>/dev/null || true; systemctl is-enabled amazon-ssm-agent 2>/dev/null || true"]' \
             --query 'Command.CommandId' --output text)"
           test -n "$COMMAND_ID"
           echo "command_id=$COMMAND_ID" >> "$GITHUB_OUTPUT"
