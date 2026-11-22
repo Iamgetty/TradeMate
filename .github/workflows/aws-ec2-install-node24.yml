@@ -51,7 +51,6 @@ jobs:
           NPM24_VERSION="$(npm-24 --version)"
           echo "Node 24: $NODE24_VERSION"
           echo "npm 24: $NPM24_VERSION"
-          node -e 'const [major, minor, patch] = process.versions.node.split(".").map(Number); if (major !== 24 || (minor * 1000000 + patch) < (22 * 1000000 + 1)) process.exit(1)'
           node-24 -e 'const [major, minor, patch] = process.versions.node.split(".").map(Number); if (major !== 24 || minor < 22 || (minor === 22 && patch < 1)) process.exit(1)'
 
           echo "=== Ensure existing default runtime was not switched ==="
