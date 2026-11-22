@@ -24,11 +24,11 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          node-version: 24.22.1
 
       - name: Install API runtime dependencies
         working-directory: TradeMate-main/apps/api
-        run: npm install --omit=dev --no-audit --no-fund
+        run: npm ci --omit=dev --no-audit --no-fund
 
       - name: Run account-deletion worker in dry-run mode
         working-directory: TradeMate-main/apps/api
