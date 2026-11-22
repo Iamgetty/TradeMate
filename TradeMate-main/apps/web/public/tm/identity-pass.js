@@ -1,0 +1,177 @@
+/* Identity pass redesign: Profile, User Center and Profile picture.
+ * Runs after app.js. Keeps every existing data-* hook, so handlers, routes and
+ * state (st, act(), idvDone(), the photo preview module) behave as before. */
+(function () {
+  "use strict";
+  if (window.__tmIdp) return;
+  if (typeof PG === "undefined" || typeof st === "undefined" || !PG.profile || !PG.uc || !PG.avatar) return;
+  window.__tmIdp = 1;
+
+  var AV = [
+    '<svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true"><path d="M10 100c0-25 18-35 40-35s40 10 40 35z" fill="#27324a"/><rect x="43" y="55" width="14" height="14" rx="6" fill="#e3a47a"/><ellipse cx="33" cy="44" rx="3" ry="4.5" fill="#e3a47a"/><ellipse cx="67" cy="44" rx="3" ry="4.5" fill="#e3a47a"/><ellipse cx="50" cy="42" rx="17" ry="19" fill="#f1b98f"/><path d="M31 42c-4-18 7-27 19-27s23 9 19 27c-3-9-8-13-19-13s-16 4-19 13z" fill="#2a1d16"/><circle cx="43" cy="45" r="1.9" fill="#1b1006"/><circle cx="57" cy="45" r="1.9" fill="#1b1006"/><path d="M44 53q6 5 12 0" stroke="#1b1006" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>',
+    '<svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true"><path d="M24 48c-2-24 10-35 26-35s28 11 26 35c0 15 3 26 6 34H18c3-8 6-19 6-34z" fill="#5a2d1d"/><path d="M12 100c0-24 17-33 38-33s38 9 38 33z" fill="#3b2a5c"/><rect x="43" y="56" width="14" height="14" rx="6" fill="#e8ad88"/><ellipse cx="50" cy="43" rx="16" ry="18" fill="#f6c3a1"/><path d="M33 40c3-11 11-16 20-14 8 1 13 7 14 15-5-7-13-9-21-7-5 1-9 3-13 6z" fill="#5a2d1d"/><circle cx="44" cy="45" r="1.8" fill="#1b1006"/><circle cx="56" cy="45" r="1.8" fill="#1b1006"/><path d="M39.5 40q4.5-3 8-1M60.5 40q-4.5-3-8-1" stroke="#5a2d1d" stroke-width="1.4" fill="none" stroke-linecap="round"/><path d="M45 53q5 4 10 0" stroke="#c2415a" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="34" cy="50" r="1.8" fill="#ffc24d"/><circle cx="66" cy="50" r="1.8" fill="#ffc24d"/></svg>',
+    '<svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true"><path d="M24 46L28 14 47 33z" fill="#f0a24a"/><path d="M76 46L72 14 53 33z" fill="#f0a24a"/><path d="M30 38L32 23 41 33z" fill="#f7b3a0"/><path d="M70 38L68 23 59 33z" fill="#f7b3a0"/><ellipse cx="50" cy="58" rx="29" ry="25" fill="#f0a24a"/><path d="M50 34v8M43 36l2 7M57 36l-2 7" stroke="#c9741f" stroke-width="2.4" stroke-linecap="round"/><ellipse cx="50" cy="66" rx="13" ry="9" fill="#f9d9a8"/><ellipse cx="39" cy="55" rx="4" ry="5" fill="#1b1006"/><ellipse cx="61" cy="55" rx="4" ry="5" fill="#1b1006"/><circle cx="40.2" cy="53.4" r="1.4" fill="#fff"/><circle cx="62.2" cy="53.4" r="1.4" fill="#fff"/><path d="M46 62h8l-4 4.5z" fill="#e0707f"/><path d="M50 66.5q-3 4-7 2.5M50 66.5q3 4 7 2.5" stroke="#1b1006" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M30 63l-12-2M30 67l-12 3M70 63l12-2M70 67l12 3" stroke="#fff" stroke-opacity=".85" stroke-width="1.3" stroke-linecap="round"/></svg>',
+    '<svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true"><path d="M10 100c0-25 18-35 40-35s40 10 40 35z" fill="#6b4f3a"/><path d="M40 66l10 14 10-14z" fill="#f4f1ea"/><rect x="43" y="55" width="14" height="14" rx="6" fill="#dca07b"/><path d="M32 46c-5-11 0-22 8-28-5 6-6 16-5 27zM68 46c5-11 0-22-8-28 5 6 6 16 5 27z" fill="#e8ecf2"/><ellipse cx="33" cy="46" rx="3" ry="4.5" fill="#dca07b"/><ellipse cx="67" cy="46" rx="3" ry="4.5" fill="#dca07b"/><ellipse cx="50" cy="43" rx="17" ry="19" fill="#eab08a"/><path d="M37 27c7-7 19-7 26 0-9-3-17-3-26 0z" fill="#e8ecf2"/><circle cx="43" cy="45" r="6.5" fill="none" stroke="#3a2a1e" stroke-width="1.6"/><circle cx="57" cy="45" r="6.5" fill="none" stroke="#3a2a1e" stroke-width="1.6"/><path d="M49.5 45h1" stroke="#3a2a1e" stroke-width="1.6"/><circle cx="43" cy="45" r="1.6" fill="#1b1006"/><circle cx="57" cy="45" r="1.6" fill="#1b1006"/><path d="M38 38l9-1.5M62 38l-9-1.5" stroke="#e8ecf2" stroke-width="2.2" stroke-linecap="round"/><path d="M40 54q5-4 10-1 5-3 10 1-5 5-10 3-5 2-10-3z" fill="#e8ecf2"/><path d="M45 59q5 3 10 0" stroke="#7a4a35" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>'
+  ];
+  var BG = ["linear-gradient(135deg,#7aa2f7,#8a7bf6)", "linear-gradient(135deg,#f0829a,#d97bb8)", "linear-gradient(135deg,#f4b95a,#ec7a55)", "linear-gradient(135deg,#6fd1c2,#4aa3e3)"];
+  var NM = ["Guy", "Lady", "Cat", "Elderly man"];
+
+  var CSS = `
+.idp-cq{container-type:inline-size}
+.idp-grid,.idp-ucg{display:grid;gap:14px;padding:10px 16px 18px}
+@container (min-width:760px){.idp-grid,.idp-ucg{grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:24px;align-items:start}}
+.idp-c3{perspective:1200px;width:100%;max-width:440px;margin:0 auto;aspect-ratio:1.58}
+.idp-ci{position:relative;width:100%;height:100%;transition:transform .7s cubic-bezier(.2,.8,.2,1);transform-style:preserve-3d}
+.idp-c3.flip .idp-ci{transform:rotateY(180deg)}
+.idp-cf,.idp-cb{position:absolute;inset:0;border-radius:26px;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden;color:#f3f5f8;padding:20px 18px 14px;border:1px solid rgba(255,176,46,.4);background:radial-gradient(120% 90% at 85% 0%,rgba(255,159,46,.22),transparent 55%),linear-gradient(145deg,#171c25,#0a0d13);box-shadow:0 24px 60px rgba(255,159,46,.14),inset 0 1px 0 rgba(255,255,255,.08);box-sizing:border-box}
+.idp-cb{transform:rotateY(180deg)}
+.idp-cf:before,.idp-cb:before{content:"";position:absolute;left:0;right:0;top:0;height:5px;background:linear-gradient(90deg,#ffc24d,#ff6a4d,#e0407f,#8a7bf6,#4aa3e3)}
+.idp-cf:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 40%,rgba(255,255,255,.07) 50%,transparent 60%)}
+.idp-cm{color:#9aa6b4;font:500 10.5px/1 'DM Mono',monospace;letter-spacing:.2em;text-transform:uppercase}
+.idp-ab{display:inline-block;background:#ffb02e;color:#1b1006;border-radius:6px;padding:3px 6px;font:800 9px 'DM Mono',monospace;letter-spacing:.1em;margin-left:8px}
+.idp-top{display:flex;justify-content:space-between;align-items:center;gap:8px;position:relative;z-index:1}
+.idp-gl{height:34px;padding:0 12px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#f3f5f8;font:700 12.5px 'Hanken Grotesk',sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:6px;position:relative;z-index:1}
+.idp-id{display:flex;gap:14px;align-items:center;margin-top:14px;position:relative;z-index:1}
+.idp-pav{width:76px;height:76px;border-radius:22px;border:0;padding:0;flex:none;overflow:hidden;cursor:pointer;outline:2px solid #ffb02e;outline-offset:3px;background:none;display:block}
+.idp-pav .big{width:100%!important;height:100%!important;border-radius:0!important;box-shadow:none}
+.idp-nm{font:800 28px 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.02em;margin:0 0 6px;color:#f3f5f8;line-height:1.05;word-break:break-word}
+.idp-bt{position:absolute;left:18px;right:18px;bottom:14px;display:flex;align-items:flex-end;justify-content:space-between;z-index:1}
+.idp-bt>div{display:flex;gap:8px;flex-wrap:wrap}
+.idp-ok{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:999px;border:1px solid #1f6b4f;background:rgba(52,211,153,.12);color:#34d399;font:700 13px 'Hanken Grotesk',sans-serif;cursor:pointer}
+.idp-sq{display:flex;align-items:center;gap:10px;min-height:62px;padding:0 12px;border-radius:16px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#f3f5f8;font:700 13px 'Hanken Grotesk',sans-serif;cursor:pointer;text-align:left}
+.idp-sq svg{color:#ffb02e;flex:none}.idp-sq small{display:block;color:#9aa6b4;font-weight:600;font-size:11px;margin-top:2px}
+.idp-sqs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;position:relative;z-index:1}
+.idp-vc{background:var(--s1);border:1px solid var(--line);border-radius:24px;padding:16px}
+.idp-vh{display:flex;gap:12px;align-items:center}
+.idp-vh h3{font:800 17px 'Bricolage Grotesque','Hanken Grotesk',sans-serif;margin:0}
+.idp-vh p{margin:3px 0 0;color:var(--mut);font-size:13px;font-weight:500}
+.idp-sh{flex:none;display:grid;place-items:center;width:44px;height:44px}
+.idp-steps{display:flex;gap:6px;margin:14px 0 8px}
+.idp-steps i{flex:1;height:8px;border-radius:9px;background:var(--s3);position:relative;overflow:hidden}
+.idp-steps i.on:after{content:"";position:absolute;inset:0;background:var(--grad);transform-origin:left;animation:idpf .9s cubic-bezier(.2,.8,.2,1)}
+.idp-steps i.now:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,176,46,.55),transparent);animation:idps 1.6s infinite}
+@keyframes idpf{from{transform:scaleX(0)}}@keyframes idps{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.idp-vm{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--mut);margin-bottom:12px}
+.idp-vm button{color:var(--am);font:700 13px 'Hanken Grotesk',sans-serif;padding:6px 0}
+.idp-cta{display:block;width:100%;height:52px;border:0;border-radius:16px;background:var(--grad);color:var(--ongrad,#1b1006);font:800 15px 'Hanken Grotesk',sans-serif;cursor:pointer}
+html[data-theme="light"] .idp-cta{color:#fff}
+.idp-rc{display:flex;gap:8px;flex-wrap:wrap}
+.idp-chip{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--s2);color:var(--txt);font:600 13px 'Hanken Grotesk',sans-serif;cursor:pointer}
+.idp-chip svg{color:var(--am)}
+.idp-all{text-align:center;margin-top:16px}
+.idp-allbtn,.idp-donebtn.btn.wide{display:inline-flex;align-items:center;justify-content:center;width:auto;height:42px;padding:0 30px;border-radius:999px;font:700 14px 'Hanken Grotesk',sans-serif;cursor:pointer}
+.idp-allbtn{border:1.5px solid var(--am);background:none;color:var(--am)}
+.pfoot.idp-strip{margin:0 16px calc(10px + env(safe-area-inset-bottom,0px));padding:0;height:46px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--s1);box-shadow:0 10px 30px rgba(0,0,0,.28)}
+.idp-sz{flex:1 1 0;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 12px;color:var(--txt);font:700 13px 'Hanken Grotesk',sans-serif;cursor:pointer;min-width:0}
+.idp-sz:first-child{flex:1.5;justify-content:flex-start}
+.idp-sz .idp-ic{width:26px;height:26px;border-radius:9px;background:var(--s2);color:var(--am);display:grid;place-items:center;flex:none}
+.idp-sz .idp-ic svg{width:16px;height:16px}
+.idp-sz em{font-style:normal;margin-left:auto;display:block}
+.idp-sw{width:40px;height:24px;border-radius:99px;border:1px solid var(--line);background:var(--s3);position:relative;flex:none;transition:background .3s,border-color .3s}
+.idp-sw:after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--mut);transition:transform .3s cubic-bezier(.2,.8,.2,1),background .3s}
+.idp-sw.on{background:rgba(255,176,46,.25);border-color:var(--am)}.idp-sw.on:after{transform:translateX(16px);background:var(--am)}
+.idp-dv{width:1px;background:var(--line);margin:10px 0}
+.idp-sec{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:20px;background:var(--s1);color:var(--txt);font:600 14px 'Hanken Grotesk',sans-serif;text-align:left;cursor:pointer}
+.idp-sec b{color:var(--am)}.idp-sec>span:nth-child(2){flex:1;color:var(--mut)}.idp-sec em{font-style:normal;color:var(--mut);font-size:13px}
+.idp-ico{width:38px;height:38px;border-radius:12px;background:var(--s2);color:var(--am);display:grid;place-items:center;flex:none}
+.idp-ucl{display:grid;gap:12px;align-content:start}
+.idp-ucr .uc-tabs{margin:0 0 12px;padding-left:0;padding-right:0}
+.idp-list{background:var(--s1);border:1px solid var(--line);border-radius:22px;overflow:hidden}
+.idp-list .lr{border-bottom:1px solid var(--line);padding:0 14px;min-height:56px}
+.idp-list .sec{padding:16px 14px 8px;border-bottom:1px solid var(--line)}
+.idp-list>:last-child{border-bottom:0}
+.idp-ucr>div:last-child{padding:14px 0 6px!important}
+.idp-avp{display:grid;justify-items:center;gap:14px;padding:22px 16px 18px}
+.idp-prev{width:112px;height:112px;border-radius:50%;overflow:hidden;outline:3px solid var(--am);outline-offset:4px;margin:6px 0}
+.idp-prev .big{width:100%!important;height:100%!important;border-radius:0!important;box-shadow:none}
+.idp-ag{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;width:100%;max-width:480px;padding:0 2px}
+.idp-at{aspect-ratio:1;border-radius:22px;border:0;display:grid;place-items:center;cursor:pointer;padding:0;overflow:hidden;outline:1px solid var(--line);outline-offset:2px}
+.idp-at.on{outline:3px solid var(--am)}.idp-at svg{width:100%;height:100%;display:block}.idp-at img{width:58%}
+.idp-avp .sec{justify-self:stretch;padding:8px 2px 0}
+@media(prefers-reduced-motion:reduce){.idp-ci,.idp-steps i:after,.idp-sw,.idp-sw:after{animation:none!important;transition:none!important}}
+`;
+  var s = document.createElement("style");
+  s.id = "tm-idpass-css";
+  s.textContent = CSS;
+  document.head.appendChild(s);
+
+  // Own avatar everywhere the app draws it: illustrated avatars 0-3; photo, logo (7) and legacy ones unchanged.
+  var _av = avHTML;
+  avHTML = function (t, e) {
+    var a = st.me.av;
+    if (st.me.photo || a === 7 || !(a >= 0 && a <= 3)) return _av(t, e);
+    t = t || 68; e = e || 22;
+    return '<span class="big" style="width:' + t + "px;height:" + t + "px;border-radius:" + e + "px;background:" + BG[a] + ';overflow:hidden;box-shadow:none;padding:0">' + AV[a] + "</span>";
+  };
+
+  function ring(n) {
+    var c = "";
+    for (var i = 0; i < 3; i++) c += '<circle cx="27" cy="27" r="22" fill="none" stroke="' + (i < n ? "#ffb02e" : "#2a3340") + '" stroke-width="5" pathLength="300" stroke-dasharray="94 206" stroke-dashoffset="' + (-i * 100) + '" stroke-linecap="round" transform="rotate(-105 27 27)"/>';
+    return '<svg width="54" height="54" viewBox="0 0 54 54" aria-hidden="true">' + c + '<text x="27" y="31" text-anchor="middle" fill="#f3f5f8" font-size="12" font-weight="800" font-family="Hanken Grotesk,sans-serif">' + n + "/3</text></svg>";
+  }
+  var SH = [["Card", "TradeMate Card", "Join waitlist", "card"], ["Rewards", "Rewards Hub", "Check now", "gift"], ["Contracts", "Contracts", "View all", "box"], ["Referral", "Invite Friends", "Invite now", "users"]];
+  function flip(label) { return '<button class="idp-gl" data-idp-flip aria-label="Flip the pass">' + label + ic("swap", "width:15px;height:15px") + "</button>"; }
+  function pass() {
+    var t = st.me, e = "Seller" === st.mode, n = idvDone();
+    return '<div class="idp-c3"><div class="idp-ci">' +
+      '<div class="idp-cf"><div class="idp-top"><span class="idp-cm">TradeMate · Identity pass' + (e ? '<span class="idp-ab">ALPHA</span>' : "") + "</span>" + flip("Flip ") + "</div>" +
+      '<div class="idp-id"><button class="idp-pav" data-pg="avatar" aria-label="Change profile picture">' + avHTML(76, 22) + '</button><div style="min-width:0"><h1 class="idp-nm">' + esc(t.nick) + '</h1><button class="idp-gl" data-act="copy" data-arg="' + t.uid + '" aria-label="Copy UID" style="height:30px">UID ' + t.uid + ic("copy", "width:14px;height:14px") + "</button></div></div>" +
+      '<div class="idp-bt"><div><button class="idp-ok" data-pg="kycinfo">' + PT_SHIELD_G + "Lv." + t.lvl + ' verified</button><button class="idp-gl" data-pg="level" style="height:36px">' + (e ? "Alpha" : "Clients") + ic("chev", "width:14px;height:14px") + "</button></div>" + ring(n) + "</div></div>" +
+      '<div class="idp-cb"><div class="idp-top"><span class="idp-cm">Shortcuts</span>' + flip("Flip ") + '</div><div class="idp-sqs">' +
+      SH.map(function (x) { return '<button class="idp-sq" data-f="' + x[0] + '">' + ic(x[3]) + "<span>" + x[1] + "<small>" + x[2] + "</small></span></button>"; }).join("") +
+      "</div></div></div></div>";
+  }
+  function verify(n, e) {
+    return '<div class="idp-vc"><div class="idp-vh"><span class="idp-sh">' + PT_SHIELD + "</span><div><h3>" + (e ? "Build your Alpha profile" : "Build your client profile") + "</h3><p>" + (e ? "Complete identity verification to unlock higher offer limits and the verified badge." : "Complete identity verification to build trust with counterparties and strengthen the profile.") + "</p></div></div>" +
+      '<div class="idp-steps">' + [0, 1, 2].map(function (i) { return '<i class="' + (i < n ? "on" : i === n ? "now" : "") + '"></i>'; }).join("") + "</div>" +
+      '<div class="idp-vm"><small>Verification: ' + n + ' of 3 steps</small><button data-pg="level">' + (e ? "Alpha benefits" : "Trust & verification") + ' →</button></div><button class="idp-cta" data-pc="kyc">Verify now</button></div>';
+  }
+  function strip(e) {
+    return '<div class="pfoot idp-strip"><button class="idp-sz" data-act="mode" role="switch" aria-checked="' + e + '"><span class="idp-ic">' + ic("swap") + '</span><span>Alpha mode</span><i class="idp-sw' + (e ? " on" : "") + '"></i></button><span class="idp-dv"></span><button class="idp-sz" data-pg="about"><span>About us</span><em>' + ic("chev", "width:16px;height:16px") + "</em></button></div>";
+  }
+
+  PG.profile = function () {
+    var e = "Seller" === st.mode, n = idvDone();
+    var chips = st.recent.filter(function (x) { return "More" !== x && (e || "Add Contract" !== x); }).map(function (x) {
+      var f = FG.reduce(function (a, b) { return a.concat(b[1]); }, []).filter(function (y) { return y[0] === x; })[0] || ["", "more"];
+      return '<button class="idp-chip" data-f="' + x + '" style="--h:' + HUE[x] + '">' + ic(f[1], "width:16px;height:16px") + x + "</button>";
+    }).join("");
+    return '<header class="ph"><button class="bk2" data-back aria-label="Back">' + ic("left") + '</button><span style="flex:1"></span><div class="rts"><button class="rt" data-pg="support" aria-label="Support">' + ic("headset") + '</button><button class="rt" data-act="uc" data-arg="My info" aria-label="User Center">' + ic("settings") + "</button></div></header>" +
+      '<div class="pbody"><div class="idp-cq"><div class="idp-grid"><div class="idp-l" style="display:grid;gap:14px;align-content:start">' + pass() + verify(n, e) + '</div><div class="idp-r"><div class="sec" style="padding-left:2px">RECENTLY USED</div><div class="idp-rc">' + chips + '</div><div class="idp-all"><button class="idp-allbtn" data-f="More">All Services</button></div></div></div></div></div>' + strip(e);
+  };
+
+  // User Center: same rows, handlers and content as before, regrouped into one card per tab under the pass.
+  var _uc = PG.uc;
+  PG.uc = function () {
+    var h = _uc();
+    try {
+      var a = h.indexOf('<div class="uc-tabs">');
+      if (a < 0) return h;
+      var te = h.indexOf("</div>", a) + 6, end = '<div class="uc-card">', rg = "Region: Global</div></div></div>", re = te;
+      if (h.indexOf(end, te) === te) { var k = h.indexOf(rg, te); if (k < 0) return h; re = k + rg.length; }
+      var lo = h.indexOf('<div style="padding:22px 16px"><button class="btn o wide" data-pg="logout">', re);
+      if (lo < 0) return h;
+      var sec = '<button class="idp-sec" data-pg="security"><span class="idp-ico">' + ic("shield") + '</span><span>Security level: <b>High</b> ' + PT_BARS + "</span><em>Region: Global</em>" + ic("chev", "width:18px;height:18px;color:var(--mut)") + "</button>";
+      return h.slice(0, a) + '<div class="idp-cq"><div class="idp-ucg"><div class="idp-ucl">' + pass() + sec + '</div><div class="idp-ucr">' + h.slice(a, te) + '<div class="idp-list">' + h.slice(re, lo) + "</div>" + h.slice(lo) + "</div></div></div>";
+    } catch (x) { return h; }
+  };
+
+  PG.avatar = function () {
+    var a = st.me.av, ph = st.me.photo;
+    var tiles = [0, 1, 2, 3].map(function (i) {
+      return '<button class="idp-at' + (!ph && a === i ? " on" : "") + '" data-act="avatar" data-arg="' + i + '" style="background:' + BG[i] + '" aria-label="' + NM[i] + '">' + AV[i] + "</button>";
+    }).join("") + '<button class="idp-at' + (!ph && a === 7 ? " on" : "") + '" data-act="avatar" data-arg="7" style="background:#0d1319" aria-label="TradeMate logo"><img src="' + LOGO + '" alt=""></button>';
+    return hdr("Profile picture") + '<div class="idp-avp"><div style="display:grid;justify-items:center;gap:14px"><div class="idp-prev">' + avHTML(112, 56) + '</div><div style="display:flex;gap:10px"><label class="btn sm" style="position:relative;cursor:pointer;overflow:hidden">' + ic("upload", "width:16px;height:16px") + (ph ? "Change photo" : "Upload photo") + '<input id="photoin" type="file" accept="image/*" aria-label="Upload profile photo" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0"></label>' + (ph ? '<button class="btn sm o" data-act="rmphoto">Remove</button>' : "") + "</div></div>" +
+      '<div class="sec">OR PICK AN AVATAR</div><div class="idp-ag">' + tiles + '</div><div style="padding:8px 0"><button class="btn wide idp-donebtn" data-back>Done</button></div><p class="fine">Your photo is cropped to a square and kept on this device in the preview.</p></div>';
+  };
+
+  // Flip the identity pass (visual only; nothing re-renders).
+  document.addEventListener("click", function (ev) {
+    var b = ev.target && ev.target.closest && ev.target.closest("[data-idp-flip]");
+    if (!b) return;
+    var c = b.closest(".idp-c3");
+    if (c) c.classList.toggle("flip");
+  }, true);
+
+  try { drawPage(); } catch (x) {}
+})();
