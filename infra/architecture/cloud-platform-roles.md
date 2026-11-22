@@ -1,6 +1,6 @@
 # TradeMate cloud platform roles
 
-**Status:** approved target architecture; implementation is in progress and no new cloud resources are authorized by this document.
+**Status:** cost-constrained architecture direction; EC2 reuse remains provisional and no new cloud resources are authorized by this document.
 
 ## Primary platform responsibilities
 
