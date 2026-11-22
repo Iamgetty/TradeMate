@@ -1,0 +1,77 @@
+name: AWS EC2 Native API and Feed Build Verification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aws-ec2-native-build-verification
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Build API and test API/feed on isolated Node 24
+    runs-on: [self-hosted, Linux, X64, aws-staging]
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify isolated Node runtime and host headroom
+        run: |
+          set -euo pipefail
+          NODE_HOME="$HOME/.local/opt/node-v24.22.1"
+          test -x "$NODE_HOME/bin/node"
+          test -x "$NODE_HOME/bin/npm"
+          export PATH="$NODE_HOME/bin:$PATH"
+          test "$(node --version)" = "v24.22.1"
+          echo "Node: $(node --version)"
+          echo "npm: $(npm --version)"
+          echo "Available memory:"
+          free -h
+          AVAILABLE_KB="$(awk '/MemAvailable:/ {print int($2)}' /proc/meminfo)"
+          test "$AVAILABLE_KB" -ge 614400
+          AVAILABLE_DISK_KB="$(df -Pk "$GITHUB_WORKSPACE" | awk 'NR==2 {print $4}')"
+          echo "Available workspace disk: ${AVAILABLE_DISK_KB} KiB"
+          test "$AVAILABLE_DISK_KB" -ge 512000
+          echo "Host guard passed. No services or databases will be started."
+
+      - name: Install API dependencies and verify production build/security tests
+        working-directory: TradeMate-main/apps/api
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.local/opt/node-v24.22.1/bin:$PATH"
+          npm ci --no-audit --no-fund
+          npm run build
+          npm run test:security
+          echo "API dependency install, TypeScript build and security tests passed."
+
+      - name: Remove API dependencies before feed verification
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -rf TradeMate-main/apps/api/node_modules
+          echo "API node_modules removed to release disk space."
+
+      - name: Install feed dependencies and run feed tests
+        working-directory: TradeMate-main/exchange-feed
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.local/opt/node-v24.22.1/bin:$PATH"
+          AVAILABLE_KB="$(awk '/MemAvailable:/ {print int($2)}' /proc/meminfo)"
+          test "$AVAILABLE_KB" -ge 614400
+          npm ci --omit=dev --no-audit --no-fund
+          npm test
+          echo "Exchange-feed dependency install and test suite passed."
+
+      - name: Remove feed dependencies
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -rf TradeMate-main/exchange-feed/node_modules
+          echo "Feed node_modules removed. No services, databases, system packages, or production traffic were changed."
