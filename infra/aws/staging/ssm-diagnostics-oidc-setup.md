@@ -48,6 +48,8 @@ In Systems Manager → Documents, create a document named `TradeMate-ReadOnly-EC
 
 This custom document contains the read-only diagnostic commands and accepts no parameters. Create it as version **1** and leave version 1 unchanged; the workflow explicitly pins version 1 rather than using the mutable default. Do not grant this GitHub role permission to create or update SSM documents. If a future change is needed, review it as a new version and update the workflow pin deliberately.
 
+**Important privilege boundary:** SSM Agent runs commands on Linux as `root`. Treat every SSM document version as privileged code, even when it is described as read-only. Review the exact YAML before registering it, keep version 1 unchanged, and do not give the GitHub OIDC role document create/update permissions. The document currently runs only fixed host-inventory and service-state commands; it accepts no parameters and makes no changes. AWS documents this root-level execution model and recommends tightly restricting `ssm:SendCommand`: https://docs.aws.amazon.com/systems-manager/latest/userguide/ssm-agent-restrict-root-level-commands.html
+
 ## 3. Attach this least-privilege inline permissions policy
 
 Policy name: `TradeMateSSMReadOnlyCommandExecution`
