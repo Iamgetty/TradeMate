@@ -1,0 +1,40 @@
+name: AWS Staging Foundation Stack Diagnosis
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    name: Read-only CloudFormation foundation diagnosis
+    runs-on: [self-hosted, Linux, X64, aws-staging]
+    timeout-minutes: 5
+    env:
+      AWS_REGION: eu-north-1
+      AWS_DEFAULT_REGION: eu-north-1
+      STACK_NAME: trademate-staging-foundation
+
+    steps:
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity --query '{Account:Account,Arn:Arn}' --output json
+
+      - name: Inspect stack status and recent resource events
+        shell: bash
+        run: |
+          set -uo pipefail
+          echo "=== Current stack status ==="
+          aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
+            --query 'Stacks[0].{StackStatus:StackStatus,CreationTime:CreationTime,LastUpdatedTime:LastUpdatedTime,StatusReason:StackStatusReason,Outputs:Outputs}' \
+            --output json 2>&1 || true
+
+          echo
+          echo "=== Recent stack events (resource names, statuses and reasons only) ==="
+          aws cloudformation describe-stack-events --stack-name "$STACK_NAME" \
+            --query 'StackEvents[:40].{Time:Timestamp,LogicalResourceId:LogicalResourceId,ResourceType:ResourceType,Status:ResourceStatus,Reason:ResourceStatusReason}' \
+            --output table 2>&1 || true
+
+          echo
+          echo "=== Read-only safety ==="
+          echo "No change set is executed, no stack is updated or deleted, and no AWS resources are created."
