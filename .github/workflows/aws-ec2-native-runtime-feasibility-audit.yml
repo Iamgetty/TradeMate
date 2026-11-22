@@ -1,0 +1,65 @@
+name: AWS EC2 Native Runtime Feasibility Audit (Read Only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aws-ec2-native-runtime-feasibility-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Inspect installed runtimes and native service prerequisites
+    runs-on: [self-hosted, Linux, X64, aws-staging]
+    timeout-minutes: 5
+    steps:
+      - name: Inspect OS, installed runtimes and service tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== Operating system ==="
+          cat /etc/os-release
+          uname -r
+          echo "=== Existing Node installations (no downloads or installs) ==="
+          for ROOT in /usr/bin /usr/local/bin /opt /home/github-runner/.nvm /home/github-runner/.volta /home/github-runner/.asdf /root/.nvm; do
+            if [ -d "$ROOT" ]; then
+              find "$ROOT" -maxdepth 4 -type f \( -name node -o -name node24 -o -name npm \) -perm /111 -print 2>/dev/null | head -40
+            fi
+          done
+          echo "=== Package manager and cached Node package metadata ==="
+          for BIN in apt-cache apt dpkg-query dnf rpm yum; do
+            command -v "$BIN" || true
+          done
+          if command -v dpkg-query >/dev/null 2>&1; then
+            dpkg-query -W -f='${Package} ${Version}\n' 'nodejs' 'npm' 2>/dev/null || true
+          fi
+          if command -v apt-cache >/dev/null 2>&1; then
+            apt-cache policy nodejs 2>/dev/null | head -20 || true
+          fi
+          if command -v rpm >/dev/null 2>&1; then
+            rpm -q nodejs npm 2>/dev/null || true
+          fi
+          echo "=== Native service prerequisites ==="
+          command -v systemctl || true
+          command -v curl || true
+          command -v openssl || true
+          command -v cloudflared || true
+          command -v nginx || true
+          command -v caddy || true
+          command -v docker || true
+          command -v podman || true
+          echo "=== Existing relevant systemd units ==="
+          systemctl list-unit-files --type=service --no-legend 2>/dev/null | grep -Ei 'cloudflared|trademate|node|nginx|caddy|docker' || true
+          systemctl list-units --type=service --all --no-legend 2>/dev/null | grep -Ei 'cloudflared|trademate|node|nginx|caddy|docker' || true
+          echo "=== Current host headroom ==="
+          free -h
+          df -h /
+          echo "=== Security and permissions (metadata only) ==="
+          id
+          if [ -d /etc/systemd/system ]; then
+            stat -c '%A %U:%G %n' /etc/systemd/system
+          fi
+          echo "Read-only audit complete. No package index refresh, installs, downloads, service changes, network changes, database access, or secret reads."
