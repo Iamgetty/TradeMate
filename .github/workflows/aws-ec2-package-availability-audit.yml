@@ -1,0 +1,38 @@
+name: AWS EC2 Read-Only Package Availability Audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aws-ec2-package-availability-audit
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    name: Check configured repositories for required packages
+    runs-on: [self-hosted, linux, x64, aws-staging]
+    timeout-minutes: 10
+    steps:
+      - name: Inspect package repositories (no installation)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== Enabled DNF repositories ==="
+          sudo -n dnf repolist --enabled || dnf repolist --enabled
+          echo "=== Available Node.js and tunnel packages ==="
+          if sudo -n dnf list --available 'nodejs*' 'cloudflared' 2>&1; then
+            :
+          else
+            dnf list --available 'nodejs*' 'cloudflared' 2>&1 || true
+          fi
+          echo "=== Exact candidate package information ==="
+          for package in nodejs24 nodejs24-npm nodejs22 nodejs22-npm cloudflared; do
+            echo "--- $package ---"
+            sudo -n dnf info --available "$package" 2>&1 || dnf info --available "$package" 2>&1 || true
+          done
+          echo "=== Installed package state (verification) ==="
+          rpm -q nodejs npm cloudflared 2>&1 || true
+          echo "Read-only package availability audit complete. No package installation, service changes, database access, or secret reads were performed."
