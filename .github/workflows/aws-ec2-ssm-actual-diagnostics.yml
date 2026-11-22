@@ -1,0 +1,42 @@
+name: AWS EC2 Actual SSM Agent Diagnostics
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aws-ec2-ssm-agent-actual-diagnostics
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    name: Run local SSM agent diagnostics
+    runs-on: [self-hosted, linux, x64, aws-staging]
+    timeout-minutes: 10
+    steps:
+      - name: Collect actual local SSM diagnostics
+        shell: bash
+        run: |
+          set -uo pipefail
+          echo "=== Agent version ==="
+          amazon-ssm-agent -version 2>&1 || true
+          echo "=== Agent service state ==="
+          systemctl is-active amazon-ssm-agent 2>&1 || true
+          systemctl is-enabled amazon-ssm-agent 2>&1 || true
+          echo "=== ssm-cli version and supported diagnostics syntax ==="
+          ssm-cli --version 2>&1 || true
+          ssm-cli get-diagnostics --help 2>&1 || true
+          echo "=== ACTUAL SSM diagnostics (not help/example output) ==="
+          if command -v timeout >/dev/null 2>&1; then
+            timeout 90s ssm-cli get-diagnostics 2>&1
+            RESULT=$?
+          else
+            ssm-cli get-diagnostics 2>&1
+            RESULT=$?
+          fi
+          echo "ssm-cli exit code: $RESULT"
+          echo "=== Safe conclusion ==="
+          echo "This workflow only reads local agent diagnostics. It does not send SSM commands, modify IAM, install packages, restart services, or change infrastructure."
+          exit 0
