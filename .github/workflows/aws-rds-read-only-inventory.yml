@@ -46,13 +46,12 @@ jobs:
 
           # Parse only the connection fields into the runner's temporary environment.
           # Never print the secret JSON, URL, username, or password.
-          python3 - "$GITHUB_ENV" "$GITHUB_OUTPUT" <<'PY' <<< "$secret_json"
+          SECRET_JSON="$secret_json" python3 - "$GITHUB_ENV" "$GITHUB_OUTPUT" <<'PY'
           import json, os, sys
           from urllib.parse import urlsplit, unquote
 
           env_path, output_path = sys.argv[1], sys.argv[2]
-          raw = sys.stdin.read()
-          data = json.loads(raw)
+          data = json.loads(os.environ["SECRET_JSON"])
           url = data.get("DATABASE_URL")
           if not isinstance(url, str) or not url:
               raise SystemExit("DATABASE_URL is missing from the secret.")
@@ -90,7 +89,7 @@ jobs:
           BEGIN READ ONLY;
           SELECT 'DATABASE' AS section, current_database() AS database_name,
                  current_user AS connected_role, current_setting('server_version') AS postgres_version;
-          SELECT 'RDS_HOST' AS section, current_setting('ssl') AS ssl_in_use;
+          SELECT 'TLS' AS section, ssl AS tls_in_use FROM pg_stat_ssl WHERE pid = pg_backend_pid();
           SELECT 'APPLICATION_ROLES' AS section, rolname, rolcanlogin, rolsuper,
                  rolcreatedb, rolcreaterole, rolbypassrls
           FROM pg_roles
