@@ -1,5 +1,7 @@
 # Staging origin security decision
 
+> **Historical design only — 22 November 2026:** This document describes the previously considered private-ALB/ECS-Fargate/Cloudflare-Tunnel pattern. ECS/Fargate and its ALB/NAT dependencies have been removed from the active roadmap due to recurring cost. Do not provision this design or execute its CloudFormation change sets without a separately approved cost decision. The current EC2 + existing Cloudflare Tunnel option is provisional and requires capacity/security validation.
+
 ## Current state
 
 The current `foundation.yaml` and `services.yaml` now define an **internal** Application Load Balancer (ALB) in private application subnets. Its security group permits HTTPS ingress only from a dedicated Cloudflare Tunnel connector security group. The connector is a private Fargate service with no public IP and a dedicated execution role that reads only the tunnel-token secret. API and exchange-feed tasks accept traffic only from the ALB.
