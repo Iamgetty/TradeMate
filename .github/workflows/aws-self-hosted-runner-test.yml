@@ -88,3 +88,57 @@ jobs:
       - name: Verify EC2 instance-role credentials
         run: |
           aws sts get-caller-identity
+
+      - name: Inspect zero-cost hosting prerequisites (read-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== Node runtime compatibility ==="
+          if command -v node >/dev/null 2>&1; then
+            node --version
+            node -e 'const major=Number(process.versions.node.split(".")[0]); if (major !== 24) { console.log("Node 24 is not currently active; no runtime was changed."); }'
+          else
+            echo "Node.js is not installed."
+          fi
+          echo "=== Service manager ==="
+          if command -v systemctl >/dev/null 2>&1; then
+            systemctl is-system-running || true
+            echo "Relevant running services (names only):"
+            systemctl list-units --type=service --state=running --no-legend 2>/dev/null | grep -Ei 'cloudflared|trademate|docker|containerd' || true
+          else
+            echo "systemd is unavailable."
+          fi
+          echo "=== Cloudflare Tunnel binary/service ==="
+          if command -v cloudflared >/dev/null 2>&1; then
+            cloudflared --version
+          else
+            echo "cloudflared is not installed; no tunnel configuration was changed."
+          fi
+          if command -v systemctl >/dev/null 2>&1; then
+            systemctl is-active cloudflared 2>/dev/null || true
+            systemctl is-enabled cloudflared 2>/dev/null || true
+          fi
+          echo "=== Container runtime ==="
+          if command -v docker >/dev/null 2>&1; then
+            docker --version
+            docker info --format 'Docker daemon reachable: {{.ServerVersion}}' 2>/dev/null || echo "Docker CLI exists but daemon is not reachable."
+          else
+            echo "Docker is not installed."
+          fi
+          echo "=== Memory pressure and filesystem ==="
+          cat /proc/pressure/memory 2>/dev/null || true
+          df -h /
+          df -i /
+          echo "=== Cloudflare Tunnel outbound TCP reachability ==="
+          python3 - <<'PY'
+          import socket
+          hosts = ("region1.v2.argotunnel.com", "region2.v2.argotunnel.com")
+          for host in hosts:
+              try:
+                  addresses = sorted({x[4][0] for x in socket.getaddrinfo(host, 7844, type=socket.SOCK_STREAM)})
+                  with socket.create_connection((host, 7844), timeout=5):
+                      print(f"{host}:7844 TCP reachable; DNS={','.join(addresses)}")
+              except Exception as exc:
+                  print(f"{host}:7844 TCP unavailable ({type(exc).__name__})")
+          print("This is a connectivity probe only; it does not create or authenticate a tunnel.")
+          PY
