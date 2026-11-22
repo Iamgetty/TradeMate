@@ -1,0 +1,73 @@
+name: Render database authentication check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-render-db:
+    name: Verify Render database credentials (read-only)
+    runs-on: [self-hosted, Linux, X64, aws-staging]
+    timeout-minutes: 5
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+
+      - name: Install isolated PostgreSQL client
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/trademate-db-check"
+          npm install --prefix "$RUNNER_TEMP/trademate-db-check" --no-save --no-audit --no-fund pg@8.13.1
+
+      - name: Authenticate and inspect source database without changing it
+        env:
+          RENDER_DATABASE_URL: ${{ secrets.RENDER_DATABASE_URL }}
+          NODE_PATH: ${{ runner.temp }}/trademate-db-check/node_modules
+        run: |
+          set -euo pipefail
+          if [[ -z "${RENDER_DATABASE_URL:-}" ]]; then
+            echo "::error::RENDER_DATABASE_URL is missing. Add it under repository Actions secrets."
+            exit 1
+          fi
+          node <<'NODE'
+          const { Client } = require('pg');
+
+          (async () => {
+            const client = new Client({
+              connectionString: process.env.RENDER_DATABASE_URL,
+              connectionTimeoutMillis: 10000,
+              query_timeout: 15000,
+              statement_timeout: 15000,
+              application_name: 'TradeMate-read-only-auth-check',
+            });
+            try {
+              await client.connect();
+              await client.query('BEGIN READ ONLY');
+              const result = await client.query(`
+                SELECT
+                  current_database() AS database_name,
+                  current_setting('server_version') AS postgres_version,
+                  (SELECT count(*)::int FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_type = 'BASE TABLE') AS public_base_tables,
+                  (SELECT count(*)::int FROM schema_migrations) AS migration_records
+              `);
+              await client.query('ROLLBACK');
+              const row = result.rows[0];
+              console.log('Authentication: SUCCESS');
+              console.log('Database:', row.database_name);
+              console.log('PostgreSQL:', row.postgres_version);
+              console.log('Public base tables:', row.public_base_tables);
+              console.log('Migration records:', row.migration_records);
+              console.log('Database changes: NONE (read-only transaction)');
+            } finally {
+              await client.end().catch(() => {});
+            }
+          })().catch((error) => {
+            console.error('Database authentication/check failed:', error.code || error.name);
+            process.exit(1);
+          });
+          NODE
