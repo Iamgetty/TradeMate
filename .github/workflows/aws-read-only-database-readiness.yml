@@ -1,0 +1,96 @@
+name: AWS Read-Only Database and Secrets Readiness
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-aws-readiness:
+    name: Inspect RDS and secret metadata without reading secret values
+    runs-on: [self-hosted, Linux, X64, aws-staging]
+    timeout-minutes: 8
+    env:
+      AWS_REGION: eu-north-1
+      AWS_DEFAULT_REGION: eu-north-1
+
+    steps:
+      - name: Verify AWS identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws sts get-caller-identity --query '{Account:Account,Arn:Arn}' --output json
+
+      - name: Inspect RDS instances (metadata only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "RDS instance inventory (no credentials or SQL):"
+          if ! aws rds describe-db-instances \
+            --query 'DBInstances[].{Identifier:DBInstanceIdentifier,Status:DBInstanceStatus,Engine:Engine,EngineVersion:EngineVersion,Class:DBInstanceClass,Database:DBName,StorageGiB:AllocatedStorage,Encrypted:StorageEncrypted,PubliclyAccessible:PubliclyAccessible,MultiAZ:MultiAZ,BackupRetentionDays:BackupRetentionPeriod,DeletionProtection:DeletionProtection,Endpoint:Endpoint.Address}' \
+            --output table; then
+            echo "::warning::RDS metadata could not be inspected with the EC2 instance role."
+          fi
+
+      - name: Inspect CloudFormation stack status and secret metadata
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          inspect_stack() {
+            local stack="$1"
+            echo
+            echo "=== $stack ==="
+            local status
+            status="$(aws cloudformation describe-stacks --stack-name "$stack" --query 'Stacks[0].StackStatus' --output text 2>/dev/null)" || {
+              echo "Stack status: NOT FOUND OR NOT AUTHORIZED"
+              return 0
+            }
+            echo "Stack status: $status"
+            aws cloudformation describe-stacks --stack-name "$stack" \
+              --query 'Stacks[0].Outputs[].OutputKey' --output text 2>/dev/null || true
+          }
+
+          inspect_stack "trademate-staging-foundation"
+          inspect_stack "trademate-staging-services"
+
+          echo
+          echo "=== Migration secret metadata (secret values are never requested) ==="
+          secret_arn="$(aws cloudformation describe-stacks \
+            --stack-name trademate-staging-services \
+            --query "Stacks[0].Outputs[?OutputKey=='MigrationDatabaseUrlSecretArn'].OutputValue | [0]" \
+            --output text 2>/dev/null)" || secret_arn=""
+
+          if [[ -z "$secret_arn" || "$secret_arn" == "None" ]]; then
+            echo "Migration secret ARN: unavailable (services stack/output missing or access denied)"
+          else
+            if metadata="$(aws secretsmanager describe-secret --secret-id "$secret_arn" \
+              --query '{Deleted: not_null(DeletedDate),RotationEnabled:RotationEnabled,LastChanged:LastChangedDate}' \
+              --output json 2>/dev/null)"; then
+              echo "Migration secret metadata: accessible"
+              echo "$metadata"
+            else
+              echo "Migration secret metadata: NOT ACCESSIBLE to EC2 role (or secret missing)"
+            fi
+          fi
+
+          echo
+          echo "=== Runtime database secret metadata ==="
+          runtime_arn="$(aws cloudformation describe-stacks \
+            --stack-name trademate-staging-services \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiDatabaseUrlSecretArn'].OutputValue | [0]" \
+            --output text 2>/dev/null)" || runtime_arn=""
+          if [[ -z "$runtime_arn" || "$runtime_arn" == "None" ]]; then
+            echo "Runtime database secret ARN: unavailable (services stack/output missing or access denied)"
+          elif metadata="$(aws secretsmanager describe-secret --secret-id "$runtime_arn" \
+            --query '{Deleted: not_null(DeletedDate),RotationEnabled:RotationEnabled,LastChanged:LastChangedDate}' \
+            --output json 2>/dev/null)"; then
+            echo "Runtime database secret metadata: accessible"
+            echo "$metadata"
+          else
+            echo "Runtime database secret metadata: NOT ACCESSIBLE to EC2 role (or secret missing)"
+          fi
+
+          echo
+          echo "Safety: this workflow does not call secretsmanager:GetSecretValue, connect to PostgreSQL, run SQL, change AWS resources, or run migrations."
