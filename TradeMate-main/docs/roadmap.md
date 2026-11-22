@@ -209,11 +209,11 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 - **Workspace selection is required before the live Render audit can continue** if more than one workspace is available. Record the selected workspace ID in the audit evidence; do not infer it from a service name.
 
 
-**Objective:** move TradeMate from its current Render-hosted application and managed PostgreSQL foundation to a production-grade cloud architecture with managed networking, database, caching/queues, real-time connectivity, CDN and operational controls. This work is planned for an upcoming migration. No AWS or GCP deployment, CloudFront distribution, dedicated WebSocket service, Redis deployment or queue-worker fleet is confirmed as active today.
+**Objective:** move TradeMate away from unnecessary recurring infrastructure spend while preserving security and reliability. The current direction is to evaluate Cloudflare Workers for the web frontend and reuse the existing EC2/RDS resources only if they pass capacity and operational acceptance. Render remains in service until an alternative is verified and approved. No new paid AWS compute, NAT, ALB, CDN, cache or queue service is approved by this roadmap.
 
 #### 1. Cloud provider decision and landing zone
 
-- **Approved direction: hybrid edge + AWS primary.** Use AWS as the primary application/cloud platform; Cloudflare for authoritative DNS, WAF, DDoS mitigation, bot controls and edge security; and Amazon CloudFront for AWS-origin static assets and explicitly approved cacheable content. Define one owner for each DNS, proxy, TLS, WAF and cache responsibility to avoid overlapping Cloudflare/CloudFront behaviour.
+- **Cost-constrained direction: existing AWS resources + Cloudflare edge.** Reuse only already-provisioned AWS resources where technically safe; use Cloudflare for authoritative DNS, WAF, DDoS mitigation, bot controls, edge security and the Workers frontend path. Do not add CloudFront or other billable edge/network services by default. Define one owner for each DNS, proxy, TLS, WAF and cache responsibility.
 - Keep **GCP optional**, not a parallel production stack. Evaluate a specific GCP service only when a measured capability, regional, resilience or commercial advantage justifies the added operational and compliance burden. Do not duplicate the core production platform across AWS and GCP by default.
 - Compare AWS regions and service choices against TradeMate's actual user/provider geography, latency, data-residency obligations, PostgreSQL compatibility, availability, support, operational complexity, exit costs and a workload-based total-cost model before selecting a region or provisioning resources.
 - This architecture direction is not authorization to create cloud accounts/resources, change DNS, copy production data, alter secrets, or cut over production. Those actions require separate explicit approval.
@@ -221,12 +221,15 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 - Document the target architecture, regions, data residency, threat model, service ownership, recovery objectives (RPO/RTO), cost model and rollback strategy before provisioning.
 - Keep staging and production isolated. Never copy production secrets into staging or development.
 
-#### 2. Application hosting and service topology
+#### 2. Application hosting and service topology — cost-constrained direction
 
-- Move the API, web frontend, exchange-feed service and background workers to managed compute on the selected cloud. Evaluate AWS ECS/Fargate or EKS and GCP Cloud Run or GKE; choose the least operationally complex option that meets scaling and networking requirements.
-- Keep independently scalable workloads separate: web/API, market/exchange feed, real-time gateway and asynchronous workers. Do not split into microservices solely for fashion; establish clear service boundaries and operational ownership first.
-- Add health/readiness checks, graceful shutdown, autoscaling limits, deployment rollbacks, resource limits, structured logs, distributed tracing and service-level dashboards.
-- Use private service-to-service networking wherever possible; expose only required public entry points through a controlled load balancer/API gateway.
+- **Do not use AWS ECS/Fargate or provision EKS, an Application Load Balancer, NAT Gateway, or other new paid compute/networking resources in the current migration plan.** These introduce recurring charges that are outside the owner's no-additional-cost requirement. Existing ECS/Fargate CloudFormation templates and workflows are dormant design artifacts only; do not execute their change sets or treat them as approved deployment targets.
+- Keep `trademate-web` on the Cloudflare Workers evaluation path. Complete the Next.js adapter compatibility and runtime acceptance gates before changing its current deployment.
+- For the NestJS API and exchange-feed, investigate reuse of the **already-existing EC2 instance** with the existing private RDS database and Cloudflare Tunnel. This is a provisional, cost-avoidance option—not an approved production deployment. The current host is a `t3.small` with 2 vCPU and approximately 2 GiB RAM; the initial audit indicates limited headroom, so do not place both services on it unless capacity, isolation, resilience, WebSocket behaviour and security are demonstrated by tests. Do not resize the instance or add paid resources without explicit budget approval.
+- If the existing EC2 host cannot safely run the required workload, keep the services on the currently operating Render platform while evaluating genuinely no-additional-cost alternatives. Do not silently substitute another paid managed-compute service.
+- Keep independently testable workload boundaries for API, market/exchange feed and background jobs even if they share a host. Do not split into separately billed services without an approved cost case.
+- Require health/readiness checks, graceful shutdown, bounded resource use, restart/recovery procedures, structured logs, monitoring and a tested rollback path. Expose only required public entry points through an authenticated, TLS-protected Cloudflare Tunnel; do not make RDS public.
+- Any proposed architecture change must include a full recurring and usage-based cost estimate and explicit owner approval before provisioning or cutover.
 
 #### 3. Managed PostgreSQL migration
 
@@ -246,7 +249,7 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 #### 5. Dedicated real-time / WebSocket capability
 
 - Design and deploy a dedicated, horizontally scalable **WebSocket gateway/service** for live market quotes, notifications and other approved real-time updates; do not assume the existing exchange-feed process is itself a separately hosted WebSocket platform.
-- Evaluate AWS API Gateway WebSocket or an ALB-fronted ECS/Fargate service on AWS; evaluate an appropriate Cloud Run/GKE or managed gateway design on GCP, accounting for long-lived connection support and platform limits.
+- First test whether the existing exchange-feed service can continue on the current host/platform and be exposed through the existing Cloudflare Tunnel without new paid infrastructure. Do not add API Gateway, ALB, ECS/Fargate, Cloud Run or another managed gateway unless a separate cost proposal is approved.
 - Define authenticated connection establishment, token/session expiry, per-channel authorization, tenant isolation, origin validation, connection quotas, heartbeat/ping-pong, reconnect/backoff, replay/resync and graceful draining.
 - Specify message schemas, event versioning, delivery guarantees, ordering expectations, backpressure, fan-out strategy and stale-data indicators. Do not present stale quotes as live.
 - Load-test concurrent connections, reconnect storms, fan-out latency, memory/CPU, regional failure and deployment draining before enabling production clients.
@@ -273,7 +276,7 @@ This programme is part of the committed TradeMate roadmap. Every item below is p
 #### 8. Migration sequence and exit criteria
 
 1. Inventory current Render services, environment variables (names only; never export secret values), database extensions/data size, DNS/domains, file storage, scheduled jobs, network dependencies, CI/CD and current traffic/latency/cost baselines.
-2. Approve one cloud provider, target regions, service mapping, budget, security architecture, compliance/data-residency assessment and rollback plan.
+2. Approve a zero-additional-cost service mapping, verify existing resource capacity and security, and document any unavoidable incremental cost before considering it.
 3. Build isolated cloud landing zones and non-production infrastructure using reviewed infrastructure-as-code; configure IAM, networking, secrets, logs, backups and CI/CD.
 4. Migrate and rehearse PostgreSQL, object storage and application services in staging; run schema/data integrity, RLS, authorization, performance, disaster-recovery and security tests.
 5. Add and load-test the dedicated WebSocket gateway, managed cache, durable queues and worker fleet; enable clients/workloads progressively behind feature flags.
