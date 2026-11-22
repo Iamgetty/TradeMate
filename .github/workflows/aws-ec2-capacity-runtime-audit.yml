@@ -1,0 +1,75 @@
+name: AWS EC2 Capacity and Runtime Audit (Read Only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aws-ec2-capacity-runtime-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Inspect host capacity and supported runtime options
+    runs-on: [self-hosted, Linux, X64, aws-staging]
+    timeout-minutes: 5
+    steps:
+      - name: Inspect host limits and runner runtime without changing anything
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== CPU and memory ==="
+          nproc
+          lscpu | grep -E '^(Architecture|CPU\(s\)|Model name|Thread|Core|Socket):' || true
+          free -h
+          grep -E '^(MemTotal|MemAvailable|SwapTotal|SwapFree):' /proc/meminfo
+          echo "=== Cgroup limits (container/host resource caps) ==="
+          for FILE in /sys/fs/cgroup/memory.max /sys/fs/cgroup/memory.current /sys/fs/cgroup/cpu.max /sys/fs/cgroup/pids.max; do
+            if [ -r "$FILE" ]; then printf '%s: ' "$FILE"; cat "$FILE"; fi
+          done
+          echo "=== Disk and inode capacity ==="
+          df -h /
+          df -i /
+          echo "=== Process and file-descriptor limits ==="
+          ulimit -n
+          ps -eo comm,rss,%cpu,%mem --sort=-rss | head -15
+          echo "=== Runner service resource policy ==="
+          UNIT="$(systemctl list-units --type=service --all --no-legend | awk '/actions\.runner\..*trademate-aws-staging/ {print $1; exit}')"
+          if [ -n "$UNIT" ]; then
+            systemctl show "$UNIT" --property=MemoryMax --property=CPUQuotaPerSecUSec --property=TasksMax --property=Restart --no-pager
+            PID="$(systemctl show "$UNIT" --property=MainPID --value)"
+            if [ "$PID" != "0" ] && [ -r "/proc/$PID/cwd" ]; then
+              RUNNER_ROOT="$(readlink -f "/proc/$PID/cwd")"
+              NODE24="$RUNNER_ROOT/externals/node24/bin/node"
+              echo "Runner root exists: $([ -d "$RUNNER_ROOT" ] && echo yes || echo no)"
+              if [ -x "$NODE24" ]; then
+                echo "Runner-bundled Node 24 binary: present"
+                "$NODE24" --version
+                echo "Note: runner-bundled Node is for GitHub Actions internals; this does not certify it as an application runtime."
+              else
+                echo "Runner-bundled Node 24 binary: unavailable at expected path"
+              fi
+            fi
+          else
+            echo "Runner systemd unit not identified."
+          fi
+          echo "=== Runtime and package manager inventory ==="
+          for BIN in node node24 npm npx corepack pnpm yarn bun; do
+            if command -v "$BIN" >/dev/null 2>&1; then
+              printf '%s: ' "$BIN"
+              case "$BIN" in
+                node|node24) "$BIN" --version ;;
+                npm) "$BIN" --version ;;
+                *) command -v "$BIN" ;;
+              esac
+            else
+              echo "$BIN: unavailable on PATH"
+            fi
+          done
+          echo "=== Service manager and container runtime ==="
+          command -v systemctl || true
+          command -v docker || true
+          command -v podman || true
+          echo "Audit is read-only: no installs, downloads, service changes, network changes, database access, or secret reads."
