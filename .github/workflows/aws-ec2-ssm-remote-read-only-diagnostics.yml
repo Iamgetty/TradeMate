@@ -39,8 +39,8 @@ jobs:
         run: |
           set -euo pipefail
           COMMAND_ID="$(aws ssm send-command \
-            --document-name TradeMate-ReadOnly-EC2-Diagnostics \\
-            --document-version 1 \\
+            --document-name TradeMate-ReadOnly-EC2-Diagnostics \
+            --document-version 1 \
             --instance-ids i-035b1f1d00052c77e \
             --timeout-seconds 120 \
             --comment "TradeMate fixed read-only EC2 diagnostics" \
@@ -64,7 +64,6 @@ jobs:
           aws ssm get-command-invocation \
             --command-id "$COMMAND_ID" \
             --instance-id i-035b1f1d00052c77e \
-            --plugin-name aws:runShellScript \
             --query '{Status:Status,ResponseCode:ResponseCode,StandardOutput:StandardOutputContent,StandardError:StandardErrorContent}' \
             --output json
           STATUS="$(aws ssm get-command-invocation \
