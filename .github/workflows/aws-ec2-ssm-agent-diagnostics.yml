@@ -1,0 +1,39 @@
+name: AWS EC2 Read-Only SSM Agent Diagnostics
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aws-ec2-ssm-agent-diagnostics
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    name: Inspect local SSM registration and connectivity evidence
+    runs-on: [self-hosted, linux, x64, aws-staging]
+    timeout-minutes: 10
+    steps:
+      - name: Read SSM agent diagnostics (no changes)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== SSM agent version and service state ==="
+          amazon-ssm-agent -version 2>&1 || true
+          systemctl show amazon-ssm-agent --property=ActiveState,SubState,UnitFileState,MainPID 2>&1 || true
+          echo "=== SSM CLI diagnostics availability ==="
+          command -v ssm-cli || true
+          if command -v ssm-cli >/dev/null 2>&1; then
+            ssm-cli get-diagnostics --help 2>&1 | head -80 || true
+          fi
+          echo "=== Recent agent log signals (last 24 hours) ==="
+          if [ -r /var/log/amazon/ssm/amazon-ssm-agent.log ]; then
+            grep -Ei 'register|registration|fingerprint|credential|ssm|error|failed|websocket|channel|handshake' /var/log/amazon/ssm/amazon-ssm-agent.log | tail -100 || true
+          else
+            echo "Agent log is not readable by runner."
+          fi
+          echo "=== Recent system journal signals ==="
+          journalctl -u amazon-ssm-agent --since '24 hours ago' --no-pager 2>&1 | grep -Ei 'register|registration|error|failed|websocket|channel|handshake|credential' | tail -80 || true
+          echo "Read-only diagnostics complete. No commands were sent through SSM, no service or IAM changes were made, and no credential values or secrets were read."
