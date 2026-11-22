@@ -1,7 +1,5 @@
 schemaVersion: '2.2'
 description: 'TradeMate fixed read-only diagnostics for the staging EC2 host. No parameters are accepted.'
-platformTypes:
-  - Linux
 mainSteps:
   - action: aws:runShellScript
     name: collectReadOnlyDiagnostics
