@@ -23,9 +23,11 @@ PY
 npm install --no-audit --no-fund
 npm run build:vinext
 worker_dir=".cloudflare/output/v1/workers/default/bundle"
-worker="$(find "$worker_dir" -maxdepth 1 -type f -name 'worker-entry-*.js' -print -quit)"
+# vinext currently places its hashed Worker entry under bundle/_next/static/,
+# not at the bundle root. Search only that known Worker-entry location.
+worker="$(find "$worker_dir" -type f -path '*/_next/static/worker-entry-*.js' -print -quit)"
 if [[ -z "$worker" || ! -s "$worker" ]]; then
-  echo "vinext did not emit a hashed Cloudflare Worker entry in $worker_dir." >&2
+  echo "vinext did not emit a hashed Cloudflare Worker entry under $worker_dir/_next/static." >&2
   exit 1
 fi
 echo "Cloudflare Worker bundle verified: $worker"
