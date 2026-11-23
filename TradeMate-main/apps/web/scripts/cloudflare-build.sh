@@ -6,11 +6,11 @@ if [[ ! -f package.json || "$(node -p "require('./package.json').name")" != "tra
   echo "Run this script from the TradeMate web application." >&2
   exit 1
 fi
-# Keep the Cloudflare adapter isolated from the canonical Next.js/Node build.
-# These flags match the currently passing isolated Cloudflare compatibility CI job.
-npx --yes vinext@1.4.0 init --skip-check --platform=cloudflare --cdn-cache=none --data-cache=none --image-optimization=none --no-prerender --name=trademate
-# The canonical Next config's standalone output is for Node/Render. Remove it
-# only in the ephemeral Cloudflare build checkout before building vinext.
+# Initialize vinext's native Cloudflare integration in the disposable
+# Workers Builds checkout. This generates vite.config.ts and cloudflare.config.ts.
+npx --yes vinext@1.4.0 init --platform=cloudflare --cdn-cache=none --data-cache=none --image-optimization=none --no-prerender --name=trademate
+# Next standalone output is for Node/Render. Remove it only from this
+# ephemeral Cloudflare checkout; the tracked Next config remains unchanged.
 python - <<'PY'
 from pathlib import Path
 path = Path("next.config.mjs")
@@ -22,8 +22,9 @@ path.write_text(source.replace(setting, ""))
 PY
 npm install --no-audit --no-fund
 npm run build:vinext
-if ! find dist -type f \( -name 'wrangler.json' -o -name 'wrangler.jsonc' \) -print -quit | grep -q .; then
-  echo "Cloudflare build completed without a Wrangler deployment manifest." >&2
+worker=".cloudflare/output/v1/workers/default/bundle/worker-entry.js"
+if [[ ! -s "$worker" ]]; then
+  echo "vinext did not emit its Cloudflare Worker bundle at $worker." >&2
   exit 1
 fi
-echo "Cloudflare Workers build and deployment manifest verified."
+echo "Cloudflare Worker bundle verified: $worker"
