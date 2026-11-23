@@ -8,4 +8,4 @@ if [[ -z "${CLOUDFLARE_API_TOKEN:-}" || -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]]; then
 fi
 # Native vinext deployment reads cloudflare.config.ts and deploys the Worker
 # defined there. It builds the app as part of deployment.
-npx --yes @vinext/cloudflare@1.4.0 deploy --env staging
+npm run deploy:vinext -- --env staging
