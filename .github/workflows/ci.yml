@@ -431,7 +431,7 @@ jobs:
       - name: Verify generated Cloudflare Worker bundle
         working-directory: ${{ runner.temp }}/trademate-web
         run: |
-          worker=$(find .cloudflare/output/v1/workers/default/bundle -maxdepth 1 -type f -name 'worker-entry-*.js' -print -quit)
+          worker=$(find .cloudflare/output/v1/workers/default/bundle -type f -path '*/_next/static/worker-entry-*.js' -print -quit)
           test -n "$worker"
           test -s "$worker"
       - name: Smoke-test local Workers runtime and API proxy guard
