@@ -274,11 +274,11 @@ BEGIN
   IF EXISTS (
     SELECT 1
     FROM pg_default_acl d
-    JOIN pg_namespace n ON n.oid = d.defaclnamespace
+    LEFT JOIN pg_namespace n ON n.oid = d.defaclnamespace
     JOIN pg_roles owner_role ON owner_role.oid = d.defaclrole
     CROSS JOIN LATERAL aclexplode(d.defaclacl) AS acl
     WHERE owner_role.rolname = 'trademate_migrator'
-      AND n.nspname = 'public'
+      AND (d.defaclnamespace = 0 OR n.nspname = 'public')
       AND d.defaclobjtype = 'r'
       AND acl.grantee = (SELECT oid FROM pg_roles WHERE rolname = 'trademate_app')
       AND acl.privilege_type IN ('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER')
@@ -289,11 +289,11 @@ BEGIN
   IF EXISTS (
     SELECT 1
     FROM pg_default_acl d
-    JOIN pg_namespace n ON n.oid = d.defaclnamespace
+    LEFT JOIN pg_namespace n ON n.oid = d.defaclnamespace
     JOIN pg_roles owner_role ON owner_role.oid = d.defaclrole
     CROSS JOIN LATERAL aclexplode(d.defaclacl) AS acl
     WHERE owner_role.rolname = 'trademate_migrator'
-      AND n.nspname = 'public'
+      AND (d.defaclnamespace = 0 OR n.nspname = 'public')
       AND d.defaclobjtype = 'S'
       AND acl.grantee = (SELECT oid FROM pg_roles WHERE rolname = 'trademate_app')
       AND acl.privilege_type IN ('USAGE', 'SELECT', 'UPDATE')
