@@ -23,4 +23,15 @@ PY
 # The generated Wrangler config uses the explicit staging Worker name above.
 # Do not select an undeclared Wrangler environment: that previously deployed
 # to the shared base Worker instead of creating an isolated staging script.
-npx cf deploy --force --keep-vars
+npx cf deploy --force
+
+# cf deploy does not support --keep-vars. Re-apply the staging-only API origin
+# after upload through the Workers Script Settings API, preserving the ASSETS
+# binding created by the deployment. Never target the production Worker here.
+response="$(curl --fail --silent --show-error \
+  --request PATCH \
+  "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/trademate-staging/settings" \
+  --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+  --form 'settings={"bindings":[{"name":"ASSETS","type":"assets"},{"name":"TRADEMATE_API_ORIGIN","type":"plain_text","text":"https://api.trademate.cfd"}]};type=application/json')"
+python -c 'import json,sys; result=json.load(sys.stdin); assert result.get("success") is True, result.get("errors")' <<< "$response"
+echo "Staging API origin binding verified."
