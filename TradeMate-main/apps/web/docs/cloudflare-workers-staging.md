@@ -1,0 +1,33 @@
+# Cloudflare Workers staging frontend
+
+The canonical web application remains the Next.js app in this directory. The existing Node/Render build (`npm run build`) is unchanged. Cloudflare support uses vinext's native Cloudflare integration in a disposable Workers Builds checkout.
+
+## Cloudflare Workers Builds settings
+
+- Repository: `Iamgetty/TradeMate`
+- Production branch: `main`
+- Root directory: `TradeMate-main/apps/web`
+- Build command: **leave empty**
+- Deploy command: `bash scripts/cloudflare-deploy.sh` (runs `npm run deploy:vinext -- --env staging`)
+- Preview command: `npx vinext-cloudflare previews deploy`
+- Worker name in generated `cloudflare.config.ts`: `trademate`
+
+Workers Builds runs its build command before both deploy and preview commands. vinext's native deploy command builds the app itself, so a separate build command should remain empty. The preview command creates per-branch preview deployments.
+
+## Native Cloudflare configuration
+
+`scripts/cloudflare-build.sh` is used by CI to initialize vinext's native Cloudflare integration and build the app. It pins vinext to 1.4.0 and uses no shared response cache, no data cache, no image optimization, and no prerendering. It removes `output: standalone` only in the ephemeral Cloudflare checkout; the canonical Node/Render Next config is not changed. Generated `vite.config.ts`, `cloudflare.config.ts`, and package changes are created in the Workers Builds checkout, not committed to the source repository.
+
+## Required Cloudflare build secrets
+
+Configure `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as encrypted build secrets/variables in Cloudflare. Scope the token to the intended account and Worker deployment only. Never put either value in Git, the build command, or application source.
+
+The initial Worker deployment is staging-only. Keep Render and production DNS unchanged until the deployed frontend, API proxy, authentication cookies, Identity Pass, and browser acceptance checks have been verified.
+
+## API origin
+
+The frontend API proxy must use the AWS staging API origin through the server-side `TRADEMATE_API_ORIGIN` environment variable. Do not expose API credentials or database connection strings to browser code. Set the actual staging API origin as a Worker secret/variable only after confirming the API's publicly reachable HTTPS endpoint and expected path prefix.
+
+## Validation boundary
+
+CI validates the vinext Cloudflare build and local runtime. That is not a substitute for a real deployment and browser verification in the Cloudflare account. Treat the first deployment as staging validation, not a production cutover.
