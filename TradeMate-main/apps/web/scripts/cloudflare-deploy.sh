@@ -23,4 +23,4 @@ PY
 # The generated Wrangler config uses the explicit staging Worker name above.
 # Do not select an undeclared Wrangler environment: that previously deployed
 # to the shared base Worker instead of creating an isolated staging script.
-npx cf deploy --force
+npx cf deploy --force --keep-vars
