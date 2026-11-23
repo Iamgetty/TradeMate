@@ -21,10 +21,12 @@
 .idp-grid,.idp-ucg{display:grid;gap:14px;padding:10px 16px 18px}
 @container (min-width:760px){.idp-grid,.idp-ucg{grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:24px;align-items:start}}
 .idp-c3{perspective:1200px;width:100%;max-width:440px;margin:0 auto;aspect-ratio:1.58}
-.idp-ci{position:relative;width:100%;height:100%;transition:transform .7s cubic-bezier(.2,.8,.2,1);transform-style:preserve-3d}
+.idp-ci{position:relative;width:100%;height:100%;transition:transform .6s cubic-bezier(.4,0,.2,1);transform-style:preserve-3d}
 .idp-c3.flip .idp-ci{transform:rotateY(180deg)}
 .idp-cf,.idp-cb{position:absolute;inset:0;border-radius:26px;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden;color:#f3f5f8;padding:20px 18px 14px;border:1px solid rgba(255,176,46,.4);background:radial-gradient(120% 90% at 85% 0%,rgba(255,159,46,.22),transparent 55%),linear-gradient(145deg,#171c25,#0a0d13);box-shadow:0 24px 60px rgba(255,159,46,.14),inset 0 1px 0 rgba(255,255,255,.08);box-sizing:border-box}
 .idp-cb{transform:rotateY(180deg)}
+.idp-cf,.idp-cb{transition:visibility 0s linear .3s}.idp-cb{visibility:hidden}.idp-c3.flip .idp-cf{visibility:hidden}.idp-c3.flip .idp-cb{visibility:visible}
+.idp-cf *,.idp-cb *{-webkit-backface-visibility:hidden;backface-visibility:hidden}
 .idp-cf:before,.idp-cb:before{content:"";position:absolute;left:0;right:0;top:0;height:5px;background:linear-gradient(90deg,#ffc24d,#ff6a4d,#e0407f,#8a7bf6,#4aa3e3)}
 .idp-cf:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 40%,rgba(255,255,255,.07) 50%,transparent 60%)}
 .idp-cm{color:#9aa6b4;font:500 10.5px/1 'DM Mono',monospace;letter-spacing:.2em;text-transform:uppercase}
@@ -33,11 +35,13 @@
 .idp-gl{height:34px;padding:0 12px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#f3f5f8;font:700 12.5px 'Hanken Grotesk',sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:6px;position:relative;z-index:1}
 .idp-id{display:flex;gap:14px;align-items:center;margin-top:14px;position:relative;z-index:1}
 .idp-pav{width:76px;height:76px;border-radius:22px;border:0;padding:0;flex:none;overflow:hidden;cursor:pointer;outline:2px solid #ffb02e;outline-offset:3px;background:none;display:block}
-.idp-pav .big{width:100%!important;height:100%!important;border-radius:0!important;box-shadow:none}
+.idp-pav .big{position:relative;display:block!important;width:100%!important;height:100%!important;border-radius:0!important;box-shadow:none}
+.big.idp-ava svg{position:absolute;inset:0;width:100%;height:100%;display:block}
 .idp-nm{font:800 28px 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.02em;margin:0 0 6px;color:#f3f5f8;line-height:1.05;word-break:break-word}
 .idp-bt{position:absolute;left:18px;right:18px;bottom:14px;display:flex;align-items:flex-end;justify-content:space-between;z-index:1}
 .idp-bt>div{display:flex;gap:8px;flex-wrap:wrap}
-.idp-ok{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:999px;border:1px solid #1f6b4f;background:rgba(52,211,153,.12);color:#34d399;font:700 13px 'Hanken Grotesk',sans-serif;cursor:pointer}
+.idp-ok{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border-radius:999px;border:1px solid #1f6b4f;background:rgba(52,211,153,.12);color:#34d399;font:700 11.5px 'Hanken Grotesk',sans-serif;cursor:pointer}
+.idp-ok svg{width:14px;height:14px}
 .idp-sq{display:flex;align-items:center;gap:10px;min-height:62px;padding:0 12px;border-radius:16px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#f3f5f8;font:700 13px 'Hanken Grotesk',sans-serif;cursor:pointer;text-align:left}
 .idp-sq svg{color:#ffb02e;flex:none}.idp-sq small{display:block;color:#9aa6b4;font-weight:600;font-size:11px;margin-top:2px}
 .idp-sqs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;position:relative;z-index:1}
@@ -48,13 +52,23 @@
 .idp-sh{flex:none;display:grid;place-items:center;width:44px;height:44px}
 .idp-steps{display:flex;gap:6px;margin:14px 0 8px}
 .idp-steps i{flex:1;height:8px;border-radius:9px;background:var(--s3);position:relative;overflow:hidden}
-.idp-steps i.on:after{content:"";position:absolute;inset:0;background:var(--grad);transform-origin:left;animation:idpf .9s cubic-bezier(.2,.8,.2,1)}
+.idp-steps i.on:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#ffc24d,#ff6a4d);transform-origin:left;animation:idpf .9s cubic-bezier(.2,.8,.2,1)}
 .idp-steps i.now:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,176,46,.55),transparent);animation:idps 1.6s infinite}
 @keyframes idpf{from{transform:scaleX(0)}}@keyframes idps{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
 .idp-vm{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--mut);margin-bottom:12px}
-.idp-vm button{color:var(--am);font:700 13px 'Hanken Grotesk',sans-serif;padding:6px 0}
-.idp-cta{display:block;width:100%;height:52px;border:0;border-radius:16px;background:var(--grad);color:var(--ongrad,#1b1006);font:800 15px 'Hanken Grotesk',sans-serif;cursor:pointer}
-html[data-theme="light"] .idp-cta{color:#fff}
+.idp-vm button{color:var(--am);font:700 13px 'Hanken Grotesk',sans-serif;padding:6px 0;display:inline-flex;align-items:center;gap:4px}
+.idp-vm button svg{transform:rotate(90deg);transition:transform .3s}.idp-vm button[aria-expanded="true"] svg{transform:rotate(-90deg)}
+.idp-acc{display:grid;grid-template-rows:0fr;transition:grid-template-rows .45s cubic-bezier(.2,.8,.2,1)}.idp-acc.open{grid-template-rows:1fr}.idp-acc>div{overflow:hidden}
+.idp-st{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13.5px;color:var(--mut)}.idp-st b{flex:1;font-weight:700}.idp-st em{font-style:normal;font-size:13px}
+.idp-st.d,.idp-st.n{color:var(--txt)}
+.idp-dot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--s2);border:1px solid var(--line);color:#1b1006}
+.idp-st.d .idp-dot{background:linear-gradient(120deg,#ffc24d,#ff6a4d);border-color:transparent}
+.idp-st.n .idp-dot i{width:8px;height:8px;border-radius:50%;background:var(--am);animation:idps2 1.4s infinite}
+@keyframes idps2{50%{opacity:.35}}
+.idp-hint{margin:2px 0 6px;font-size:12px;color:var(--mut)}
+.idp-lnk{color:var(--am);font:700 13px 'Hanken Grotesk',sans-serif;padding:4px 0 10px}
+.idp-cta{display:flex;align-items:center;justify-content:center;width:100%;height:52px;border:0;border-radius:16px;background:linear-gradient(120deg,#ffc24d,#ff6a4d);color:#1b1006;font:800 15px 'Hanken Grotesk',sans-serif;text-align:center;cursor:pointer;box-shadow:0 8px 24px rgba(255,106,77,.25)}
+html[data-theme="light"] .idp-cta{background:var(--grad);color:#fff;box-shadow:none}
 .idp-rc{display:flex;gap:8px;flex-wrap:wrap}
 .idp-chip{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--s2);color:var(--txt);font:600 13px 'Hanken Grotesk',sans-serif;cursor:pointer}
 .idp-chip svg{color:var(--am)}
@@ -75,6 +89,7 @@ html[data-theme="light"] .idp-cta{color:#fff}
 .idp-sec b{color:var(--am)}.idp-sec>span:nth-child(2){flex:1;color:var(--mut)}.idp-sec em{font-style:normal;color:var(--mut);font-size:13px}
 .idp-ico{width:38px;height:38px;border-radius:12px;background:var(--s2);color:var(--am);display:grid;place-items:center;flex:none}
 .idp-ucl{display:grid;gap:12px;align-content:start}
+.idp-list .lr .lic{background:var(--s2)!important;border:1px solid var(--line)!important;box-shadow:none!important}
 .idp-ucr .uc-tabs{margin:0 0 12px;padding-left:0;padding-right:0}
 .idp-list{background:var(--s1);border:1px solid var(--line);border-radius:22px;overflow:hidden}
 .idp-list .lr{border-bottom:1px solid var(--line);padding:0 14px;min-height:56px}
@@ -83,10 +98,10 @@ html[data-theme="light"] .idp-cta{color:#fff}
 .idp-ucr>div:last-child{padding:14px 0 6px!important}
 .idp-avp{display:grid;justify-items:center;gap:14px;padding:22px 16px 18px}
 .idp-prev{width:112px;height:112px;border-radius:50%;overflow:hidden;outline:3px solid var(--am);outline-offset:4px;margin:6px 0}
-.idp-prev .big{width:100%!important;height:100%!important;border-radius:0!important;box-shadow:none}
+.idp-prev .big{position:relative;display:block!important;width:100%!important;height:100%!important;border-radius:0!important;box-shadow:none}
 .idp-ag{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;width:100%;max-width:480px;padding:0 2px}
-.idp-at{aspect-ratio:1;border-radius:22px;border:0;display:grid;place-items:center;cursor:pointer;padding:0;overflow:hidden;outline:1px solid var(--line);outline-offset:2px}
-.idp-at.on{outline:3px solid var(--am)}.idp-at svg{width:100%;height:100%;display:block}.idp-at img{width:58%}
+.idp-at{aspect-ratio:1;border-radius:22px;border:0;position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;overflow:hidden;outline:1px solid var(--line);outline-offset:2px}
+.idp-at.on{outline:3px solid var(--am)}.idp-at svg{position:absolute;inset:0;width:100%;height:100%;display:block}.idp-at img{position:relative;width:58%}
 .idp-avp .sec{justify-self:stretch;padding:8px 2px 0}
 @media(prefers-reduced-motion:reduce){.idp-ci,.idp-steps i:after,.idp-sw,.idp-sw:after{animation:none!important;transition:none!important}}
 `;
@@ -101,7 +116,7 @@ html[data-theme="light"] .idp-cta{color:#fff}
     var a = st.me.av;
     if (st.me.photo || a === 7 || !(a >= 0 && a <= 3)) return _av(t, e);
     t = t || 68; e = e || 22;
-    return '<span class="big" style="width:' + t + "px;height:" + t + "px;border-radius:" + e + "px;background:" + BG[a] + ';overflow:hidden;box-shadow:none;padding:0">' + AV[a] + "</span>";
+    return '<span class="big idp-ava" style="position:relative;display:block;width:' + t + "px;height:" + t + "px;border-radius:" + e + "px;background:" + BG[a] + ';overflow:hidden;box-shadow:none;padding:0">' + AV[a] + "</span>";
   };
 
   function ring(n) {
@@ -113,10 +128,10 @@ html[data-theme="light"] .idp-cta{color:#fff}
   function flip(label) { return '<button class="idp-gl" data-idp-flip aria-label="Flip the pass">' + label + ic("swap", "width:15px;height:15px") + "</button>"; }
   function pass() {
     var t = st.me, e = "Seller" === st.mode, n = idvDone();
-    return '<div class="idp-c3"><div class="idp-ci">' +
+    return '<div class="idp-c3' + (flipped ? " flip" : "") + '"><div class="idp-ci">' +
       '<div class="idp-cf"><div class="idp-top"><span class="idp-cm">TradeMate · Identity pass' + (e ? '<span class="idp-ab">ALPHA</span>' : "") + "</span>" + flip("Flip ") + "</div>" +
       '<div class="idp-id"><button class="idp-pav" data-pg="avatar" aria-label="Change profile picture">' + avHTML(76, 22) + '</button><div style="min-width:0"><h1 class="idp-nm">' + esc(t.nick) + '</h1><button class="idp-gl" data-act="copy" data-arg="' + t.uid + '" aria-label="Copy UID" style="height:30px">UID ' + t.uid + ic("copy", "width:14px;height:14px") + "</button></div></div>" +
-      '<div class="idp-bt"><div><button class="idp-ok" data-pg="kycinfo">' + PT_SHIELD_G + "Lv." + t.lvl + ' verified</button><button class="idp-gl" data-pg="level" style="height:36px">' + (e ? "Alpha" : "Clients") + ic("chev", "width:14px;height:14px") + "</button></div>" + ring(n) + "</div></div>" +
+      '<div class="idp-bt"><div><button class="idp-ok" data-pg="kycinfo">' + PT_SHIELD_G + "Lv." + t.lvl + ' verified</button><button class="idp-gl" data-pg="level" style="height:28px;padding:0 10px;font-size:11.5px">' + (e ? "Alpha" : "Clients") + ic("chev", "width:12px;height:12px") + "</button></div>" + ring(n) + "</div></div>" +
       '<div class="idp-cb"><div class="idp-top"><span class="idp-cm">Shortcuts</span>' + flip("Flip ") + '</div><div class="idp-sqs">' +
       SH.map(function (x) { return '<button class="idp-sq" data-f="' + x[0] + '">' + ic(x[3]) + "<span>" + x[1] + "<small>" + x[2] + "</small></span></button>"; }).join("") +
       "</div></div></div></div>";
@@ -124,7 +139,9 @@ html[data-theme="light"] .idp-cta{color:#fff}
   function verify(n, e) {
     return '<div class="idp-vc"><div class="idp-vh"><span class="idp-sh">' + PT_SHIELD + "</span><div><h3>" + (e ? "Build your Alpha profile" : "Build your client profile") + "</h3><p>" + (e ? "Complete identity verification to unlock higher offer limits and the verified badge." : "Complete identity verification to build trust with counterparties and strengthen the profile.") + "</p></div></div>" +
       '<div class="idp-steps">' + [0, 1, 2].map(function (i) { return '<i class="' + (i < n ? "on" : i === n ? "now" : "") + '"></i>'; }).join("") + "</div>" +
-      '<div class="idp-vm"><small>Verification: ' + n + ' of 3 steps</small><button data-pg="level">' + (e ? "Alpha benefits" : "Trust & verification") + ' →</button></div><button class="idp-cta" data-pc="kyc">Verify now</button></div>';
+      '<div class="idp-vm"><small>Verification: ' + n + ' of 3 steps</small><button data-idp-acc aria-expanded="' + openAcc + '">' + (e ? "Alpha benefits" : "Trust & verification") + ic("chev", "width:14px;height:14px") + '</button></div>' +
+      '<div class="idp-acc' + (openAcc ? " open" : "") + '"><div>' + ["Personal Information", "Identity Document", "Live Selfie"].map(function (nm, i) { var d = i < n, nx = i === n && n < 3; return '<div class="idp-st' + (d ? " d" : nx ? " n" : "") + '"><span class="idp-dot">' + (d ? '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>' : nx ? "<i></i>" : "") + "</span><b>" + nm + "</b><em>" + (d ? "Done" : nx ? "Up next" : "Locked") + "</em></div>"; }).join("") + '<p class="idp-hint">Tap Verify now to continue. Each step opens your verification flow.</p><button class="idp-lnk" data-pg="level">' + (e ? "View Alpha benefits" : "View verification levels & benefits") + ' \u2192</button></div></div>' +
+      '<button class="idp-cta" data-pc="kyc">Verify now</button></div>';
   }
   function strip(e) {
     return '<div class="pfoot idp-strip"><button class="idp-sz" data-act="mode" role="switch" aria-checked="' + e + '"><span class="idp-ic">' + ic("swap") + '</span><span>Alpha mode</span><i class="idp-sw' + (e ? " on" : "") + '"></i></button><span class="idp-dv"></span><button class="idp-sz" data-pg="about"><span>About us</span><em>' + ic("chev", "width:16px;height:16px") + "</em></button></div>";
@@ -165,13 +182,35 @@ html[data-theme="light"] .idp-cta{color:#fff}
       '<div class="sec">OR PICK AN AVATAR</div><div class="idp-ag">' + tiles + '</div><div style="padding:8px 0"><button class="btn wide idp-donebtn" data-back>Done</button></div><p class="fine">Your photo is cropped to a square and kept on this device in the preview.</p></div>';
   };
 
-  // Flip the identity pass (visual only; nothing re-renders).
+  // Pass state lives here, not in the DOM, so a redraw cannot reset it.
+  var flipped = false, openAcc = false, flipTimer = 0;
+  function setFlip(v) {
+    flipped = v;
+    var all = document.querySelectorAll(".idp-c3");
+    for (var i = 0; i < all.length; i++) all[i].classList.toggle("flip", v);
+    clearTimeout(flipTimer);
+    if (v) flipTimer = setTimeout(function () { setFlip(false); }, 20000);
+  }
   document.addEventListener("click", function (ev) {
-    var b = ev.target && ev.target.closest && ev.target.closest("[data-idp-flip]");
-    if (!b) return;
-    var c = b.closest(".idp-c3");
-    if (c) c.classList.toggle("flip");
+    var t = ev.target;
+    if (!t || !t.closest) return;
+    if (t.closest("[data-idp-flip]")) { setFlip(!flipped); return; }
+    var a = t.closest("[data-idp-acc]");
+    if (a) {
+      openAcc = !openAcc;
+      a.setAttribute("aria-expanded", openAcc);
+      var card = a.closest(".idp-vc"), box = card && card.querySelector(".idp-acc");
+      if (box) box.classList.toggle("open", openAcc);
+    }
   }, true);
+  // 20 seconds without any activity brings the pass back to its front.
+  ["pointerdown", "keydown", "scroll", "touchstart"].forEach(function (n) {
+    document.addEventListener(n, function () {
+      if (!flipped) return;
+      clearTimeout(flipTimer);
+      flipTimer = setTimeout(function () { setFlip(false); }, 20000);
+    }, { capture: true, passive: true });
+  });
 
   try { drawPage(); } catch (x) {}
 })();
