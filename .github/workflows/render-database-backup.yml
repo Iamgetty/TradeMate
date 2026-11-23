@@ -90,7 +90,7 @@ jobs:
           echo "Backup verified on the existing EC2 runner."
 
       - name: Publish short-lived private workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: trademate-render-db-backup
           path: ${{ steps.verify.outputs.backup_file }}*
