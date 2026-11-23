@@ -1,0 +1,83 @@
+name: AWS RDS Migration Role Read-Only Check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aws-rds-migration-role-read-only-check
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    name: Inspect staging migration role without modifying RDS
+    runs-on: [self-hosted, linux, x64, aws-staging]
+    timeout-minutes: 8
+    env:
+      AWS_REGION: eu-north-1
+      AWS_DEFAULT_REGION: eu-north-1
+      SECRET_ID: trademate/staging/api
+    steps:
+      - name: Check migration credentials and required privileges
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v psql >/dev/null 2>&1 || { echo "::error::psql is not installed."; exit 1; }
+          secret_json="$(aws secretsmanager get-secret-value --secret-id "$SECRET_ID" --query SecretString --output text)"
+          [[ -n "$secret_json" && "$secret_json" != "None" ]] || { echo "::error::SecretString unavailable."; exit 1; }
+
+          mapfile -t fields < <(SECRET_JSON="$secret_json" python3 - <<'PY'
+          import json, os
+          from urllib.parse import urlsplit, unquote
+          data = json.loads(os.environ["SECRET_JSON"])
+          url = data.get("MIGRATION_DATABASE_URL")
+          if not isinstance(url, str) or not url:
+              raise SystemExit("MIGRATION_DATABASE_URL is missing.")
+          p = urlsplit(url)
+          if p.scheme not in ("postgres", "postgresql") or not p.hostname:
+              raise SystemExit("MIGRATION_DATABASE_URL is not a valid PostgreSQL URL.")
+          values = [p.hostname, str(p.port or 5432), unquote(p.username or ""),
+                    unquote(p.password or ""), unquote(p.path.lstrip("/")),
+                    data.get("PGSSLMODE") or "require"]
+          if values[0] != "trademate-db.cnoaequa8k6z.eu-north-1.rds.amazonaws.com":
+              raise SystemExit("Migration URL host does not match approved staging RDS.")
+          if not all(values[i] for i in (2, 3, 4)):
+              raise SystemExit("Migration URL is missing required fields.")
+          if any("\n" in x or "\r" in x for x in values):
+              raise SystemExit("Unexpected newline in connection fields.")
+          for value in values: print(value)
+          PY
+          )
+          unset secret_json
+          [[ "${#fields[@]}" -eq 6 ]] || { echo "::error::Could not parse migration connection safely."; exit 1; }
+          for value in "${fields[@]}"; do echo "::add-mask::$value"; done
+          export PGHOST="${fields[0]}" PGPORT="${fields[1]}" PGUSER="${fields[2]}"
+          export PGPASSWORD="${fields[3]}" PGDATABASE="${fields[4]}" PGSSLMODE="${fields[5]}"
+          unset fields
+
+          psql --no-psqlrc --no-align --tuples-only --set=ON_ERROR_STOP=1 <<'SQL'
+          BEGIN READ ONLY;
+          SELECT 'CONNECTED_AS' AS section, current_user, current_database(),
+                 current_setting('server_version'), ssl
+          FROM pg_stat_ssl WHERE pid = pg_backend_pid();
+          SELECT 'ROLE_FLAGS' AS section, rolname, rolcanlogin, rolsuper,
+                 rolcreatedb, rolcreaterole, rolbypassrls
+          FROM pg_roles WHERE rolname = current_user;
+          SELECT 'RDS_ADMIN_MEMBERSHIP' AS section,
+                 pg_has_role(current_user, 'rds_superuser', 'MEMBER') AS is_rds_superuser_member;
+          SELECT 'DATABASE_PRIVILEGES' AS section,
+                 has_database_privilege(current_user, current_database(), 'CONNECT') AS can_connect,
+                 has_database_privilege(current_user, current_database(), 'CREATE') AS can_create_schema;
+          SELECT 'PUBLIC_SCHEMA_PRIVILEGES' AS section,
+                 has_schema_privilege(current_user, 'public', 'USAGE') AS can_use_public,
+                 has_schema_privilege(current_user, 'public', 'CREATE') AS can_create_in_public;
+          SELECT 'PGCRYPTO_AVAILABILITY' AS section, name, default_version, installed_version
+          FROM pg_available_extensions WHERE name = 'pgcrypto';
+          SELECT 'WORKER_ROLE' AS section, EXISTS (
+            SELECT 1 FROM pg_roles WHERE rolname = 'trademate_worker'
+          ) AS exists;
+          ROLLBACK;
+          SQL
+          echo "Read-only migration-role check completed. No database changes were made."
