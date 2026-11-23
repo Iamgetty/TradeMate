@@ -8,8 +8,8 @@ The canonical web application remains the Next.js app in this directory. The exi
 - Production branch: `main`
 - Root directory: `TradeMate-main/apps/web`
 - Build command: **leave empty**
-- Deploy command: `bash scripts/cloudflare-deploy.sh`
-- Preview command: `npx --yes @vinext/cloudflare@1.4.0 previews deploy`
+- Deploy command: `bash scripts/cloudflare-deploy.sh` (runs `npm run deploy:vinext -- --env staging`)
+- Preview command: `npx vinext-cloudflare previews deploy`
 - Worker name in generated `cloudflare.config.ts`: `trademate`
 
 Workers Builds runs its build command before both deploy and preview commands. vinext's native deploy command builds the app itself, so a separate build command should remain empty. The preview command creates per-branch preview deployments.
