@@ -6,9 +6,9 @@ if [[ -z "${CLOUDFLARE_API_TOKEN:-}" || -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]]; then
   echo "Cloudflare deployment credentials are not configured." >&2
   exit 1
 fi
-# Cloudflare Workers Builds starts from a clean checkout. Generate vinext's
-# Vite/Cloudflare config and deploy script in that checkout before deploying.
-npx --yes vinext@1.4.0 init --platform=cloudflare --cdn-cache=none --data-cache=none --image-optimization=none --no-prerender --name=trademate
+# Deploy to a dedicated staging Worker. Never target the shared production
+# Worker name ("trademate") from this staging pipeline.
+npx --yes vinext@1.4.0 init --platform=cloudflare --cdn-cache=none --data-cache=none --image-optimization=none --no-prerender --name=trademate-staging
 # Keep the Node/Render Next.js config unchanged in the repository; the
 # Cloudflare build uses the same ephemeral standalone-output adjustment as CI.
 python - <<'PY'
@@ -20,4 +20,7 @@ if source.count(setting) != 1:
     raise SystemExit("Expected exactly one standalone output setting in next.config.mjs")
 path.write_text(source.replace(setting, ""))
 PY
-npm run deploy:vinext -- --env staging
+# The generated Wrangler config uses the explicit staging Worker name above.
+# Do not select an undeclared Wrangler environment: that previously deployed
+# to the shared base Worker instead of creating an isolated staging script.
+npm run deploy:vinext
