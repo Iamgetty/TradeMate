@@ -15,7 +15,7 @@ python - <<'PY'
 from pathlib import Path
 path = Path("next.config.mjs")
 source = path.read_text()
-setting = "  output: 'standalone',\\n"
+setting = "  output: 'standalone'," + chr(10)
 if source.count(setting) != 1:
     raise SystemExit("Expected exactly one standalone output setting in next.config.mjs")
 path.write_text(source.replace(setting, ""))
