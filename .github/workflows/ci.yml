@@ -431,8 +431,8 @@ jobs:
       - name: Verify exactly one generated Cloudflare deployment manifest
         working-directory: ${{ runner.temp }}/trademate-web
         run: |
-          manifests=$(find dist -type f \\( -name 'wrangler.json' -o -name 'wrangler.jsonc' \\) -print)
-          test "$(printf '%s\\n' "$manifests" | sed '/^$/d' | wc -l)" -eq 1
+          manifests=$(find dist -type f \( -name 'wrangler.json' -o -name 'wrangler.jsonc' \) -print)
+          test "$(printf '%s\n' "$manifests" | sed '/^$/d' | wc -l)" -eq 1
       - name: Smoke-test local Workers runtime and API proxy guard
         working-directory: ${{ runner.temp }}/trademate-web
         run: |
