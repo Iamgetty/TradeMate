@@ -47,7 +47,7 @@ jobs:
               raise SystemExit("DATABASE_URL host does not match approved staging RDS.")
           if not all(values[i] for i in (2, 3, 4)):
               raise SystemExit("DATABASE_URL is missing required connection fields.")
-          if "\n" in "\n".join(values) or any("\r" in x for x in values):
+          if any("\n" in x or "\r" in x for x in values):
               raise SystemExit("Unexpected newline in connection fields.")
           for value in values:
               print(value)
