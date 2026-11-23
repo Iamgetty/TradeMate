@@ -1,17 +1,22 @@
 # Cloudflare Workers staging frontend
 
-The canonical web application remains the Next.js app in this directory. The existing Node/Render build (`npm run build`) is unchanged. Cloudflare support is an additional vinext build.
+The canonical web application remains the Next.js app in this directory. The existing Node/Render build (`npm run build`) is unchanged. Cloudflare support uses vinext's native Cloudflare integration in a disposable Workers Builds checkout.
 
-## Cloudflare Workers Build settings
+## Cloudflare Workers Builds settings
 
 - Repository: `Iamgetty/TradeMate`
 - Production branch: `main`
 - Root directory: `TradeMate-main/apps/web`
-- Build command: `bash scripts/cloudflare-build.sh`
+- Build command: **leave empty**
 - Deploy command: `bash scripts/cloudflare-deploy.sh`
-- Worker name: `trademate`
+- Preview command: `npx --yes @vinext/cloudflare@1.4.0 previews deploy`
+- Worker name in generated `cloudflare.config.ts`: `trademate`
 
-The build script pins vinext to 1.4.0 and uses the same Cloudflare adapter initialization flags as the repository's isolated Cloudflare CI validation. It generates adapter files in the Cloudflare build checkout; it does not commit generated files or alter the canonical Next.js configuration.
+Workers Builds runs its build command before both deploy and preview commands. vinext's native deploy command builds the app itself, so a separate build command should remain empty. The preview command creates per-branch preview deployments.
+
+## Native Cloudflare configuration
+
+`scripts/cloudflare-build.sh` is used by CI to initialize vinext's native Cloudflare integration and build the app. It pins vinext to 1.4.0 and uses no shared response cache, no data cache, no image optimization, and no prerendering. It removes `output: standalone` only in the ephemeral Cloudflare checkout; the canonical Node/Render Next config is not changed. Generated `vite.config.ts`, `cloudflare.config.ts`, and package changes are created in the Workers Builds checkout, not committed to the source repository.
 
 ## Required Cloudflare build secrets
 
@@ -25,4 +30,4 @@ The frontend API proxy must use the AWS staging API origin through the server-si
 
 ## Validation boundary
 
-The existing CI validates a disposable vinext/Workers build and local runtime. That is not a substitute for a real deployment and browser verification in the Cloudflare account. Treat the first deployment as staging validation, not a production cutover.
+CI validates the vinext Cloudflare build and local runtime. That is not a substitute for a real deployment and browser verification in the Cloudflare account. Treat the first deployment as staging validation, not a production cutover.
