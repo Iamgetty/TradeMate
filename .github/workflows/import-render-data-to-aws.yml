@@ -39,7 +39,7 @@ jobs:
             --secret-id "trademate/migration/render-source" \
             --query SecretString --output text > "$WORK/source-secret.json"
           aws secretsmanager get-secret-value \
-            --secret-id "arn:aws:secretsmanager:eu-north-1:661406600284:secret:rds!db-886813df-a023-45a5-b5ef-71fe0e81b8cf-nYlUfh" \
+            --secret-id "arn:aws:secretsmanager:eu-north-1:661406600284:secret:rds!db-886813df-a023-45a5-bef4-71fe0e81b8cf-nYlUfh" \
             --query SecretString --output text > "$WORK/target-secret.json"
           chmod 600 "$WORK"/*.json
 
