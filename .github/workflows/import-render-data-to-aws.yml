@@ -152,7 +152,7 @@ jobs:
           psql -X -qAt -F '|' -v ON_ERROR_STOP=1 -c "SELECT schemaname,tablename,indexname,indexdef FROM pg_indexes WHERE schemaname='public' ORDER BY 1,2,3" > "$WORK/source-indexes.txt"
           psql -X -qAt -F '|' -v ON_ERROR_STOP=1 -c "SELECT event_object_table,trigger_name,event_manipulation,action_timing,action_statement FROM information_schema.triggers WHERE trigger_schema='public' ORDER BY 1,2,3,4,5" > "$WORK/source-triggers.txt"
           psql -X -qAt -F '|' -v ON_ERROR_STOP=1 -c "SELECT tablename,policyname,permissive,roles::text,cmd,COALESCE(qual,''),COALESCE(with_check,'') FROM pg_policies WHERE schemaname='public' ORDER BY 1,2" > "$WORK/source-policies.txt"
-          psql -X -qAt -F '|' -v ON_ERROR_STOP=1 -c "SELECT table_name,view_definition FROM information_schema.views WHERE table_schema='public' ORDER BY table_name" > "$WORK/source-views.txt"
+          psql -X -qAt -F '|' -v ON_ERROR_STOP=1 -c "SELECT table_name,md5(view_definition) FROM information_schema.views WHERE table_schema='public' ORDER BY table_name" > "$WORK/source-views.txt"
 
           set -a
           source "$WORK/target.env"
@@ -161,7 +161,7 @@ jobs:
           psql -X -qAt -F '|' -v ON_ERROR_STOP=1 -c "SELECT schemaname,tablename,indexname,indexdef FROM pg_indexes WHERE schemaname='public' ORDER BY 1,2,3" > "$WORK/target-indexes.txt"
           psql -X -qAt -F '|' -v ON_ERROR_STOP=1 -c "SELECT event_object_table,trigger_name,event_manipulation,action_timing,action_statement FROM information_schema.triggers WHERE trigger_schema='public' ORDER BY 1,2,3,4,5" > "$WORK/target-triggers.txt"
           psql -X -qAt -F '|' -v ON_ERROR_STOP=1 -c "SELECT tablename,policyname,permissive,roles::text,cmd,COALESCE(qual,''),COALESCE(with_check,'') FROM pg_policies WHERE schemaname='public' ORDER BY 1,2" > "$WORK/target-policies.txt"
-          psql -X -qAt -F '|' -v ON_ERROR_STOP=1 -c "SELECT table_name,view_definition FROM information_schema.views WHERE table_schema='public' ORDER BY table_name" > "$WORK/target-views.txt"
+          psql -X -qAt -F '|' -v ON_ERROR_STOP=1 -c "SELECT table_name,md5(view_definition) FROM information_schema.views WHERE table_schema='public' ORDER BY table_name" > "$WORK/target-views.txt"
 
           python3 - "$WORK" <<'PY'
           import pathlib, sys
