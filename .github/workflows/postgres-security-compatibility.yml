@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - '.github/workflows/postgres-security-compatibility.yml'
+      - '.github/workflows/aws-staging-build-images.yml'
+      - '.github/workflows/aws-staging-migration-task.yml'
       - 'TradeMate-main/apps/api/database/**'
       - 'TradeMate-main/apps/api/scripts/test-db-roles.js'
       - 'TradeMate-main/apps/api/scripts/test-rls-pilot.js'
@@ -28,6 +30,8 @@ on:
       - main
     paths:
       - '.github/workflows/postgres-security-compatibility.yml'
+      - '.github/workflows/aws-staging-build-images.yml'
+      - '.github/workflows/aws-staging-migration-task.yml'
       - 'TradeMate-main/apps/api/database/**'
       - 'TradeMate-main/apps/api/scripts/test-db-roles.js'
       - 'TradeMate-main/apps/api/scripts/test-rls-pilot.js'
