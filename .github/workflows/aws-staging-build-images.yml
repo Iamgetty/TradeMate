@@ -60,8 +60,8 @@ jobs:
             "API TypeScript build"
             "Web build and runtime syntax"
             "Isolated Cloudflare Workers frontend build and runtime"
-            "Non-destructive vinext compatibility scan"
-            "Generate and validate lockfiles"
+            "PostgreSQL 18 role and RLS checks"
+            "PostgreSQL 16 role and RLS checks"
           )
           for required_check in "${REQUIRED_CHECKS[@]}"; do
             conclusion="$(jq -r --arg name "$required_check" '[.[] | select(.name==$name)] | sort_by(.completed_at // .started_at) | last | .conclusion // "missing"' <<< "$CHECK_RUNS")"
