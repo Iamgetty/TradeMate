@@ -2978,6 +2978,11 @@ class CommunityFeedController {
     parseBody(announcementBodySchema, body);
     const keyId = this.reviewKey(request);
     if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to publish announcements.');
+    const session = await resolvePresentedSessionUser(token);
+    if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    const authorUserId = session.rows[0].id as string;
     const content = typeof body?.body === 'string' ? body.body.trim() : '';
     if (content.length < 1 || content.length > 5000) throw new BadRequestException('Announcements must be between 1 and 5,000 characters.');
     const client = await databasePool.connect();
@@ -2985,9 +2990,9 @@ class CommunityFeedController {
       await client.query('BEGIN');
       const result = await client.query(
         `INSERT INTO feed_posts (author_user_id, post_type, body, pinned)
-         VALUES (NULL, 'announcement', $1, true)
+         VALUES ($1, 'announcement', $2, true)
          RETURNING id, post_type, body, pinned, created_at`,
-        [content],
+        [authorUserId, content],
       );
       await client.query(
         "INSERT INTO audit_events (event_type, entity_type, entity_id, metadata) VALUES ('feed.announcement.created', 'feed_post', $1, $2::jsonb)",
