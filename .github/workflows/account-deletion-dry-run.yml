@@ -15,7 +15,9 @@ concurrency:
 jobs:
   dry-run:
     name: Inspect due account-deletion requests (dry run)
-    runs-on: ubuntu-latest
+    # The AWS runner is attached to the same VPC security group allowed by RDS.
+    # GitHub-hosted runners cannot reach this private, non-publicly-accessible RDS endpoint.
+    runs-on: [self-hosted, Linux, X64, aws-staging]
     timeout-minutes: 10
     steps:
       - name: Check out TradeMate
