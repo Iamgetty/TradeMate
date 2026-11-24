@@ -45,7 +45,7 @@ jobs:
           def write(name, vals):
               p=w/name
               with p.open("w") as f:
-                  for k,v in vals.items(): f.write(f"{k}={shlex.quote(str(v))}\\n")
+                  for k,v in vals.items(): f.write(f"{k}={shlex.quote(str(v))}\n")
               p.chmod(0o600)
           write("source.env",{"PGHOST":u.hostname,"PGPORT":u.port or 5432,"PGUSER":unquote(u.username),"PGPASSWORD":unquote(u.password),"PGDATABASE":unquote(u.path.lstrip("/")),"PGSSLMODE":"require"})
           write("target.env",{"PGHOST":"trademate-db.cnoaequa8k6z.eu-north-1.rds.amazonaws.com","PGPORT":5432,"PGUSER":dst["username"],"PGPASSWORD":dst["password"],"PGDATABASE":"trademate","PGSSLMODE":"require"})
