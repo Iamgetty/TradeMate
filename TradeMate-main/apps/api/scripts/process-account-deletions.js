@@ -25,22 +25,6 @@ function reportDatabaseError(context, error) {
   console.error(`Account deletion worker database error [${context}]: code=${code} severity=${severity} message=${safeMessage}`);
 }
 
-function isRenderInternalDatabaseUrl(value) {
-  try {
-    return new URL(value).hostname.endsWith('.render.internal');
-  } catch {
-    return false;
-  }
-}
-
-// Render's internal PostgreSQL endpoint may present a self-signed certificate.
-// Permit that certificate only when explicitly enabled AND the URL is a Render
-// internal hostname. TLS encryption remains enabled. External connections
-// (including AWS RDS) always verify the server certificate.
-const allowRenderInternalSelfSignedCert =
-  process.env.WORKER_DATABASE_ALLOW_SELF_SIGNED_INTERNAL_CERT === 'true' &&
-  isRenderInternalDatabaseUrl(connectionString);
-
 // pg-connection-string parses sslmode=require from the URL and can replace the
 // explicit SSL options below. Remove only that URL parameter; TLS remains
 // mandatory because the explicit SSL configuration supplies the trusted CA.
