@@ -1,0 +1,146 @@
+name: Read-only Render to AWS database audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trademate-db-read-only-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Compare Render and AWS rows without changing either database
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 20
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Compare table counts and exact row fingerprints
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          command -v aws >/dev/null
+          command -v psql >/dev/null
+          command -v python3 >/dev/null
+
+          WORK="$(mktemp -d "${RUNNER_TEMP:-/tmp}/trademate-db-audit.XXXXXX")"
+          chmod 700 "$WORK"
+          trap 'rm -rf "$WORK"' EXIT
+
+          aws secretsmanager get-secret-value \
+            --secret-id "trademate/migration/render-source" \
+            --query SecretString --output text > "$WORK/source-secret.json"
+          aws secretsmanager get-secret-value \
+            --secret-id "arn:aws:secretsmanager:eu-north-1:661406600284:secret:rds!db-886813df-a023-45a5-bef4-71fe0e81b8cf-nYlUfh" \
+            --query SecretString --output text > "$WORK/target-secret.json"
+          chmod 600 "$WORK"/*.json
+
+          python3 - "$WORK" <<'PY'
+          import json, pathlib, shlex, sys
+          from urllib.parse import urlparse, unquote
+          work = pathlib.Path(sys.argv[1])
+          src = json.loads((work / "source-secret.json").read_text())
+          u = urlparse(src.get("DATABASE_URL", ""))
+          if not all([u.hostname, u.username, u.password, u.path.strip("/")]):
+              raise SystemExit("Render source secret is incomplete.")
+          dst = json.loads((work / "target-secret.json").read_text())
+          if not dst.get("username") or not dst.get("password"):
+              raise SystemExit("RDS managed secret is incomplete.")
+          def write_env(name, values):
+              path = work / name
+              with path.open("w") as f:
+                  for k, v in values.items():
+                      f.write(f"{k}={shlex.quote(str(v))}\\n")
+              path.chmod(0o600)
+          write_env("source.env", {
+              "PGHOST":u.hostname, "PGPORT":u.port or 5432,
+              "PGUSER":unquote(u.username), "PGPASSWORD":unquote(u.password),
+              "PGDATABASE":unquote(u.path.lstrip("/")), "PGSSLMODE":"require"
+          })
+          write_env("target.env", {
+              "PGHOST":"trademate-db.cnoaequa8k6z.eu-north-1.rds.amazonaws.com",
+              "PGPORT":5432, "PGUSER":dst["username"], "PGPASSWORD":dst["password"],
+              "PGDATABASE":"trademate", "PGSSLMODE":"require"
+          })
+          PY
+          rm -f "$WORK/source-secret.json" "$WORK/target-secret.json"
+
+          python3 - "$WORK" <<'PY'
+          import hashlib, json, os, pathlib, subprocess, sys
+          work = pathlib.Path(sys.argv[1])
+
+          def connect(env_file):
+              env = os.environ.copy()
+              for line in (work / env_file).read_text().splitlines():
+                  k, v = line.split("=", 1)
+                  # env files are generated with shlex.quote; parse safely.
+                  import shlex
+                  parsed = shlex.split(v)
+                  env[k] = parsed[0] if parsed else ""
+              return env
+
+          def query(env, sql):
+              p = subprocess.run(
+                  ["psql", "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-c", sql],
+                  env=env, text=True, capture_output=True
+              )
+              if p.returncode:
+                  raise RuntimeError("Read-only SQL query failed: " + p.stderr[-1200:])
+              return p.stdout.splitlines()
+
+          src = connect("source.env")
+          dst = connect("target.env")
+          # Explicitly set the server-side transaction read-only for every session.
+          for env in (src, dst):
+              query(env, "SET default_transaction_read_only = on; SELECT current_database();")
+
+          def tables(env):
+              return query(env, """
+                SELECT tablename FROM pg_tables
+                WHERE schemaname='public' AND tablename <> 'schema_migrations'
+                ORDER BY tablename
+              """)
+
+          st, dt = tables(src), tables(dst)
+          if st != dt:
+              print("TABLE_SET_MISMATCH")
+              print("Only on Render:", ",".join(sorted(set(st)-set(dt))) or "none")
+              print("Only on AWS:", ",".join(sorted(set(dt)-set(st))) or "none")
+              raise SystemExit(2)
+
+          report = []
+          for table in st:
+              # Table identifiers originate from pg_tables and are quoted by psycopg-safe
+              # PostgreSQL format %I rather than interpolated into SQL.
+              count_sql = "SELECT count(*) FROM public." + '"' + table.replace('"','""') + '"'
+              source_count = int(query(src, count_sql)[0])
+              target_count = int(query(dst, count_sql)[0])
+
+              row_sql = (
+                  "SELECT md5(row_to_json(t)::text) FROM public."
+                  + '"' + table.replace('"','""') + '" t ORDER BY 1'
+              )
+              sh = query(src, row_sql)
+              th = query(dst, row_sql)
+              from collections import Counter
+              sc, tc = Counter(sh), Counter(th)
+              exact_overlap = sum((sc & tc).values())
+              source_only = sum((sc - tc).values())
+              target_only = sum((tc - sc).values())
+              report.append({
+                  "table": table, "render_rows": source_count, "aws_rows": target_count,
+                  "exact_matching_rows": exact_overlap,
+                  "render_only_rows": source_only, "aws_only_rows": target_only
+              })
+
+          print("READ_ONLY_AUDIT_RESULT")
+          print(json.dumps(report, separators=(",", ":")))
+          print("No INSERT, UPDATE, DELETE, TRUNCATE, DDL, or migration statements were executed.")
+          PY
