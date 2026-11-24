@@ -104,6 +104,7 @@ jobs:
           source "$WORK/target.env"
           set +a
           pg_isready
+          # Migration 051 also enforces Render's NOT NULL author identity after checking for null rows.
           psql -X -v ON_ERROR_STOP=1 -f "TradeMate-main/apps/api/database/migrations/051_p2p_dispute_resolution_columns.sql"
           psql -X -v ON_ERROR_STOP=1 -q -c "INSERT INTO public.schema_migrations (migration_name) VALUES ('051_p2p_dispute_resolution_columns.sql') ON CONFLICT (migration_name) DO NOTHING;"
 
