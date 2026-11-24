@@ -1,4 +1,4 @@
-name: Secure Render migration audit login
+name: Diagnose Render migration role authority
 
 on:
   workflow_dispatch:
@@ -11,8 +11,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  secure-audit-login:
-    name: Remove inherited write access and verify read-only privileges
+  diagnose-render-role:
+    name: Identify Render role identity and denied privilege operation
     runs-on: [self-hosted, Linux, X64, aws-staging]
     timeout-minutes: 8
     steps:
@@ -25,7 +25,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/trademate-role-security"
           npm install --prefix "$RUNNER_TEMP/trademate-role-security" --no-save --no-audit --no-fund pg@8.13.1
-      - name: Apply least-privilege grants and verify
+      - name: Diagnose role identity and test permissions without committing
         env:
           RENDER_DATABASE_URL: ${{ secrets.RENDER_DATABASE_URL }}
           NODE_PATH: ${{ runner.temp }}/trademate-role-security/node_modules
@@ -39,64 +39,101 @@ jobs:
           fi
           node <<'NODE'
           const { Client } = require('pg');
-          const sql = `
-          BEGIN;
-          REVOKE trademate_db_jzjt_user FROM trademate_migration_audit;
-          REVOKE ALL PRIVILEGES ON DATABASE trademate_db_jzjt FROM trademate_migration_audit;
-          GRANT CONNECT ON DATABASE trademate_db_jzjt TO trademate_migration_audit;
-          REVOKE ALL PRIVILEGES ON SCHEMA public, trademate_private FROM trademate_migration_audit;
-          GRANT USAGE ON SCHEMA public TO trademate_migration_audit;
-          REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public, trademate_private FROM trademate_migration_audit;
-          GRANT SELECT ON ALL TABLES IN SCHEMA public TO trademate_migration_audit;
-          ALTER ROLE trademate_migration_audit SET default_transaction_read_only = on;
-          COMMIT;
-          `;
+
+          const tests = [
+            ['remove audit membership in owner role',
+             'REVOKE trademate_db_jzjt_user FROM trademate_migration_audit'],
+            ['remove database privileges',
+             'REVOKE ALL PRIVILEGES ON DATABASE trademate_db_jzjt FROM trademate_migration_audit'],
+            ['grant database CONNECT',
+             'GRANT CONNECT ON DATABASE trademate_db_jzjt TO trademate_migration_audit'],
+            ['remove schema privileges',
+             'REVOKE ALL PRIVILEGES ON SCHEMA public, trademate_private FROM trademate_migration_audit'],
+            ['grant public schema USAGE',
+             'GRANT USAGE ON SCHEMA public TO trademate_migration_audit'],
+            ['remove table privileges',
+             'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public, trademate_private FROM trademate_migration_audit'],
+            ['grant SELECT on public tables',
+             'GRANT SELECT ON ALL TABLES IN SCHEMA public TO trademate_migration_audit'],
+            ['set audit role read-only by default',
+             'ALTER ROLE trademate_migration_audit SET default_transaction_read_only = on'],
+          ];
+
           (async () => {
             const client = new Client({
               connectionString: process.env.RENDER_DATABASE_URL,
               connectionTimeoutMillis: 10000,
               query_timeout: 20000,
               statement_timeout: 20000,
-              application_name: 'TradeMate-migration-role-hardening',
+              application_name: 'TradeMate-render-role-diagnostic',
             });
+            let inTransaction = false;
             try {
               await client.connect();
-              await client.query(sql);
-              const check = await client.query(`
+              const identity = await client.query(`
                 SELECT
-                  pg_has_role('trademate_migration_audit', 'trademate_db_jzjt_user', 'MEMBER') AS inherits_owner,
-                  has_database_privilege('trademate_migration_audit', 'trademate_db_jzjt', 'CONNECT') AS can_connect,
-                  has_database_privilege('trademate_migration_audit', 'trademate_db_jzjt', 'CREATE') AS can_create_database,
-                  has_schema_privilege('trademate_migration_audit', 'public', 'USAGE') AS public_usage,
-                  has_schema_privilege('trademate_migration_audit', 'public', 'CREATE') AS public_create,
-                  has_schema_privilege('trademate_migration_audit', 'trademate_private', 'USAGE') AS private_usage,
-                  EXISTS (
-                    SELECT 1 FROM information_schema.role_table_grants
-                    WHERE grantee = 'trademate_migration_audit'
-                      AND table_schema = 'public'
-                      AND privilege_type IN ('INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER')
-                  ) AS has_table_write_grants,
-                  (SELECT rolcreatedb OR rolcreaterole OR rolsuper
-                   FROM pg_roles WHERE rolname = 'trademate_migration_audit') AS has_elevated_role_flags
+                  current_database() AS database_name,
+                  session_user::text AS session_user,
+                  current_user::text AS current_user,
+                  current_setting('role') AS active_role,
+                  COALESCE((SELECT rolsuper FROM pg_roles WHERE rolname = session_user), false) AS session_is_superuser,
+                  COALESCE((SELECT rolcreaterole FROM pg_roles WHERE rolname = session_user), false) AS session_can_create_roles,
+                  COALESCE((SELECT rolcreatedb FROM pg_roles WHERE rolname = session_user), false) AS session_can_create_databases,
+                  COALESCE((SELECT rolinherit FROM pg_roles WHERE rolname = session_user), false) AS session_inherits_roles,
+                  pg_has_role(session_user, 'trademate_db_jzjt_user', 'MEMBER') AS session_is_owner_member
               `);
-              const r = check.rows[0];
-              const safe = !r.inherits_owner && r.can_connect && !r.can_create_database &&
-                r.public_usage && !r.public_create && !r.private_usage && !r.has_table_write_grants &&
-                !r.has_elevated_role_flags;
-              console.log('Migration audit role security verification:', safe ? 'PASS' : 'FAIL');
-              console.log('Owner-role membership removed:', !r.inherits_owner);
-              console.log('Database CONNECT only:', r.can_connect && !r.can_create_database);
-              console.log('Public schema USAGE without CREATE:', r.public_usage && !r.public_create);
-              console.log('Private schema inaccessible:', !r.private_usage);
-              console.log('No table write grants:', !r.has_table_write_grants);
-              console.log('No elevated role flags:', !r.has_elevated_role_flags);
-              console.log('Role default_transaction_read_only: on');
-              if (!safe) process.exitCode = 1;
+              const i = identity.rows[0];
+              console.log('Connected database:', i.database_name);
+              console.log('session_user:', i.session_user);
+              console.log('current_user:', i.current_user);
+              console.log('active role:', i.active_role);
+              console.log('session role flags:', JSON.stringify({
+                superuser: i.session_is_superuser,
+                createrole: i.session_can_create_roles,
+                createdb: i.session_can_create_databases,
+                inherit: i.session_inherits_roles,
+                member_of_owner_role: i.session_is_owner_member,
+              }));
+
+              const membership = await client.query(`
+                SELECT
+                  member.rolname AS member_role,
+                  granted.rolname AS granted_role,
+                  to_jsonb(m)->>'admin_option' AS admin_option,
+                  to_jsonb(m)->>'inherit_option' AS inherit_option,
+                  to_jsonb(m)->>'set_option' AS set_option
+                FROM pg_auth_members m
+                JOIN pg_roles member ON member.oid = m.member
+                JOIN pg_roles granted ON granted.oid = m.roleid
+                WHERE member.rolname = 'trademate_migration_audit'
+                  AND granted.rolname = 'trademate_db_jzjt_user'
+              `);
+              console.log('Audit-to-owner membership:', JSON.stringify(membership.rows));
+
+              await client.query('BEGIN');
+              inTransaction = true;
+              for (let n = 0; n < tests.length; n++) {
+                const [label, statement] = tests[n];
+                const savepoint = 'diagnostic_test_' + n;
+                await client.query('SAVEPOINT ' + savepoint);
+                try {
+                  await client.query(statement);
+                  console.log('PERMISSION TEST PASS:', label, '(will be rolled back)');
+                } catch (error) {
+                  console.log('PERMISSION TEST DENIED:', label, 'SQLSTATE=' + (error.code || 'unknown'));
+                  await client.query('ROLLBACK TO SAVEPOINT ' + savepoint);
+                }
+                await client.query('RELEASE SAVEPOINT ' + savepoint);
+              }
             } finally {
+              if (inTransaction) {
+                await client.query('ROLLBACK');
+                console.log('Diagnostic transaction rolled back; no privilege changes committed.');
+              }
               await client.end().catch(() => {});
             }
           })().catch((error) => {
-            console.error('Role hardening failed:', error.code || error.name);
+            console.error('Render role diagnostic failed:', error.code || error.name);
             process.exit(1);
           });
           NODE
