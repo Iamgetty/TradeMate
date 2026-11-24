@@ -20,13 +20,23 @@ ALTER TABLE public.feed_posts
   ALTER COLUMN author_user_id SET NOT NULL;
 
 DO $$
+DECLARE
+  current_definition TEXT;
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conrelid = 'public.feed_posts'::regclass
-      AND conname = 'feed_posts_author_user_id_fkey'
-  ) THEN
+  SELECT pg_get_constraintdef(oid)
+    INTO current_definition
+  FROM pg_constraint
+  WHERE conrelid = 'public.feed_posts'::regclass
+    AND conname = 'feed_posts_author_user_id_fkey';
+
+  IF current_definition IS NOT NULL
+     AND current_definition <> 'FOREIGN KEY (author_user_id) REFERENCES users(id) ON DELETE CASCADE' THEN
+    ALTER TABLE public.feed_posts
+      DROP CONSTRAINT feed_posts_author_user_id_fkey;
+    current_definition := NULL;
+  END IF;
+
+  IF current_definition IS NULL THEN
     ALTER TABLE public.feed_posts
       ADD CONSTRAINT feed_posts_author_user_id_fkey
       FOREIGN KEY (author_user_id)
