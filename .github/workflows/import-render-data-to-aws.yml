@@ -1,0 +1,144 @@
+name: Import Render data into AWS staging RDS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/import-render-data-to-aws.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trademate-render-to-aws-data-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    name: Safely transfer and verify Render PostgreSQL data
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 45
+    steps:
+      - name: Transfer and verify database data
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+
+          command -v aws >/dev/null
+          command -v pg_dump >/dev/null
+          command -v pg_restore >/dev/null
+          command -v psql >/dev/null
+          command -v python3 >/dev/null
+
+          WORK="$(mktemp -d "${RUNNER_TEMP:-/tmp}/trademate-db-import.XXXXXX")"
+          chmod 700 "$WORK"
+          trap 'rm -rf "$WORK"' EXIT
+
+          aws secretsmanager get-secret-value \
+            --secret-id "trademate/migration/render-source" \
+            --query SecretString --output text > "$WORK/source-secret.json"
+          aws secretsmanager get-secret-value \
+            --secret-id "arn:aws:secretsmanager:eu-north-1:661406600284:secret:rds!db-886813df-a023-45a5-b5ef-71fe0e81b8cf-nYlUfh" \
+            --query SecretString --output text > "$WORK/target-secret.json"
+          chmod 600 "$WORK"/*.json
+
+          python3 - "$WORK" <<'PY'
+          import json, pathlib, sys
+          from urllib.parse import urlparse, unquote
+          work = pathlib.Path(sys.argv[1])
+          src = json.loads((work / "source-secret.json").read_text())
+          raw = src.get("DATABASE_URL")
+          if not raw:
+              raise SystemExit("Source database URL is missing from its secret.")
+          u = urlparse(raw)
+          if not all([u.hostname, u.username, u.password, u.path.strip("/")]):
+              raise SystemExit("Source database URL is incomplete.")
+          target = json.loads((work / "target-secret.json").read_text())
+          required = ("host", "port", "username", "password")
+          if any(not target.get(k) for k in required):
+              raise SystemExit("RDS managed secret is missing a required connection field.")
+          def write_env(path, values):
+              with path.open("w") as f:
+                  for k, v in values.items():
+                      f.write(f"{k}={json.dumps(str(v))}\n")
+              path.chmod(0o600)
+          write_env(work / "source.env", {
+              "PGHOST": u.hostname, "PGPORT": u.port or 5432,
+              "PGUSER": unquote(u.username), "PGPASSWORD": unquote(u.password),
+              "PGDATABASE": unquote(u.path.lstrip("/")), "PGSSLMODE": "require"
+          })
+          write_env(work / "target.env", {
+              "PGHOST": target["host"], "PGPORT": target["port"],
+              "PGUSER": target["username"], "PGPASSWORD": target["password"],
+              "PGDATABASE": "trademate", "PGSSLMODE": "require"
+          })
+          PY
+          rm -f "$WORK/source-secret.json" "$WORK/target-secret.json"
+
+          table_counts() {
+            psql -X -qAt -v ON_ERROR_STOP=1 <<'SQL'
+          SELECT format(
+            'SELECT %L || ''|'' || count(*)::text FROM %I.%I',
+            tablename, schemaname, tablename
+          )
+          FROM pg_tables
+          WHERE schemaname = 'public' AND tablename <> 'schema_migrations'
+          ORDER BY tablename
+          \gexec
+          SQL
+          }
+
+          set -a
+          source "$WORK/source.env"
+          set +a
+          pg_isready
+          table_counts > "$WORK/source-counts.txt"
+          test -s "$WORK/source-counts.txt"
+
+          set -a
+          source "$WORK/target.env"
+          set +a
+          pg_isready
+          table_counts > "$WORK/target-before-counts.txt"
+          if awk -F'|' '$2 != 0 { print "Target contains existing application rows in table " $1 > "/dev/stderr"; bad=1 } END { exit bad }' "$WORK/target-before-counts.txt"; then
+            :
+          else
+            echo "::error::Refusing to import: AWS target is not empty. No target rows were changed."
+            exit 1
+          fi
+
+          if [[ "$(cut -d'|' -f1 "$WORK/source-counts.txt" | sort)" != "$(cut -d'|' -f1 "$WORK/target-before-counts.txt" | sort)" ]]; then
+            echo "::error::Source and target public table sets differ. No import attempted."
+            exit 1
+          fi
+
+          set -a
+          source "$WORK/source.env"
+          set +a
+          pg_dump --format=custom --data-only --no-owner --no-acl \
+            --exclude-table=public.schema_migrations \
+            --file "$WORK/render-data.dump"
+
+          set -a
+          source "$WORK/target.env"
+          set +a
+          pg_restore --data-only --no-owner --no-acl --single-transaction \
+            --exit-on-error --dbname="$PGDATABASE" "$WORK/render-data.dump"
+          psql -X -v ON_ERROR_STOP=1 -q -c "ANALYZE;"
+
+          table_counts > "$WORK/target-after-counts.txt"
+          if ! diff -u "$WORK/source-counts.txt" "$WORK/target-after-counts.txt"; then
+            echo "::error::Post-import row counts do not match Render. Keep Render online and investigate."
+            exit 1
+          fi
+
+          echo "## Render to AWS staging data import"
+          echo
+          echo "- Import completed in a single transaction."
+          echo "- Application table row counts match between source and target."
+          echo "- The schema_migrations table was intentionally excluded; AWS schema migrations remain authoritative."
+          echo "- Render source was not modified."
+          echo "- No credentials or row contents are emitted."
+          echo
+          echo "Verified application tables: $(wc -l < "$WORK/source-counts.txt" | tr -d ' ')"
