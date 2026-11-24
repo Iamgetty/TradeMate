@@ -28,6 +28,18 @@ jobs:
         with:
           node-version: 24.22.1
 
+      - name: Download AWS RDS CA bundle
+        env:
+          PGSSLROOTCERT: ${{ runner.temp }}/eu-north-1-bundle.pem
+        run: |
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            https://truststore.pki.rds.amazonaws.com/eu-north-1/eu-north-1-bundle.pem \
+            --output "$PGSSLROOTCERT"
+          test -s "$PGSSLROOTCERT"
+          grep -q -- "-----BEGIN CERTIFICATE-----" "$PGSSLROOTCERT"
+          chmod 600 "$PGSSLROOTCERT"
+          echo "Downloaded and validated the AWS eu-north-1 RDS CA bundle."
+
       - name: Install API runtime dependencies
         working-directory: TradeMate-main/apps/api
         run: npm ci --omit=dev --no-audit --no-fund
@@ -38,6 +50,7 @@ jobs:
           WORKER_DATABASE_URL: ${{ secrets.TRADEMATE_WORKER_DATABASE_URL }}
           EXPECTED_WORKER_DB_HOST: trademate-db.cnoaequa8k6z.eu-north-1.rds.amazonaws.com
           PGSSLMODE: require
+          PGSSLROOTCERT: ${{ runner.temp }}/eu-north-1-bundle.pem
           ACCOUNT_DELETION_EXECUTE: "false"
           ACCOUNT_DELETION_LEGAL_APPROVAL: "false"
           NODE_ENV: production
