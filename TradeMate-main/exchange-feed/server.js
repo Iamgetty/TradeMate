@@ -12,6 +12,10 @@ const crypto = require('crypto');
 const { createMt5QuoteStore } = require('./mt5-quotes');
 const { createReconnectPolicy } = require('./reconnect-policy');
 const { buildReadiness } = require('./readiness');
+const { createLifecycle } = require('./lifecycle');
+const lifecycle = createLifecycle();
+const providerAbortController = new AbortController();
+lifecycle.trackAbortController(providerAbortController);
 const mt5QuoteStore = createMt5QuoteStore();
 // Public MT5 broadcasting stays disabled until broker redistribution permission is confirmed.
 const mt5RedistributionPermissionConfirmed = process.env.MT5_REDISTRIBUTION_PERMISSION_CONFIRMED === 'true';
@@ -111,15 +115,22 @@ function connect(name, url, onOpen, onMessage, opts = {}) {
   const stableConnectionMs = 60000;
   let reconnectTimer = null;
   const start = () => {
+    if (lifecycle.stopped) return;
     const ws = new WebSocket(url);
+    const untrackSocket = lifecycle.trackSocket(ws);
     let pingTimer;
+    let untrackPingTimer = () => {};
+    let untrackReconnectTimer = () => {};
     let openedAt = 0;
     ws.on('open', () => {
       openedAt = Date.now();
       feedStatus.set(name, false); // count as live only after messages arrive
       console.log(`[${name}] connected; awaiting market data`);
       onOpen(ws);
-      if (opts.ping) pingTimer = setInterval(() => ws.readyState === 1 && ws.send(opts.ping), 20000);
+      if (opts.ping) {
+        pingTimer = setInterval(() => ws.readyState === 1 && ws.send(opts.ping), 20000);
+        untrackPingTimer = lifecycle.trackTimer(pingTimer, clearInterval);
+      }
     });
     ws.on('message', (raw) => {
       try {
@@ -136,15 +147,19 @@ function connect(name, url, onOpen, onMessage, opts = {}) {
     });
     ws.on('error', (e) => console.error(`[${name}] error:`, e.message));
     ws.on('close', () => {
+      untrackSocket();
       clearInterval(pingTimer);
+      untrackPingTimer();
       feedStatus.set(name, false);
-      if (reconnectTimer) return;
+      if (lifecycle.stopped || reconnectTimer) return;
       const delay = reconnect.nextDelay();
       console.log(`[${name}] closed, reconnecting in ${delay} ms`);
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null;
+        untrackReconnectTimer();
         start();
       }, delay);
+      untrackReconnectTimer = lifecycle.trackTimer(reconnectTimer, clearTimeout);
     });
   };
   start();
@@ -284,7 +299,23 @@ const fxQuotes = new Map();
 const useTwelveData = !!process.env.TWELVE_DATA_API_KEY;
 const fxStatus = { state: useTwelveData ? 'connecting' : (process.env.OANDA_ACCOUNT_ID && process.env.OANDA_API_TOKEN ? 'connecting' : 'not_configured'), provider: useTwelveData ? 'Twelve Data' : 'OANDA', plan: useTwelveData ? 'Basic' : null, quoteType: useTwelveData ? 'reference_only' : 'account_otc', refreshMinutes: useTwelveData ? 30 : null, error: null, instruments: 0, updatedAt: null };
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms) => new Promise((resolve) => {
+  if (lifecycle.stopped) return resolve();
+  const signal = providerAbortController.signal;
+  const timer = setTimeout(done, ms);
+  timer.unref?.();
+  const untrack = lifecycle.trackTimer(timer, clearTimeout);
+  function onAbort() {
+    clearTimeout(timer);
+    done();
+  }
+  function done() {
+    untrack();
+    signal.removeEventListener('abort', onAbort);
+    resolve();
+  }
+  signal.addEventListener('abort', onAbort, { once: true });
+});
 async function runOandaPricing() {
   const accountId = process.env.OANDA_ACCOUNT_ID;
   const token = process.env.OANDA_API_TOKEN;
@@ -301,7 +332,7 @@ async function runOandaPricing() {
     try {
       fxStatus.state = 'connecting';
       fxStatus.error = null;
-      const instrumentsResponse = await fetch(`${apiHost}/v3/accounts/${encodeURIComponent(accountId)}/instruments`, { headers });
+      const instrumentsResponse = await fetch(`${apiHost}/v3/accounts/${encodeURIComponent(accountId)}/instruments`, { headers, signal: providerAbortController.signal });
       if (!instrumentsResponse.ok) throw new Error(`OANDA instruments request failed (${instrumentsResponse.status})`);
       const instrumentData = await instrumentsResponse.json();
       const available = new Set((instrumentData.instruments || []).map((x) => x.name));
@@ -312,7 +343,7 @@ async function runOandaPricing() {
 
       const url = new URL(`/v3/accounts/${encodeURIComponent(accountId)}/pricing/stream`, streamHost);
       url.searchParams.set('instruments', instruments.join(','));
-      const response = await fetch(url, { headers });
+      const response = await fetch(url, { headers, signal: providerAbortController.signal });
       if (!response.ok || !response.body) throw new Error(`OANDA pricing stream failed (${response.status})`);
       fxStatus.state = 'connected';
       fxStatus.error = null;
@@ -352,7 +383,9 @@ async function runOandaPricing() {
       fxStatus.error = error.message || 'OANDA connection failed';
       console.error('[oanda-fx]', fxStatus.error);
     }
+    if (lifecycle.stopped) return;
     await sleep(5000);
+    if (lifecycle.stopped) return;
   }
 }
 const TWELVE_DATA_WANTED = [
@@ -375,13 +408,13 @@ async function runTwelveDataPricing() {
     fxStatus.error = null;
     let successful = 0;
     let lastError = null;
-    for (let i = 0; i < TWELVE_DATA_WANTED.length; i++) {
+    for (let i = 0; i < TWELVE_DATA_WANTED.length && !lifecycle.stopped; i++) {
       const item = TWELVE_DATA_WANTED[i];
       try {
         const url = new URL('https://api.twelvedata.com/price');
         url.searchParams.set('symbol', item.symbol);
         url.searchParams.set('apikey', apiKey);
-        const response = await fetch(url, { headers: { Accept: 'application/json' } });
+        const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: providerAbortController.signal });
         const payload = await response.json().catch(() => ({}));
         const price = Number(payload && payload.price);
         if (!response.ok || !Number.isFinite(price) || price <= 0) {
@@ -408,7 +441,9 @@ async function runTwelveDataPricing() {
     fxStatus.state = successful || fxQuotes.size ? 'available' : 'error';
     fxStatus.error = successful ? null : lastError;
     console.log('[twelvedata-basic] refreshed ' + successful + '/' + TWELVE_DATA_WANTED.length + ' mixed FX/equity reference prices');
+    if (lifecycle.stopped) return;
     await sleep(Math.max(1000, refreshInterval - (Date.now() - cycleStarted)));
+    if (lifecycle.stopped) return;
   }
 }
 
@@ -505,7 +540,7 @@ function top(map, desc, limit = DEPTH) {
   return out;
 }
 
-setInterval(() => {
+const broadcastTimer = setInterval(() => {
   const now = Date.now();
   const watchedBases = new Set([...wss.clients]
     .filter((client) => client.readyState === WebSocket.OPEN && client.watch)
@@ -543,5 +578,33 @@ setInterval(() => {
     c.send(cache.get(key));
   }
 }, PUSH_MS);
+lifecycle.trackTimer(broadcastTimer, clearInterval);
 
+function shutdown(signal) {
+  if (lifecycle.stopped) return;
+  console.log(`[shutdown] ${signal} received; closing feed connections`);
+  lifecycle.stop();
+  for (const client of wss.clients) {
+    try { client.close(1001, 'Feed service shutting down'); } catch (_) { client.terminate(); }
+  }
+  wss.close();
+  const forceClose = setTimeout(() => {
+    for (const client of wss.clients) client.terminate();
+    server.closeAllConnections?.();
+  }, 5000);
+  forceClose.unref();
+  server.close((error) => {
+    clearTimeout(forceClose);
+    if (error) {
+      console.error('[shutdown] HTTP server close failed:', error.message);
+      process.exitCode = 1;
+      return;
+    }
+    console.log('[shutdown] Feed server stopped cleanly');
+    process.exitCode = 0;
+  });
+}
+
+process.once('SIGTERM', () => shutdown('SIGTERM'));
+process.once('SIGINT', () => shutdown('SIGINT'));
 server.listen(PORT, () => console.log(`Feed server on port ${PORT}`));
