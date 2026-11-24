@@ -2,6 +2,11 @@ name: AWS EC2 Capacity and Runtime Audit (Read Only)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/aws-ec2-capacity-runtime-audit.yml"
 
 permissions:
   contents: read
