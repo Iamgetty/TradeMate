@@ -99,11 +99,13 @@ jobs:
           done
           echo "=== Listening application ports ==="
           ss -ltnp 2>/dev/null | grep -E ':(3000|4000)([[:space:]]|$)' || echo "No listeners on ports 3000 or 4000."
-          echo "=== API environment file metadata (contents are never read) ==="
-          if [ -e /etc/trademate/api.env ]; then
-            stat -c 'path=%n owner=%U group=%G mode=%a size=%s' /etc/trademate/api.env
+          echo "=== API environment file metadata and variable names only ==="
+          if sudo -n test -r /etc/trademate/api.env; then
+            sudo -n stat -c 'path=%n owner=%U group=%G mode=%a size=%s' /etc/trademate/api.env
+            echo "Configured variable names (values are never read or printed):"
+            sudo -n awk -F= '/^[[:space:]]*(export[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*=/ { key=$1; sub(/^[[:space:]]*export[[:space:]]+/, "", key); sub(/[[:space:]]*$/, "", key); print key }' /etc/trademate/api.env | sort -u
           else
-            echo "/etc/trademate/api.env: absent"
+            echo "/etc/trademate/api.env: unreadable or absent to passwordless sudo"
           fi
           echo "=== Service manager and container runtime ==="
           command -v systemctl || true
