@@ -86,7 +86,7 @@ jobs:
           for APP_UNIT in trademate-api.service trademate-exchange-feed.service exchange-feed.service; do
             if systemctl show "$APP_UNIT" >/dev/null 2>&1; then
               echo "--- $APP_UNIT ---"
-              systemctl show "$APP_UNIT" --property=LoadState --property=ActiveState --property=SubState --property=MainPID --property=MemoryCurrent --property=ExecMainStartTimestamp --no-pager
+              systemctl show "$APP_UNIT" --property=LoadState --property=ActiveState --property=SubState --property=MainPID --property=MemoryCurrent --property=ExecMainStartTimestamp --property=FragmentPath --property=DropInPaths --property=EnvironmentFiles --no-pager
               APP_PID="$(systemctl show "$APP_UNIT" --property=MainPID --value)"
               if [ "$APP_PID" != "0" ] && [ -r "/proc/$APP_PID/exe" ]; then
                 printf 'Executable: '
