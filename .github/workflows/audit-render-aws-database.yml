@@ -57,7 +57,7 @@ jobs:
               path = work / name
               with path.open("w") as f:
                   for k, v in values.items():
-                      f.write(f"{k}={shlex.quote(str(v))}\\n")
+                      f.write(f"{k}={shlex.quote(str(v))}\n")
               path.chmod(0o600)
           write_env("source.env", {
               "PGHOST":u.hostname, "PGPORT":u.port or 5432,
