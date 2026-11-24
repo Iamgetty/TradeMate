@@ -101,7 +101,7 @@ jobs:
           set +a
           pg_isready
           table_counts > "$WORK/target-before-counts.txt"
-          if awk -F'|' '$2 != 0 { print "Target contains existing application rows in table " $1 > "/dev/stderr"; bad=1 } END { exit bad }' "$WORK/target-before-counts.txt"; then
+          if awk -F'|' '$2 != 0 && $1 != "auth_rate_limits" { print "Target contains existing application rows in table " $1 > "/dev/stderr"; bad=1 } END { exit bad }' "$WORK/target-before-counts.txt"; then
             :
           else
             echo "::error::Refusing to import: AWS target is not empty. No target rows were changed."
@@ -123,6 +123,9 @@ jobs:
           set -a
           source "$WORK/target.env"
           set +a
+          # Rate-limit rows are transient staging traffic, not migrated user data.
+          # Render has zero rows in this table; clear staging-only entries before restore.
+          psql -X -v ON_ERROR_STOP=1 -q -c "TRUNCATE TABLE public.auth_rate_limits;"
           pg_restore --data-only --no-owner --no-acl --single-transaction \
             --exit-on-error --dbname="$PGDATABASE" "$WORK/render-data.dump"
           psql -X -v ON_ERROR_STOP=1 -q -c "ANALYZE;"
