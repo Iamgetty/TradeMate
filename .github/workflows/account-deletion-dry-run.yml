@@ -30,10 +30,11 @@ jobs:
         working-directory: TradeMate-main/apps/api
         run: npm ci --omit=dev --no-audit --no-fund
 
-      - name: Run account-deletion worker in dry-run mode
+      - name: Verify worker database destination and run dry-run
         working-directory: TradeMate-main/apps/api
         env:
           WORKER_DATABASE_URL: ${{ secrets.TRADEMATE_WORKER_DATABASE_URL }}
+          EXPECTED_WORKER_DB_HOST: trademate-db.cnoaequa8k6z.eu-north-1.rds.amazonaws.com
           PGSSLMODE: require
           ACCOUNT_DELETION_EXECUTE: "false"
           ACCOUNT_DELETION_LEGAL_APPROVAL: "false"
@@ -43,4 +44,16 @@ jobs:
             echo "::error::TRADEMATE_WORKER_DATABASE_URL is not configured. This scheduled check cannot be considered successful."
             exit 1
           fi
+
+          ACTUAL_HOST="$(node -e 'try { process.stdout.write(new URL(process.env.WORKER_DATABASE_URL).hostname) } catch { process.exit(2) }')" || {
+            echo "::error::Worker database URL is invalid."
+            exit 1
+          }
+
+          if [ "$ACTUAL_HOST" != "$EXPECTED_WORKER_DB_HOST" ]; then
+            echo "::error::Worker database destination is not the approved AWS RDS instance. No account-deletion query was run."
+            exit 1
+          fi
+
+          echo "Worker database destination verified: approved AWS RDS instance."
           node scripts/process-account-deletions.js
