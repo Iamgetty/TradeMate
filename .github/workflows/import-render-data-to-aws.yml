@@ -210,6 +210,7 @@ jobs:
           set +a
           pg_dump --format=custom --data-only --no-owner --no-acl \
             --exclude-table=public.schema_migrations \
+            --exclude-table=trademate_private.rls_context_hmac_keys \
             --file "$WORK/render-data.dump"
 
           set -a
