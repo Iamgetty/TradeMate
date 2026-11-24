@@ -93,6 +93,23 @@ jobs:
           source "$WORK/source.env"
           set +a
           pg_isready
+
+          echo "=== SOURCE p2p_trades columns ==="
+          psql -X -P pager=off -c "SELECT ordinal_position, column_name, data_type, udt_name, is_nullable, column_default, character_maximum_length, numeric_precision, numeric_scale FROM information_schema.columns WHERE table_schema='public' AND table_name='p2p_trades' ORDER BY ordinal_position;"
+          echo "=== SOURCE migration history ==="
+          psql -X -P pager=off -c "SELECT migration_name FROM public.schema_migrations ORDER BY migration_name;"
+
+          set -a
+          source "$WORK/target.env"
+          set +a
+          pg_isready
+          echo "=== AWS TARGET p2p_trades columns ==="
+          psql -X -P pager=off -c "SELECT ordinal_position, column_name, data_type, udt_name, is_nullable, column_default, character_maximum_length, numeric_precision, numeric_scale FROM information_schema.columns WHERE table_schema='public' AND table_name='p2p_trades' ORDER BY ordinal_position;"
+          echo "=== AWS TARGET migration history ==="
+          psql -X -P pager=off -c "SELECT migration_name FROM public.schema_migrations ORDER BY migration_name;"
+          echo "::notice::Schema diagnostics only. No database rows or schema were modified."
+          exit 0
+
           table_counts > "$WORK/source-counts.txt"
           test -s "$WORK/source-counts.txt"
 
