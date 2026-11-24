@@ -84,6 +84,7 @@ jobs:
                   import shlex
                   parsed = shlex.split(v)
                   env[k] = parsed[0] if parsed else ""
+              env["PGOPTIONS"] = "-c default_transaction_read_only=on"
               return env
 
           def query(env, sql):
