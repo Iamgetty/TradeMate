@@ -122,6 +122,17 @@ const sendTransactionalEmail = async (to: string, subject: string, html: string)
   }
 };
 
+const notifySuccessfulSignIn = async (email: string) => {
+  const delivered = await sendTransactionalEmail(
+    email,
+    'New sign-in to your TradeMate account',
+    '<p>A sign-in to your TradeMate account was completed.</p><p>If this was not you, change your password and review your active sessions immediately.</p>',
+  );
+  if (!delivered) {
+    console.warn('[auth] Sign-in succeeded, but its security notification email was not delivered.');
+  }
+};
+
 const cookieOptions = () => ({ httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/', maxAge: SESSION_DAYS * 24 * 60 * 60 * 1000 });
 const sessionTokenFrom = (request: Request) => sessionTokenFromCookieHeader(request.headers.cookie);
 const databasePool = process.env.DATABASE_URL
@@ -324,7 +335,7 @@ class AuthController {
       throw new UnauthorizedException('Email or password is incorrect.');
     }
     await databasePool.query('DELETE FROM auth_rate_limits WHERE key_hash = $1', [rateKey]);
-    void sendTransactionalEmail(user.email, 'New sign-in to your TradeMate account', '<p>A sign-in to your TradeMate account was completed.</p><p>If this was not you, change your password and review your active sessions immediately.</p>');
+    await notifySuccessfulSignIn(user.email);
     response.cookie(SESSION_COOKIE, token, cookieOptions());
     return { user: { id: user.id, email: user.email, display_name: user.display_name, country_code: user.country_code } };
   }
@@ -652,6 +663,7 @@ class AuthController {
       }
       await client.query('DELETE FROM auth_rate_limits WHERE key_hash IN ($1, $2)', [totpRateKey, tokenDigest((request.ip || 'unknown') + '|' + String(challenge.rows[0].email).trim().toLowerCase())]);
       await client.query('COMMIT');
+      await notifySuccessfulSignIn(completedLogin.rows[0].email);
       response.cookie(SESSION_COOKIE, sessionToken, cookieOptions());
       return { user: completedLogin.rows[0] };
     } catch (error) {
