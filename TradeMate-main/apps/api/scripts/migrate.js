@@ -58,6 +58,7 @@ const MIGRATIONS = [
   '049_scoped_auth_lifecycle_operations.sql',
   '050_signed_transaction_rls_identity.sql',
   '051_p2p_dispute_resolution_columns.sql',
+  '052_render_view_reconciliation.sql',
 ];
 
 async function main() {
