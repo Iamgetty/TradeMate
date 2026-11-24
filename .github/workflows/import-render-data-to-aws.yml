@@ -107,6 +107,8 @@ jobs:
           # Migration 051 also enforces Render's NOT NULL author identity after checking for null rows.
           psql -X -v ON_ERROR_STOP=1 -f "TradeMate-main/apps/api/database/migrations/051_p2p_dispute_resolution_columns.sql"
           psql -X -v ON_ERROR_STOP=1 -q -c "INSERT INTO public.schema_migrations (migration_name) VALUES ('051_p2p_dispute_resolution_columns.sql') ON CONFLICT (migration_name) DO NOTHING;"
+          psql -X -v ON_ERROR_STOP=1 -f "TradeMate-main/apps/api/database/migrations/052_render_view_reconciliation.sql"
+          psql -X -v ON_ERROR_STOP=1 -q -c "INSERT INTO public.schema_migrations (migration_name) VALUES ('052_render_view_reconciliation.sql') ON CONFLICT (migration_name) DO NOTHING;"
 
           # Fail closed unless every source column exists on AWS with the same PostgreSQL type and nullability.
           set -a
@@ -176,6 +178,13 @@ jobs:
                   print(f"AWS is missing {len(missing)} source {label}:")
                   for item in missing[:30]:
                       print(f"  {item}")
+                      if label == "constraints" and "|feed_posts_author_user_id_fkey|" in item:
+                          target_rows = sorted(
+                              row for row in target
+                              if "|feed_posts_author_user_id_fkey|" in row
+                          )
+                          for row in target_rows:
+                              print(f"  AWS same-name constraint: {row}")
           if failed:
               raise SystemExit("Source and AWS integrity definitions differ; import was not attempted.")
           print("Source constraints and indexes are present on AWS.")
