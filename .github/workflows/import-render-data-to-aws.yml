@@ -19,6 +19,8 @@ jobs:
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 45
     steps:
+      - name: Check out TradeMate repository
+        uses: actions/checkout@v4
       - name: Transfer and verify database data
         shell: bash
         run: |
@@ -94,29 +96,51 @@ jobs:
           set +a
           pg_isready
 
-          echo "=== SOURCE p2p_trades columns ==="
-          psql -X -P pager=off -c "SELECT ordinal_position, column_name, data_type, udt_name, is_nullable, column_default, character_maximum_length, numeric_precision, numeric_scale FROM information_schema.columns WHERE table_schema='public' AND table_name='p2p_trades' ORDER BY ordinal_position;"
-          echo "=== SOURCE migration history ==="
-          psql -X -P pager=off -c "SELECT migration_name FROM public.schema_migrations ORDER BY migration_name;"
-
-          set -a
-          source "$WORK/target.env"
-          set +a
-          pg_isready
-          echo "=== AWS TARGET p2p_trades columns ==="
-          psql -X -P pager=off -c "SELECT ordinal_position, column_name, data_type, udt_name, is_nullable, column_default, character_maximum_length, numeric_precision, numeric_scale FROM information_schema.columns WHERE table_schema='public' AND table_name='p2p_trades' ORDER BY ordinal_position;"
-          echo "=== AWS TARGET migration history ==="
-          psql -X -P pager=off -c "SELECT migration_name FROM public.schema_migrations ORDER BY migration_name;"
-          echo "::notice::Schema diagnostics only. No database rows or schema were modified."
-          exit 0
-
           table_counts > "$WORK/source-counts.txt"
           test -s "$WORK/source-counts.txt"
 
+          # Apply the tracked additive schema reconciliation before touching data.
           set -a
           source "$WORK/target.env"
           set +a
           pg_isready
+          psql -X -v ON_ERROR_STOP=1 -f "TradeMate-main/apps/api/database/migrations/051_p2p_dispute_resolution_columns.sql"
+          psql -X -v ON_ERROR_STOP=1 -q -c "INSERT INTO public.schema_migrations (migration_name) VALUES ('051_p2p_dispute_resolution_columns.sql') ON CONFLICT (migration_name) DO NOTHING;"
+
+          # Fail closed unless every source column exists on AWS with the same PostgreSQL type and nullability.
+          set -a
+          source "$WORK/source.env"
+          set +a
+          psql -X -qAt -F '|' -v ON_ERROR_STOP=1 -c "SELECT table_name,column_name,udt_name,COALESCE(character_maximum_length::text,''),COALESCE(numeric_precision::text,''),COALESCE(numeric_scale::text,''),is_nullable FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name,column_name" > "$WORK/source-schema.txt"
+
+          set -a
+          source "$WORK/target.env"
+          set +a
+          psql -X -qAt -F '|' -v ON_ERROR_STOP=1 -c "SELECT table_name,column_name,udt_name,COALESCE(character_maximum_length::text,''),COALESCE(numeric_precision::text,''),COALESCE(numeric_scale::text,''),is_nullable FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name,column_name" > "$WORK/target-schema.txt"
+
+          python3 - "$WORK/source-schema.txt" "$WORK/target-schema.txt" <<'PY'
+          import pathlib, sys
+          def load(path):
+              rows = {}
+              for line in pathlib.Path(path).read_text().splitlines():
+                  fields = line.split("|")
+                  if len(fields) != 7:
+                      raise SystemExit("Could not parse database schema inventory.")
+                  key = (fields[0], fields[1])
+                  rows[key] = tuple(fields[2:])
+              return rows
+          source, target = load(sys.argv[1]), load(sys.argv[2])
+          missing = sorted(set(source) - set(target))
+          mismatched = sorted(k for k in set(source) & set(target) if source[k] != target[k])
+          if missing or mismatched:
+              for table, column in missing:
+                  print(f"Missing AWS column: {table}.{column}")
+              for table, column in mismatched:
+                  print(f"Type/nullability mismatch: {table}.{column}")
+              raise SystemExit("Source and AWS schemas are not compatible; import was not attempted.")
+          print(f"Schema compatibility verified for {len(source)} source columns.")
+          PY
+
           table_counts > "$WORK/target-before-counts.txt"
           if awk -F'|' '$2 != 0 && $1 != "auth_rate_limits" { print "Target contains existing application rows in table " $1 > "/dev/stderr"; bad=1 } END { exit bad }' "$WORK/target-before-counts.txt"; then
             :
