@@ -39,12 +39,12 @@ jobs:
             --secret-id "trademate/migration/render-source" \
             --query SecretString --output text > "$WORK/source-secret.json"
           aws secretsmanager get-secret-value \
-            --secret-id "arn:aws:secretsmanager:eu-north-1:661406600284:secret:rds!db-886813df-a023-45a5-b5ef-71fe0e81b8cf-nYlUfh" \
+            --secret-id "arn:aws:secretsmanager:eu-north-1:661406600284:secret:rds!db-886813df-a023-45a5-b4ef-71fe0e81b8cf-nYlUfh" \
             --query SecretString --output text > "$WORK/target-secret.json"
           chmod 600 "$WORK"/*.json
 
           python3 - "$WORK" <<'PY'
-          import json, pathlib, sys
+          import json, pathlib, shlex, sys
           from urllib.parse import urlparse, unquote
           work = pathlib.Path(sys.argv[1])
           src = json.loads((work / "source-secret.json").read_text())
@@ -61,7 +61,7 @@ jobs:
           def write_env(path, values):
               with path.open("w") as f:
                   for k, v in values.items():
-                      f.write(f"{k}={json.dumps(str(v))}\n")
+                      f.write(f"{k}={shlex.quote(str(v))}\n")
               path.chmod(0o600)
           write_env(work / "source.env", {
               "PGHOST": u.hostname, "PGPORT": u.port or 5432,
