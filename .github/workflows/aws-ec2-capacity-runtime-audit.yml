@@ -73,6 +73,38 @@ jobs:
               echo "$BIN: unavailable on PATH"
             fi
           done
+          echo "=== Application runtime installed outside PATH ==="
+          NODE_HOME="$HOME/.local/opt/node-v24.22.1"
+          if [ -x "$NODE_HOME/bin/node" ]; then
+            echo "Node 24 application runtime: present"
+            "$NODE_HOME/bin/node" --version
+            "$NODE_HOME/bin/npm" --version
+          else
+            echo "Node 24 application runtime: absent at $NODE_HOME"
+          fi
+          echo "=== TradeMate service states (no environment values read) ==="
+          for APP_UNIT in trademate-api.service trademate-exchange-feed.service exchange-feed.service; do
+            if systemctl show "$APP_UNIT" >/dev/null 2>&1; then
+              echo "--- $APP_UNIT ---"
+              systemctl show "$APP_UNIT" --property=LoadState --property=ActiveState --property=SubState --property=MainPID --property=MemoryCurrent --property=ExecMainStartTimestamp --no-pager
+              APP_PID="$(systemctl show "$APP_UNIT" --property=MainPID --value)"
+              if [ "$APP_PID" != "0" ] && [ -r "/proc/$APP_PID/exe" ]; then
+                printf 'Executable: '
+                readlink -f "/proc/$APP_PID/exe"
+                ps -p "$APP_PID" -o pid=,rss=,pcpu=,comm=
+              fi
+            else
+              echo "$APP_UNIT: not installed"
+            fi
+          done
+          echo "=== Listening application ports ==="
+          ss -ltnp 2>/dev/null | grep -E ':(3000|4000)([[:space:]]|$)' || echo "No listeners on ports 3000 or 4000."
+          echo "=== API environment file metadata (contents are never read) ==="
+          if [ -e /etc/trademate/api.env ]; then
+            stat -c 'path=%n owner=%U group=%G mode=%a size=%s' /etc/trademate/api.env
+          else
+            echo "/etc/trademate/api.env: absent"
+          fi
           echo "=== Service manager and container runtime ==="
           command -v systemctl || true
           command -v docker || true
