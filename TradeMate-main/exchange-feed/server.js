@@ -301,18 +301,20 @@ const fxStatus = { state: useTwelveData ? 'connecting' : (process.env.OANDA_ACCO
 
 const sleep = (ms) => new Promise((resolve) => {
   if (lifecycle.stopped) return resolve();
+  const signal = providerAbortController.signal;
   const timer = setTimeout(done, ms);
   timer.unref?.();
   const untrack = lifecycle.trackTimer(timer, clearTimeout);
-  function done() {
-    untrack();
-    providerAbortController.signal.removeEventListener('abort', done);
-    resolve();
-  }
-  providerAbortController.signal.addEventListener('abort', () => {
+  function onAbort() {
     clearTimeout(timer);
     done();
-  }, { once: true });
+  }
+  function done() {
+    untrack();
+    signal.removeEventListener('abort', onAbort);
+    resolve();
+  }
+  signal.addEventListener('abort', onAbort, { once: true });
 });
 async function runOandaPricing() {
   const accountId = process.env.OANDA_ACCOUNT_ID;
