@@ -47,3 +47,12 @@ test('stop is idempotent and resources registered afterwards are immediately sto
   assert.equal(cleared, true);
   assert.equal(terminated, true);
 });
+
+test('stop aborts registered provider requests', () => {
+  const lifecycle = createLifecycle();
+  const controller = new AbortController();
+  lifecycle.trackAbortController(controller);
+  assert.equal(controller.signal.aborted, false);
+  lifecycle.stop();
+  assert.equal(controller.signal.aborted, true);
+});
