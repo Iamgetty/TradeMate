@@ -45,9 +45,9 @@ jobs:
           REVOKE ALL PRIVILEGES ON DATABASE trademate_db_jzjt FROM trademate_migration_audit;
           GRANT CONNECT ON DATABASE trademate_db_jzjt TO trademate_migration_audit;
           REVOKE ALL PRIVILEGES ON SCHEMA public, trademate_private FROM trademate_migration_audit;
-          GRANT USAGE ON SCHEMA public, trademate_private TO trademate_migration_audit;
+          GRANT USAGE ON SCHEMA public TO trademate_migration_audit;
           REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public, trademate_private FROM trademate_migration_audit;
-          GRANT SELECT ON ALL TABLES IN SCHEMA public, trademate_private TO trademate_migration_audit;
+          GRANT SELECT ON ALL TABLES IN SCHEMA public TO trademate_migration_audit;
           ALTER ROLE trademate_migration_audit SET default_transaction_read_only = on;
           COMMIT;
           `;
@@ -69,10 +69,11 @@ jobs:
                   has_database_privilege('trademate_migration_audit', 'trademate_db_jzjt', 'CREATE') AS can_create_database,
                   has_schema_privilege('trademate_migration_audit', 'public', 'USAGE') AS public_usage,
                   has_schema_privilege('trademate_migration_audit', 'public', 'CREATE') AS public_create,
+                  has_schema_privilege('trademate_migration_audit', 'trademate_private', 'USAGE') AS private_usage,
                   EXISTS (
                     SELECT 1 FROM information_schema.role_table_grants
                     WHERE grantee = 'trademate_migration_audit'
-                      AND table_schema IN ('public', 'trademate_private')
+                      AND table_schema = 'public'
                       AND privilege_type IN ('INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER')
                   ) AS has_table_write_grants,
                   (SELECT rolcreatedb OR rolcreaterole OR rolsuper
@@ -80,12 +81,13 @@ jobs:
               `);
               const r = check.rows[0];
               const safe = !r.inherits_owner && r.can_connect && !r.can_create_database &&
-                r.public_usage && !r.public_create && !r.has_table_write_grants &&
+                r.public_usage && !r.public_create && !r.private_usage && !r.has_table_write_grants &&
                 !r.has_elevated_role_flags;
               console.log('Migration audit role security verification:', safe ? 'PASS' : 'FAIL');
               console.log('Owner-role membership removed:', !r.inherits_owner);
               console.log('Database CONNECT only:', r.can_connect && !r.can_create_database);
               console.log('Public schema USAGE without CREATE:', r.public_usage && !r.public_create);
+              console.log('Private schema inaccessible:', !r.private_usage);
               console.log('No table write grants:', !r.has_table_write_grants);
               console.log('No elevated role flags:', !r.has_elevated_role_flags);
               console.log('Role default_transaction_read_only: on');
