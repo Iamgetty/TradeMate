@@ -45,7 +45,7 @@ jobs:
           test "$ACCOUNT" = "661406600284"
           COMMAND_ID="$(aws ssm send-command \
             --document-name TradeMate-Deploy-Exchange-Feed \
-            --document-version 1 \
+            --document-version 2 \
             --instance-ids i-035b1f1d00052c77e \
             --parameters "ReleaseSha=$RELEASE_SHA" \
             --timeout-seconds 900 \
