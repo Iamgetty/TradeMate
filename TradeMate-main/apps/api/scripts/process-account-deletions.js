@@ -33,23 +33,19 @@ poolUrl.searchParams.delete('sslmode');
 
 let ssl;
 if (process.env.PGSSLMODE === 'require') {
-  if (allowRenderInternalSelfSignedCert) {
-    ssl = { rejectUnauthorized: false };
-  } else {
-    const caPath = process.env.PGSSLROOTCERT;
-    if (!caPath) {
-      console.error('PGSSLROOTCERT is required when verified PostgreSQL TLS is enabled.');
-      process.exit(1);
-    }
-    try {
-      ssl = {
-        ca: fs.readFileSync(caPath, 'utf8'),
-        rejectUnauthorized: true,
-      };
-    } catch {
-      console.error('The configured PostgreSQL CA bundle could not be read.');
-      process.exit(1);
-    }
+  const caPath = process.env.PGSSLROOTCERT;
+  if (!caPath) {
+    console.error('PGSSLROOTCERT is required when verified PostgreSQL TLS is enabled.');
+    process.exit(1);
+  }
+  try {
+    ssl = {
+      ca: fs.readFileSync(caPath, 'utf8'),
+      rejectUnauthorized: true,
+    };
+  } catch {
+    console.error('The configured PostgreSQL CA bundle could not be read.');
+    process.exit(1);
   }
 }
 
