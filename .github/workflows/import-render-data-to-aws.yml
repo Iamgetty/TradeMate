@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/import-render-data-to-aws.yml"
+      - "TradeMate-main/apps/api/database/migrations/051_p2p_dispute_resolution_columns.sql"
+      - "TradeMate-main/apps/api/database/migrations/052_render_view_reconciliation.sql"
 
 permissions:
   contents: read
