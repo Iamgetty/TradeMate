@@ -141,6 +141,37 @@ jobs:
           print(f"Schema compatibility verified for {len(source)} source columns.")
           PY
 
+          # Compare source constraints and indexes as well; this catches missing integrity rules.
+          set -a
+          source "$WORK/source.env"
+          set +a
+          psql -X -qAt -F '|' -v ON_ERROR_STOP=1 -c "SELECT n.nspname,t.relname,c.conname,c.contype::text,pg_get_constraintdef(c.oid) FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='public' ORDER BY 1,2,3" > "$WORK/source-constraints.txt"
+          psql -X -qAt -F '|' -v ON_ERROR_STOP=1 -c "SELECT schemaname,tablename,indexname,indexdef FROM pg_indexes WHERE schemaname='public' ORDER BY 1,2,3" > "$WORK/source-indexes.txt"
+
+          set -a
+          source "$WORK/target.env"
+          set +a
+          psql -X -qAt -F '|' -v ON_ERROR_STOP=1 -c "SELECT n.nspname,t.relname,c.conname,c.contype::text,pg_get_constraintdef(c.oid) FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='public' ORDER BY 1,2,3" > "$WORK/target-constraints.txt"
+          psql -X -qAt -F '|' -v ON_ERROR_STOP=1 -c "SELECT schemaname,tablename,indexname,indexdef FROM pg_indexes WHERE schemaname='public' ORDER BY 1,2,3" > "$WORK/target-indexes.txt"
+
+          python3 - "$WORK" <<'PY'
+          import pathlib, sys
+          work = pathlib.Path(sys.argv[1])
+          failed = False
+          for label in ("constraints", "indexes"):
+              source = set((work / f"source-{label}.txt").read_text().splitlines())
+              target = set((work / f"target-{label}.txt").read_text().splitlines())
+              missing = sorted(source - target)
+              if missing:
+                  failed = True
+                  print(f"AWS is missing {len(missing)} source {label}:")
+                  for item in missing[:30]:
+                      print(f"  {item}")
+          if failed:
+              raise SystemExit("Source and AWS integrity definitions differ; import was not attempted.")
+          print("Source constraints and indexes are present on AWS.")
+          PY
+
           table_counts > "$WORK/target-before-counts.txt"
           if awk -F'|' '$2 != 0 && $1 != "auth_rate_limits" { print "Target contains existing application rows in table " $1 > "/dev/stderr"; bad=1 } END { exit bad }' "$WORK/target-before-counts.txt"; then
             :
