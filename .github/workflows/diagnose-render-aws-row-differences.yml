@@ -12,16 +12,16 @@ concurrency:
 
 jobs:
   diagnose:
-    name: Fingerprint differing rows without exposing row contents
+    name: Inspect differing session metadata without exposing row contents
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 15
     steps:
-      - name: Check out main
+      - name: Check out diagnostic branch
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: diagnose-render-aws-session-conflict
 
-      - name: Compare hashed primary keys and row fingerprints
+      - name: Compare source and target metadata read-only
         shell: bash
         run: |
           set -euo pipefail
@@ -29,131 +29,66 @@ jobs:
           command -v aws >/dev/null
           command -v psql >/dev/null
           command -v python3 >/dev/null
-
           WORK="$(mktemp -d "${RUNNER_TEMP:-/tmp}/trademate-db-diff.XXXXXX")"
           chmod 700 "$WORK"
           trap 'rm -rf "$WORK"' EXIT
-
-          aws secretsmanager get-secret-value \
-            --secret-id "trademate/migration/render-source" \
-            --query SecretString --output text > "$WORK/source-secret.json"
-          aws secretsmanager get-secret-value \
-            --secret-id "arn:aws:secretsmanager:eu-north-1:661406600284:secret:rds!db-886813df-a023-45a5-bef4-71fe0e81b8cf-nYlUfh" \
-            --query SecretString --output text > "$WORK/target-secret.json"
+          aws secretsmanager get-secret-value --secret-id "trademate/migration/render-source" --query SecretString --output text > "$WORK/source-secret.json"
+          aws secretsmanager get-secret-value --secret-id "arn:aws:secretsmanager:eu-north-1:661406600284:secret:rds!db-886813df-a023-45a5-bef4-71fe0e81b8cf-nYlUfh" --query SecretString --output text > "$WORK/target-secret.json"
           chmod 600 "$WORK"/*.json
-
           python3 - "$WORK" <<'PY'
           import json, pathlib, shlex, sys
           from urllib.parse import urlparse, unquote
-          work = pathlib.Path(sys.argv[1])
-          src = json.loads((work / "source-secret.json").read_text())
-          u = urlparse(src.get("DATABASE_URL", ""))
-          if not all([u.hostname, u.username, u.password, u.path.strip("/")]):
-              raise SystemExit("Render source secret is incomplete.")
-          dst = json.loads((work / "target-secret.json").read_text())
-          if not dst.get("username") or not dst.get("password"):
-              raise SystemExit("RDS managed secret is incomplete.")
-          def write_env(name, values):
-              path = work / name
-              with path.open("w") as f:
-                  for k, v in values.items():
-                      f.write(f"{k}={shlex.quote(str(v))}\n")
-              path.chmod(0o600)
-          write_env("source.env", {
-              "PGHOST":u.hostname, "PGPORT":u.port or 5432,
-              "PGUSER":unquote(u.username), "PGPASSWORD":unquote(u.password),
-              "PGDATABASE":unquote(u.path.lstrip("/")), "PGSSLMODE":"require"
-          })
-          write_env("target.env", {
-              "PGHOST":"trademate-db.cnoaequa8k6z.eu-north-1.rds.amazonaws.com",
-              "PGPORT":5432, "PGUSER":dst["username"], "PGPASSWORD":dst["password"],
-              "PGDATABASE":"trademate", "PGSSLMODE":"require"
-          })
+          w=pathlib.Path(sys.argv[1]); src=json.loads((w/"source-secret.json").read_text()); u=urlparse(src.get("DATABASE_URL",""))
+          if not all([u.hostname,u.username,u.password,u.path.strip("/")]): raise SystemExit("Render source secret is incomplete.")
+          dst=json.loads((w/"target-secret.json").read_text())
+          if not dst.get("username") or not dst.get("password"): raise SystemExit("RDS secret is incomplete.")
+          def write(name, vals):
+              p=w/name
+              with p.open("w") as f:
+                  for k,v in vals.items(): f.write(f"{k}={shlex.quote(str(v))}\\n")
+              p.chmod(0o600)
+          write("source.env",{"PGHOST":u.hostname,"PGPORT":u.port or 5432,"PGUSER":unquote(u.username),"PGPASSWORD":unquote(u.password),"PGDATABASE":unquote(u.path.lstrip("/")),"PGSSLMODE":"require"})
+          write("target.env",{"PGHOST":"trademate-db.cnoaequa8k6z.eu-north-1.rds.amazonaws.com","PGPORT":5432,"PGUSER":dst["username"],"PGPASSWORD":dst["password"],"PGDATABASE":"trademate","PGSSLMODE":"require"})
           PY
           rm -f "$WORK/source-secret.json" "$WORK/target-secret.json"
-
           python3 - "$WORK" <<'PY'
           import json, os, pathlib, subprocess, sys, shlex
-          from collections import Counter
-          work = pathlib.Path(sys.argv[1])
-          tables = ("audit_events", "user_notifications", "user_sessions")
-
-          def connect(name):
-              env = os.environ.copy()
-              for line in (work / name).read_text().splitlines():
-                  k, v = line.split("=", 1)
-                  parsed = shlex.split(v)
-                  env[k] = parsed[0] if parsed else ""
-              env["PGOPTIONS"] = "-c default_transaction_read_only=on"
-              return env
-
-          def query(env, sql):
-              p = subprocess.run(
-                  ["psql", "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-c", sql],
-                  env=env, text=True, capture_output=True
-              )
-              if p.returncode:
-                  raise RuntimeError("Read-only SQL query failed: " + p.stderr[-1000:])
+          w=pathlib.Path(sys.argv[1]); tables=("audit_events","user_notifications","user_sessions")
+          def conn(name):
+              e=os.environ.copy()
+              for line in (w/name).read_text().splitlines():
+                  k,v=line.split("=",1); z=shlex.split(v); e[k]=z[0] if z else ""
+              e["PGOPTIONS"]="-c default_transaction_read_only=on"; return e
+          def q(env,sql):
+              p=subprocess.run(["psql","-X","-qAt","-v","ON_ERROR_STOP=1","-c",sql],env=env,text=True,capture_output=True)
+              if p.returncode: raise RuntimeError("Read-only query failed: "+p.stderr[-800:])
               return p.stdout.splitlines()
-
-          src, dst = connect("source.env"), connect("target.env")
-          for env in (src, dst):
-              query(env, "SET default_transaction_read_only = on; SELECT current_database();")
-
-          def ident(value):
-              return '"' + value.replace('"', '""') + '"'
-
-          def fingerprints(env, table):
-              table_literal = table.replace("'", "''")
-              pk_rows = query(env, f"""
-                SELECT a.attname
-                FROM pg_index i
-                JOIN pg_class c ON c.oid=i.indrelid
-                JOIN pg_namespace n ON n.oid=c.relnamespace
-                JOIN unnest(i.indkey) WITH ORDINALITY k(attnum, ord) ON true
-                JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum=k.attnum
-                WHERE n.nspname='public' AND c.relname='{table_literal}'
-                  AND i.indisprimary
-                ORDER BY k.ord
-              """)
-              if not pk_rows:
-                  raise RuntimeError(f"Table {table} has no primary key; refusing ambiguous comparison.")
-              pairs = ", ".join(
-                  "'" + col.replace("'", "''") + "', t." + ident(col)
-                  for col in pk_rows
-              )
-              sql = (
-                  "SELECT md5(jsonb_build_object(" + pairs + ")::text), "
-                  "md5(row_to_json(t)::text) FROM public." + ident(table) + " t"
-              )
-              result = {}
-              for line in query(env, sql):
-                  key_hash, row_hash = line.split("|", 1)
-                  if key_hash in result:
-                      raise RuntimeError(f"Duplicate primary-key fingerprint in {table}.")
-                  result[key_hash] = row_hash
-              return result
-
-          report = []
+          src,dst=conn("source.env"),conn("target.env")
+          for e in (src,dst): q(e,"SET default_transaction_read_only=on; SELECT current_database();")
+          def ident(x): return '"'+x.replace('"','""')+'"'
+          def records(env,table):
+              tl=table.replace("'","''")
+              pks=q(env,f"""SELECT a.attname FROM pg_index i JOIN pg_class c ON c.oid=i.indrelid JOIN pg_namespace n ON n.oid=c.relnamespace JOIN unnest(i.indkey) WITH ORDINALITY k(attnum,ord) ON true JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum=k.attnum WHERE n.nspname='public' AND c.relname='{tl}' AND i.indisprimary ORDER BY k.ord""")
+              if not pks: raise RuntimeError("No primary key for "+table)
+              pairs=", ".join("'"+c.replace("'","''")+"',t."+ident(c) for c in pks)
+              rows=q(env,"SELECT md5(jsonb_build_object("+pairs+")::text)||'|'||row_to_json(t)::text FROM public."+ident(table)+" t")
+              out={}
+              for line in rows:
+                  h,raw=line.split("|",1); out[h]=json.loads(raw)
+              return out
+          safe_time=lambda row:{k:v for k,v in row.items() if (k.endswith("_at") or k.endswith("_on")) and v is not None}
+          report=[]
           for table in tables:
-              s, a = fingerprints(src, table), fingerprints(dst, table)
-              only_render = sorted(set(s) - set(a))
-              only_aws = sorted(set(a) - set(s))
-              changed = sorted(k for k in set(s) & set(a) if s[k] != a[k])
-              report.append({
-                  "table": table,
-                  "render_count": len(s),
-                  "aws_count": len(a),
-                  "render_only_primary_key_hashes": only_render,
-                  "aws_only_primary_key_hashes": only_aws,
-                  "same_primary_key_different_row": [
-                      {"primary_key_hash": k, "render_row_hash": s[k], "aws_row_hash": a[k]}
-                      for k in changed
-                  ]
-              })
-
-          print("READ_ONLY_ROW_DIFFERENCE_DIAGNOSTIC")
-          print(json.dumps(report, separators=(",", ":")))
-          print("Only MD5 fingerprints are emitted; no primary-key values, row contents, tokens, or credentials are logged.")
-          print("Both connections enforce default_transaction_read_only=on. No database writes or schema changes were executed.")
+              s,a=records(src,table),records(dst,table)
+              render_only=sorted(set(s)-set(a)); aws_only=sorted(set(a)-set(s))
+              changed=[]
+              for key in sorted(set(s)&set(a)):
+                  if s[key]!=a[key]:
+                      diff=sorted(k for k in set(s[key])|set(a[key]) if s[key].get(k)!=a[key].get(k))
+                      changed.append({"primary_key_hash":key,"differing_column_names":diff,"render_timestamps":safe_time(s[key]),"aws_timestamps":safe_time(a[key])})
+              report.append({"table":table,"render_count":len(s),"aws_count":len(a),"render_only_count":len(render_only),"aws_only_count":len(aws_only),"aws_only_timestamp_metadata":[safe_time(a[k]) for k in aws_only],"same_key_different_row":changed})
+          print("READ_ONLY_RECONCILIATION_METADATA")
+          print(json.dumps(report,separators=(",",":")))
+          print("Only differing column names and timestamp metadata are emitted; no IDs, user data, tokens, or credentials are logged.")
+          print("Both sessions enforce default_transaction_read_only=on. No database writes or schema changes were executed.")
           PY
