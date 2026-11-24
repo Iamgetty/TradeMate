@@ -39,7 +39,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install Node.js 24.22.1
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.22.1
           check-latest: true
