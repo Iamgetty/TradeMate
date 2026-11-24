@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const fs = require('node:fs');
 
 const connectionString = process.env.WORKER_DATABASE_URL || (process.env.NODE_ENV === 'production' ? '' : process.env.DATABASE_URL);
 if (!connectionString) {
@@ -35,16 +36,42 @@ function isRenderInternalDatabaseUrl(value) {
 // Render's internal PostgreSQL endpoint may present a self-signed certificate.
 // Permit that certificate only when explicitly enabled AND the URL is a Render
 // internal hostname. TLS encryption remains enabled. External connections
-// (including GitHub Actions) continue to verify the server certificate.
+// (including AWS RDS) always verify the server certificate.
 const allowRenderInternalSelfSignedCert =
   process.env.WORKER_DATABASE_ALLOW_SELF_SIGNED_INTERNAL_CERT === 'true' &&
   isRenderInternalDatabaseUrl(connectionString);
 
+// pg-connection-string parses sslmode=require from the URL and can replace the
+// explicit SSL options below. Remove only that URL parameter; TLS remains
+// mandatory because the explicit SSL configuration supplies the trusted CA.
+const poolUrl = new URL(connectionString);
+poolUrl.searchParams.delete('sslmode');
+
+let ssl;
+if (process.env.PGSSLMODE === 'require') {
+  if (allowRenderInternalSelfSignedCert) {
+    ssl = { rejectUnauthorized: false };
+  } else {
+    const caPath = process.env.PGSSLROOTCERT;
+    if (!caPath) {
+      console.error('PGSSLROOTCERT is required when verified PostgreSQL TLS is enabled.');
+      process.exit(1);
+    }
+    try {
+      ssl = {
+        ca: fs.readFileSync(caPath, 'utf8'),
+        rejectUnauthorized: true,
+      };
+    } catch {
+      console.error('The configured PostgreSQL CA bundle could not be read.');
+      process.exit(1);
+    }
+  }
+}
+
 const pool = new Pool({
-  connectionString,
-  ssl: process.env.PGSSLMODE === 'require'
-    ? { rejectUnauthorized: !allowRenderInternalSelfSignedCert }
-    : undefined,
+  connectionString: poolUrl.toString(),
+  ssl,
   connectionTimeoutMillis: 5000,
   max: 2,
 });
