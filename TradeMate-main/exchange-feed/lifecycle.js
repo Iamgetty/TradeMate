@@ -4,6 +4,7 @@ function createLifecycle() {
   let stopped = false;
   const sockets = new Set();
   const timers = new Map();
+  const abortControllers = new Set();
 
   function trackSocket(socket) {
     if (!socket) return () => {};
@@ -25,6 +26,16 @@ function createLifecycle() {
     return () => timers.delete(timer);
   }
 
+  function trackAbortController(controller) {
+    if (!controller) return () => {};
+    if (stopped) {
+      controller.abort();
+      return () => {};
+    }
+    abortControllers.add(controller);
+    return () => abortControllers.delete(controller);
+  }
+
   function stop() {
     if (stopped) return false;
     stopped = true;
@@ -32,6 +43,10 @@ function createLifecycle() {
       try { clear(timer); } catch (_) {}
     }
     timers.clear();
+    for (const controller of abortControllers) {
+      try { controller.abort(); } catch (_) {}
+    }
+    abortControllers.clear();
     for (const socket of sockets) {
       try {
         if (socket.readyState === 0 || socket.readyState === 1) {
@@ -48,6 +63,7 @@ function createLifecycle() {
   return {
     trackSocket,
     trackTimer,
+    trackAbortController,
     stop,
     get stopped() { return stopped; },
     get socketCount() { return sockets.size; },
