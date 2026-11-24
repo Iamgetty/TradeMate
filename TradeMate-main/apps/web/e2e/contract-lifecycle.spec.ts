@@ -784,7 +784,7 @@ test('desktop Profile content scrolls fully while its header and mode switcher s
     expect(anchored!.footer.bottom).toBeCloseTo(before!.footer.bottom, 0);
     expect(anchored!.bodyTop).toBeGreaterThan(0);
 
-    await content.evaluate(element => { element.scrollTop = 0; });
+    await content.evaluate(element => element.scrollTo({ top: 0, behavior: 'instant' }));
     await expect.poll(() => content.evaluate(element => element.scrollTop)).toBe(0);
     await expect(footer.locator('[data-act="mode"]')).toBeVisible();
   } finally {
