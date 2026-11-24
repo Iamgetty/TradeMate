@@ -137,6 +137,8 @@ jobs:
                   print(f"Missing AWS column: {table}.{column}")
               for table, column in mismatched:
                   print(f"Type/nullability mismatch: {table}.{column}")
+                  print(f"  Render source: {source[(table, column)]}")
+                  print(f"  AWS target:   {target[(table, column)]}")
               raise SystemExit("Source and AWS schemas are not compatible; import was not attempted.")
           print(f"Schema compatibility verified for {len(source)} source columns.")
           PY
