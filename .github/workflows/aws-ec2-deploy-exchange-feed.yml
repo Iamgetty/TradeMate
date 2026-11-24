@@ -1,0 +1,84 @@
+name: Deploy Exchange Feed to AWS Staging
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: trademate-exchange-feed-staging-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy feed to the existing staging EC2 instance
+    runs-on: ubuntu-latest
+    environment: aws-staging
+    timeout-minutes: 20
+    steps:
+      - name: Validate selected source revision
+        shell: bash
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          echo "Selected immutable source revision: $RELEASE_SHA"
+
+      - name: Assume the narrowly scoped staging deployment role
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
+        with:
+          role-to-assume: arn:aws:iam::661406600284:role/TradeMateGitHubStagingDeployRole
+          aws-region: eu-north-1
+          role-session-name: trademate-exchange-feed-deploy
+
+      - name: Verify AWS account and dispatch fixed deployment document
+        id: deploy
+        shell: bash
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
+          test "$ACCOUNT" = "661406600284"
+          COMMAND_ID="$(aws ssm send-command \
+            --document-name TradeMate-Deploy-Exchange-Feed \
+            --document-version 1 \
+            --instance-ids i-035b1f1d00052c77e \
+            --parameters "ReleaseSha=$RELEASE_SHA" \
+            --timeout-seconds 900 \
+            --comment "TradeMate staging Exchange Feed deployment $RELEASE_SHA" \
+            --query 'Command.CommandId' --output text)"
+          test -n "$COMMAND_ID"
+          echo "command_id=$COMMAND_ID" >> "$GITHUB_OUTPUT"
+          echo "Submitted the fixed deployment document to the single staging EC2 instance."
+
+      - name: Wait for deployment and report service health
+        shell: bash
+        env:
+          COMMAND_ID: ${{ steps.deploy.outputs.command_id }}
+        run: |
+          set -euo pipefail
+          STATUS=Pending
+          for attempt in $(seq 1 180); do
+            RESULT="$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id i-035b1f1d00052c77e \
+              --plugin-name deployExchangeFeed 2>/dev/null || true)"
+            STATUS="$(jq -r '.Status // "Pending"' <<<"$RESULT")"
+            case "$STATUS" in
+              Success)
+                jq '{Status,ResponseCode,StandardOutputContent,StandardErrorContent}' <<<"$RESULT"
+                exit 0
+                ;;
+              Failed|TimedOut|Cancelled|Cancelling)
+                jq '{Status,ResponseCode,StandardOutputContent,StandardErrorContent}' <<<"$RESULT"
+                exit 1
+                ;;
+            esac
+            sleep 5
+          done
+          echo "Deployment command did not finish before the 15-minute polling limit."
+          exit 1
