@@ -12,6 +12,8 @@ const crypto = require('crypto');
 const { createMt5QuoteStore } = require('./mt5-quotes');
 const { createReconnectPolicy } = require('./reconnect-policy');
 const { buildReadiness } = require('./readiness');
+const { createLifecycle } = require('./lifecycle');
+const lifecycle = createLifecycle();
 const mt5QuoteStore = createMt5QuoteStore();
 // Public MT5 broadcasting stays disabled until broker redistribution permission is confirmed.
 const mt5RedistributionPermissionConfirmed = process.env.MT5_REDISTRIBUTION_PERMISSION_CONFIRMED === 'true';
@@ -111,15 +113,22 @@ function connect(name, url, onOpen, onMessage, opts = {}) {
   const stableConnectionMs = 60000;
   let reconnectTimer = null;
   const start = () => {
+    if (lifecycle.stopped) return;
     const ws = new WebSocket(url);
+    const untrackSocket = lifecycle.trackSocket(ws);
     let pingTimer;
+    let untrackPingTimer = () => {};
+    let untrackReconnectTimer = () => {};
     let openedAt = 0;
     ws.on('open', () => {
       openedAt = Date.now();
       feedStatus.set(name, false); // count as live only after messages arrive
       console.log(`[${name}] connected; awaiting market data`);
       onOpen(ws);
-      if (opts.ping) pingTimer = setInterval(() => ws.readyState === 1 && ws.send(opts.ping), 20000);
+      if (opts.ping) {
+        pingTimer = setInterval(() => ws.readyState === 1 && ws.send(opts.ping), 20000);
+        untrackPingTimer = lifecycle.trackTimer(pingTimer, clearInterval);
+      }
     });
     ws.on('message', (raw) => {
       try {
@@ -136,15 +145,19 @@ function connect(name, url, onOpen, onMessage, opts = {}) {
     });
     ws.on('error', (e) => console.error(`[${name}] error:`, e.message));
     ws.on('close', () => {
+      untrackSocket();
       clearInterval(pingTimer);
+      untrackPingTimer();
       feedStatus.set(name, false);
-      if (reconnectTimer) return;
+      if (lifecycle.stopped || reconnectTimer) return;
       const delay = reconnect.nextDelay();
       console.log(`[${name}] closed, reconnecting in ${delay} ms`);
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null;
+        untrackReconnectTimer();
         start();
       }, delay);
+      untrackReconnectTimer = lifecycle.trackTimer(reconnectTimer, clearTimeout);
     });
   };
   start();
@@ -505,7 +518,7 @@ function top(map, desc, limit = DEPTH) {
   return out;
 }
 
-setInterval(() => {
+const broadcastTimer = setInterval(() => {
   const now = Date.now();
   const watchedBases = new Set([...wss.clients]
     .filter((client) => client.readyState === WebSocket.OPEN && client.watch)
@@ -543,5 +556,33 @@ setInterval(() => {
     c.send(cache.get(key));
   }
 }, PUSH_MS);
+lifecycle.trackTimer(broadcastTimer, clearInterval);
 
+function shutdown(signal) {
+  if (lifecycle.stopped) return;
+  console.log(`[shutdown] ${signal} received; closing feed connections`);
+  lifecycle.stop();
+  for (const client of wss.clients) {
+    try { client.close(1001, 'Feed service shutting down'); } catch (_) { client.terminate(); }
+  }
+  wss.close();
+  const forceClose = setTimeout(() => {
+    for (const client of wss.clients) client.terminate();
+    server.closeAllConnections?.();
+  }, 5000);
+  forceClose.unref();
+  server.close((error) => {
+    clearTimeout(forceClose);
+    if (error) {
+      console.error('[shutdown] HTTP server close failed:', error.message);
+      process.exitCode = 1;
+      return;
+    }
+    console.log('[shutdown] Feed server stopped cleanly');
+    process.exitCode = 0;
+  });
+}
+
+process.once('SIGTERM', () => shutdown('SIGTERM'));
+process.once('SIGINT', () => shutdown('SIGINT'));
 server.listen(PORT, () => console.log(`Feed server on port ${PORT}`));
