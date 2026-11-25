@@ -129,6 +129,17 @@ The concern that a feed post was not linked to its user was checked against the 
 
 The API's left join and fallback display label can mask missing display-name values in other records, so keep the orphan/null audit as a regression check. The current target row is linked correctly.
 
+## Cloudflare routing and release target
+
+Read-only Cloudflare account inspection found:
+- Workers `trademate` and `trademate-staging` both exist.
+- Custom Worker domains `trademate.cfd` and `www.trademate.cfd` are currently attached to `trademate-staging`, environment `production`.
+- The candidate `trademate` Worker has no custom domain attached in the current domain inventory.
+- `api.trademate.cfd` and `feed.trademate.cfd` are proxied CNAMEs to the same Cloudflare Tunnel hostname.
+- No zone-level Workers Routes are configured; the site hostnames are bound as Worker custom domains.
+
+This matches the current web/API/feed responses, but it means the branded public domain is still serving the staging Worker, not the candidate production Worker. Do not describe the candidate production Worker as promoted. Keep this as an explicit release gate until staging acceptance and promotion are approved.
+
 ## Live service state at audit time
 
 | Service / endpoint | Result | Interpretation |
