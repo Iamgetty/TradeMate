@@ -46,7 +46,7 @@ jobs:
           command -v pg_dump >/dev/null
           command -v pg_restore >/dev/null
           command -v git >/dev/null
-          if ! command -v age >/dev/null; then sudo dnf install -y age; fi
+          if ! command -v age >/dev/null; then mkdir -p /tmp/tm-age-install; curl -fsSL 'https://dl.filippo.io/age/v1.3.2?for=linux/amd64' -o /tmp/tm-age-install/age.tar.gz; echo 'cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10  /tmp/tm-age-install/age.tar.gz' | sha256sum -c -; tar -xzf /tmp/tm-age-install/age.tar.gz -C /tmp/tm-age-install; sudo find /tmp/tm-age-install -type f -name age -perm -u+x -exec install -m 755 {} /usr/local/bin/age \\; ; rm -rf /tmp/tm-age-install; fi
           pg_dump --version
           age --version
           W="$(mktemp -d "${RUNNER_TEMP:-/tmp}/tm-render-backup.XXXXXX")"
