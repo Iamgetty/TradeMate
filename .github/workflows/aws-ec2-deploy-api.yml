@@ -42,6 +42,15 @@ jobs:
             echo "Skipping stale successful CI revision $RELEASE_SHA; main is now $CURRENT_MAIN."
             exit 0
           fi
+
+          ACTIVE_SHA="$(cat /opt/trademate/api/current-release 2>/dev/null || true)"
+          if [[ "$ACTIVE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            git fetch --no-tags --depth=1 origin "$ACTIVE_SHA"
+            if git diff --quiet "$ACTIVE_SHA" "$RELEASE_SHA" -- TradeMate-main/apps/api; then
+              echo "API source is unchanged since active release $ACTIVE_SHA; skipping restart."
+              exit 0
+            fi
+          fi
           echo "deploy=true" >> "$GITHUB_OUTPUT"
 
           NODE_HOME="$HOME/.local/opt/node-v24.22.1"
