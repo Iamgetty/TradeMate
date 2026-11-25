@@ -35,7 +35,7 @@ A first-pass read of the base action dispatcher suggested sign-out was local-onl
 | CR-06 | Referral / rewards / affiliate | Referral code is derived client-side from UID; referral stats and rewards are hard-coded zero. Rewards tasks/points are illustrative. Affiliate join toggles `st.joinedAff`; affiliate page says Coming soon. | Static / local-only | Do not show earned points, joined status or commissions as real. Implement attribution, qualification, ledger, abuse controls and settlement before launch. |
 | CR-07 | Wallet and money movement | Wallet choices show “Wallet connection is not enabled yet”; crypto deposit is disabled; fiat deposit and transfer buttons show not connected. No wallet, deposit, withdrawal, transfer or custody ledger controller exists in the API module. | Disabled / not implemented | Keep disabled. Decide custody/non-custody model, supported networks, payment providers, compliance, ledger/reconciliation and controls before implementation. |
 | CR-08 | KYC | Signed-in KYC submit explicitly says “Identity verification is not open yet”; no KYC submission controller/provider workflow exists. | Disabled / not implemented | Keep unavailable until a KYC provider and case lifecycle are integrated and accepted. |
-| CR-09 | FX and MT5 feeds | Live feed health reports FX `not_configured`, 0 instruments/quotes, and MT5 0 quotes. Public MT5 broadcast is false and redistribution permission is unconfirmed. | Disconnected / awaiting configuration | Configure an authorized FX provider and broker-connected MT5 collector; verify freshness and permission before enabling public MT5 broadcast. |
+| CR-09 | FX and MT5 feeds | The deployed app's central book client still uses Render. AWS feed has FX `not_configured`, 0 quotes and MT5 0 quotes; Render has 8 FX reference quotes but reports MT5 broadcast/permission flags true. | Still dependent on Render; AWS parity incomplete | Configure FX on AWS, resolve the MT5 flag discrepancy, validate WebSocket parity, then switch the app to AWS. Do not enable MT5 broadcast without written authorization. |
 
 ## Other local-only, static or misleading interactions
 
@@ -86,6 +86,26 @@ The current API includes controllers for:
 
 The frontend directly calls 75 distinct literal API paths. The presence of a route is not proof that a visible button reaches it or that the deployed workflow passes a two-account test. In particular, sports-transfer API routes exist but were not established as fully surfaced/accepted UI journeys in this pass.
 
+## Render dependency still present in the deployed market UI
+
+A second migration check found that the market order-book client in the exact deployed `app.js` still calls `createFeedClient({ url: "wss://exchange-feed.onrender.com", ... })` inside `tmConnectCentral()`. The new AWS feed at `wss://feed.trademate.cfd` is not yet the configured source for that central aggregated order-book client.
+
+Both services were healthy at the same audit time, but they are **not feature-equivalent**:
+
+| Capability | Existing Render feed | New AWS feed |
+|---|---|---|
+| Readiness | 200, ready | 200, ready |
+| Exchange providers | 5/5 live | 5/5 live |
+| Books | 75 observed, 75 fresh, 0 stale | 75 observed, 75 fresh, 0 stale |
+| FX | Available; Twelve Data Basic; 8 reference quotes | Not configured; 0 quotes |
+| MT5 quotes | 0 | 0 |
+| MT5 public-broadcast flag | true | false |
+| MT5 redistribution-permission flag | true | false |
+
+No endpoint switch was made. Changing the UI to AWS now would remove the FX reference quotes currently provided by Render. Also, the Render MT5 permission/broadcast flags conflict with the project’s conservative permission gate; although both services report zero MT5 quotes, the Render flag state must be investigated and broker authorization verified before any MT5 broadcast is allowed. Do not copy those flags to AWS.
+
+**Migration action:** configure and verify the approved FX provider on AWS, resolve the MT5 permission-flag discrepancy, run the same WebSocket contract/freshness tests against AWS, then change `tmConnectCentral()` to `wss://feed.trademate.cfd` and verify live order books and FX in the browser before retiring Render.
+
 ## Feed author relationship — resolved on AWS target
 
 The concern that a feed post was not linked to its user was checked against the live AWS database and API:
@@ -110,7 +130,9 @@ The API's left join and fallback display label can mask missing display-name val
 | `/api/market/activity?division=services` | HTTP 200; 14-day counts and current listing/enquiry/deal counts all zero | Real DB-backed activity endpoint; no qualifying Services activity in sampled window |
 | `/api/market/highlights?division=services` | HTTP 200; all four slides null | Real DB-backed highlights endpoint; no qualifying records for the sampled division |
 | Feed health MT5 | 0 quotes; public broadcast disabled | MT5 is not ingesting |
-| Feed health FX | `not_configured`, 0 instruments/quotes | FX provider is not configured |
+| Feed health FX (AWS) | `not_configured`, 0 instruments/quotes | FX provider is not configured |
+| Existing Render feed `/ready` | HTTP 200; 5/5 feeds live; 75 fresh books; Twelve Data 8 FX quotes | Still serving the UI's central order-book client |
+| New AWS feed `/ready` | HTTP 200; 5/5 feeds live; 75 fresh books; FX not configured | Healthy but not feature-equivalent to Render yet |
 | `https://trademate.cfd/` and `/app` | HTTP 200 | Web app responds |
 
 Note: `/health` at the API domain root (without `/api`) returns 404 by design because Nest uses global prefix `/api`. Do not use the root health URL as an API outage test.
