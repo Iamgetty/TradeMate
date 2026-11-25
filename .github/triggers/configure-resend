@@ -1,1 +1,2 @@
 Trigger AWS staging Resend runtime configuration. This file contains no credentials.
+Workflow retry after repairing the shell quoting in aws-staging-configure-resend.yml.
