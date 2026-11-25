@@ -104,7 +104,7 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
     await expect(buyer.locator('#pg')).toContainText('wallet connection and payment handoff are not available yet.');
     await buyer.goto('/app');
     await buyer.locator('#app .top button[data-pg="profile"]').click();
-    await buyer.locator('#pg .pt-pills button[data-pg="level"]').click();
+    await buyer.locator('#pg [data-pg="level"]').last().click();
     await expect(buyer.locator('#pg')).toContainText('No live level, qualification or progress record is currently connected');
     await expect(buyer.locator('#pg')).not.toContainText('10 completed contracts');
     await buyer.goto('/market/' + fixture.b2bListingId);
