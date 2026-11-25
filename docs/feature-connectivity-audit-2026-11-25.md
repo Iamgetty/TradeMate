@@ -46,9 +46,12 @@ Verified:
 | Community social links | Display “Opens our … page” toast; no verified destination URL in handler. | Placeholder |
 | App-store rating | Displays toast saying rating opens in app store. | Placeholder |
 | B2B local sub-account fallback | `subadd` appends to `st.subs`; not a persistent sub-account. Connected organization screen is a separate real organization workflow. | Local-only in preview; not a real sub-account system |
-| Profile avatar/photo | `avatar` and `rmphoto` update local state; no corresponding upload path in these handlers. | Device/local state |
+| Profile avatar picker | `avatar` and `rmphoto` update local state; the screen explicitly says the photo is kept on this device in preview. | Device/local preview only; separate public-profile editor is server-backed |
+| Public profile editor | `tlUpdateProfile` sends bio, Instagram/X handles, website, profile photo and cover photo to `PATCH /api/profiles/me` when connected. | Connected; browser acceptance and payload-size limits still need verification |
+| Organization photo | Stored in localStorage under `tm.orgphoto.<id>`; not uploaded to organization backend. | Local-only |
 | Organization photo | Saved in localStorage under `tm.orgphoto.<id>`; not uploaded to organization backend. | Local-only |
 | Buyer/Seller mode | `mode` toggles local app state and local save; no server preference route is called for this switch. | Local-only preference |
+| Legacy deal controls | `dealcancel` changes a local deal status and `dealadv` increments a local step; the server-backed contract lifecycle is a separate flow. | Local-only legacy interaction; do not confuse with contract status |
 | Theme | Stored locally. | Expected device-only preference |
 | Additional verification | UI is a future support-request description, not a case-management API. | Not implemented |
 | TradeMate Card | Explicit Coming soon screen. | Not available |
@@ -102,6 +105,9 @@ The API's left join and fallback display label can mask missing display-name val
 | `https://api.trademate.cfd/api/auth/me` without credentials | HTTP 401 | Expected unauthenticated response |
 | `https://api.trademate.cfd/api/feed/posts?limit=40` | HTTP 200 | Feed API responding |
 | `https://feed.trademate.cfd/health` | HTTP 200; 5/5 exchange feeds live; 75 books | Exchange service is live at sampled time |
+| `/api/market/quotes?symbols=^GSPC,AAPL` | HTTP 200; valid quotes returned, both marked `delayed` with last market timestamps on 24 Nov | Quote integration is connected; not real-time at sampled time |
+| `/api/market/activity?division=services` | HTTP 200; 14-day counts and current listing/enquiry/deal counts all zero | Real DB-backed activity endpoint; no qualifying Services activity in sampled window |
+| `/api/market/highlights?division=services` | HTTP 200; all four slides null | Real DB-backed highlights endpoint; no qualifying records for the sampled division |
 | Feed health MT5 | 0 quotes; public broadcast disabled | MT5 is not ingesting |
 | Feed health FX | `not_configured`, 0 instruments/quotes | FX provider is not configured |
 | `https://trademate.cfd/` and `/app` | HTTP 200 | Web app responds |
