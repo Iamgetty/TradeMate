@@ -57,9 +57,9 @@ jobs:
 data = json.load(sys.stdin)
 api_key = data["api_key"]
 from_email = data["from_email"]
-if not api_key.startswith("re_") or any(c in api_key for c in "\r\n\x00"):
+if not api_key.startswith("re_") or any(c in api_key for c in "\\r\\n\\x00"):
     raise SystemExit("Secret validation failed; no value was displayed.")
-if not re.fullmatch(r"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+", from_email):
+if not re.fullmatch(r"[^\\s@<>]+@[^\\s@<>]+\\.[^\\s@<>]+", from_email):
     raise SystemExit("Sender validation failed; no value was displayed.")
 path = "/etc/trademate/api.env"
 directory = os.path.dirname(path)
@@ -69,16 +69,16 @@ try:
         existing = f.read()
 except FileNotFoundError:
     existing = ""
-lines = [line for line in existing.splitlines() if not re.match(r"^\s*(?:RESEND_API_KEY|RESEND_FROM_EMAIL)\s*=", line)]
+lines = [line for line in existing.splitlines() if not re.match(r"^\\s*(?:RESEND_API_KEY|RESEND_FROM_EMAIL)\\s*=", line)]
 def quote(value):
-    if any(c in value for c in "\r\n\x00"):
+    if any(c in value for c in "\\r\\n\\x00"):
         raise SystemExit("Environment value contains an unsupported control character.")
-    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
-new_content = "\n".join(lines).rstrip("\n")
+    return "\\\"" + value.replace("\\\\", "\\\\\\\\").replace("\\\"", "\\\\\\\"") + "\\\""
+new_content = "\\n".join(lines).rstrip("\\n")
 if new_content:
-    new_content += "\n"
-new_content += "RESEND_API_KEY=" + quote(api_key) + "\n"
-new_content += "RESEND_FROM_EMAIL=" + quote(from_email) + "\n"
+    new_content += "\\n"
+new_content += "RESEND_API_KEY=" + quote(api_key) + "\\n"
+new_content += "RESEND_FROM_EMAIL=" + quote(from_email) + "\\n"
 fd, temporary = tempfile.mkstemp(prefix=".api.env.", dir=directory)
 try:
     os.fchmod(fd, 0o600)
@@ -98,18 +98,16 @@ finally:
         os.unlink(temporary)
 subprocess.run(["systemctl", "restart", "trademate-api.service"], check=True, timeout=60)
 time.sleep(2)
-active = subprocess.run(["systemctl", "is-active", "--quiet", "trademate-api.service"]).returncode == 0
-if not active:
+if subprocess.run(["systemctl", "is-active", "--quiet", "trademate-api.service"]).returncode != 0:
     raise SystemExit("The staging API did not become active after restart.")
 pid = subprocess.check_output(["systemctl", "show", "trademate-api.service", "--property=MainPID", "--value"], text=True).strip()
 if not pid.isdigit() or pid == "0":
     raise SystemExit("The staging API has no active main process.")
 with open("/proc/" + pid + "/environ", "rb") as f:
-    entries = dict(item.split(b"=", 1) for item in f.read().split(b"\x00") if b"=" in item)
+    entries = dict(item.split(b"=", 1) for item in f.read().split(b"\\x00") if b"=" in item)
 if entries.get(b"RESEND_API_KEY", b"").decode() != api_key or entries.get(b"RESEND_FROM_EMAIL", b"").decode() != from_email:
     raise SystemExit("The restarted API process did not load both Resend settings.")
-mode = os.stat(path).st_mode & 0o777
-if mode != 0o600:
+if os.stat(path).st_mode & 0o777 != 0o600:
     raise SystemExit("The runtime environment file permissions are not 0600.")
 print("Resend runtime configuration installed; both settings are loaded by the active staging API process.")
 print("Secret values were not printed. File permissions: 0600. Service: active.")
