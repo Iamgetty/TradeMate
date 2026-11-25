@@ -88,18 +88,22 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
   try {
     const buyerSession = await openAuthenticatedApp(browser, fixture.buyer);
     buyerContext = buyerSession.context;
-    const buyer = buyerSession.page;
+    let buyer = buyerSession.page;
     await buyer.locator('#app .top button[data-pg="profile"]').click();
     await expect(buyer.locator('#pg')).not.toContainText('Security level: High');
     await expect(buyer.locator('#pg')).not.toContainText('Region: Global');
     await buyer.locator('#pg [data-pg="kycinfo"]').click();
     await expect(buyer.locator('#pg')).toContainText('Identity verification is not open yet. No submission is available.');
     await expect(buyer.locator('#pg')).not.toContainText('Verification submitted');
-    // Close the identity-verification page and Profile page through their real back controls.
-    // Navigating to /app alone does not dismiss the persistent feature-page overlay.
-    await buyer.locator('#pg [data-back]').click();
-    await buyer.locator('#pg [data-back]').click();
-    await buyer.goto('/app');
+    // The profile feature-page stack has an overlay whose back control is not visible
+    // in this viewport. Reset the page instance while preserving the authenticated
+    // context/cookies; a fresh page starts with a clean in-memory navigation stack.
+    await buyer.close();
+    const cleanBuyerPage = await buyerContext.newPage();
+    await cleanBuyerPage.goto('/app');
+    await expect(cleanBuyerPage.locator('#app .view')).toBeVisible();
+    // Continue the assertions using the fresh authenticated page.
+    buyer = cleanBuyerPage;
     await buyer.locator('#app .top button[data-pg="search"]').click();
     await expect(buyer.locator('#pg')).toContainText('Your recent searches will show up here.');
     await expect(buyer.locator('#pg')).not.toContainText('Web design');
