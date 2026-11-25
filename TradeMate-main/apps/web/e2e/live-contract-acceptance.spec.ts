@@ -110,11 +110,17 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
     await buyer.goto('/app');
     await buyer.locator('#app .top button[data-pg="scan"]').click();
     await expect(buyer.locator('#pg')).toContainText('wallet connection and payment handoff are not available yet.');
+    // A new page resets the feature-page overlay stack; route navigation alone does not.
+    await buyer.close();
+    buyer = await buyerContext.newPage();
     await buyer.goto('/app');
+    await expect(buyer.locator('#app .view')).toBeVisible();
     await buyer.locator('#app .top button[data-pg="profile"]').click();
     await buyer.locator('#pg [data-pg="level"]').last().click();
     await expect(buyer.locator('#pg')).toContainText('No live level, qualification or progress record is currently connected');
     await expect(buyer.locator('#pg')).not.toContainText('10 completed contracts');
+    await buyer.close();
+    buyer = await buyerContext.newPage();
     await buyer.goto('/market/' + fixture.b2bListingId);
     const buyerContractsResponse = await buyer.request.get('/api/market/contracts/mine');
     expect(buyerContractsResponse.status(), 'buyer contract list API must be available').toBe(200);
