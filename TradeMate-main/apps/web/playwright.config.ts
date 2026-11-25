@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const externalBaseURL = process.env.TRADEMATE_E2E_BASE_URL?.replace(/\/+$/, '');
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -10,15 +12,17 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 10_000 },
   use: {
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL: externalBaseURL ?? 'http://127.0.0.1:3000',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     ...devices['Desktop Chrome'],
   },
-  webServer: {
-    command: 'npm run dev -- --hostname 127.0.0.1 --port 3000',
-    url: 'http://127.0.0.1:3000/app',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  ...(externalBaseURL ? {} : {
+    webServer: {
+      command: 'npm run dev -- --hostname 127.0.0.1 --port 3000',
+      url: 'http://127.0.0.1:3000/app',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+  }),
 });
