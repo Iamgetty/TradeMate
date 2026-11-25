@@ -95,6 +95,10 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
     await buyer.locator('#pg [data-pg="kycinfo"]').click();
     await expect(buyer.locator('#pg')).toContainText('Identity verification is not open yet. No submission is available.');
     await expect(buyer.locator('#pg')).not.toContainText('Verification submitted');
+    // Close the identity-verification page and Profile page through their real back controls.
+    // Navigating to /app alone does not dismiss the persistent feature-page overlay.
+    await buyer.locator('#pg [data-back]').click();
+    await buyer.locator('#pg [data-back]').click();
     await buyer.goto('/app');
     await buyer.locator('#app .top button[data-pg="search"]').click();
     await expect(buyer.locator('#pg')).toContainText('Your recent searches will show up here.');
