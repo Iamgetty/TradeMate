@@ -1,0 +1,115 @@
+name: Deploy TradeMate API to AWS staging
+
+on:
+  workflow_run:
+    workflows:
+      - TradeMate CI
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trademate-api-staging-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and promote API on the existing EC2 staging host
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
+    runs-on: [self-hosted, Linux, X64, aws-staging]
+    timeout-minutes: 25
+    steps:
+      - name: Check out the exact CI-passing revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Reject stale revisions and verify host headroom
+        shell: bash
+        env:
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          CURRENT_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          if [[ "$CURRENT_MAIN" != "$RELEASE_SHA" ]]; then
+            echo "Skipping stale successful CI revision $RELEASE_SHA; main is now $CURRENT_MAIN."
+            exit 0
+          fi
+
+          NODE_HOME="$HOME/.local/opt/node-v24.22.1"
+          export PATH="$NODE_HOME/bin:$PATH"
+          test "$(node --version)" = "v24.22.1"
+          AVAILABLE_KB="$(awk '/MemAvailable:/ {print int($2)}' /proc/meminfo)"
+          AVAILABLE_DISK_KB="$(df -Pk /opt/trademate/api/releases | awk 'NR==2 {print $4}')"
+          echo "Available memory: ${AVAILABLE_KB} KiB"
+          echo "Available release disk: ${AVAILABLE_DISK_KB} KiB"
+          test "$AVAILABLE_KB" -ge 614400
+          test "$AVAILABLE_DISK_KB" -ge 512000
+          systemctl is-active --quiet trademate-api.service
+          systemctl is-active --quiet trademate-exchange-feed.service
+          systemctl is-active --quiet cloudflared.service
+          echo "Node 24, host headroom, API, feed, and tunnel checks passed."
+
+      - name: Build and test the API
+        working-directory: TradeMate-main/apps/api
+        env:
+          NODE_OPTIONS: --max-old-space-size=512
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.local/opt/node-v24.22.1/bin:$PATH"
+          npm ci --no-audit --no-fund
+          npm run build
+          npm run test:security
+          npm prune --omit=dev --no-audit --no-fund
+          test -s dist/main.js
+          test -d node_modules
+          echo "API production build and security tests passed."
+
+      - name: Stage immutable API release
+        shell: bash
+        env:
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          RELEASE_ROOT="/opt/trademate/api/releases/$RELEASE_SHA"
+          APP_DIR="$RELEASE_ROOT/TradeMate-main/apps/api"
+          ACTIVE_DIR="$(systemctl show trademate-api.service -p WorkingDirectory --value)"
+          if [[ "$ACTIVE_DIR" == "$APP_DIR" ]]; then
+            echo "Revision $RELEASE_SHA is already active."
+            exit 0
+          fi
+          if [[ -e "$RELEASE_ROOT" ]]; then
+            rm -rf "$RELEASE_ROOT"
+          fi
+          install -d -m 0755 "$RELEASE_ROOT/TradeMate-main/apps"
+          cp -a TradeMate-main/apps/api "$RELEASE_ROOT/TradeMate-main/apps/"
+          printf '%s\n' "$RELEASE_SHA" > "$RELEASE_ROOT/.release-sha"
+          test -s "$APP_DIR/dist/main.js"
+          test -d "$APP_DIR/node_modules"
+          echo "Immutable API release staged at $APP_DIR"
+
+      - name: Promote API with automatic rollback
+        shell: bash
+        env:
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          sudo /usr/local/sbin/trademate-promote-api-release "$RELEASE_SHA"
+          ACTIVE_DIR="$(systemctl show trademate-api.service -p WorkingDirectory --value)"
+          test "$ACTIVE_DIR" = "/opt/trademate/api/releases/$RELEASE_SHA/TradeMate-main/apps/api"
+          echo "API is running from the exact CI-passing revision $RELEASE_SHA."
+
+      - name: Verify public API and Cloudflare Worker proxy
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 20 https://api.trademate.cfd/api/health
+          echo
+          curl --fail --silent --show-error --max-time 20 https://trademate-staging.trademate-web.workers.dev/api/health
+          echo
+          echo "Public API and Cloudflare Worker API proxy both returned healthy responses."
