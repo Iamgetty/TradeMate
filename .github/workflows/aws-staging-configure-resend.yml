@@ -49,8 +49,10 @@ jobs:
             echo "::error::RESEND_FROM_EMAIL must be a plain email address."
             exit 1
           fi
-          sudo -n true
-          env_files="$(sudo -n systemctl show trademate-api.service --property=EnvironmentFiles --value)"
+          # Only the root-owned, no-argument helper may run with elevated privileges.
+          # Never sudo a script from the writable GitHub workspace.
+          sudo -n -l /usr/local/sbin/trademate-configure-resend-runtime >/dev/null
+          env_files="$(systemctl show trademate-api.service --property=EnvironmentFiles --value)"
           if [[ "$env_files" != *"/etc/trademate/api.env"* ]]; then
             echo "::error::trademate-api.service is not configured to load /etc/trademate/api.env; refusing to modify the host."
             exit 1
@@ -61,7 +63,7 @@ jobs:
         run: |
           set -euo pipefail
           set +x
-          python3 - <<'PY' | sudo -n python3 .github/scripts/configure-resend-runtime.py
+          python3 - <<'PY' | sudo -n /usr/local/sbin/trademate-configure-resend-runtime
           import json
           import os
           import sys
