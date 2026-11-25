@@ -46,9 +46,10 @@ A first-pass read of the base action dispatcher suggested sign-out was local-onl
 | Newsletter / `wsub` | Displays a toast only. | No subscription backend |
 | Affiliate community | Displays “Community chat opens in the app”. | Placeholder |
 | Community social links | Display “Opens our … page” toast; no verified destination URL in handler. | Placeholder |
+| Support attachments | Connected support screen explicitly says attachments are not yet supported; preview-mode file picker does not make it a server attachment. | Not implemented for connected accounts |
 | App-store rating | Displays toast saying rating opens in app store. | Placeholder |
 | B2B local sub-account fallback | `subadd` appends to `st.subs`; not a persistent sub-account. Connected organization screen is a separate real organization workflow. | Local-only in preview; not a real sub-account system |
-| Profile avatar picker | `avatar` and `rmphoto` update local state; the screen explicitly says the photo is kept on this device in preview. | Device/local preview only; separate public-profile editor is server-backed |
+| Profile avatar picker | `avatar` and `rmphoto` update local state; the screen explicitly says the photo is kept on this device in the preview. | Device/local preview only; separate public-profile editor is server-backed |
 | Public profile editor | `tlUpdateProfile` sends bio, Instagram/X handles, website, profile photo and cover photo to `PATCH /api/profiles/me` when connected. | Connected; browser acceptance and payload-size limits still need verification |
 | Organization photo | Stored in localStorage under `tm.orgphoto.<id>`; not uploaded to organization backend. | Local-only |
 | Organization photo | Saved in localStorage under `tm.orgphoto.<id>`; not uploaded to organization backend. | Local-only |
@@ -85,7 +86,7 @@ The current API includes controllers for:
 - Sports-transfer profiles, mandates and opportunities.
 - Market quote route.
 
-The legacy `apps/web/public/tm/app.js` contains 75 distinct literal API path strings; separate Next.js pages and helper scripts call additional paths such as `/api/market/activity`, `/api/market/highlights` and the NFT routes. The presence of a route is not proof that a visible button reaches it or that the deployed workflow passes a two-account test. In particular, sports-transfer API routes exist but were not established as fully surfaced/accepted UI journeys in this pass.
+The legacy `apps/web/public/tm/app.js` contains 75 distinct literal API path strings; separate Next.js pages and helper scripts call additional paths such as `/api/market/activity`, `/api/market/highlights` and the NFT routes. All 41 distinct `data-pg` screen names found in the source have a matching `PG.*` screen definition, and all 38 distinct `data-pc` action names have a matching `PC.*` handler. The issue is therefore not orphaned navigation/action markers; it is that some defined handlers intentionally perform local-only actions, cosmetic state changes or display disabled services. The presence of a route is not proof that a visible button reaches it or that the deployed workflow passes a two-account test. In particular, sports-transfer API routes exist but were not established as fully surfaced/accepted UI journeys in this pass.
 
 ## Next.js application pages — separate from the legacy `/app` runtime
 
