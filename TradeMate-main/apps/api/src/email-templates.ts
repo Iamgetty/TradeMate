@@ -117,7 +117,7 @@ export const renderTradeMateEmail = (subject: string, content: string) => {
         <tr><td align="center" style="padding:20px 10px 3px;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
             <tr>
-              <td align="center" style="padding-bottom:5px;"><img src="https://trademate-web.onrender.com/tm/img/logo.png" width="34" height="34" alt="TradeMate" style="display:block;width:34px;height:34px;opacity:.16;"></td>
+              <td align="center" style="padding-bottom:5px;"><img src="https://trademate.cfd/tm/img/logo.png" width="34" height="34" alt="TradeMate" style="display:block;width:34px;height:34px;opacity:.16;"></td>
             </tr>
             <tr><td align="center" style="font-family:Manrope,Arial,Helvetica,sans-serif;font-size:17px;line-height:23px;font-weight:800;letter-spacing:1.1px;color:#e1e5ea;">TRADE SMARTER. TOGETHER.</td></tr>
             <tr><td align="center" style="padding-top:3px;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:10px;line-height:16px;color:#c4cad2;"><a href="https://trademate.cfd" style="color:#c4cad2;text-decoration:none;">Discover TradeMate</a></td></tr>
