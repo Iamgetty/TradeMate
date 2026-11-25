@@ -237,6 +237,8 @@ test('two real browser sessions exchange a PostgreSQL-backed B2B listing enquiry
     await buyer.goto('/market/' + fixture.b2bListingId);
     await expect(buyer.getByRole('heading', { name: fixture.b2bListingTitle })).toBeVisible({ timeout: 20_000 });
     await expect(buyer.getByText('1,250 available')).toBeVisible();
+    await expect(buyer.locator('#app')).not.toContainText('1–3 days');
+    await expect(buyer.locator('#app')).not.toContainText('Pixel Cats');
     await buyer.getByLabel('Your message').fill('Please confirm the delivery schedule for this B2B offer.');
     await buyer.getByRole('button', { name: 'Send enquiry' }).click();
     await expect(buyer.getByRole('status')).toContainText('Your enquiry has been sent');
@@ -288,6 +290,9 @@ test('two real browser sessions exchange a PostgreSQL-backed B2B listing enquiry
     expect(messagePayload.data.messages).toEqual(expect.arrayContaining([
       expect.objectContaining({ message: 'Please confirm the delivery schedule for this B2B offer.' }),
       expect.objectContaining({ message: 'The delivery schedule is five business days after the contract is agreed.' }),
+    ]));
+    expect(messagePayload.data.messages).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ message: 'Thanks for your message. I will get back to you shortly.' }),
     ]));
   } finally {
     await Promise.allSettled([buyerContext?.close(), sellerContext?.close()]);
