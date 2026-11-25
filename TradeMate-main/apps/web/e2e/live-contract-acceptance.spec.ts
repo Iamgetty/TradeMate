@@ -11,6 +11,15 @@ type Fixture = {
   b2bListingTitle: string;
 };
 
+async function waitForAppReady(page: Page) {
+  await expect(page.locator('#app .view')).toBeVisible({ timeout: 20_000 });
+  // The shell can appear before the app's delegated click handler is installed.
+  // Wait for a JS-rendered topbar control before interacting with the app.
+  await expect(page.locator('#app .top button[data-pg="profile"]')).toBeVisible({ timeout: 20_000 });
+  const session = await page.request.get('/api/auth/me');
+  expect(session.status(), 'the app must finish initializing with a validated browser session').toBe(200);
+}
+
 async function openAuthenticatedApp(browser: Browser, actor: Actor) {
   const context = await browser.newContext({ baseURL: 'http://127.0.0.1:3000' });
   await context.addCookies([{
@@ -22,9 +31,7 @@ async function openAuthenticatedApp(browser: Browser, actor: Actor) {
   }]);
   const page = await context.newPage();
   await page.goto('http://127.0.0.1:3000/app');
-  await expect(page.locator('#app .view')).toBeVisible({ timeout: 20_000 });
-  const session = await page.request.get('/api/auth/me');
-  expect(session.status(), 'the browser session must be validated by the real API').toBe(200);
+  await waitForAppReady(page);
   const payload = await session.json();
   expect(payload.user.email).toBe(actor.email);
   return { context, page };
@@ -101,20 +108,21 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
     await buyer.close();
     const cleanBuyerPage = await buyerContext.newPage();
     await cleanBuyerPage.goto('/app');
-    await expect(cleanBuyerPage.locator('#app .view')).toBeVisible();
+    await waitForAppReady(cleanBuyerPage);
     // Continue the assertions using the fresh authenticated page.
     buyer = cleanBuyerPage;
     await buyer.locator('#app .top button[data-pg="search"]').click();
     await expect(buyer.locator('#pg')).toContainText('Your recent searches will show up here.');
     await expect(buyer.locator('#pg')).not.toContainText('Web design');
     await buyer.goto('/app');
+    await waitForAppReady(buyer);
     await buyer.locator('#app .top button[data-pg="scan"]').click();
     await expect(buyer.locator('#pg')).toContainText('wallet connection and payment handoff are not available yet.');
     // A new page resets the feature-page overlay stack; route navigation alone does not.
     await buyer.close();
     buyer = await buyerContext.newPage();
     await buyer.goto('/app');
-    await expect(buyer.locator('#app .view')).toBeVisible();
+    await waitForAppReady(buyer);
     await buyer.locator('#app .top button[data-pg="profile"]').click();
     // The level control is the second pill in the profile hero; scope to the hero rather than relying on a styling wrapper.
     const profileHero = buyer.locator('#pg .pt-hero');
@@ -238,7 +246,7 @@ test('buyer creates a B2B contract proposal from the public listing and both par
     await expect(seller.getByText('Waiting for the other party')).toBeVisible();
 
     await buyer.goto('/app');
-    await expect(buyer.locator('#app .view')).toBeVisible();
+    await waitForAppReady(buyer);
     await openContract(buyer, contractTitle);
     await buyer.setViewportSize({ width: 390, height: 844 });
     await expectNoHorizontalOverflow(buyer, 'Clients newly proposed contract');
@@ -314,7 +322,7 @@ test('two real browser sessions exchange a PostgreSQL-backed B2B listing enquiry
     expect(sellerEnquiry, 'the seller must see the same persisted enquiry').toBeTruthy();
 
     await buyer.goto('/app');
-    await expect(buyer.locator('#app .view')).toBeVisible();
+    await waitForAppReady(buyer);
     await buyer.locator('#sbar [data-f="More"]').click();
     await buyer.getByRole('button', { name: 'Conversations', exact: true }).click();
     const buyerConversations = buyer.locator('#pg .pgs[data-id="conversations"]');
