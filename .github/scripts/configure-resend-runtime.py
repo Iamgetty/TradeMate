@@ -13,7 +13,7 @@ api_key = data.get("api_key", "")
 from_email = data.get("from_email", "")
 if not re.fullmatch(r"re_[A-Za-z0-9_-]+", api_key):
     raise SystemExit("RESEND_API_KEY is missing or has an invalid format; value not displayed.")
-if not re.fullmatch(r"[^\\s@<>]+@[^\\s@<>]+\\.[^\\s@<>]+", from_email):
+if not re.fullmatch(r"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+", from_email):
     raise SystemExit("RESEND_FROM_EMAIL is missing or invalid; value not displayed.")
 
 path = "/etc/trademate/api.env"
@@ -27,19 +27,19 @@ except FileNotFoundError:
 
 lines = [
     line for line in existing.splitlines()
-    if not re.match(r"^\\s*(?:RESEND_API_KEY|RESEND_FROM_EMAIL)\\s*=", line)
+    if not re.match(r"^\s*(?:RESEND_API_KEY|RESEND_FROM_EMAIL)\s*=", line)
 ]
 
 def systemd_quote(value):
-    if any(char in value for char in ("\\r", "\\n", "\\x00")):
+    if any(char in value for char in ("\r", "\n", "\x00")):
         raise SystemExit("Environment value contains an unsupported control character.")
-    return '"' + value.replace("\\\\", "\\\\\\\\").replace('"', '\\"') + '"'
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
-content = "\\n".join(lines).rstrip("\\n")
+content = "\n".join(lines).rstrip("\n")
 if content:
-    content += "\\n"
-content += "RESEND_API_KEY=" + systemd_quote(api_key) + "\\n"
-content += "RESEND_FROM_EMAIL=" + systemd_quote(from_email) + "\\n"
+    content += "\n"
+content += "RESEND_API_KEY=" + systemd_quote(api_key) + "\n"
+content += "RESEND_FROM_EMAIL=" + systemd_quote(from_email) + "\n"
 
 fd, temporary = tempfile.mkstemp(prefix=".api.env.", dir=directory)
 try:
@@ -72,7 +72,7 @@ if not pid.isdigit() or pid == "0":
 with open("/proc/" + pid + "/environ", "rb") as handle:
     entries = dict(
         item.split(b"=", 1)
-        for item in handle.read().split(b"\\x00")
+        for item in handle.read().split(b"\x00")
         if b"=" in item
     )
 if entries.get(b"RESEND_API_KEY", b"").decode() != api_key:
