@@ -4,52 +4,10 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - '.github/workflows/postgres-security-compatibility.yml'
-      - '.github/workflows/aws-staging-build-images.yml'
-      - '.github/workflows/aws-staging-migration-task.yml'
-      - '.github/workflows/aws-ec2-capacity-runtime-audit.yml'
-      - 'TradeMate-main/apps/api/database/**'
-      - 'TradeMate-main/apps/api/scripts/test-db-roles.js'
-      - 'TradeMate-main/apps/api/scripts/test-rls-pilot.js'
-      - 'TradeMate-main/apps/api/scripts/test-rls-runtime-login.js'
-      - 'TradeMate-main/apps/api/scripts/test-credential-write-operations.js'
-      - 'TradeMate-main/apps/api/scripts/test-credential-write-lockdown.js'
-      - 'TradeMate-main/apps/api/scripts/test-auth-lifecycle-operations.js'
-      - 'TradeMate-main/apps/api/scripts/test-rls-hmac-compatibility.js'
-      - 'TradeMate-main/apps/api/scripts/test-migration-hmac-key-immutability.js'
-      - 'TradeMate-main/apps/api/scripts/test-database-context.js'
-      - 'TradeMate-main/apps/api/src/database-context.ts'
-      - 'TradeMate-main/apps/api/src/environment.ts'
-      - 'TradeMate-main/apps/api/scripts/migrate.js'
-      - 'TradeMate-main/apps/api/src/module.ts'
-      - 'TradeMate-main/apps/api/package.json'
-      - 'TradeMate-main/apps/api/package-lock.json'
-      - 'TradeMate-main/docs/security/database-rls-trusted-context.md'
   push:
     branches:
       - main
-    paths:
-      - '.github/workflows/postgres-security-compatibility.yml'
-      - '.github/workflows/aws-staging-build-images.yml'
-      - '.github/workflows/aws-staging-migration-task.yml'
-      - '.github/workflows/aws-ec2-capacity-runtime-audit.yml'
-      - 'TradeMate-main/apps/api/database/**'
-      - 'TradeMate-main/apps/api/scripts/test-db-roles.js'
-      - 'TradeMate-main/apps/api/scripts/test-rls-pilot.js'
-      - 'TradeMate-main/apps/api/scripts/test-rls-runtime-login.js'
-      - 'TradeMate-main/apps/api/scripts/test-credential-write-operations.js'
-      - 'TradeMate-main/apps/api/scripts/test-credential-write-lockdown.js'
-      - 'TradeMate-main/apps/api/scripts/test-auth-lifecycle-operations.js'
-      - 'TradeMate-main/apps/api/scripts/test-rls-hmac-compatibility.js'
-      - 'TradeMate-main/apps/api/scripts/test-database-context.js'
-      - 'TradeMate-main/apps/api/src/database-context.ts'
-      - 'TradeMate-main/apps/api/src/environment.ts'
-      - 'TradeMate-main/apps/api/scripts/migrate.js'
-      - 'TradeMate-main/apps/api/src/module.ts'
-      - 'TradeMate-main/apps/api/package.json'
-      - 'TradeMate-main/apps/api/package-lock.json'
-      - 'TradeMate-main/docs/security/database-rls-trusted-context.md'
+  workflow_dispatch:
 
 permissions:
   contents: read
