@@ -101,6 +101,8 @@ const tokenDigest = (token: string) => createHash('sha256').update(token).digest
 const sendTransactionalEmail = async (to: string, subject: string, html: string) => {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
+  const senderAddress = from?.match(/<([^<>]+)>/)?.[1] ?? from;
+  const brandedFrom = senderAddress ? `TradeMate <${senderAddress}>` : from;
   if (!apiKey || !from) {
     console.warn('[email] Resend is not configured; transactional email was not sent.');
     return false;
@@ -109,7 +111,7 @@ const sendTransactionalEmail = async (to: string, subject: string, html: string)
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to: [to], subject, html: renderTradeMateEmail(subject, html) }),
+      body: JSON.stringify({ from: brandedFrom, to: [to], subject, html: renderTradeMateEmail(subject, html) }),
     });
     if (!response.ok) {
       console.error('[email] Resend delivery failed:', response.status, (await response.text()).slice(0, 500));
