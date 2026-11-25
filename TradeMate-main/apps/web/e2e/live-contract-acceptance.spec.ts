@@ -89,6 +89,11 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
     const buyerSession = await openAuthenticatedApp(browser, fixture.buyer);
     buyerContext = buyerSession.context;
     const buyer = buyerSession.page;
+    await buyer.locator('#app .top button[data-pg="profile"]').click();
+    await buyer.locator('#pg [data-pg="kycinfo"]').click();
+    await expect(buyer.locator('#pg')).toContainText('No verification request has been submitted.');
+    await expect(buyer.locator('#pg')).not.toContainText('Verification submitted');
+    await buyer.goto('/market/' + fixture.b2bListingId);
     const buyerContractsResponse = await buyer.request.get('/api/market/contracts/mine');
     expect(buyerContractsResponse.status(), 'buyer contract list API must be available').toBe(200);
     const buyerContractsPayload = await buyerContractsResponse.json();
