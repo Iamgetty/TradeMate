@@ -32,9 +32,9 @@ It reads ticks from the local logged-in MT5 terminal and refreshes `%USERPROFILE
 
 The staging endpoint is `https://feed.trademate.cfd/mt5/quotes`. Remote upload remains disabled unless both `TRADEMATE_MT5_ENDPOINT` and `MT5_INGEST_TOKEN` are set.
 
-**Do not enable upload until the staging feed runtime has the matching `MT5_INGEST_TOKEN` configured and tested.** The token is stored in AWS Systems Manager Parameter Store as the SecureString `/trademate/staging/MT5_INGEST_TOKEN`. Do not put it in `symbols.json`, source control, chat, screenshots, or logs. Retrieve it only from an AWS-authenticated account with approved access, and never paste it into a terminal command that is saved in history.
+**Do not enable upload until the staging feed runtime has the matching `MT5_INGEST_TOKEN` configured and tested.** **Current blocker:** `/trademate/staging/MT5_INGEST_TOKEN` has not been created, and the exchange-feed service is not configured to read it. Do not attempt remote upload yet. Do not put tokens in `symbols.json`, source control, chat, screenshots, or logs.
 
-When the backend runtime is confirmed configured, set the local session variables and run:
+When the backend runtime and secret are explicitly configured, set the local session variables and run:
 
 ```powershell
 $env:TRADEMATE_MT5_ENDPOINT = "https://feed.trademate.cfd"
