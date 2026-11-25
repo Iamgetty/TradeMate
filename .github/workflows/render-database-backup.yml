@@ -1,98 +1,87 @@
-name: Backup Render PostgreSQL (backup only)
+name: Encrypted Render PostgreSQL backup to private GitHub repository
 
 on:
   workflow_dispatch:
     inputs:
       confirm_backup:
-        description: "Type BACKUP to create a private local backup on the existing EC2 runner"
+        description: "Type BACKUP to run a read-only pg_dump"
         required: true
         type: string
+      backup_repo:
+        description: "Private backup repository (owner/name)"
+        required: true
+        type: string
+        default: "Iamgetty/TradeMate-db-backups"
 
 permissions:
   contents: read
 
+concurrency:
+  group: trademate-render-db-encrypted-backup
+  cancel-in-progress: false
+
 jobs:
-  backup-render-db:
-    name: Create and verify private Render database backup
+  backup:
+    name: Dump, encrypt, and push Render DB backup
     if: ${{ inputs.confirm_backup == 'BACKUP' }}
     runs-on: [self-hosted, Linux, X64, aws-staging]
-    timeout-minutes: 20
+    timeout-minutes: 45
     env:
       RENDER_DATABASE_URL: ${{ secrets.RENDER_DATABASE_URL }}
+      AGE_RECIPIENT: ${{ secrets.AGE_RECIPIENT }}
+      BACKUP_REPO_TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
+      BACKUP_REPO: ${{ inputs.backup_repo }}
     steps:
-      - name: Validate tools, source access, and local storage
+      - name: Create encrypted dump and push only ciphertext to private repository
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "${RENDER_DATABASE_URL:-}" ]]; then
-            echo "::error::RENDER_DATABASE_URL is missing."
-            exit 1
-          fi
-          command -v pg_dump >/dev/null || { echo "::error::pg_dump is not installed on this runner. No backup was created."; exit 1; }
-          command -v pg_restore >/dev/null || { echo "::error::pg_restore is not installed on this runner. No backup was created."; exit 1; }
-          dump_major="$(pg_dump --version | grep -oE '[0-9]+' | head -1)"
-          restore_major="$(pg_restore --version | grep -oE '[0-9]+' | head -1)"
-          if [[ "$dump_major" -lt 18 || "$restore_major" -lt 18 ]]; then
-            echo "::error::PostgreSQL 18 client tools are required for this PostgreSQL 18 source. No backup was created."
-            exit 1
-          fi
-          free_kb="$(df -Pk "$HOME" | awk 'NR==2 {print $4}')"
-          if [[ "$free_kb" -lt 1048576 ]]; then
-            echo "::error::Less than 1 GiB free in runner home. No backup was created."
-            exit 1
-          fi
-          echo "PostgreSQL client tools: OK (pg_dump $dump_major)"
-          echo "Available local storage: at least 1 GiB"
-          echo "Backup destination: private directory under runner home"
-          echo "No database changes will be made."
-
-      - name: Create private custom-format backup and verify archive
-        shell: bash
-        run: |
-          set -euo pipefail
+          set +x
           umask 077
-          backup_dir="$HOME/trademate-backups"
-          mkdir -p "$backup_dir"
-          chmod 700 "$backup_dir"
-          timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
-          backup_file="$backup_dir/render-trademate-$timestamp.dump"
-          partial_file="$backup_file.partial"
-          trap 'rm -f "$partial_file"' EXIT
-          pg_dump --no-password --dbname="$RENDER_DATABASE_URL" --format=custom --compress=6 --no-owner --no-acl --file="$partial_file"
-          test -s "$partial_file"
-          pg_restore --list "$partial_file" >/dev/null
-          mv "$partial_file" "$backup_file"
-          chmod 600 "$backup_file"
-          sha256sum "$backup_file" > "$backup_file.sha256"
-          chmod 600 "$backup_file.sha256"
-          bytes="$(stat -c '%s' "$backup_file")"
-          checksum="$(cut -d ' ' -f1 "$backup_file.sha256")"
-          echo "Backup: SUCCESS"
-          echo "Archive verification: SUCCESS (pg_restore --list)"
-          echo "Backup size: $bytes bytes"
-          echo "SHA-256: $checksum"
-          echo "Private backup location: $backup_file"
-          echo "Database changes: NONE (pg_dump only)"
+          [[ -n "$RENDER_DATABASE_URL" ]] || { echo "::error::Missing RENDER_DATABASE_URL"; exit 1; }
+          [[ -n "$AGE_RECIPIENT" ]] || { echo "::error::Missing AGE_RECIPIENT"; exit 1; }
+          [[ "$AGE_RECIPIENT" == age1* ]] || { echo "::error::AGE_RECIPIENT must be an age public recipient"; exit 1; }
+          [[ -n "$BACKUP_REPO_TOKEN" ]] || { echo "::error::Missing BACKUP_REPO_TOKEN"; exit 1; }
+          [[ "$BACKUP_REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo "::error::Invalid private repo owner/name"; exit 1; }
+          command -v pg_dump >/dev/null
+          command -v pg_restore >/dev/null
+          command -v git >/dev/null
+          if ! command -v age >/dev/null; then sudo dnf install -y age; fi
+          pg_dump --version
+          age --version
+          W="$(mktemp -d "${RUNNER_TEMP:-/tmp}/tm-render-backup.XXXXXX")"
+          trap 'rm -rf "$W"' EXIT
+          plain="$W/render-trademate.dump"
+          encrypted="$W/render-trademate.dump.age"
+          pg_dump --no-password --dbname="$RENDER_DATABASE_URL" --format=custom --compress=6 --no-owner --no-acl --file="$plain"
+          test -s "$plain"
+          pg_restore --list "$plain" >/dev/null
+          age -r "$AGE_RECIPIENT" -o "$encrypted" "$plain"
+          test -s "$encrypted"
+          head -c 20 "$encrypted" | grep -q 'age-encryption.org/v1'
+          sha256sum "$encrypted" > "$encrypted.sha256"
+          echo "Validated dump and ciphertext created."
+          echo "Encrypted size: $(stat -c '%s' "$encrypted") bytes"
+          echo "Ciphertext SHA-256: $(cut -d ' ' -f1 "$encrypted.sha256")"
+          rm -f "$plain"
           unset RENDER_DATABASE_URL
-
-      - name: Confirm backup files and permissions
-        id: verify
-        shell: bash
-        run: |
-          set -euo pipefail
-          latest="$(find "$HOME/trademate-backups" -maxdepth 1 -type f -name 'render-trademate-*.dump' -printf '%T@ %p\n' | sort -nr | head -1 | cut -d ' ' -f2-)"
-          test -n "$latest"
-          test -s "$latest"
-          test -s "$latest.sha256"
-          (cd "$(dirname "$latest")" && sha256sum -c "$(basename "$latest").sha256")
-          stat -c 'File permissions: %a; owner: %U; size: %s bytes' "$latest"
-          echo "backup_file=$latest" >> "$GITHUB_OUTPUT"
-          echo "Backup verified on the existing EC2 runner."
-
-      - name: Publish short-lived private workflow artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: trademate-render-db-backup
-          path: ${{ steps.verify.outputs.backup_file }}*
-          if-no-files-found: error
-          retention-days: 7
+          # Git uses askpass; token is not placed in the clone URL or command args.
+          cat > "$W/askpass.sh" <<'ASKPASS'
+          #!/bin/sh
+          case "$1" in
+            *Username*) printf '%s\n' 'x-access-token' ;;
+            *) printf '%s\n' "$BACKUP_REPO_TOKEN" ;;
+          esac
+          ASKPASS
+          chmod 700 "$W/askpass.sh"
+          GIT_ASKPASS="$W/askpass.sh" GIT_TERMINAL_PROMPT=0 git clone --quiet "https://github.com/$BACKUP_REPO.git" "$W/repo"
+          cd "$W/repo"
+          mkdir -p backups/render
+          timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          cp "$encrypted" "backups/render/render-trademate-$timestamp.dump.age"
+          cp "$encrypted.sha256" "backups/render/render-trademate-$timestamp.dump.age.sha256"
+          git add backups/render/
+          git -c user.name='TradeMate Backup Bot' -c user.email='backup-bot@users.noreply.github.com' commit -m "backup: encrypted Render PostgreSQL $timestamp"
+          GIT_ASKPASS="$W/askpass.sh" GIT_TERMINAL_PROMPT=0 git push --quiet origin HEAD
+          echo "Ciphertext stored in private repository: $BACKUP_REPO"
+          echo "Plaintext dump was deleted locally; no GitHub Actions artifact was uploaded."
