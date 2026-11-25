@@ -144,6 +144,19 @@ The concern that a feed post was not linked to its user was checked against the 
 
 The API's left join and fallback display label can mask missing display-name values in other records, so keep the orphan/null audit as a regression check. The current target row is linked correctly.
 
+## Data migration and Render retirement guard
+
+The current source/target database comparison from the migration checks shows:
+- Core records matched at the last comparison: users 2/2, credentials 2/2, organizations 2/2, organization members 2/2, listings 2/2, feed posts 1/1, feed attachments 1/1, comments 1/1, reactions 2/2 and follows 1/1.
+- Activity rows differ: audit events Render 65 vs AWS 77; notifications 18 vs AWS 24; sessions 55 vs AWS 58. These extra target rows may be post-import activity, but have not been reconciled event-by-event.
+- The runtime AWS DB role cannot SELECT `schema_migrations`, so migration-history parity was not independently checked with that role.
+- An AWS manual snapshot exists for the AWS target; it is **not** a backup of the Render source.
+- The private backup repository `Iamgetty/TradeMate-db-backups` exists but the encrypted Render source dump has not been created/uploaded and verified.
+- Render source database `trademate-db` is currently `available` and `not_suspended`, with expiry `2026-11-25T21:52:06.818364Z` (21:52 UTC today).
+- Render services `exchange-feed`, `trademate-api` and `trademate-web` remain in the workspace and are not suspended. The exchange-feed is actively used by the deployed app. Render API database health returned 200 during the check; direct Render API and web root requests timed out during the same check.
+
+**Retirement decision:** do not delete/suspend Render resources or claim the migration fully signed off until the encrypted source backup is verified, activity differences are explained, migration history is checked, and the market feed is switched to AWS with FX parity.
+
 ## Cloudflare routing and release target
 
 Read-only Cloudflare account inspection found:
