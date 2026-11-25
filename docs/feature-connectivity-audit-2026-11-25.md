@@ -85,7 +85,20 @@ The current API includes controllers for:
 - Sports-transfer profiles, mandates and opportunities.
 - Market quote route.
 
-The frontend directly calls 75 distinct literal API paths. The presence of a route is not proof that a visible button reaches it or that the deployed workflow passes a two-account test. In particular, sports-transfer API routes exist but were not established as fully surfaced/accepted UI journeys in this pass.
+The legacy `apps/web/public/tm/app.js` contains 75 distinct literal API path strings; separate Next.js pages and helper scripts call additional paths such as `/api/market/activity`, `/api/market/highlights` and the NFT routes. The presence of a route is not proof that a visible button reaches it or that the deployed workflow passes a two-account test. In particular, sports-transfer API routes exist but were not established as fully surfaced/accepted UI journeys in this pass.
+
+## Next.js application pages — separate from the legacy `/app` runtime
+
+The Next.js pages were checked separately because they coexist with the large legacy app runtime:
+- `/` and `/terminal` redirect to the canonical `/app` surface.
+- `/auth` calls the server for register/login, email verification/resend and 2FA challenge verification.
+- `/account` loads the authenticated user and organization, updates the display name and calls the real logout endpoint.
+- `/business` creates an organization through the API.
+- `/market/[id]` loads listing details and sends enquiry/contract proposals through the API.
+- `/messages` and `/messages/[id]` load and reply to server-backed enquiries.
+- `/offers/new` creates a persistent draft; `/offers` loads, edits and deletes drafts. **These standalone Next.js offers pages do not expose the existing submit-for-review endpoint**, so users entering through this route cannot advance a draft to moderation from that page. The legacy `/app` wizard has a separate submit-for-review path.
+- `/nfts` calls the OpenSea proxy but is currently blocked by the missing server-side API key and correctly displays a provider-not-connected state.
+- The standalone Portfolio Manager is in the legacy runtime; its synthetic figures are covered above.
 
 ## Render dependency still present in the deployed market UI
 
