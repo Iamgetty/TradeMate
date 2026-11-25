@@ -27,7 +27,7 @@ Workflow file: `.github/workflows/render-database-backup.yml`
 - Runs on the existing self-hosted `aws-staging` runner.
 - Uses `pg_dump` custom format and validates the plaintext archive with `pg_restore --list` before encryption.
 - Encrypts with age using the public recipient key.
-- Pushes ciphertext and checksum to the private backup repository using a scoped token.
+- Uploads 900 MB ciphertext chunks and a checksum manifest to private Release assets (keeps large backups out of Git history).
 - Removes the temporary plaintext dump and uploads no Actions artifact.
 - It is **not run yet**; required private repo and secrets are not configured/verified.
 
@@ -40,7 +40,7 @@ Workflow file: `.github/workflows/render-database-backup.yml`
    - `AGE_RECIPIENT`: public age recipient (starts `age1`)
    - `BACKUP_REPO_TOKEN`: fine-grained token scoped only to the private backup repo, Contents read/write
 4. Open Actions → **Encrypted Render PostgreSQL backup to private GitHub repository** → Run workflow. Enter `BACKUP`, leave repository default `Iamgetty/TradeMate-db-backups`, and run.
-5. Confirm the encrypted file and checksum exist in the private backup repo. Keep the private age key offline for restore.
+5. Confirm the private Release contains numbered encrypted chunks and a `SHA256SUMS` asset. Keep the private age key offline for restore. Download all chunks, run `sha256sum -c SHA256SUMS`, reassemble in numeric order with `cat chunk-* > backup.dump.age`, then decrypt.
 6. Restore-test by decrypting and restoring into an isolated database; record table counts and migrations. A dump's listing check is not a full restore test.
 
 ## Recovery steps
