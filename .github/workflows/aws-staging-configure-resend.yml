@@ -1,0 +1,72 @@
+name: AWS Staging Configure Resend Runtime
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/triggers/configure-resend
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trademate-aws-staging-resend-runtime
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    name: Configure Resend on the staging API
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+      - aws-staging
+    timeout-minutes: 10
+    env:
+      RESEND_API_KEY: \${{ secrets.RESEND_API_KEY }}
+      RESEND_FROM_EMAIL: \${{ secrets.RESEND_FROM_EMAIL }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate runner, secrets, and systemd configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+
+          if [[ -z "\${RESEND_API_KEY:-}" || -z "\${RESEND_FROM_EMAIL:-}" ]]; then
+            echo "::error::Both RESEND_API_KEY and RESEND_FROM_EMAIL repository secrets are required."
+            exit 1
+          fi
+          if [[ ! "$RESEND_API_KEY" =~ ^re_[A-Za-z0-9_-]+$ ]]; then
+            echo "::error::RESEND_API_KEY has an invalid format; its value was not displayed."
+            exit 1
+          fi
+          if [[ ! "$RESEND_FROM_EMAIL" =~ ^[^[:space:]@<>]+@[^[:space:]@<>]+\.[^[:space:]@<>]+$ ]]; then
+            echo "::error::RESEND_FROM_EMAIL must be a plain email address."
+            exit 1
+          fi
+          sudo -n true
+          env_files="$(sudo -n systemctl show trademate-api.service --property=EnvironmentFiles --value)"
+          if [[ "$env_files" != *"/etc/trademate/api.env"* ]]; then
+            echo "::error::trademate-api.service is not configured to load /etc/trademate/api.env; refusing to modify the host."
+            exit 1
+          fi
+
+      - name: Install settings and verify the live API process
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          python3 - <<'PY' | sudo -n python3 .github/scripts/configure-resend-runtime.py
+          import json
+          import os
+          import sys
+          json.dump({
+              "api_key": os.environ["RESEND_API_KEY"],
+              "from_email": os.environ["RESEND_FROM_EMAIL"],
+          }, sys.stdout)
+          PY
