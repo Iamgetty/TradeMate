@@ -258,7 +258,7 @@ test('two real browser sessions exchange a PostgreSQL-backed B2B listing enquiry
     await seller.getByRole('button', { name: 'Conversations', exact: true }).click();
     const sellerConversations = seller.locator('#pg .pgs[data-id="conversations"]');
     await expect(sellerConversations).toContainText(fixture.b2bListingTitle, { timeout: 15_000 });
-    await sellerConversations.locator('.cv-row').filter({ hasText: fixture.b2bListingTitle }).click();
+    await sellerConversations.locator('.cv-row[data-arg="' + buyerEnquiry.id + '"]').click();
     await expect(seller.locator('#dm')).toBeVisible();
     await expect(seller.getByText('Please confirm the delivery schedule for this B2B offer.')).toBeVisible();
     await seller.locator('#dm').fill('The delivery schedule is five business days after the contract is agreed.');
@@ -279,7 +279,7 @@ test('two real browser sessions exchange a PostgreSQL-backed B2B listing enquiry
     await buyer.getByRole('button', { name: 'Conversations', exact: true }).click();
     const buyerConversations = buyer.locator('#pg .pgs[data-id="conversations"]');
     await expect(buyerConversations).toContainText(fixture.b2bListingTitle, { timeout: 15_000 });
-    await buyerConversations.locator('.cv-row').filter({ hasText: fixture.b2bListingTitle }).click();
+    await buyerConversations.locator('.cv-row[data-arg="' + buyerEnquiry.id + '"]').click();
     await expect(buyer.getByText('The delivery schedule is five business days after the contract is agreed.')).toBeVisible();
 
     const durableMessages = await buyer.request.get('/api/market/enquiries/' + buyerEnquiry.id + '/messages');
