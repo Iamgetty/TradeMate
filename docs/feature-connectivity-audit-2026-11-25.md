@@ -112,13 +112,13 @@ Note: `/health` at the API domain root (without `/api`) returns 404 by design be
 
 1. Fix CR-01 sign out before treating auth/session lifecycle as complete.
 2. Remove or clearly label the Portfolio Manager synthetic valuation, balances, activity counts and sample documents.
-3. Replace fake success states for waitlist, advertising, promotions, affiliate and newsletter with honest disabled states until their backend workflows exist.
-4. Keep KYC, deposits, transfers, wallet and card disabled until their real providers/services exist.
-5. Configure FX and MT5 only with valid provider/broker credentials and authorization; validate quote freshness, reconnect and stale-data handling.
-6. Execute two-account browser acceptance for authentication, profile, feed/media, notifications, support, organization, listings, enquiries, contracts and P2P, including refresh/re-entry, permission boundaries, retries and cross-account isolation.
-7. Exercise every `data-act`, `data-pc`, `data-pg`, `data-f`, navigation tab and dynamic form control in the deployed app; verify each either has a persistent service action or is explicitly labeled local/preview/disabled.
-8. Verify NFT/OpenSea provider credentials and timeouts; validate market quote symbols, freshness and stale-state behaviour. Do not infer a working Forex feed from crypto exchange-feed health.
-9. Add automated regression checks for missing/orphaned feed authors and for UI handlers that display success without a persisted API response.
+2. Replace fake success states for waitlist, advertising, promotions, affiliate and newsletter with honest disabled states until their backend workflows exist.
+3. Keep KYC, deposits, transfers, wallet and card disabled until their real providers/services exist.
+4. Configure FX and MT5 only with valid provider/broker credentials and authorization; validate quote freshness, reconnect and stale-data handling.
+5. Execute two-account browser acceptance for authentication, profile, feed/media, notifications, support, organization, listings, enquiries, contracts and P2P, including refresh/re-entry, permission boundaries, retries and cross-account isolation.
+6. Exercise every `data-act`, `data-pc`, `data-pg`, `data-f`, navigation tab and dynamic form control in the deployed app; verify each either has a persistent service action or is explicitly labeled local/preview/disabled.
+7. Verify NFT/OpenSea provider credentials and timeouts; validate market quote symbols, freshness and stale-state behaviour. Do not infer a working Forex feed from crypto exchange-feed health.
+8. Add automated regression checks for missing/orphaned feed authors and for UI handlers that display success without a persisted API response.
 
 ## Release guardrails
 
