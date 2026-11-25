@@ -8,7 +8,8 @@ export default defineConfig({
   workers: process.env.CI ? 2 : undefined,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: 'list',
+  // On CI, also emit GitHub annotations so each failing assertion is visible on the run page.
+  reporter: process.env.CI ? [['list'], ['github']] : 'list',
   timeout: 30_000,
   expect: { timeout: 10_000 },
   use: {
