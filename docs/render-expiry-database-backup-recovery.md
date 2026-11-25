@@ -33,14 +33,14 @@ Workflow file: `.github/workflows/render-database-backup.yml`
 
 ## Required user-side setup (only remaining action for GitHub backup)
 
-1. Create a new GitHub repository `TradeMate-db-backups` and make sure **Private** is selected.
+1. Create a new GitHub repository `TradeMate-db-backups`, select **Private**, and initialize it with a README so it has a default branch for Releases.
 2. On a trusted local machine, install age and generate a key: `age-keygen -o trademate-backup-age.key`. Keep the private key file offline and never upload it.
 3. Add three Actions secrets in the **public TradeMate source repository**:
    - `RENDER_DATABASE_URL`: Render source DB connection string
    - `AGE_RECIPIENT`: public age recipient (starts `age1`)
    - `BACKUP_REPO_TOKEN`: fine-grained token scoped only to the private backup repo, Contents read/write
 4. Open Actions → **Encrypted Render PostgreSQL backup to private GitHub repository** → Run workflow. Enter `BACKUP`, leave repository default `Iamgetty/TradeMate-db-backups`, and run.
-5. Confirm the private Release contains numbered encrypted chunks and a `SHA256SUMS` asset. Keep the private age key offline for restore. Download all chunks, run `sha256sum -c SHA256SUMS`, reassemble in numeric order with `cat chunk-* > backup.dump.age`, then decrypt.
+5. Confirm the private Release contains numbered encrypted chunks and a `SHA256SUMS` asset. Keep the private age key offline for restore. Download the chunks and checksum manifest into one folder, run `sha256sum -c SHA256SUMS`, reassemble in numeric order with `cat chunk-* > backup.dump.age`, then decrypt with `age -d -i trademate-backup-age.key backup.dump.age > backup.dump`.
 6. Restore-test by decrypting and restoring into an isolated database; record table counts and migrations. A dump's listing check is not a full restore test.
 
 ## Recovery steps
