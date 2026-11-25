@@ -46,11 +46,11 @@ mkdir -p "$DROPIN_DIR" "$BACKUPS"
 
 if [[ -f "$DROPIN" ]]; then
   cp -a "$DROPIN" "$BACKUP"
-  printf 'present\\n' > "$BACKUP.state"
+  printf 'present\n' > "$BACKUP.state"
 else
-  printf 'absent\\n' > "$BACKUP.state"
+  printf 'absent\n' > "$BACKUP.state"
 fi
-printf '%s\\n' "$PREVIOUS_DIR" > "$BACKUP.working-directory"
+printf '%s\n' "$PREVIOUS_DIR" > "$BACKUP.working-directory"
 
 restore_previous() {
   if [[ "$(cat "$BACKUP.state")" == "present" ]]; then
@@ -63,7 +63,7 @@ restore_previous() {
 }
 
 TMP="$DROPIN.tmp.$$"
-printf '[Service]\\nWorkingDirectory=%s\\n' "$APP_DIR" > "$TMP"
+printf '[Service]\nWorkingDirectory=%s\n' "$APP_DIR" > "$TMP"
 chown root:root "$TMP"
 chmod 0644 "$TMP"
 mv -f "$TMP" "$DROPIN"
@@ -81,7 +81,7 @@ for attempt in $(seq 1 30); do
     if grep -q '"status":"ok"' <<<"$BODY" && grep -q '"service":"trademate-api"' <<<"$BODY"; then
       CURRENT="$(systemctl show "$SERVICE" -p WorkingDirectory --value)"
       if [[ "$CURRENT" == "$APP_DIR" ]]; then
-        printf '%s\\n' "$SHA" > /opt/trademate/api/current-release
+        printf '%s\n' "$SHA" > /opt/trademate/api/current-release
         chown root:root /opt/trademate/api/current-release
         chmod 0644 /opt/trademate/api/current-release
         echo "API release $SHA promoted successfully."
