@@ -71,7 +71,7 @@ jobs:
           split -b 900m --numeric-suffixes=1 --suffix-length=3 "$encrypted" "$W/chunk-"
           (cd "$W" && sha256sum chunk-* > SHA256SUMS)
           auth_config="$W/curl-auth.conf"
-          printf 'header = "Authorization: Bearer %s"\\n' "$BACKUP_REPO_TOKEN" > "$auth_config"
+          printf 'header = "Authorization: Bearer %s"\n' "$BACKUP_REPO_TOKEN" > "$auth_config"
           chmod 600 "$auth_config"
           release_payload="$W/release.json"
           python3 - "$tag" > "$release_payload" <<'PY'
