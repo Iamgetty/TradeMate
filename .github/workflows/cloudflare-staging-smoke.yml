@@ -32,7 +32,7 @@ jobs:
             local label="$3"
             local status=""
             for attempt in $(seq 1 24); do
-              status="$(curl --silent --show-error --output "$output" --write-out '%{http_code}' --max-time 20 "$url" || true)"
+              status="$(curl --silent --show-error --location --output "$output" --write-out '%{http_code}' --max-time 20 "$url" || true)"
               if [[ "$status" == "200" ]]; then
                 echo "$label returned HTTP 200"
                 return 0
