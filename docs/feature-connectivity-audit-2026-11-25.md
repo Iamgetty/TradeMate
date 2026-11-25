@@ -137,8 +137,10 @@ The concern that a feed post was not linked to its user was checked against the 
 - The only current AWS feed post has a non-null `author_user_id`.
 - That ID resolves to an existing user row; display name is `Deukleinz`.
 - Aggregate check: 1 post, 0 null author IDs, 0 orphaned author IDs.
-- The public feed API returns that post successfully.
-- No UPDATE/repair was performed because the ownership relationship is already valid.
+- The public feed API returns that post with `author_name: Deukleinz` and a non-empty `author_user_id`.
+- The feed card renders the author as a `data-tl-user-id` control; its click handler calls `tlOpen(name, userId)`, then `GET /api/profiles/:id` when signed in. The profile lookup is session-protected (an unauthenticated direct request correctly returns 401).
+- The matching `user_profiles` row and username also exist in the Render source database. The AWS target's post-to-`users` relation and author name are verified; the target profile-row query could not be completed in this pass.
+- No UPDATE/repair was performed because the feed post is already linked to its user in both the source and target databases. There is no missing author ID to reconnect.
 
 The API's left join and fallback display label can mask missing display-name values in other records, so keep the orphan/null audit as a regression check. The current target row is linked correctly.
 
