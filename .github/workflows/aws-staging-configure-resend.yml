@@ -25,8 +25,8 @@ jobs:
       - aws-staging
     timeout-minutes: 10
     env:
-      RESEND_API_KEY: \${{ secrets.RESEND_API_KEY }}
-      RESEND_FROM_EMAIL: \${{ secrets.RESEND_FROM_EMAIL }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -37,7 +37,7 @@ jobs:
           set -euo pipefail
           set +x
 
-          if [[ -z "\${RESEND_API_KEY:-}" || -z "\${RESEND_FROM_EMAIL:-}" ]]; then
+          if [[ -z "${RESEND_API_KEY:-}" || -z "${RESEND_FROM_EMAIL:-}" ]]; then
             echo "::error::Both RESEND_API_KEY and RESEND_FROM_EMAIL repository secrets are required."
             exit 1
           fi
