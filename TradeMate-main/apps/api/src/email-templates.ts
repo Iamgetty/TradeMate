@@ -77,7 +77,7 @@ export const renderTradeMateEmail = (subject: string, content: string) => {
         <tr><td class="email-brand" style="padding:0 10px 22px;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0">
             <tr>
-              <td valign="middle"><img class="email-logo" src="https://trademate-web.onrender.com/tm/img/logo.png" width="46" height="46" alt="" style="display:block;width:46px;height:46px;object-fit:contain;"></td>
+              <td valign="middle"><img class="email-logo" src="https://trademate.cfd/tm/img/logo.png" width="46" height="46" alt="TradeMate" style="display:block;width:46px;height:46px;object-fit:contain;"></td>
               <td valign="middle" style="padding-left:10px;font-family:Manrope,Arial,Helvetica,sans-serif;font-size:25px;line-height:30px;font-weight:800;letter-spacing:-1.1px;color:#20242a;">trademate</td>
             </tr>
           </table>
