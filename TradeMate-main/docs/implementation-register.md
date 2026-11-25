@@ -1,6 +1,6 @@
 # TradeMate implementation register
 
-**Canonical cross-stack status ledger.** Updated: 2026-11-25 after live source/runtime, database, Cloudflare, Render, market-feed and feature-connectivity review. Current documentation audit head: `55ad1dafdcdac0ab33c9c1bfee9642e839035ea0`.  
+**Canonical cross-stack status ledger.** Updated: 2026-11-25 after live source/runtime, database, Cloudflare, Render, market-feed and feature-connectivity review. Current documentation audit head: `7c320b2e4c20c09b74660217222963dd505b2913`.  
 **Branch baseline:** `main` (deployed web runtime `app.js` byte-for-byte matches the current `main` source file; API and feed runtime acceptance is recorded separately below).  
 **Rule:** no domain is complete merely because its first component exists. Repository implementation, CI verification, staging validation and production acceptance are tracked separately.
 
@@ -55,10 +55,12 @@ Detailed feature-by-feature evidence, including all local-only controls, missing
 
 ### Latest CI evidence
 
-- Run [45613082656](https://github.com/Iamgetty/TradeMate/actions/runs/45613082656): API TypeScript build/security validation, web build/runtime syntax, container builds, exchange-feed/MT5 tests, Cloudflare Worker build and database migration integration passed. The browser app-shell/live API acceptance job and secret-scanning step were cancelled, so this is **not** a full CI pass.
-- Run [45613082650](https://github.com/Iamgetty/TradeMate/actions/runs/45613082650): PostgreSQL 16 and 18 role/RLS compatibility jobs passed.
-- Newest runs for current docs head `55ad1daf`: TradeMate CI was queued and PostgreSQL security compatibility was in progress at last poll. Deployment and Cloudflare smoke workflows were skipped because the commits changed documentation only.
-- A successful isolated test does not prove production user journeys. Browser acceptance, provider credentials, data reconciliation and live collector setup remain separate gates.
+- Full TradeMate CI run [45614916329](https://github.com/Iamgetty/TradeMate/actions/runs/45614916329) completed **8/8 jobs successfully** on audit head `626bee385b9665e71ba2498dbc3e87f3b58f0a8f`: API TypeScript build/security validation, web build/runtime, exchange-feed/MT5 tests, database migration integration, AWS container builds, Cloudflare Worker build/runtime, SAST/SCA/secret scanning, and mocked plus live two-account browser acceptance.
+- PostgreSQL 16/18 security compatibility run [45614916251](https://github.com/Iamgetty/TradeMate/actions/runs/45614916251) passed.
+- AWS API staging deployment [45614751061](https://github.com/Iamgetty/TradeMate/actions/runs/45614751061) and Cloudflare staging smoke [45614750716](https://github.com/Iamgetty/TradeMate/actions/runs/45614750716) succeeded on the audited source.
+- Live source comparison confirms the deployed web `app.js`, API `module.ts`/`main.ts`, and exchange-feed `server.js` match current `main`. The branded domain is still attached to the staging Worker; production promotion is not implied.
+- These checks verify builds and selected test journeys, not every UI control or provider. Local-only features, missing OpenSea credentials, Render market-feed dependency, FX/MT5 gaps, data reconciliation and backup requirements remain as recorded in the feature audit.
+
 
 ## Current engineering increment (CI verified; production acceptance not implied)
 
