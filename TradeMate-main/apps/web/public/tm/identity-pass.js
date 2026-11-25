@@ -22,7 +22,6 @@
 @container (min-width:760px){.idp-grid,.idp-ucg{grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:24px;align-items:start}}
 .idp-c3{perspective:1200px;width:100%;max-width:440px;margin:0 auto;aspect-ratio:1.45}
 .idp-ci{position:relative;width:100%;height:100%}
-
 .idp-cf,.idp-cb{position:absolute;inset:0;border-radius:26px;overflow:hidden;color:var(--txt);padding:20px 18px 14px;border:1px solid color-mix(in srgb,var(--am) 38%,var(--line));background:linear-gradient(145deg,var(--s2),var(--s1));box-shadow:0 24px 60px color-mix(in srgb,var(--am) 14%,transparent),0 10px 30px rgba(0,0,0,.16);box-sizing:border-box}
 .idp-cb{display:none}
 .idp-c3.flip .idp-cf{display:none}.idp-c3.flip .idp-cb{display:block}
@@ -34,7 +33,7 @@
 .idp-gl{height:34px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--s2);color:var(--txt);font:700 12.5px 'Hanken Grotesk',sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:6px;position:relative;z-index:1}
 .idp-id{display:flex;gap:14px;align-items:center;margin-top:14px;position:relative;z-index:1}
 .idp-pav{width:76px;height:76px;border-radius:22px;border:0;padding:0;flex:none;overflow:hidden;cursor:pointer;outline:2px solid var(--am);outline-offset:3px;background:none;display:block}
-.idp-pav .big{position:relative;display:block!important;width:100%!important;height:100%!important;border-radius:0!important;box-shadow:none}
+.idp-pav .big{position:relative;display:grid!important;place-items:center;margin:0!important;width:100%!important;height:100%!important;border-radius:0!important;box-shadow:none}
 .big.idp-ava svg{position:absolute;inset:0;width:100%;height:100%;display:block}
 .idp-nm{font:800 28px 'Bricolage Grotesque','Hanken Grotesk',sans-serif;letter-spacing:-.02em;margin:0 0 6px;color:var(--txt);line-height:1.05;word-break:break-word}
 .idp-bt{position:absolute;left:18px;right:18px;bottom:14px;display:flex;align-items:flex-end;justify-content:space-between;z-index:1}
@@ -52,7 +51,7 @@
 .idp-steps{display:flex;gap:6px;margin:14px 0 8px}
 .idp-steps i{flex:1;height:8px;border-radius:9px;background:var(--s3);position:relative;overflow:hidden}
 .idp-steps i.on:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#ffc24d,#ff6a4d);transform-origin:left;animation:idpf .9s cubic-bezier(.2,.8,.2,1)}
-.idp-steps i.now:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,176,46,.55),transparent);animation:idps 1.6s infinite}
+.idp-steps i.now:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--am) 55%,transparent),transparent);animation:idps 1.6s infinite}
 @keyframes idpf{from{transform:scaleX(0)}}@keyframes idps{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
 .idp-vm{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--mut);margin-bottom:12px}
 .idp-vm button{color:var(--am);font:700 13px 'Hanken Grotesk',sans-serif;padding:6px 0;display:inline-flex;align-items:center;gap:4px}
@@ -67,7 +66,6 @@
 .idp-hint{margin:2px 0 6px;font-size:12px;color:var(--mut)}
 .idp-lnk{color:var(--am);font:700 13px 'Hanken Grotesk',sans-serif;padding:4px 0 10px}
 .idp-cta{display:flex;align-items:center;justify-content:center;width:100%;height:52px;border:0;border-radius:16px;background:linear-gradient(120deg,#ffc24d,#ff6a4d);color:#1b1006;font:800 15px 'Hanken Grotesk',sans-serif;text-align:center;cursor:pointer;box-shadow:0 8px 24px rgba(255,106,77,.25)}
-
 .idp-rc{display:flex;gap:8px;flex-wrap:wrap}
 .idp-chip{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--s2);color:var(--txt);font:600 13px 'Hanken Grotesk',sans-serif;cursor:pointer}
 .idp-chip svg{color:var(--am)}
@@ -82,10 +80,18 @@
 .idp-sz em{font-style:normal;margin-left:auto;display:block}
 .idp-sw{width:40px;height:24px;border-radius:99px;border:1px solid var(--line);background:var(--s3);position:relative;flex:none;transition:background .3s,border-color .3s}
 .idp-sw:after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--mut);transition:transform .3s cubic-bezier(.2,.8,.2,1),background .3s}
-.idp-sw.on{background:rgba(255,176,46,.25);border-color:var(--am)}.idp-sw.on:after{transform:translateX(16px);background:var(--am)}
+.idp-sw.on{background:color-mix(in srgb,var(--am) 24%,transparent);border-color:var(--am)}.idp-sw.on:after{transform:translateX(16px);background:var(--am)}
 .idp-dv{width:1px;background:var(--line);margin:10px 0}
 .idp-sec{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:20px;background:var(--s1);color:var(--txt);font:600 14px 'Hanken Grotesk',sans-serif;text-align:left;cursor:pointer}
-.idp-sec b{color:var(--am)}.idp-sec>span:nth-child(2){flex:1;color:var(--mut);display:flex;align-items:center;gap:8px}
+.idp-sec b{font-weight:800}.idp-sl{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;color:var(--mut)}
+.idp-sl1{display:flex;align-items:center;gap:8px;white-space:nowrap;font-weight:600}
+.idp-sl1 b{color:var(--lv,var(--am))}
+.idp-sl3{font-size:12.5px;font-weight:600;color:var(--mut)}
+.idp-sl2{font-size:11.5px;font-weight:700;line-height:1.3;color:var(--am)}
+.idp-bars{display:inline-flex;align-items:flex-end;gap:3px;height:15px;flex:none}
+.idp-bars i{display:block;width:4px;border-radius:2px;background:color-mix(in srgb,var(--mut) 38%,transparent)}
+.idp-bars i:nth-child(1){height:6px}.idp-bars i:nth-child(2){height:10px}.idp-bars i:nth-child(3){height:15px}
+.idp-bars i.on{background:var(--lv,var(--am))}
 .idp-sec svg{display:block;flex:none}.idp-sec em{font-style:normal;color:var(--mut);font-size:13px}
 .idp-ico{width:38px;height:38px;border-radius:12px;background:var(--s2);color:var(--am);display:grid;place-items:center;flex:none}
 .idp-ucl{display:grid;gap:12px;align-content:start}
@@ -98,21 +104,28 @@
 .idp-ucr>div:last-child{padding:14px 0 6px!important}
 .idp-avp{display:grid;justify-items:center;gap:14px;padding:22px 16px 18px}
 .idp-prev{width:112px;height:112px;border-radius:50%;overflow:hidden;outline:3px solid var(--am);outline-offset:4px;margin:6px 0}
-.idp-prev .big{position:relative;display:block!important;width:100%!important;height:100%!important;border-radius:0!important;box-shadow:none}
+.idp-prev .big{position:relative;display:grid!important;place-items:center;margin:0!important;width:100%!important;height:100%!important;border-radius:0!important;box-shadow:none}
 .idp-ag{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;width:100%;max-width:480px;padding:0 2px}
 .idp-at{aspect-ratio:1;border-radius:22px;border:0;position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;overflow:hidden;outline:1px solid var(--line);outline-offset:2px}
 .idp-at.on{outline:3px solid var(--am)}.idp-at svg{position:absolute;inset:0;width:100%;height:100%;display:block}.idp-at img{position:relative;width:58%}
 .idp-avp .sec{justify-self:stretch;padding:8px 2px 0}
-.idp-pg{width:78px;height:78px;border-radius:20px;background:var(--s2);border:1px solid var(--line);display:grid;place-items:center;flex:none;position:relative}
-.idp-pg svg{display:block}
 .idp-rg{fill:none;stroke:var(--s3);stroke-width:6;stroke-linecap:round}.idp-rg.on{stroke:var(--am)}
-.idp-pt{fill:var(--txt);font:800 17px 'Hanken Grotesk',sans-serif;text-anchor:middle}.idp-ps{fill:var(--mut);font:700 8px 'Hanken Grotesk',sans-serif;text-anchor:middle;letter-spacing:.08em}
+.idp-pt{fill:var(--txt);stroke:none;font:800 19px 'Hanken Grotesk',sans-serif;text-anchor:middle}
+.idp-rs{width:68px!important;height:68px!important;display:block;flex:none}
 html[data-theme="purple"] .idp-cta{background:var(--grad);color:#fff;box-shadow:none}
 html[data-theme="light"] .idp-cta:not(#a):not(#b){background:var(--am)!important;background-image:none!important;color:#fff!important;box-shadow:none!important}
 html[data-theme="light"] .idp-ab{color:#fff}
 html[data-theme="light"] .idp-cf:not(#a):not(#b):before,html[data-theme="light"] .idp-cb:not(#a):not(#b):before{background:var(--am)!important}
 html[data-theme="light"] .idp-steps i.on:not(#a):not(#b):after{background:var(--am)!important}
 html[data-theme="light"] .idp-list .lr .lic svg,html[data-theme="light"] .idp-list .lr .lic svg *{stroke:var(--am)!important;color:var(--am)!important}
+html[data-theme="purple"] .idp-steps i.on:after,html[data-theme="purple"] .idp-st.d .idp-dot{background:var(--grad)}
+html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:before{background:var(--grad)}
+.pgs .sp-hero{background:var(--s1)!important;border:1px solid var(--line)!important}
+.pgs .sp-qi{background:var(--s1)!important;border:1px solid var(--line)!important;border-radius:18px!important;min-height:96px;padding:14px 10px;gap:8px;box-shadow:none}
+.pgs .sp-qi svg{box-sizing:content-box;width:20px;height:20px;padding:9px;border-radius:12px;background:var(--s2);color:var(--am)}
+.pgs .sp-ri{background:var(--s2)!important}
+.pgs .sp-cta{background:var(--grad)!important;color:var(--ongrad,#1b1006)!important}
+.pgs .sp-qi:hover,.pgs .sp-row:hover{border-color:color-mix(in srgb,var(--am) 40%,var(--line))!important}
 @media(prefers-reduced-motion:reduce){.idp-ci,.idp-steps i:after,.idp-sw,.idp-sw:after{animation:none!important;transition:none!important}}
 `;
   var s = document.createElement("style");
@@ -131,8 +144,8 @@ html[data-theme="light"] .idp-list .lr .lic svg,html[data-theme="light"] .idp-li
 
   function ring(n) {
     var c = "";
-    for (var i = 0; i < 3; i++) c += '<circle class="idp-rg' + (i < n ? " on" : "") + '" cx="32" cy="32" r="25" pathLength="300" stroke-dasharray="94 206" stroke-dashoffset="' + (-i * 100) + '" transform="rotate(-105 32 32)"/>';
-    return '<div class="idp-pg" role="img" aria-label="Verification progress: ' + n + ' of 3 steps"><svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">' + c + '<text class="idp-pt" x="32" y="33">' + n + '/3</text><text class="idp-ps" x="32" y="45">STEPS</text></svg></div>';
+    for (var i = 0; i < 3; i++) c += '<circle class="idp-rg' + (i < n ? " on" : "") + '" cx="34" cy="34" r="28" pathLength="300" stroke-dasharray="94 206" stroke-dashoffset="' + (-i * 100) + '" transform="rotate(-105 34 34)"/>';
+    return '<svg class="idp-rs" viewBox="0 0 68 68" role="img" aria-label="Verification progress: ' + n + ' of 3 steps">' + c + '<text class="idp-pt" x="34" y="41">' + n + '/3</text></svg>';
   }
   var SH = [["Card", "TradeMate Card", "Join waitlist", "card"], ["Rewards", "Rewards Hub", "Check now", "gift"], ["Contracts", "Contracts", "View all", "box"], ["Referral", "Invite Friends", "Invite now", "users"]];
   function flip(label) { return '<button class="idp-gl" data-idp-flip aria-label="Flip the pass">' + label + ic("swap", "width:15px;height:15px") + "</button>"; }
@@ -167,9 +180,28 @@ html[data-theme="light"] .idp-list .lr .lic svg,html[data-theme="light"] .idp-li
       '<div class="pbody"><div class="idp-cq"><div class="idp-grid"><div class="idp-l" style="display:grid;gap:14px;align-content:start">' + pass() + verify(n, e) + '</div><div class="idp-r"><div class="sec" style="padding-left:2px">RECENTLY USED</div><div class="idp-rc">' + chips + '</div><div class="idp-all"><button class="idp-allbtn" data-f="More">All Services</button></div></div></div></div></div>' + strip(e);
   };
 
+  // Security level comes from the account's real setup: password (always), authenticator 2FA, verified identity.
+  var secAsked = "", secBusy = false;
+  function secLoad() {
+    var id = st.me && st.me.uid;
+    if (!CONNECTED || st.twofaStatus || secAsked === id || typeof loadAccountTwoFactor !== "function") return;
+    secAsked = id; secBusy = true;
+    loadAccountTwoFactor().then(function () { secBusy = false; try { if (topPage() === "uc") drawPage(); } catch (x) {} }, function () { secBusy = false; });
+  }
+  function secRow() {
+    var tf = st.twofaStatus, on = !!(tf && tf.enabled), kyc = idvDone() >= 3, n = 1 + (on ? 1 : 0) + (kyc ? 1 : 0);
+    var lv = n >= 3 ? ["High", "--up"] : n === 2 ? ["Medium", "--am"] : ["Low", "--dn"];
+    var hint = !on ? "Turn on two-factor sign-in to raise it" : !kyc ? "Verify your identity to raise it" : "";
+    var wait = secBusy, bars = "";
+    for (var i = 0; i < 3; i++) bars += '<i' + (!wait && i < n ? ' class="on"' : "") + "></i>";
+    var name = wait ? "Checking…" : lv[0];
+    return '<button class="idp-sec" data-pg="security" style="--lv:' + (wait ? "var(--mut)" : "var(--" + lv[1].slice(2) + ")") + '" aria-label="Security level: ' + name + (hint && !wait ? ". " + hint : "") + '"><span class="idp-ico">' + ic("shield") + '</span><span class="idp-sl"><span class="idp-sl1">Security level: <b>' + name + '</b><span class="idp-bars" aria-hidden="true">' + bars + '</span></span><span class="idp-sl3">Region: Global</span>' + (hint && !wait ? '<span class="idp-sl2">' + hint + " \u2192</span>" : "") + "</span>" + ic("chev", "width:18px;height:18px;color:var(--mut)") + "</button>";
+  }
+
   // User Center: same rows, handlers and content as before, regrouped into one card per tab under the pass.
   var _uc = PG.uc;
   PG.uc = function () {
+    secLoad();
     var h = _uc();
     try {
       var a = h.indexOf('<div class="uc-tabs">');
@@ -178,7 +210,7 @@ html[data-theme="light"] .idp-list .lr .lic svg,html[data-theme="light"] .idp-li
       if (h.indexOf(end, te) === te) { var k = h.indexOf(rg, te); if (k < 0) return h; re = k + rg.length; }
       var lo = h.indexOf('<div style="padding:22px 16px"><button class="btn o wide" data-pg="logout">', re);
       if (lo < 0) return h;
-      var sec = '<button class="idp-sec" data-pg="security"><span class="idp-ico">' + ic("shield") + '</span><span>Security level: <b>High</b> ' + PT_BARS + "</span><em>Region: Global</em>" + ic("chev", "width:18px;height:18px;color:var(--mut)") + "</button>";
+      var sec = secRow();
       return h.slice(0, a) + '<div class="idp-cq"><div class="idp-ucg"><div class="idp-ucl">' + pass() + sec + '</div><div class="idp-ucr">' + h.slice(a, te) + '<div class="idp-list">' + h.slice(re, lo) + "</div>" + h.slice(lo) + "</div></div></div>";
     } catch (x) { return h; }
   };
