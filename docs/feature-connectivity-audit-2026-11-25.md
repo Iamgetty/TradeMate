@@ -126,6 +126,7 @@ No endpoint switch was made. Changing the UI to AWS now would remove the FX refe
 
 A repository search of the deployed web runtime and Next.js app found no frontend calls for these API families. They are backend capabilities, not currently proven end-user workflows:
 
+- **Exchange-feed WebSocket:** the API exposes a `/api/market-feed` WebSocket, but the current web runtime does not reference it. Its central aggregated order-book client still uses Render, while another market module opens direct exchange WebSockets. The new AWS exchange-feed service is deployed and healthy but is not yet the app's configured central feed source.
 - **Sports Transfer:** no `/sports-transfer/*` call in the web runtime. The API has player/sports profiles, consents, organization membership, representative mandates and opportunity drafts. The Sports category tile is not proof those dedicated workflows are connected.
 - **Moderation administration:** no web-runtime calls to `/moderation/reports`, organization/listing review queues or announcements. The backend moderation routes exist, but an operational moderator console/acceptance path was not found in this pass.
 - **Organization member management:** backend member list, invite, accept and revoke endpoints exist, but the web runtime does not call the membership endpoints. Current organization UI supports create/update/documents; it does not provide the complete invitation and member-role workflow.
