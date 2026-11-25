@@ -116,8 +116,13 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
     await buyer.goto('/app');
     await expect(buyer.locator('#app .view')).toBeVisible();
     await buyer.locator('#app .top button[data-pg="profile"]').click();
-    // Use the visible Alpha/Clients level pill in the profile header; the lower benefits link is covered by the Verify now CTA.
-    await buyer.locator('#pg .pt-pills [data-pg="level"]').click();
+    // The level control is the second pill in the profile hero; scope to the hero rather than relying on a styling wrapper.
+    const profileHero = buyer.locator('#pg .pt-hero');
+    await expect(profileHero).toBeVisible();
+    const levelPill = profileHero.locator('button[data-pg="level"]');
+    await expect(levelPill).toHaveCount(1);
+    await expect(levelPill).toBeVisible();
+    await levelPill.click();
     await expect(buyer.locator('#pg')).toContainText('No live level, qualification or progress record is currently connected');
     await expect(buyer.locator('#pg')).not.toContainText('10 completed contracts');
     await buyer.close();
