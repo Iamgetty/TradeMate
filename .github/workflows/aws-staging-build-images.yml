@@ -90,10 +90,8 @@ jobs:
         image:
           - name: api
             dockerfile: TradeMate-main/apps/api/Dockerfile
-            repository_output: ApiEcrRepositoryUri
           - name: exchange-feed
             dockerfile: TradeMate-main/exchange-feed/Dockerfile
-            repository_output: ExchangeFeedEcrRepositoryUri
     steps:
       - name: Check out the exact tested source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -127,7 +125,6 @@ jobs:
         id: image
         env:
           EXPECTED_ACCOUNT_ID: ${{ vars.AWS_STAGING_ACCOUNT_ID }}
-          REPOSITORY_OUTPUT_KEY: ${{ matrix.image.repository_output }}
           EXPECTED_REPOSITORY_NAME: trademate/${{ matrix.image.name }}
         run: |
           set -euo pipefail
@@ -137,16 +134,12 @@ jobs:
             exit 1
           fi
 
-          STACK_STATUS="$(aws cloudformation describe-stacks --stack-name trademate-staging-foundation --query 'Stacks[0].StackStatus' --output text)"
-          if [[ "$STACK_STATUS" != "CREATE_COMPLETE" && "$STACK_STATUS" != "UPDATE_COMPLETE" ]]; then
-            echo "::error::The staging foundation stack is not stable."
-            exit 1
-          fi
-          OUTPUTS="$(aws cloudformation describe-stacks --stack-name trademate-staging-foundation --query 'Stacks[0].Outputs' --output json)"
-          REPOSITORY_URI="$(jq -r --arg key "$REPOSITORY_OUTPUT_KEY" '.[] | select(.OutputKey==$key) | .OutputValue' <<< "$OUTPUTS")"
-          EXPECTED_PREFIX="$EXPECTED_ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/$EXPECTED_REPOSITORY_NAME"
-          if [[ "$REPOSITORY_URI" != "$EXPECTED_PREFIX" ]]; then
-            echo "::error::The ECR repository output does not match the expected account, region and repository."
+          EXPECTED_URI="$EXPECTED_ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/$EXPECTED_REPOSITORY_NAME"
+          REPOSITORY="$(aws ecr describe-repositories --repository-names "$EXPECTED_REPOSITORY_NAME" --query 'repositories[0].[repositoryUri,imageTagMutability]' --output text)"
+          REPOSITORY_URI="$(awk '{print $1}' <<< "$REPOSITORY")"
+          TAG_MUTABILITY="$(awk '{print $2}' <<< "$REPOSITORY")"
+          if [[ "$REPOSITORY_URI" != "$EXPECTED_URI" || "$TAG_MUTABILITY" != "IMMUTABLE" ]]; then
+            echo "::error::The pre-provisioned ECR repository is missing or does not enforce immutable tags."
             exit 1
           fi
           echo "repository_uri=$REPOSITORY_URI" >> "$GITHUB_OUTPUT"
