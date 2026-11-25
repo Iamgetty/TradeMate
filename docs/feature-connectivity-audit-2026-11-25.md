@@ -36,6 +36,7 @@ A first-pass read of the base action dispatcher suggested sign-out was local-onl
 | CR-07 | Wallet and money movement | Wallet choices show “Wallet connection is not enabled yet”; crypto deposit is disabled; fiat deposit and transfer buttons show not connected. No wallet, deposit, withdrawal, transfer or custody ledger controller exists in the API module. | Disabled / not implemented | Keep disabled. Decide custody/non-custody model, supported networks, payment providers, compliance, ledger/reconciliation and controls before implementation. |
 | CR-08 | KYC | Signed-in KYC submit explicitly says “Identity verification is not open yet”; no KYC submission controller/provider workflow exists. | Disabled / not implemented | Keep unavailable until a KYC provider and case lifecycle are integrated and accepted. |
 | CR-09 | FX and MT5 feeds | The deployed app's central book client still uses Render. AWS feed has FX `not_configured`, 0 quotes and MT5 0 quotes; Render has 8 FX reference quotes but reports MT5 broadcast/permission flags true. | Still dependent on Render; AWS parity incomplete | Configure FX on AWS, resolve the MT5 flag discrepancy, validate WebSocket parity, then switch the app to AWS. Do not enable MT5 broadcast without written authorization. |
+| CR-10 | NFT / OpenSea | Live `/api/nfts`, `/api/nft-collections` and `/api/nft-collection` requests all return HTTP 503 with `configured:false`: `OPENSEA_API_KEY` is absent from the deployed web service environment. | Provider disconnected | Configure the OpenSea key as a server-side secret in the deployed web runtime, then verify search, collection listing and item details. Never expose the key to browser code. |
 
 ## Other local-only, static or misleading interactions
 
@@ -106,6 +107,17 @@ No endpoint switch was made. Changing the UI to AWS now would remove the FX refe
 
 **Migration action:** configure and verify the approved FX provider on AWS, resolve the MT5 permission-flag discrepancy, run the same WebSocket contract/freshness tests against AWS, then change `tmConnectCentral()` to `wss://feed.trademate.cfd` and verify live order books and FX in the browser before retiring Render.
 
+## Backend routes that are not currently wired to the web runtime
+
+A repository search of the deployed web runtime and Next.js app found no frontend calls for these API families. They are backend capabilities, not currently proven end-user workflows:
+
+- **Sports Transfer:** no `/sports-transfer/*` call in the web runtime. The API has player/sports profiles, consents, organization membership, representative mandates and opportunity drafts. The Sports category tile is not proof those dedicated workflows are connected.
+- **Moderation administration:** no web-runtime calls to `/moderation/reports`, organization/listing review queues or announcements. The backend moderation routes exist, but an operational moderator console/acceptance path was not found in this pass.
+- **Organization member management:** backend member list, invite, accept and revoke endpoints exist, but the web runtime does not call the membership endpoints. Current organization UI supports create/update/documents; it does not provide the complete invitation and member-role workflow.
+- **Sports profile self-service and consent controls:** the API supports private profile/consent operations, but no corresponding web calls were found.
+
+The source contains 82 `data-act` marker occurrences (61 distinct values), 48 `data-pc` occurrences (38 distinct values), 75 `data-pg` occurrences (41 distinct values), 19 `data-f` occurrences (9 distinct values), plus a navigation tab marker. These counts describe literal source markers, not a claim that every generated or dynamic control has passed browser testing.
+
 ## Feed author relationship — resolved on AWS target
 
 The concern that a feed post was not linked to its user was checked against the live AWS database and API:
@@ -131,6 +143,7 @@ The API's left join and fallback display label can mask missing display-name val
 | `/api/market/highlights?division=services` | HTTP 200; all four slides null | Real DB-backed highlights endpoint; no qualifying records for the sampled division |
 | Feed health MT5 | 0 quotes; public broadcast disabled | MT5 is not ingesting |
 | Feed health FX (AWS) | `not_configured`, 0 instruments/quotes | FX provider is not configured |
+| NFT search/collections/items routes | HTTP 503, `configured:false` | OpenSea API key is absent from the deployed web runtime |
 | Existing Render feed `/ready` | HTTP 200; 5/5 feeds live; 75 fresh books; Twelve Data 8 FX quotes | Still serving the UI's central order-book client |
 | New AWS feed `/ready` | HTTP 200; 5/5 feeds live; 75 fresh books; FX not configured | Healthy but not feature-equivalent to Render yet |
 | `https://trademate.cfd/` and `/app` | HTTP 200 | Web app responds |
@@ -143,11 +156,11 @@ Note: `/health` at the API domain root (without `/api`) returns 404 by design be
 1. Remove or clearly label the Portfolio Manager synthetic valuation, balances, activity counts and sample documents.
 2. Replace fake success states for waitlist, advertising, promotions, affiliate and newsletter with honest disabled states until their backend workflows exist.
 3. Keep KYC, deposits, transfers, wallet and card disabled until their real providers/services exist.
-4. Configure FX and MT5 only with valid provider/broker credentials and authorization; validate quote freshness, reconnect and stale-data handling.
-5. Execute two-account browser acceptance for authentication, profile, feed/media, notifications, support, organization, listings, enquiries, contracts and P2P, including refresh/re-entry, permission boundaries, retries and cross-account isolation.
-6. Exercise every `data-act`, `data-pc`, `data-pg`, `data-f`, navigation tab and dynamic form control in the deployed app; verify each either has a persistent service action or is explicitly labeled local/preview/disabled.
-7. Verify NFT/OpenSea provider credentials and timeouts; validate market quote symbols, freshness and stale-state behaviour. Do not infer a working Forex feed from crypto exchange-feed health.
-8. Add automated regression checks for missing/orphaned feed authors and for UI handlers that display success without a persisted API response.
+4. Configure FX on AWS to match Render before switching the app feed; resolve the Render MT5 broadcast-flag discrepancy and do not enable public broadcast without written authorization.
+5. Configure the OpenSea API key as a server-side secret and verify all three NFT endpoints. for authentication, profile, feed/media, notifications, support, organization, listings, enquiries, contracts and P2P, including refresh/re-entry, permission boundaries, retries and cross-account isolation.
+6. Execute two-account browser acceptance for auth, profile, feed/media, notifications, support, organization, listings, enquiries, contracts and P2P, including refresh/re-entry, permissions, retries and cross-account isolation.\n7. Exercise every `data-act`, `data-pc`, `data-pg`, `data-f`, navigation tab and dynamic form control in the deployed app; verify each either has a persistent service action or is explicitly labeled local/preview/disabled.
+8. Validate market quote symbols, freshness and stale-state behaviour. Do not infer a working Forex feed from crypto exchange-feed health.
+9. Add automated regression checks for missing/orphaned feed authors and for UI handlers that display success without a persisted API response.
 
 ## Release guardrails
 
