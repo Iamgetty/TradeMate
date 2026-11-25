@@ -86,7 +86,7 @@ The current API includes controllers for:
 - Sports-transfer profiles, mandates and opportunities.
 - Market quote route.
 
-The legacy `apps/web/public/tm/app.js` contains 75 distinct literal API path strings; separate Next.js pages and helper scripts call additional paths such as `/api/market/activity`, `/api/market/highlights` and the NFT routes. All 41 distinct `data-pg` screen names found in the source have a matching `PG.*` screen definition, and all 38 distinct `data-pc` action names have a matching `PC.*` handler. The issue is therefore not orphaned navigation/action markers; it is that some defined handlers intentionally perform local-only actions, cosmetic state changes or display disabled services. The presence of a route is not proof that a visible button reaches it or that the deployed workflow passes a two-account test. In particular, sports-transfer API routes exist but were not established as fully surfaced/accepted UI journeys in this pass.
+The legacy `apps/web/public/tm/app.js` contains 75 literal API call sites covering 64 unique method/path prefixes; separate Next.js pages and helper scripts call additional paths such as `/api/market/activity`, `/api/market/highlights` and the NFT routes. All 41 distinct `data-pg` screen names found in the source have a matching `PG.*` screen definition, and all 38 distinct `data-pc` action names have a matching `PC.*` handler. The issue is therefore not orphaned navigation/action markers; it is that some defined handlers intentionally perform local-only actions, cosmetic state changes or display disabled services. The presence of a route is not proof that a visible button reaches it or that the deployed workflow passes a two-account test. In particular, sports-transfer API routes exist but were not established as fully surfaced/accepted UI journeys in this pass.
 
 ## Next.js application pages — separate from the legacy `/app` runtime
 
@@ -153,7 +153,7 @@ The current source/target database comparison from the migration checks shows:
 - Activity rows differ: audit events Render 65 vs AWS 77; notifications 18 vs AWS 24; sessions 55 vs AWS 58. These extra target rows may be post-import activity, but have not been reconciled event-by-event.
 - The runtime AWS DB role cannot SELECT `schema_migrations`, so migration-history parity was not independently checked with that role.
 - An AWS manual snapshot exists for the AWS target; it is **not** a backup of the Render source.
-- The private backup repository `Iamgetty/TradeMate-db-backups` exists but the encrypted Render source dump has not been created/uploaded and verified.
+- The private backup repository `Iamgetty/TradeMate-db-backups` exists but currently contains only `README.md`; the encrypted Render source dump has not been created/uploaded and verified.
 - Render source database `trademate-db` is currently `available` and `not_suspended`, with expiry `2026-11-25T21:52:06.818364Z` (21:52 UTC today).
 - Render services `exchange-feed`, `trademate-api` and `trademate-web` remain in the workspace and are not suspended. The exchange-feed is actively used by the deployed app. Render API database health returned 200 during the check; direct Render API and web root requests timed out during the same check.
 
@@ -204,6 +204,16 @@ Note: `/health` at the API domain root (without `/api`) returns 404 by design be
 7. Exercise every `data-act`, `data-pc`, `data-pg`, `data-f`, navigation tab and dynamic form control in the deployed app; verify each either has a persistent service action or is explicitly labeled local/preview/disabled.
 8. Validate market quote symbols, freshness and stale-state behaviour. Do not infer a working Forex feed from crypto exchange-feed health.
 9. Add automated regression checks for missing/orphaned feed authors and for UI handlers that display success without a persisted API response.
+
+## Deployed source parity and latest CI
+
+- The live web asset `/tm/app.js?v=173` is byte-for-byte identical to `main:TradeMate-main/apps/web/public/tm/app.js` (439,187 bytes; SHA-256 `c7780714811958b4a9e979dc6c281a5db82edf60c853ec14642a1cfe1a4411f1`).
+- The active AWS API release directory is under commit `bf0f6ef7f340ee8274c30c7883b8dbc6cef499f0`; deployed `apps/api/src/module.ts` and `src/main.ts` are byte-for-byte identical to current main. The deployed exchange-feed `server.js` is also byte-for-byte identical to current main.
+- API and exchange-feed systemd services are active. API health/database health and feed health/readiness all returned 200.
+- AWS API staging deployment run [45614751061](https://github.com/Iamgetty/TradeMate/actions/runs/45614751061) and Cloudflare staging smoke run [45614750716](https://github.com/Iamgetty/TradeMate/actions/runs/45614750716) succeeded on the audited code.
+- Full TradeMate CI run [45614916329](https://github.com/Iamgetty/TradeMate/actions/runs/45614916329) completed **8/8 jobs successfully**, including API build/security validation, web build, exchange-feed/MT5 tests, database migration integration, AWS container builds, Cloudflare Worker build/runtime, SAST/SCA/secret scanning and the mocked plus live two-account browser acceptance job.
+- PostgreSQL 16/18 security compatibility run [45614916251](https://github.com/Iamgetty/TradeMate/actions/runs/45614916251) succeeded.
+- These checks verify repository build/integration and test journeys; they do not make local-only UI controls into backend features, provide missing provider credentials, or complete the Render-to-AWS feed migration.
 
 ## Release guardrails
 
