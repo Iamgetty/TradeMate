@@ -45,7 +45,7 @@ jobs:
             echo "::error::RESEND_API_KEY has an invalid format; its value was not displayed."
             exit 1
           fi
-          if [[ ! "$RESEND_FROM_EMAIL" =~ ^[^[:space:]@<>]+@[^[:space:]@<>]+\.[^[:space:]@<>]+$ ]]; then
+          if [[ ! "$RESEND_FROM_EMAIL" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]]; then
             echo "::error::RESEND_FROM_EMAIL must be a plain email address."
             exit 1
           fi
