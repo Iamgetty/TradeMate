@@ -183,6 +183,8 @@ This matches the current web/API/feed responses, but it means the branded public
 | `/api/market/quotes?symbols=^GSPC,AAPL` | HTTP 200; valid quotes returned, both marked `delayed` with last market timestamps on 24 Nov | Quote integration is connected; not real-time at sampled time |
 | `/api/market/activity?division=services` | HTTP 200; 14-day counts and current listing/enquiry/deal counts all zero | Real DB-backed activity endpoint; no qualifying Services activity in sampled window |
 | `/api/market/highlights?division=services` | HTTP 200; all four slides null | Real DB-backed highlights endpoint; no qualifying records for the sampled division |
+| Public marketplace listings | Services and B2B listing endpoints return HTTP 200 with 0 public records. Render source has one `draft` and one `pending_review` listing. | Marketplace API is connected; no approved/public offers are currently available |
+| P2P book/trades | USDT/NGN book and completed-trades endpoints return HTTP 200 with 0 records. | P2P API is connected; there are currently no public P2P ads or completed P2P trades |
 | Feed health MT5 | 0 quotes; public broadcast disabled | MT5 is not ingesting |
 | Feed health FX (AWS) | `not_configured`, 0 instruments/quotes | FX provider is not configured |
 | NFT search/collections/items routes | HTTP 503, `configured:false` | OpenSea API key is absent from the deployed web runtime |
