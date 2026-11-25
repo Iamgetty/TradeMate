@@ -25,7 +25,7 @@ TradeMate is a global contract marketplace. Identity and business verification m
 | Dojah | African identity and compliance APIs | **Evaluate — regional fallback candidate** | Validate exact country and product coverage, registry access, reliability, security and data terms. |
 | Onfido / Entrust | Identity verification | **Evaluate — existing roadmap candidate** | Reassess against Sumsub, Veriff and Trulioo using the same global test matrix; do not assume selected. |
 | KYC/KYB provider-neutral adapter | TradeMate integration boundary for provider routing, normalized decisions, evidence references and audit history | **Planned — required architecture** | Keep user identity attached to the user and business verification attached to the organization; support multiple providers and manual review. |
-| Email delivery provider | Registration verification and transactional email | **Not selected** | Existing email verification code/provider configuration must be audited; select based on deliverability, global reach, security, data processing, templates, webhooks and cost. |
+| Resend | Registration verification and transactional email | **In use — runtime delivery tested and user-confirmed** | Runtime credentials are configured server-side and the user confirmed a successful delivery test. Retain webhook/delivery monitoring and sender-domain reputation checks. |
 
 **Global KYB acceptance rule:** a provider's advertised country count is not sufficient. Maintain a country-by-country matrix for company registry lookup, legal existence/status, directors, shareholders/beneficial owners, representative authority, address, document-based fallback and manual review. Include African countries and less-digitized registries. Do not block an otherwise supported country solely because an automated registry API is unavailable; use a documented risk-based manual/document workflow where legally permissible.
 
@@ -35,36 +35,36 @@ TradeMate is a global contract marketplace. Identity and business verification m
 
 | Provider / software | Product area | Register status | Acceptance / notes |
 |---|---|---|---|
-| MetaTrader 5 (MT5) | Forex platform connectivity | **In use / code present — integration foundation** | Validate live connectivity and quote freshness; MT5 is a platform integration, not proof of brokerage execution or custody. |
-| Exness | Forex / MT5 quote source | **In use / code present — acceptance outstanding** | Verify live provider availability, credentials, freshness, reconnect and fallback behaviour. |
-| Binance | Crypto spot market data | **In use / code present** | Verify feed freshness, reconnect, rate limits and symbol mapping; no implication of user trading/custody. |
-| Bybit | Crypto spot/derivatives market data | **In use / code present** | Verify feed freshness, reconnect, rate limits and symbol mapping; market-data integration only. |
-| Twelve Data | Financial/market data | **In use / code present** | Verify plan limits, permitted use, coverage, freshness and fallback. |
-| OpenSea | NFT collection/item data | **In use / code present** | Verify API access, rate limits, attribution, collection coverage and failure handling. |
+| MetaTrader 5 (MT5) | Forex platform connectivity | **Code present; live collector not connected** | AWS feed reports 0 MT5 quotes. The Windows broker-connected terminal/collector still needs setup and a secure ingestion token; this is not proof of brokerage execution or custody. |
+| Exness | Forex / MT5 quote source | **Collector integration foundation; no live quotes** | AWS feed reports 0 MT5 quotes. Verify broker login, symbol mapping, token-protected ingestion and freshness after the user's terminal collector is configured. |
+| Binance | Crypto spot market data | **In use — 5/5 exchange providers live in AWS and Render feed services** | AWS and Render readiness checks both observed 75 fresh books; app's central aggregated book client still points to Render. Verify parity before switching. No implication of user trading/custody. |
+| Bybit | Crypto spot/derivatives market data | **In use — spot and linear feeds live in AWS and Render feed services** | Both services reported 5/5 providers and 75 fresh books at audit time. Market-data integration only. |
+| Twelve Data | Financial/market data | **In use on legacy Render feed only; AWS not configured** | Render reports 8 reference quotes on the Basic plan. AWS feed currently reports FX not_configured and 0 quotes. Configure and verify AWS parity before moving the app off Render. |
+| OpenSea | NFT collection/item data | **Code present; deployed provider disconnected** | Live `/api/nfts`, `/api/nft-collections` and `/api/nft-collection` routes return HTTP 503 with `configured:false` because `OPENSEA_API_KEY` is absent from the deployed web runtime. Configure server-side and retest. |
 | OANDA | Forex data/provider | **Not configured / excluded from current Forex foundation** | Current roadmap says no OANDA credentials; do not imply active integration. Reconsider only through explicit provider decision. |
 
 ## Cloud, hosting, delivery and developer platform
 
-AWS is the approved primary-cloud direction with Cloudflare at the edge. GCP is optional, not a parallel default stack. Render remains the current hosting/database platform until a separately approved and verified migration.
+AWS is the partially migrated primary runtime with Cloudflare at the edge. The branded domain currently serves the staging Worker, and the candidate production Worker is not promoted. Render is still active as a legacy source and the central market-feed dependency has not yet been switched; keep it until backup, reconciliation and feed parity are verified. GCP is optional, not a parallel default stack.
 
 | Provider / service | Purpose | Register status | Notes / alternatives |
 |---|---|---|---|
-| Render | Current web/API/feed hosting and managed PostgreSQL | **Current platform** | Verify each service/deploy independently; retain until migration is approved and proven. |
+| Render | Legacy web/API/feed hosting and source managed PostgreSQL | **Migration retirement pending — still active and still referenced** | Render source DB remains available until 2026-11-25 21:52 UTC. The deployed app's central order-book client still points to `exchange-feed.onrender.com`; Render feed currently supplies 8 Twelve Data FX reference quotes. Render web/API/feed services remain active. Do not suspend/delete until encrypted source backup, reconciliation and AWS feed parity are verified. |
 | GitHub / GitHub Actions | Source control, CI and deployment workflows | **Current platform** | Protect main, exact-head CI, reviewed changes and deployment provenance. |
-| AWS | Primary cloud direction | **Planned direction** | No migration or provisioning implied. |
-| Cloudflare | DNS, WAF, DDoS, bot and edge security | **Planned direction** | Define clear ownership with CDN and origin routing. |
+| AWS | Primary cloud platform | **In use — partial migration/staging deployed** | API runs on EC2 and uses RDS PostgreSQL; exchange-feed runs on AWS and is exposed through Cloudflare Tunnel. Render feed dependency and FX parity remain open; source DB backup/reconciliation and final retirement are not complete. |
+| Cloudflare | DNS, edge Worker hosting, tunnel ingress and domain routing | **In use — staging Worker on branded domain** | `trademate.cfd` and `www` are attached to `trademate-staging`; candidate `trademate` Worker is not promoted. `api` and `feed` are proxied through Cloudflare Tunnel. |
 | Amazon CloudFront | CDN | **Planned direction** | AWS target; cache only approved public assets/content. |
-| Amazon RDS for PostgreSQL / Aurora PostgreSQL | Managed PostgreSQL | **Planned alternatives** | Select one based on compatibility, operational needs, cost and regional availability. |
-| Amazon ECS / Fargate | Managed application compute | **Planned candidate** | Preferred simpler compute candidate; validate workload fit. |
+| Amazon RDS for PostgreSQL | Managed PostgreSQL | **In use — AWS target database** | PostgreSQL 18.1, private and encrypted. Source/target core rows matched at last comparison, but activity-table differences and migration-history verification remain open. Aurora remains an alternative, not deployed. |
+| Amazon EC2 | API and exchange-feed compute | **In use — staging runtime** | API and exchange-feed services are running on the EC2 host under systemd; SSM is used for administration. ECS/Fargate remains an alternative, not the current runtime. |
 | Amazon EKS | Kubernetes compute | **Alternative** | Do not choose by default unless measured operational requirements justify Kubernetes. |
 | Amazon ElastiCache (Redis/Valkey) | Cache and coordination | **Planned candidate** | Never source of truth for contracts, audit history or financial records. |
 | Amazon SQS | Durable queues | **Planned candidate** | Select semantics per asynchronous workload. |
 | Amazon SNS | Pub/sub notifications | **Planned candidate** | Use only where fan-out semantics justify it. |
 | Amazon EventBridge | Event routing/scheduling | **Planned candidate** | Avoid duplicate event infrastructure without a use case. |
 | Amazon S3 | Private object/media storage | **Planned candidate** | Requires access control, encryption, signed URLs, malware scanning and retention/deletion policy. |
-| AWS Secrets Manager | Secrets management | **Planned candidate** | Prefer workload identity and rotation; never store secrets in source. |
-| AWS Systems Manager Parameter Store | Configuration/parameter management | **Planned candidate** | Distinguish secrets from non-secret configuration. |
-| AWS API Gateway WebSocket | Managed WebSocket gateway | **Evaluate — AWS option** | Compare with ALB-fronted ECS/Fargate for long-lived connections, auth, fan-out, cost and limits. |
+| AWS Secrets Manager | Secrets management | **In use** | `trademate/staging/api` is used for API runtime configuration; secret values must never be printed or committed. |
+| AWS Systems Manager Parameter Store | Configuration/parameter management | **Partially configured / MT5 token pending** | SSM is available for host administration. The MT5 ingestion token and least-privilege parameter access are not yet configured for the feed service. |
+| AWS API Gateway WebSocket | Managed WebSocket gateway | **Alternative — not deployed** | Current exchange-feed WebSocket runs as a Node service on EC2 behind Cloudflare Tunnel; API Gateway WebSocket is not the current ingress. |
 | Google Cloud Platform (GCP) | Optional cloud alternative | **Alternative only** | Not a parallel default production platform. |
 | Cloud Run | Managed compute | **GCP alternative** | Evaluate only if a measured case warrants GCP. |
 | Google Kubernetes Engine (GKE) | Kubernetes compute | **GCP alternative** | Not default. |
