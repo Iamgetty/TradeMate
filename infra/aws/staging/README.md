@@ -124,12 +124,12 @@ This workflow is a repository implementation, not deployment acceptance. It has 
 
 ## Guardrails
 
-- This repository change does not provision, modify or delete cloud resources.
-- No production Render resource, database, secret, DNS record, Cloudflare route or deployment is changed.
-- No production database backup or customer data is copied.
-- Do not run `terraform apply`, deploy workflows, database migrations, Cloudflare production route changes or DNS changes without the relevant explicit approval.
-- Keep Render available as a separate staging/testing/QA environment. Do not treat it as production or automatically synchronize production data/secrets into it.
-- AWS is the production backend source of truth; Cloudflare is the frontend hosting and edge delivery platform.
+- No new AWS stacks, paid AWS infrastructure, database migrations, or production data transfers were created or run during the current staging work.
+- The existing EC2 staging API/feed host was used for the already-established staging deployment path.
+- Cloudflare Worker code/bindings and staging domain attachment were changed during this staging work. Current custom domains `trademate.cfd` and `www.trademate.cfd` remain attached to `trademate-staging`; the separately tested `trademate` Worker candidate is not attached to those custom domains.
+- No production custom-domain cutover is authorized by the staging acceptance. Do not move custom domains, migrate production data, shut down Render, rotate production secrets, or run production migrations without separate explicit approval.
+- No production database backup or customer data was copied.
+- Keep Render available until a replacement has been fully tested and explicitly approved; do not silently synchronize production data/secrets.
 
 ---
 
