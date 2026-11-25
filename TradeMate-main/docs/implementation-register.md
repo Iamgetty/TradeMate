@@ -1,7 +1,7 @@
 # TradeMate implementation register
 
-**Canonical cross-stack status ledger.** Updated: 2026-11-20 (code-bearing PR #219 head `37550648a9ab71468ba58079c438eea8c20d0f99` passed TradeMate CI, PostgreSQL 16/18 security compatibility including real-login impersonation and pgcrypto HMAC primitive checks, Cloudflare compatibility, lockfile validation and AWS infrastructure validation)  
-**Branch baseline:** `fix/audit-remediation-2026-11-18`  
+**Canonical cross-stack status ledger.** Updated: 2026-11-25 after live source/runtime, database, Cloudflare, Render, market-feed and feature-connectivity review. Current documentation audit head: `55ad1dafdcdac0ab33c9c1bfee9642e839035ea0`.  
+**Branch baseline:** `main` (deployed web runtime `app.js` byte-for-byte matches the current `main` source file; API and feed runtime acceptance is recorded separately below).  
 **Rule:** no domain is complete merely because its first component exists. Repository implementation, CI verification, staging validation and production acceptance are tracked separately.
 
 ## Status legend
@@ -33,6 +33,32 @@
 | 15. Developer experience and architecture governance | ◐ Partial | Ownership/catalogue, ADRs, coding/review standards, dependency lifecycle, maintainability measures, architecture documentation and upgrade plans |
 
 **Important:** These are conservative initial domain-level assessments based on the currently available project audit context. They are not individual feature-level checkmarks and do not constitute production acceptance. Revalidate each row against the exact current branch and deployed environment before upgrading its status.
+
+## Live deployment and feature-connectivity review — 2026-11-25
+
+Detailed feature-by-feature evidence, including all local-only controls, missing providers, backend-only API families, Render dependencies, and the feed-author relationship, is maintained in [`docs/feature-connectivity-audit-2026-11-25.md`](feature-connectivity-audit-2026-11-25.md). The third-party provider inventory was refreshed in [`docs/third-party-integrations.md`](third-party-integrations.md).
+
+| Area | Current evidence | Status |
+|---|---|---|
+| Public web runtime | `https://trademate.cfd/` and `/app` return 200. Deployed `/tm/app.js?v=173` is byte-identical to `main:TradeMate-main/apps/web/public/tm/app.js`. | ✓ Runtime source parity; feature acceptance remains partial |
+| Cloudflare release routing | `trademate.cfd` and `www` are attached to `trademate-staging`; candidate `trademate` Worker is not promoted. | ◐ Staging exposed on branded domain; production promotion not performed |
+| API and database | `api.trademate.cfd/api/health` and `/api/health/database` return 200; database connected. | ✓ Live health; full API acceptance remains partial |
+| Exchange feed | AWS `feed.trademate.cfd/health` and `/ready` return 200; 5/5 exchange feeds and 75 fresh books at audit time. | ✓ Live crypto market feed; FX/MT5 not complete |
+| Feed UI routing | Deployed `tmConnectCentral()` still points to `wss://exchange-feed.onrender.com`. Render provides 8 Twelve Data reference quotes; AWS feed has FX not configured. | ◐ Render dependency remains; do not switch until AWS FX parity and WebSocket acceptance |
+| MT5 | AWS feed has 0 MT5 quotes; broker-connected Windows collector/token setup is incomplete. | ☐ Live ingestion not accepted |
+| NFT/OpenSea | Live NFT routes return HTTP 503 with `configured:false`; deployed web runtime lacks `OPENSEA_API_KEY`. | ☐ Provider disconnected |
+| Email | Resend runtime delivery was tested and user-confirmed. | ✓ Delivery test confirmed |
+| Feed-post ownership | Render and AWS each contain the feed post with non-null author ID resolving to user `Deukleinz`; feed UI author control carries the user ID and loads profile when signed in. | ✓ Post-to-user relation verified; no repair required |
+| Render database migration | Core rows match; audit_events 65/77, notifications 18/24 and sessions 55/58 differ; migration-history parity and event reconciliation remain outstanding. Encrypted Render source dump is not yet in the private backup repository. | ◐ Data copy exists; migration sign-off/retirement blocked |
+| Render retirement | Source DB remains available/not suspended with expiry 2026-11-25 21:52 UTC; Render web/API/feed services remain active. | ◐ Do not suspend/delete until source backup, reconciliation and feed parity pass |
+| UI/backend connectivity | 41 distinct `data-pg` screen names and 38 distinct `data-pc` action names have matching definitions. Many defined handlers are deliberately local-only, preview-only or disabled; the feature audit identifies them. | ◐ Inventory mapped; two-account browser acceptance not complete |
+
+### Latest CI evidence
+
+- Run [45613082656](https://github.com/Iamgetty/TradeMate/actions/runs/45613082656): API TypeScript build/security validation, web build/runtime syntax, container builds, exchange-feed/MT5 tests, Cloudflare Worker build and database migration integration passed. The browser app-shell/live API acceptance job and secret-scanning step were cancelled, so this is **not** a full CI pass.
+- Run [45613082650](https://github.com/Iamgetty/TradeMate/actions/runs/45613082650): PostgreSQL 16 and 18 role/RLS compatibility jobs passed.
+- Newest runs for current docs head `55ad1daf`: TradeMate CI was queued and PostgreSQL security compatibility was in progress at last poll. Deployment and Cloudflare smoke workflows were skipped because the commits changed documentation only.
+- A successful isolated test does not prove production user journeys. Browser acceptance, provider credentials, data reconciliation and live collector setup remain separate gates.
 
 ## Current engineering increment (CI verified; production acceptance not implied)
 
