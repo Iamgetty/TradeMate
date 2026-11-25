@@ -152,13 +152,13 @@ Note: `/health` at the API domain root (without `/api`) returns 404 by design be
 
 ## Full acceptance work still required
 
-1. Fix CR-01 sign out before treating auth/session lifecycle as complete.
 1. Remove or clearly label the Portfolio Manager synthetic valuation, balances, activity counts and sample documents.
 2. Replace fake success states for waitlist, advertising, promotions, affiliate and newsletter with honest disabled states until their backend workflows exist.
 3. Keep KYC, deposits, transfers, wallet and card disabled until their real providers/services exist.
 4. Configure FX on AWS to match Render before switching the app feed; resolve the Render MT5 broadcast-flag discrepancy and do not enable public broadcast without written authorization.
-5. Configure the OpenSea API key as a server-side secret and verify all three NFT endpoints. for authentication, profile, feed/media, notifications, support, organization, listings, enquiries, contracts and P2P, including refresh/re-entry, permission boundaries, retries and cross-account isolation.
-6. Execute two-account browser acceptance for auth, profile, feed/media, notifications, support, organization, listings, enquiries, contracts and P2P, including refresh/re-entry, permissions, retries and cross-account isolation.\n7. Exercise every `data-act`, `data-pc`, `data-pg`, `data-f`, navigation tab and dynamic form control in the deployed app; verify each either has a persistent service action or is explicitly labeled local/preview/disabled.
+5. Configure the OpenSea API key as a server-side secret and verify all three NFT endpoints.
+6. Execute two-account browser acceptance for authentication, profile, feed/media, notifications, support, organization, listings, enquiries, contracts and P2P, including refresh/re-entry, permission boundaries, retries and cross-account isolation.
+7. Exercise every `data-act`, `data-pc`, `data-pg`, `data-f`, navigation tab and dynamic form control in the deployed app; verify each either has a persistent service action or is explicitly labeled local/preview/disabled.
 8. Validate market quote symbols, freshness and stale-state behaviour. Do not infer a working Forex feed from crypto exchange-feed health.
 9. Add automated regression checks for missing/orphaned feed authors and for UI handlers that display success without a persisted API response.
 
