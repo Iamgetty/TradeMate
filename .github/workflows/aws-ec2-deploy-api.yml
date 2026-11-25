@@ -29,6 +29,7 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Reject stale revisions and verify host headroom
+        id: guard
         shell: bash
         env:
           RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -36,10 +37,12 @@ jobs:
           set -euo pipefail
           [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
           CURRENT_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          echo "deploy=false" >> "$GITHUB_OUTPUT"
           if [[ "$CURRENT_MAIN" != "$RELEASE_SHA" ]]; then
             echo "Skipping stale successful CI revision $RELEASE_SHA; main is now $CURRENT_MAIN."
             exit 0
           fi
+          echo "deploy=true" >> "$GITHUB_OUTPUT"
 
           NODE_HOME="$HOME/.local/opt/node-v24.22.1"
           export PATH="$NODE_HOME/bin:$PATH"
@@ -56,6 +59,7 @@ jobs:
           echo "Node 24, host headroom, API, feed, and tunnel checks passed."
 
       - name: Build and test the API
+        if: steps.guard.outputs.deploy == 'true'
         working-directory: TradeMate-main/apps/api
         env:
           NODE_OPTIONS: --max-old-space-size=512
@@ -71,6 +75,7 @@ jobs:
           echo "API production build and security tests passed."
 
       - name: Stage immutable API release
+        if: steps.guard.outputs.deploy == 'true'
         shell: bash
         env:
           RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -94,6 +99,7 @@ jobs:
           echo "Immutable API release staged at $APP_DIR"
 
       - name: Promote API with automatic rollback
+        if: steps.guard.outputs.deploy == 'true'
         shell: bash
         env:
           RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -105,6 +111,7 @@ jobs:
           echo "API is running from the exact CI-passing revision $RELEASE_SHA."
 
       - name: Verify public API and Cloudflare Worker proxy
+        if: steps.guard.outputs.deploy == 'true'
         shell: bash
         run: |
           set -euo pipefail
