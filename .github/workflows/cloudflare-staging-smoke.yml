@@ -51,4 +51,5 @@ jobs:
           test "$(od -An -tx1 -N8 /tmp/trademate-logo.png | tr -d ' \n')" = "89504e470d0a1a0a"
 
           retry_get "$API_URL/api/health" /tmp/trademate-api-health.json "Staging API origin health"
-          echo "Cloudflare staging homepage, PNG asset, and API origin health checks passed."
+          retry_get "$BASE_URL/api/health" /tmp/trademate-worker-api-health.json "Staging Worker API proxy"
+          echo "Cloudflare staging homepage, PNG asset, API origin, and Worker proxy checks passed."
