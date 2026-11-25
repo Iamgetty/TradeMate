@@ -135,7 +135,10 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
     await expect(buyer.locator('#pg')).not.toContainText('10 completed contracts');
     await buyer.close();
     buyer = await buyerContext.newPage();
-    await buyer.goto('/market/' + fixture.b2bListingId);
+    // The remaining steps drive the app shell (#sbar, #app .view), so return to /app
+    // with a clean overlay stack rather than the public listing page.
+    await buyer.goto('/app');
+    await waitForAppReady(buyer);
     const buyerContractsResponse = await buyer.request.get('/api/market/contracts/mine');
     expect(buyerContractsResponse.status(), 'buyer contract list API must be available').toBe(200);
     const buyerContractsPayload = await buyerContractsResponse.json();
