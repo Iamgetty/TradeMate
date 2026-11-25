@@ -2,6 +2,10 @@ name: AWS Staging Configure Resend Runtime
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/triggers/configure-resend'
 
 permissions:
   contents: read
