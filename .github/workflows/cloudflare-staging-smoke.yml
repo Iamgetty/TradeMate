@@ -1,0 +1,54 @@
+name: Cloudflare staging smoke
+
+on:
+  workflow_run:
+    workflows:
+      - TradeMate CI
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  staging-smoke:
+    name: Verify deployed Cloudflare staging Worker
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Wait for staging Worker and verify public routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_URL="https://trademate-staging.trademate-web.workers.dev"
+          API_URL="https://api.trademate.cfd"
+
+          retry_get() {
+            local url="$1"
+            local output="$2"
+            local label="$3"
+            local status=""
+            for attempt in $(seq 1 24); do
+              status="$(curl --silent --show-error --output "$output" --write-out '%{http_code}' --max-time 20 "$url" || true)"
+              if [[ "$status" == "200" ]]; then
+                echo "$label returned HTTP 200"
+                return 0
+              fi
+              echo "::notice::$label attempt $attempt returned HTTP ${status:-no response}; retrying"
+              sleep 10
+            done
+            echo "::error::$label did not return HTTP 200"
+            return 1
+          }
+
+          retry_get "$BASE_URL/" /tmp/trademate-home.html "Staging homepage"
+          grep -qi "TradeMate" /tmp/trademate-home.html
+
+          retry_get "$BASE_URL/tm/img/logo.png" /tmp/trademate-logo.png "Staging logo asset"
+          test "$(od -An -tx1 -N8 /tmp/trademate-logo.png | tr -d ' \n')" = "89504e470d0a1a0a"
+
+          retry_get "$API_URL/api/health" /tmp/trademate-api-health.json "Staging API origin health"
+          echo "Cloudflare staging homepage, PNG asset, and API origin health checks passed."
