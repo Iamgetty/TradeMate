@@ -8,7 +8,7 @@ if [[ -z "${CLOUDFLARE_API_TOKEN:-}" || -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]]; then
 fi
 # Deploy to a dedicated staging Worker. Never target the shared production
 # Worker name ("trademate") from this staging pipeline.
-npx --yes vinext@1.4.0 init --platform=cloudflare --cdn-cache=none --data-cache=none --image-optimization=none --no-prerender --name=trademate
+npx --yes vinext@1.4.0 init --platform=cloudflare --cdn-cache=none --data-cache=none --image-optimization=none --no-prerender --name=trademate-staging
 # Keep the Node/Render Next.js config unchanged in the repository; the
 # Cloudflare build uses the same ephemeral standalone-output adjustment as CI.
 python - <<'PY'
