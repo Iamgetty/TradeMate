@@ -16,8 +16,6 @@ async function waitForAppReady(page: Page) {
   // The shell can appear before the app's delegated click handler is installed.
   // Wait for a JS-rendered topbar control before interacting with the app.
   await expect(page.locator('#app .top button[data-pg="profile"]')).toBeVisible({ timeout: 20_000 });
-  const session = await page.request.get('/api/auth/me');
-  expect(session.status(), 'the app must finish initializing with a validated browser session').toBe(200);
 }
 
 async function openAuthenticatedApp(browser: Browser, actor: Actor) {
@@ -32,6 +30,8 @@ async function openAuthenticatedApp(browser: Browser, actor: Actor) {
   const page = await context.newPage();
   await page.goto('http://127.0.0.1:3000/app');
   await waitForAppReady(page);
+  const session = await page.request.get('/api/auth/me');
+  expect(session.status(), 'the browser session must be validated by the real API').toBe(200);
   const payload = await session.json();
   expect(payload.user.email).toBe(actor.email);
   return { context, page };
