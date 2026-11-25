@@ -104,7 +104,7 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
     await expect(buyer.locator('#pg')).toContainText('wallet connection and payment handoff are not available yet.');
     await buyer.goto('/app');
     await buyer.locator('#app .top button[data-pg="profile"]').click();
-    await buyer.locator('#pg [data-pg="level"]').click();
+    await buyer.locator('#pg .pt-pills button[data-pg="level"]').click();
     await expect(buyer.locator('#pg')).toContainText('No live level, qualification or progress record is currently connected');
     await expect(buyer.locator('#pg')).not.toContainText('10 completed contracts');
     await buyer.goto('/market/' + fixture.b2bListingId);
@@ -256,8 +256,7 @@ test('two real browser sessions exchange a PostgreSQL-backed B2B listing enquiry
     await buyer.goto('/market/' + fixture.b2bListingId);
     await expect(buyer.getByRole('heading', { name: fixture.b2bListingTitle })).toBeVisible({ timeout: 20_000 });
     await expect(buyer.getByText('1,250 available')).toBeVisible();
-    await expect(buyer.locator('#app')).not.toContainText('1–3 days');
-    await expect(buyer.locator('#app')).not.toContainText('Pixel Cats');
+    await expect(buyer.locator('#pg .pgs .sec').filter({ hasText: 'DETAILS' })).toHaveCount(0);
     await buyer.getByLabel('Your message').fill('Please confirm the delivery schedule for this B2B offer.');
     await buyer.getByRole('button', { name: 'Send enquiry' }).click();
     await expect(buyer.getByRole('status')).toContainText('Your enquiry has been sent');
