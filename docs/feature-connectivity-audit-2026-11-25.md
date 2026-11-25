@@ -53,7 +53,6 @@ A first-pass read of the base action dispatcher suggested sign-out was local-onl
 | Profile avatar picker | `avatar` and `rmphoto` update local state; the screen explicitly says the photo is kept on this device in the preview. | Device/local preview only; separate public-profile editor is server-backed |
 | Public profile editor | `tlUpdateProfile` sends bio, Instagram/X handles, website, profile photo and cover photo to `PATCH /api/profiles/me` when connected. | Connected; browser acceptance and payload-size limits still need verification |
 | Organization photo | Stored in localStorage under `tm.orgphoto.<id>`; not uploaded to organization backend. | Local-only |
-| Organization photo | Saved in localStorage under `tm.orgphoto.<id>`; not uploaded to organization backend. | Local-only |
 | Buyer/Seller mode | `mode` toggles local app state and local save; no server preference route is called for this switch. | Local-only preference |
 | Legacy deal controls | `dealcancel` changes a local deal status and `dealadv` increments a local step; the server-backed contract lifecycle is a separate flow. | Local-only legacy interaction; do not confuse with contract status |
 | Theme | Stored locally. | Expected device-only preference |
@@ -100,7 +99,7 @@ The Next.js pages were checked separately because they coexist with the large le
 - `/messages` and `/messages/[id]` load and reply to server-backed enquiries.
 - `/offers/new` creates a persistent draft; `/offers` loads, edits and deletes drafts. **These standalone Next.js offers pages do not expose the existing submit-for-review endpoint**, so users entering through this route cannot advance a draft to moderation from that page. The legacy `/app` wizard has a separate submit-for-review path.
 - `/nfts` calls the OpenSea proxy but is currently blocked by the missing server-side API key and correctly displays a provider-not-connected state.
-- The standalone Portfolio Manager is in the legacy runtime; its synthetic figures are covered above.
+- The Portfolio Manager module is part of the legacy runtime; its synthetic figures are covered above.
 
 ## Render dependency still present in the deployed market UI
 
