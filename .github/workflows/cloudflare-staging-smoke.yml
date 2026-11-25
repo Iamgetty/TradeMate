@@ -17,7 +17,7 @@ jobs:
     name: Verify deployed Cloudflare staging Worker
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 15
     steps:
       - name: Wait for staging Worker and verify public routes
         shell: bash
@@ -53,3 +53,16 @@ jobs:
           retry_get "$API_URL/api/health" /tmp/trademate-api-health.json "Staging API origin health"
           retry_get "$BASE_URL/api/health" /tmp/trademate-worker-api-health.json "Staging Worker API proxy"
           echo "Cloudflare staging homepage, PNG asset, API origin, and Worker proxy checks passed."
+
+      - name: Install frontend dependencies and Chromium
+        working-directory: TradeMate-main/apps/web
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Run browser acceptance tests against Cloudflare staging
+        working-directory: TradeMate-main/apps/web
+        env:
+          CI: "true"
+          TRADEMATE_E2E_BASE_URL: https://trademate-staging.trademate-web.workers.dev
+        run: npx playwright test e2e/app-shell.spec.ts
