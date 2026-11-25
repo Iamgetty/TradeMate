@@ -28,6 +28,16 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
+      - name: Verify installed root helper matches reviewed source
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$(sha256sum infra/aws/scripts/trademate-promote-api-release.sh | awk '{print $1}')"
+          actual="$(sha256sum /usr/local/sbin/trademate-promote-api-release | awk '{print $1}')"
+          test "$expected" = "$actual"
+          sudo -l | grep -F '/usr/local/sbin/trademate-promote-api-release'
+          echo "Installed API promotion helper matches the reviewed repository source."
+
       - name: Reject stale revisions and verify host headroom
         id: guard
         shell: bash
