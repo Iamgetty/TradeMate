@@ -11,6 +11,7 @@ on:
       - ".github/workflows/aws-staging-migration-task.yml"
       - ".github/workflows/aws-staging-build-images.yml"
       - ".github/workflows/aws-ec2-deploy-exchange-feed.yml"
+      - ".github/workflows/*.yml"
       - ".github/workflows/aws-staging-api-promotion.yml"
       - ".github/workflows/aws-ec2-deploy-exchange-feed.yml"
   push:
