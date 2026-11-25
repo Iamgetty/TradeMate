@@ -2,6 +2,20 @@
 
 > **Superseded cost decision — 22 November 2026:** ECS/Fargate is removed from the active TradeMate migration roadmap because it adds recurring cost. The ECS/Fargate, ALB, NAT Gateway and related CloudFormation templates/workflows in this directory are retained as historical, un-deployed design artifacts only. **Do not execute either existing change set or provision any of these resources.** The current investigation is limited to Cloudflare Workers for the web frontend and potential reuse of the existing EC2 host plus existing RDS for backend workloads, subject to capacity/security acceptance. Keep Render online until a replacement is fully tested and explicitly approved. No new paid AWS resource is authorized.
 
+## Current verified staging state (25 November 2026)
+
+The following is a live status snapshot, not production approval:
+
+- Cloudflare Workers `trademate-staging` is the Worker currently attached to `trademate.cfd` and `www.trademate.cfd`. Both domains are enabled and tested with HTTP 200.
+- Staging workers.dev URL: `https://trademate-staging.trademate-web.workers.dev`; homepage and API proxy acceptance pass.
+- A separate Worker named `trademate` is built with the same API-origin binding and tested at `https://trademate.trademate-web.workers.dev`. It is a candidate only; custom domains remain on `trademate-staging`.
+- The API is running on the existing EC2 staging host under systemd `trademate-api.service`, release `bf0f6ef7f340ee8274c30c7883b8dbc6cef499f0`. The health route returns HTTP 200. Feed service health is HTTP 200.
+- API runtime email code now uses the TradeMate sender name and the custom-domain logo URL; the compiled release was checked on-host. The logo route returns a valid PNG.
+- Latest exact-head TradeMate CI, PostgreSQL compatibility, API deployment, and Cloudflare staging smoke runs passed. Browser acceptance passed 8/8 on both staging and the production Worker candidate.
+- The MT5 quote collector remains local CSV-only by default. The staging feed's ingestion token and runtime configuration are **not** yet in place, so do not enable collector uploads or public quote broadcast.
+
+No production custom-domain cutover, production data migration, MT5 quote upload, or public quote redistribution is approved by this snapshot.
+
 ## Architecture decision
 
 TradeMate uses a split-cloud architecture:
