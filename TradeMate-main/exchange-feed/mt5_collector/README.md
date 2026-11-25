@@ -4,7 +4,7 @@
 - Windows laptop with MetaTrader 5 installed, running and logged in to the intended Exness account.
 - Python 3.10+.
 - MT5 terminal must have the configured instruments available in Market Watch.
-- The exchange-feed service must have `MT5_INGEST_TOKEN` configured securely and the MT5 ingestion PR deployed to a test environment.
+- Staging exchange-feed service at `https://feed.trademate.cfd`.
 
 ## Install
 Open PowerShell in this folder:
@@ -13,40 +13,44 @@ Open PowerShell in this folder:
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 py -m pip install -r requirements.txt
-```
-
-Create the working symbol list from the supplied template, then edit it only if your broker uses different names:
-
-```powershell
 Copy-Item .\symbols.example.json .\symbols.json
 ```
 
-Keep the `symbol` field as the normalized TradeMate symbol; `mt5_symbol` must exactly match the broker's symbol (including suffixes such as m).
+Keep `symbol` normalized for TradeMate. `mt5_symbol` must exactly match the broker symbol (including suffixes such as `m`). Confirm each configured symbol exists in Market Watch before running.
 
-## First run: local CSV only
+## First run: local CSV-only validation (safe default)
 
-Do not configure an endpoint or token yet. Run:
+Do not set endpoint or token. Run:
 
 ```powershell
 py .\mt5_collector.py
 ```
 
-The collector will read ticks from the logged-in desktop MT5 terminal and refresh `%USERPROFILE%\Downloads\exness_mt5_live_quotes.csv`. It will not send data anywhere. Stop with Ctrl+C.
+It reads ticks from the local logged-in MT5 terminal and refreshes `%USERPROFILE%\\Downloads\\exness_mt5_live_quotes.csv`. No quotes are sent to TradeMate. Stop with Ctrl+C.
 
-## Optional: send to a test feed later
+## Staging upload (gated)
 
-Only after a test feed is deployed and its secret is configured, set the HTTPS URL and matching secret:
+The staging endpoint is `https://feed.trademate.cfd/mt5/quotes`. Remote upload remains disabled unless both `TRADEMATE_MT5_ENDPOINT` and `MT5_INGEST_TOKEN` are set.
+
+**Do not enable upload until the staging feed runtime has the matching `MT5_INGEST_TOKEN` configured and tested.** The token is stored in AWS Systems Manager Parameter Store as the SecureString `/trademate/staging/MT5_INGEST_TOKEN`. Do not put it in `symbols.json`, source control, chat, screenshots, or logs. Retrieve it only from an AWS-authenticated account with approved access, and never paste it into a terminal command that is saved in history.
+
+When the backend runtime is confirmed configured, set the local session variables and run:
 
 ```powershell
-$env:TRADEMATE_MT5_ENDPOINT = "https://YOUR-TEST-FEED-HOST"
-$env:MT5_INGEST_TOKEN = "YOUR_LONG_RANDOM_SECRET"
+$env:TRADEMATE_MT5_ENDPOINT = "https://feed.trademate.cfd"
+$env:MT5_INGEST_TOKEN = "<retrieve securely; do not save or share>"
 py .\mt5_collector.py
 ```
 
-Do not put secrets in symbols.json or commit them to GitHub.
+The collector will keep a local CSV snapshot and post quote batches to the HTTPS endpoint. Remove the session token when done:
 
-## Safety notes
-- Use a test/staging feed first, not production.
-- The endpoint token must be at least 32 characters and must be stored as a Render secret/environment variable, not in source control.
-- This collector sends MT5 bid/ask/last and broker tick timestamps. It does not imply that the broker permits public redistribution.
-- CFD quotes must be identified as broker CFD prices. Obtain Exness and any relevant exchange permissions before public display.
+```powershell
+Remove-Item Env:\\MT5_INGEST_TOKEN
+Remove-Item Env:\\TRADEMATE_MT5_ENDPOINT
+```
+
+## Safety / permission gates
+- The collector is read-only: no order, deal or trade-management calls are present.
+- It sends bid/ask/last, volume and broker tick timestamps only.
+- These are Exness broker CFD prices where applicable; they are not necessarily exchange prices.
+- Do not enable public broadcast/redistribution without written broker and relevant instrument permissions. The feed's public-broadcast and redistribution flags must remain disabled until approval.
