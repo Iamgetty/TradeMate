@@ -23,18 +23,19 @@ Verified:
 
 ## Critical findings requiring correction before production promotion
 
+A first-pass read of the base action dispatcher suggested sign-out was local-only. Tracing the later action wrappers showed the connected path is correctly intercepted: it calls `POST /api/auth/logout`, resets local session state and reports whether server revocation was confirmed. Sign-out is therefore **connected in the current deployed source**; retain explicit tests for success and network-failure paths.
+
 | ID | Area | Evidence / actual behaviour | Status | Required action |
 |---|---|---|---|---|
-| CR-01 | Sign out | `act.logout` only clears `st.stack`, redraws and displays “Signed out (preview only)”. It does not call the existing `POST /api/auth/logout` route, revoke the server session or clear the auth token through the API. | Disconnected after sign-in | Wire sign out to server logout, clear client auth state/cookies safely, then redirect. Test expired-session and network-failure behaviour. |
-| CR-02 | Portfolio Manager valuation | `PMD` hard-codes portfolio value $24,750.50, change +12.8%, balance $12,430.75, +5.2%, activity counts and document records. The page then derives a changing chart from live Binance BTC/ETH/SOL/BNB prices using fixed asset weights anchored to that hard-coded value. | Synthetic data presented as a portfolio | Remove or prominently label demo data. Do not present these as a user's holdings, balance, performance or investment history. Replace with an actual ledger/portfolio source only after product and data model are defined. |
-| CR-03 | Portfolio documents | `PMD.docs` hard-codes agreement, identity and proof-of-address rows, including signed flags and dates. They are not loaded from the organization document API. | Static / synthetic | Replace with real authenticated document records or clearly label as sample preview. Never imply a user has signed or submitted a document unless persisted. |
-| CR-04 | Account sign-in provider linking | `act.link` toggles `st.links` only. Telegram, X and Google controls do not perform OAuth or call a backend account-link route. | Local-only | Remove fake Linked state or implement OAuth state/nonce, callback, account binding and unlink lifecycle. |
-| CR-05 | Advertising request | `act.advsend` validates only a local campaign title, shows “Request sent”, then navigates back. No request API exists in the API module. | Fake success / local-only | Do not show success until a persisted server request exists; otherwise show “not available”. |
-| CR-06 | Promotions | `act.promo` toggles `st.open` and displays Joined/Left. No promotion participation route or record exists. | Local-only | Mark as preview or implement server-side eligibility, participation and audit records. |
-| CR-07 | Referral / rewards / affiliate | Referral code is derived client-side from UID; referral stats and rewards are hard-coded zero. Rewards tasks/points are illustrative. Affiliate join toggles `st.joinedAff`; affiliate page says Coming soon. | Static / local-only | Do not show earned points, joined status or commissions as real. Implement attribution, qualification, ledger, abuse controls and settlement before launch. |
-| CR-08 | Wallet and money movement | Wallet choices show “Wallet connection is not enabled yet”; crypto deposit is disabled; fiat deposit and transfer buttons show not connected. No wallet, deposit, withdrawal, transfer or custody ledger controller exists in the API module. | Disabled / not implemented | Keep disabled. Decide custody/non-custody model, supported networks, payment providers, compliance, ledger/reconciliation and controls before implementation. |
-| CR-09 | KYC | Signed-in KYC submit explicitly says “Identity verification is not open yet”; no KYC submission controller/provider workflow exists. | Disabled / not implemented | Keep unavailable until a KYC provider and case lifecycle are integrated and accepted. |
-| CR-10 | FX and MT5 feeds | Live feed health reports FX `not_configured`, 0 instruments/quotes, and MT5 0 quotes. Public MT5 broadcast is false and redistribution permission is unconfirmed. | Disconnected / awaiting configuration | Configure an authorized FX provider and broker-connected MT5 collector; verify freshness and permission before enabling public MT5 broadcast. |
+| CR-01 | Portfolio Manager valuation | `PMD` hard-codes portfolio value $24,750.50, change +12.8%, balance $12,430.75, +5.2%, activity counts and document records. The page then derives a changing chart from live Binance BTC/ETH/SOL/BNB prices using fixed asset weights anchored to that hard-coded value. | Synthetic data presented as a portfolio | Remove or prominently label demo data. Do not present these as a user's holdings, balance, performance or investment history. Replace with an actual ledger/portfolio source only after product and data model are defined. |
+| CR-02 | Portfolio documents | `PMD.docs` hard-codes agreement, identity and proof-of-address rows, including signed flags and dates. They are not loaded from the organization document API. | Static / synthetic | Replace with real authenticated document records or clearly label as sample preview. Never imply a user has signed or submitted a document unless persisted. |
+| CR-03 | Account sign-in provider linking | `act.link` toggles `st.links` only. Telegram, X and Google controls do not perform OAuth or call a backend account-link route. | Local-only | Remove fake Linked state or implement OAuth state/nonce, callback, account binding and unlink lifecycle. |
+| CR-04 | Advertising request | `act.advsend` validates only a local campaign title, shows “Request sent”, then navigates back. No request API exists in the API module. | Fake success / local-only | Do not show success until a persisted server request exists; otherwise show “not available”. |
+| CR-05 | Promotions | `act.promo` toggles `st.open` and displays Joined/Left. No promotion participation route or record exists. | Local-only | Mark as preview or implement server-side eligibility, participation and audit records. |
+| CR-06 | Referral / rewards / affiliate | Referral code is derived client-side from UID; referral stats and rewards are hard-coded zero. Rewards tasks/points are illustrative. Affiliate join toggles `st.joinedAff`; affiliate page says Coming soon. | Static / local-only | Do not show earned points, joined status or commissions as real. Implement attribution, qualification, ledger, abuse controls and settlement before launch. |
+| CR-07 | Wallet and money movement | Wallet choices show “Wallet connection is not enabled yet”; crypto deposit is disabled; fiat deposit and transfer buttons show not connected. No wallet, deposit, withdrawal, transfer or custody ledger controller exists in the API module. | Disabled / not implemented | Keep disabled. Decide custody/non-custody model, supported networks, payment providers, compliance, ledger/reconciliation and controls before implementation. |
+| CR-08 | KYC | Signed-in KYC submit explicitly says “Identity verification is not open yet”; no KYC submission controller/provider workflow exists. | Disabled / not implemented | Keep unavailable until a KYC provider and case lifecycle are integrated and accepted. |
+| CR-09 | FX and MT5 feeds | Live feed health reports FX `not_configured`, 0 instruments/quotes, and MT5 0 quotes. Public MT5 broadcast is false and redistribution permission is unconfirmed. | Disconnected / awaiting configuration | Configure an authorized FX provider and broker-connected MT5 collector; verify freshness and permission before enabling public MT5 broadcast. |
 
 ## Other local-only, static or misleading interactions
 
@@ -62,7 +63,7 @@ Verified:
 | Support tickets/feedback in preview mode | Local fallback creates local ticket/feedback records when not connected. Connected path calls API. | Preview-only fallback; connected path exists |
 | Nickname in preview mode | Saves to local state when not connected; connected path calls profile API. | Preview-only fallback |
 | Account preferences | Supported preference fields call `PATCH /api/preferences`. | Connected |
-| Two-factor/session/account deletion | Real API calls exist in the UI. Logout is the notable disconnected auth action. | Connected; full browser acceptance outstanding |
+| Two-factor/session/account deletion/logout | Real API calls exist in the UI, including the connected logout wrapper. | Connected; full browser acceptance outstanding |
 
 ## Server-backed workflows present in source
 
@@ -117,7 +118,7 @@ Note: `/health` at the API domain root (without `/api`) returns 404 by design be
 ## Full acceptance work still required
 
 1. Fix CR-01 sign out before treating auth/session lifecycle as complete.
-2. Remove or clearly label the Portfolio Manager synthetic valuation, balances, activity counts and sample documents.
+1. Remove or clearly label the Portfolio Manager synthetic valuation, balances, activity counts and sample documents.
 2. Replace fake success states for waitlist, advertising, promotions, affiliate and newsletter with honest disabled states until their backend workflows exist.
 3. Keep KYC, deposits, transfers, wallet and card disabled until their real providers/services exist.
 4. Configure FX and MT5 only with valid provider/broker credentials and authorization; validate quote freshness, reconnect and stale-data handling.
