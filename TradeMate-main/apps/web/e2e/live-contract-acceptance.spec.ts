@@ -95,6 +95,18 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
     await buyer.locator('#pg [data-pg="kycinfo"]').click();
     await expect(buyer.locator('#pg')).toContainText('Identity verification is not open yet. No submission is available.');
     await expect(buyer.locator('#pg')).not.toContainText('Verification submitted');
+    await buyer.goto('/app');
+    await buyer.locator('#app .top button[data-pg="search"]').click();
+    await expect(buyer.locator('#pg')).toContainText('Your recent searches will show up here.');
+    await expect(buyer.locator('#pg')).not.toContainText('Web design');
+    await buyer.goto('/app');
+    await buyer.locator('#app .top button[data-pg="scan"]').click();
+    await expect(buyer.locator('#pg')).toContainText('wallet connection and payment handoff are not available yet.');
+    await buyer.goto('/app');
+    await buyer.locator('#app .top button[data-pg="profile"]').click();
+    await buyer.locator('#pg [data-pg="level"]').click();
+    await expect(buyer.locator('#pg')).toContainText('No live level, qualification or progress record is currently connected');
+    await expect(buyer.locator('#pg')).not.toContainText('10 completed contracts');
     await buyer.goto('/market/' + fixture.b2bListingId);
     const buyerContractsResponse = await buyer.request.get('/api/market/contracts/mine');
     expect(buyerContractsResponse.status(), 'buyer contract list API must be available').toBe(200);
