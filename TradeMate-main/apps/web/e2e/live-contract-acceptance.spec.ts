@@ -29,7 +29,7 @@ async function openProfilePage(page: Page) {
     const profilePage = page.locator('#pg .pgs[data-id="profile"]');
     try {
       await expect(profilePage).toBeVisible({ timeout: 8_000 });
-      await expect(profilePage.locator('.pt-hero')).toBeVisible({ timeout: 8_000 });
+      await expect(profilePage.locator('.idp-cq')).toBeVisible({ timeout: 8_000 });
     } catch (error) {
       const diagnostic = await page.evaluate(() => ({
         url: location.href,
@@ -153,7 +153,7 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
     await waitForAppReady(buyer);
     await openProfilePage(buyer);
     // The level control is the second pill in the profile hero; scope to the hero rather than relying on a styling wrapper.
-    const profileHero = buyer.locator('#pg .pt-hero');
+    const profileHero = buyer.locator('#pg .idp-cq');
     await expect(profileHero).toBeVisible();
     const levelPill = profileHero.locator('button[data-pg="level"]');
     await expect(levelPill).toHaveCount(1);
