@@ -207,7 +207,7 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
       var a = h.indexOf('<div class="uc-tabs">');
       if (a < 0) return h;
       var te = h.indexOf("</div>", a) + 6, end = '<div class="uc-card">', rg = "Region: Global</div></div></div>", re = te;
-      if (h.indexOf(end, te) === te) { var k = h.indexOf(rg, te); if (k < 0) return h; re = k + rg.length; }
+      if (h.indexOf(end, te) === te) { var k = h.indexOf("</div></div>", te); if (k < 0) return h; re = k + 12; }
       var lo = h.indexOf('<div style="padding:22px 16px"><button class="btn o wide" data-pg="logout">', re);
       if (lo < 0) return h;
       var sec = secRow();
