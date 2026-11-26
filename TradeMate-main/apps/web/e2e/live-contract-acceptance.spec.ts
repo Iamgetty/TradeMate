@@ -18,33 +18,28 @@ async function waitForAppReady(page: Page) {
   await expect(page.locator('#app .top button[data-pg="profile"]')).toBeVisible({ timeout: 20_000 });
 }
 
-// Open the Profile feature page from the topbar. A click that lands before the app's
-// delegated handler is ready is silently lost, so re-click until the page renders.
-// If it never renders, fail with a diagnostic of what the page actually shows.
+// Open the Profile feature page from the topbar. Do not retry the click if the
+// overlay opens: the open feature page covers the topbar and intercepts later clicks.
 async function openProfilePage(page: Page) {
   const pageErrors: string[] = [];
   const onPageError = (error: Error) => { pageErrors.push(error.message); };
   page.on('pageerror', onPageError);
   try {
-    const attempts = 3;
-    for (let attempt = 1; attempt <= attempts; attempt += 1) {
-      await page.locator('#app .top button[data-pg="profile"]').click();
-      try {
-        await expect(page.locator('#pg .pgs[data-id="profile"] .pt-hero')).toBeVisible({ timeout: 4_000 });
-        return;
-      } catch {
-        if (attempt < attempts) continue;
-        const diagnostic = await page.evaluate(() => ({
-          url: location.href,
-          pgPageId: document.querySelector('#pg .pgs')?.getAttribute('data-id') ?? null,
-          pgHtml: (document.querySelector('#pg')?.innerHTML ?? '').slice(0, 600),
-          appText: ((document.querySelector('#app') as HTMLElement | null)?.innerText ?? '').slice(0, 300),
-          htmlClass: document.documentElement.className,
-          viewport: { w: window.innerWidth, h: window.innerHeight },
-        })).catch(() => ({ diagnostic: 'page.evaluate failed' }));
-        throw new Error('Profile page did not render after ' + attempts + ' clicks. '
-          + JSON.stringify({ diagnostic, pageErrors: pageErrors.slice(0, 5) }));
-      }
+    await page.locator('#app .top button[data-pg="profile"]').click();
+    const profilePage = page.locator('#pg .pgs[data-id="profile"]');
+    try {
+      await expect(profilePage).toBeVisible({ timeout: 8_000 });
+      await expect(profilePage.locator('.pt-hero')).toBeVisible({ timeout: 8_000 });
+    } catch (error) {
+      const diagnostic = await page.evaluate(() => ({
+        url: location.href,
+        pgPageId: document.querySelector('#pg .pgs')?.getAttribute('data-id') ?? null,
+        pgHtml: (document.querySelector('#pg')?.innerHTML ?? '').slice(0, 1200),
+        appText: ((document.querySelector('#app') as HTMLElement | null)?.innerText ?? '').slice(0, 500),
+        viewport: { w: window.innerWidth, h: window.innerHeight },
+      })).catch(() => ({ diagnostic: 'page.evaluate failed' }));
+      throw new Error('Profile page did not render after one click. '
+        + JSON.stringify({ diagnostic, pageErrors: pageErrors.slice(0, 5) }));
     }
   } finally {
     page.off('pageerror', onPageError);
