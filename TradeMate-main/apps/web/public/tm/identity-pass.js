@@ -39,7 +39,7 @@
 .idp-bt{position:absolute;left:18px;right:18px;bottom:14px;display:flex;align-items:flex-end;justify-content:space-between;z-index:1}
 .idp-bt>div{display:flex;gap:8px;flex-wrap:wrap}
 .idp-ok{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border-radius:999px;border:1px solid color-mix(in srgb,var(--up) 45%,transparent);background:color-mix(in srgb,var(--up) 14%,transparent);color:var(--up);font:700 11.5px 'Hanken Grotesk',sans-serif;cursor:pointer}
-.idp-ok svg{width:14px;height:14px}
+.idp-ok svg{width:14px;height:14px}.idp-ok.pending{border-color:color-mix(in srgb,var(--dn) 45%,transparent);background:color-mix(in srgb,var(--dn) 12%,transparent);color:var(--dn)}
 .idp-sq{display:flex;align-items:center;gap:10px;min-height:62px;padding:0 12px;border-radius:16px;border:1px solid var(--line);background:var(--s2);color:var(--txt);font:700 13px 'Hanken Grotesk',sans-serif;cursor:pointer;text-align:left}
 .idp-sq svg{color:var(--am);flex:none}.idp-sq small{display:block;color:var(--mut);font-weight:600;font-size:11px;margin-top:2px}
 .idp-sqs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;position:relative;z-index:1}
@@ -172,7 +172,7 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
   }
 
   PG.profile = function () {
-    var e = "Seller" === st.mode, n = idvDone();
+    var e = "Seller" === st.mode;
     var chips = st.recent.filter(function (x) { return "More" !== x && (e || "Add Contract" !== x); }).map(function (x) {
       var f = FG.reduce(function (a, b) { return a.concat(b[1]); }, []).filter(function (y) { return y[0] === x; })[0] || ["", "more"];
       return '<button class="idp-chip" data-f="' + x + '" style="--h:' + HUE[x] + '">' + ic(f[1], "width:16px;height:16px") + x + "</button>";
