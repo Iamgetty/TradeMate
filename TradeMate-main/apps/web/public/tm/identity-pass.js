@@ -97,6 +97,7 @@
 .idp-ucl{display:grid;gap:12px;align-content:start}
 .idp-list .lr .lic{background:var(--s2)!important;border:1px solid var(--line)!important;box-shadow:none!important}
 .idp-ucr .uc-tabs{margin:0 0 12px;padding-left:0;padding-right:0}
+.uc-hd:has(+ .uc-tabs button[data-arg="My info"].on) h2{display:none}
 .idp-list{background:var(--s1);border:1px solid var(--line);border-radius:22px;overflow:hidden}
 .idp-list .lr{border-bottom:1px solid var(--line);padding:0 14px;min-height:56px}
 .idp-list .sec{padding:16px 14px 8px;border-bottom:1px solid var(--line)}
@@ -110,8 +111,8 @@
 .idp-at.on{outline:3px solid var(--am)}.idp-at svg{position:absolute;inset:0;width:100%;height:100%;display:block}.idp-at img{position:relative;width:58%}
 .idp-avp .sec{justify-self:stretch;padding:8px 2px 0}
 .idp-rg{fill:none;stroke:var(--s3);stroke-width:6;stroke-linecap:round}.idp-rg.on{stroke:var(--am)}
-.idp-pt{fill:var(--txt);stroke:none;font:800 19px 'Hanken Grotesk',sans-serif;text-anchor:middle}
-.idp-rs{width:68px!important;height:68px!important;display:block;flex:none}
+.idp-pt{fill:var(--txt);stroke:none;font:700 14px 'Hanken Grotesk',sans-serif;text-anchor:middle}
+.idp-rs{width:54px!important;height:54px!important;display:block;flex:none}
 html[data-theme="purple"] .idp-cta{background:var(--grad);color:#fff;box-shadow:none}
 html[data-theme="light"] .idp-cta:not(#a):not(#b){background:var(--am)!important;background-image:none!important;color:#fff!important;box-shadow:none!important}
 html[data-theme="light"] .idp-ab{color:#fff}
@@ -191,11 +192,10 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
   function secRow() {
     var tf = st.twofaStatus, on = !!(tf && tf.enabled), kyc = idvDone() >= 3, n = 1 + (on ? 1 : 0) + (kyc ? 1 : 0);
     var lv = n >= 3 ? ["High", "--up"] : n === 2 ? ["Medium", "--am"] : ["Low", "--dn"];
-    var hint = !on ? "Turn on two-factor sign-in to raise it" : !kyc ? "Verify your identity to raise it" : "";
-    var wait = secBusy, bars = "";
-    for (var i = 0; i < 3; i++) bars += '<i' + (!wait && i < n ? ' class="on"' : "") + "></i>";
+    var hint = "";
+    var wait = secBusy;
     var name = wait ? "Checking…" : lv[0];
-    return '<button class="idp-sec" data-pg="security" style="--lv:' + (wait ? "var(--mut)" : "var(--" + lv[1].slice(2) + ")") + '" aria-label="Security level: ' + name + (hint && !wait ? ". " + hint : "") + '"><span class="idp-ico">' + ic("shield") + '</span><span class="idp-sl"><span class="idp-sl1">Security level: <b>' + name + '</b><span class="idp-bars" aria-hidden="true">' + bars + '</span></span><span class="idp-sl3">Region: Global</span>' + (hint && !wait ? '<span class="idp-sl2">' + hint + " \u2192</span>" : "") + "</span>" + ic("chev", "width:18px;height:18px;color:var(--mut)") + "</button>";
+    return '<button class="idp-sec" data-pg="security" style="--lv:' + (wait ? "var(--mut)" : "var(--" + lv[1].slice(2) + ")") + '" aria-label="Security level: ' + name + '"><span class="idp-ico">' + ic("shield") + '</span><span class="idp-sl"><span class="idp-sl1">Security level: <b>' + name + '</b></span><span class="idp-sl3">Region: Global</span></span>' + ic("chev", "width:18px;height:18px;color:var(--mut)") + "</button>";
   }
 
   // User Center: same rows, handlers and content as before, regrouped into one card per tab under the pass.
