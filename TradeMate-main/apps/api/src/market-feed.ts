@@ -107,8 +107,9 @@ function attachMarketFeed(server: Server, options: MarketFeedOptions = {}) {
   heartbeat.unref?.();
 
   server.on('upgrade', (request, socket, head) => {
-    let pathname = '';
-    try { pathname = new URL(request.url || '/', 'http://localhost').pathname; } catch { return; }
+    const pathname = (() => {
+      try { return new URL(request.url || '/', 'http://localhost').pathname; } catch { return ''; }
+    })();
     if (pathname !== '/api/market-feed') return;
     if (!isAllowedMarketFeedOrigin(request.headers.origin)) {
       socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
