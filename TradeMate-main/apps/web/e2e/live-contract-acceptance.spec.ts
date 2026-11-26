@@ -18,6 +18,39 @@ async function waitForAppReady(page: Page) {
   await expect(page.locator('#app .top button[data-pg="profile"]')).toBeVisible({ timeout: 20_000 });
 }
 
+// Open the Profile feature page from the topbar. A click that lands before the app's
+// delegated handler is ready is silently lost, so re-click until the page renders.
+// If it never renders, fail with a diagnostic of what the page actually shows.
+async function openProfilePage(page: Page) {
+  const pageErrors: string[] = [];
+  const onPageError = (error: Error) => { pageErrors.push(error.message); };
+  page.on('pageerror', onPageError);
+  try {
+    const attempts = 3;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      await page.locator('#app .top button[data-pg="profile"]').click();
+      try {
+        await expect(page.locator('#pg .pgs[data-id="profile"] .pt-hero')).toBeVisible({ timeout: 4_000 });
+        return;
+      } catch {
+        if (attempt < attempts) continue;
+        const diagnostic = await page.evaluate(() => ({
+          url: location.href,
+          pgPageId: document.querySelector('#pg .pgs')?.getAttribute('data-id') ?? null,
+          pgHtml: (document.querySelector('#pg')?.innerHTML ?? '').slice(0, 600),
+          appText: ((document.querySelector('#app') as HTMLElement | null)?.innerText ?? '').slice(0, 300),
+          htmlClass: document.documentElement.className,
+          viewport: { w: window.innerWidth, h: window.innerHeight },
+        })).catch(() => ({ diagnostic: 'page.evaluate failed' }));
+        throw new Error('Profile page did not render after ' + attempts + ' clicks. '
+          + JSON.stringify({ diagnostic, pageErrors: pageErrors.slice(0, 5) }));
+      }
+    }
+  } finally {
+    page.off('pageerror', onPageError);
+  }
+}
+
 async function openAuthenticatedApp(browser: Browser, actor: Actor) {
   const context = await browser.newContext({ baseURL: 'http://127.0.0.1:3000' });
   await context.addCookies([{
@@ -96,7 +129,7 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
     const buyerSession = await openAuthenticatedApp(browser, fixture.buyer);
     buyerContext = buyerSession.context;
     let buyer = buyerSession.page;
-    await buyer.locator('#app .top button[data-pg="profile"]').click();
+    await openProfilePage(buyer);
     await expect(buyer.locator('#pg')).not.toContainText('Security level: High');
     await expect(buyer.locator('#pg')).not.toContainText('Region: Global');
     await buyer.locator('#pg [data-pg="kycinfo"]').click();
@@ -123,7 +156,7 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
     buyer = await buyerContext.newPage();
     await buyer.goto('/app');
     await waitForAppReady(buyer);
-    await buyer.locator('#app .top button[data-pg="profile"]').click();
+    await openProfilePage(buyer);
     // The level control is the second pill in the profile hero; scope to the hero rather than relying on a styling wrapper.
     const profileHero = buyer.locator('#pg .pt-hero');
     await expect(profileHero).toBeVisible();
