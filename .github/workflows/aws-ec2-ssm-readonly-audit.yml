@@ -39,7 +39,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # shellcheck disable=SC2016 -- AWS CLI receives literal remote-shell commands.
+          # AWS CLI receives literal remote-shell commands; do not expand $x locally.
+          # shellcheck disable=SC2016
           COMMAND_ID="$(aws ssm send-command \
             --instance-ids i-035b1f1d00052c77e \
             --document-name AWS-RunShellScript \
