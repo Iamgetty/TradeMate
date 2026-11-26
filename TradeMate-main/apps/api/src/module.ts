@@ -7,6 +7,7 @@ import { createRlsAwarePool, sessionTokenFromCookieHeader } from './database-con
 import { decodeProfileImageDataUrl, hasMatchingUploadSignature } from './upload-validation';
 import { decimalToUnits, fiatCentsToQuantityUnits, productToFiatCents, unitsToDecimal } from './p2p-decimal';
 import { renderTradeMateEmail } from './email-templates';
+import { verifyPersonaWebhookSignature } from './persona-webhook-signature';
 import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema, sportsOrganizationCreateBodySchema, sportsOrganizationMembershipInviteBodySchema, sportsRepresentativeMandateCreateBodySchema, sportsRepresentativeMandateResponseBodySchema, sportsTransferOpportunityCreateBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
@@ -242,24 +243,6 @@ class PersonaWebhookController {
     return { received: true, duplicate: inserted.rowCount === 0 };
   }
 }
-
-const verifyPersonaWebhookSignature = (rawBody: Buffer, signatureHeader: string, secret: string): boolean => {
-  if (!signatureHeader || !secret) return false;
-  const nowSeconds = Math.floor(Date.now() / 1000);
-  for (const signatureSet of signatureHeader.trim().split(/\s+/)) {
-    const timestampMatch = signatureSet.match(/(?:^|,)t=(\d+)/);
-    const signatureMatch = signatureSet.match(/(?:^|,)v1=([a-f0-9]{64})(?:,|$)/i);
-    if (!timestampMatch || !signatureMatch) continue;
-    const timestamp = Number(timestampMatch[1]);
-    if (!Number.isSafeInteger(timestamp) || Math.abs(nowSeconds - timestamp) > 300) continue;
-    const expected = createHmac('sha256', secret)
-      .update(String(timestamp) + '.' + rawBody.toString('utf8'))
-      .digest();
-    const supplied = Buffer.from(signatureMatch[1], 'hex');
-    if (supplied.length === expected.length && timingSafeEqual(supplied, expected)) return true;
-  }
-  return false;
-};
 
 @Controller('auth')
 class AuthController {
