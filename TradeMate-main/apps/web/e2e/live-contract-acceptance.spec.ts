@@ -152,8 +152,9 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
     await buyer.goto('/app');
     await waitForAppReady(buyer);
     await openProfilePage(buyer);
-    // The level control is the second pill in the profile hero; scope to the hero rather than relying on a styling wrapper.
-    const profileHero = buyer.locator('#pg .idp-cq');
+    // The identity pass has its own level pill; the verification card has a separate benefits link.
+    // Scope to the pass so the test exercises the actual account-level navigation control.
+    const profileHero = buyer.locator('#pg .idp-cq .idp-c3');
     await expect(profileHero).toBeVisible();
     const levelPill = profileHero.locator('button[data-pg="level"]');
     await expect(levelPill).toHaveCount(1);
