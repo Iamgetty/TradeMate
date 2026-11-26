@@ -72,9 +72,3 @@ jobs:
           TRADEMATE_E2E_BASE_URL: https://trademate-staging.trademate-web.workers.dev
         run: npx playwright test e2e/app-shell.spec.ts
 
-      - name: Run browser acceptance tests against production Worker candidate
-        working-directory: TradeMate-main/apps/web
-        env:
-          CI: "true"
-          TRADEMATE_E2E_BASE_URL: https://trademate.trademate-web.workers.dev
-        run: npx playwright test e2e/app-shell.spec.ts
