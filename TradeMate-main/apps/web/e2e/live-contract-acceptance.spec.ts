@@ -11,6 +11,41 @@ type Fixture = {
   b2bListingTitle: string;
 };
 
+async function waitForAppReady(page: Page) {
+  await expect(page.locator('#app .view')).toBeVisible({ timeout: 20_000 });
+  // The shell can appear before the app's delegated click handler is installed.
+  // Wait for a JS-rendered topbar control before interacting with the app.
+  await expect(page.locator('#app .top button[data-pg="profile"]')).toBeVisible({ timeout: 20_000 });
+}
+
+// Open the Profile feature page from the topbar. Do not retry the click if the
+// overlay opens: the open feature page covers the topbar and intercepts later clicks.
+async function openProfilePage(page: Page) {
+  const pageErrors: string[] = [];
+  const onPageError = (error: Error) => { pageErrors.push(error.message); };
+  page.on('pageerror', onPageError);
+  try {
+    await page.locator('#app .top button[data-pg="profile"]').click();
+    const profilePage = page.locator('#pg .pgs[data-id="profile"]');
+    try {
+      await expect(profilePage).toBeVisible({ timeout: 8_000 });
+      await expect(profilePage.locator('.idp-cq')).toBeVisible({ timeout: 8_000 });
+    } catch (error) {
+      const diagnostic = await page.evaluate(() => ({
+        url: location.href,
+        pgPageId: document.querySelector('#pg .pgs')?.getAttribute('data-id') ?? null,
+        pgHtml: (document.querySelector('#pg')?.innerHTML ?? '').slice(0, 1200),
+        appText: ((document.querySelector('#app') as HTMLElement | null)?.innerText ?? '').slice(0, 500),
+        viewport: { w: window.innerWidth, h: window.innerHeight },
+      })).catch(() => ({ diagnostic: 'page.evaluate failed' }));
+      throw new Error('Profile page did not render after one click. '
+        + JSON.stringify({ diagnostic, pageErrors: pageErrors.slice(0, 5) }));
+    }
+  } finally {
+    page.off('pageerror', onPageError);
+  }
+}
+
 async function openAuthenticatedApp(browser: Browser, actor: Actor) {
   const context = await browser.newContext({ baseURL: 'http://127.0.0.1:3000' });
   await context.addCookies([{
@@ -22,7 +57,7 @@ async function openAuthenticatedApp(browser: Browser, actor: Actor) {
   }]);
   const page = await context.newPage();
   await page.goto('http://127.0.0.1:3000/app');
-  await expect(page.locator('#app .view')).toBeVisible({ timeout: 20_000 });
+  await waitForAppReady(page);
   const session = await page.request.get('/api/auth/me');
   expect(session.status(), 'the browser session must be validated by the real API').toBe(200);
   const payload = await session.json();
@@ -88,7 +123,51 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
   try {
     const buyerSession = await openAuthenticatedApp(browser, fixture.buyer);
     buyerContext = buyerSession.context;
-    const buyer = buyerSession.page;
+    let buyer = buyerSession.page;
+    await openProfilePage(buyer);
+    await expect(buyer.locator('#pg')).not.toContainText('Security level: High');
+    await expect(buyer.locator('#pg')).not.toContainText('Region: Global');
+    await buyer.locator('#pg [data-pg="kycinfo"]').click();
+    await expect(buyer.locator('#pg')).toContainText('Identity verification is not open yet. No submission is available.');
+    await expect(buyer.locator('#pg')).not.toContainText('Verification submitted');
+    // The profile feature-page stack has an overlay whose back control is not visible
+    // in this viewport. Reset the page instance while preserving the authenticated
+    // context/cookies; a fresh page starts with a clean in-memory navigation stack.
+    await buyer.close();
+    const cleanBuyerPage = await buyerContext.newPage();
+    await cleanBuyerPage.goto('/app');
+    await waitForAppReady(cleanBuyerPage);
+    // Continue the assertions using the fresh authenticated page.
+    buyer = cleanBuyerPage;
+    await buyer.locator('#app .top button[data-pg="search"]').click();
+    await expect(buyer.locator('#pg')).toContainText('Your recent searches will show up here.');
+    await expect(buyer.locator('#pg')).not.toContainText('Web design');
+    await buyer.goto('/app');
+    await waitForAppReady(buyer);
+    await buyer.locator('#app .top button[data-pg="scan"]').click();
+    await expect(buyer.locator('#pg')).toContainText('wallet connection and payment handoff are not available yet.');
+    // A new page resets the feature-page overlay stack; route navigation alone does not.
+    await buyer.close();
+    buyer = await buyerContext.newPage();
+    await buyer.goto('/app');
+    await waitForAppReady(buyer);
+    await openProfilePage(buyer);
+    // The identity pass has its own level pill; the verification card has a separate benefits link.
+    // Scope to the pass so the test exercises the actual account-level navigation control.
+    const profileHero = buyer.locator('#pg .idp-cq .idp-c3');
+    await expect(profileHero).toBeVisible();
+    const levelPill = profileHero.locator('button[data-pg="level"]');
+    await expect(levelPill).toHaveCount(1);
+    await expect(levelPill).toBeVisible();
+    await levelPill.click();
+    await expect(buyer.locator('#pg')).toContainText('No live level, qualification or progress record is currently connected');
+    await expect(buyer.locator('#pg')).not.toContainText('10 completed contracts');
+    await buyer.close();
+    buyer = await buyerContext.newPage();
+    // The remaining steps drive the app shell (#sbar, #app .view), so return to /app
+    // with a clean overlay stack rather than the public listing page.
+    await buyer.goto('/app');
+    await waitForAppReady(buyer);
     const buyerContractsResponse = await buyer.request.get('/api/market/contracts/mine');
     expect(buyerContractsResponse.status(), 'buyer contract list API must be available').toBe(200);
     const buyerContractsPayload = await buyerContractsResponse.json();
@@ -199,7 +278,7 @@ test('buyer creates a B2B contract proposal from the public listing and both par
     await expect(seller.getByText('Waiting for the other party')).toBeVisible();
 
     await buyer.goto('/app');
-    await expect(buyer.locator('#app .view')).toBeVisible();
+    await waitForAppReady(buyer);
     await openContract(buyer, contractTitle);
     await buyer.setViewportSize({ width: 390, height: 844 });
     await expectNoHorizontalOverflow(buyer, 'Clients newly proposed contract');
@@ -237,6 +316,7 @@ test('two real browser sessions exchange a PostgreSQL-backed B2B listing enquiry
     await buyer.goto('/market/' + fixture.b2bListingId);
     await expect(buyer.getByRole('heading', { name: fixture.b2bListingTitle })).toBeVisible({ timeout: 20_000 });
     await expect(buyer.getByText('1,250 available')).toBeVisible();
+    await expect(buyer.locator('#pg .pgs .sec').filter({ hasText: 'DETAILS' })).toHaveCount(0);
     await buyer.getByLabel('Your message').fill('Please confirm the delivery schedule for this B2B offer.');
     await buyer.getByRole('button', { name: 'Send enquiry' }).click();
     await expect(buyer.getByRole('status')).toContainText('Your enquiry has been sent');
@@ -258,7 +338,7 @@ test('two real browser sessions exchange a PostgreSQL-backed B2B listing enquiry
     await seller.getByRole('button', { name: 'Conversations', exact: true }).click();
     const sellerConversations = seller.locator('#pg .pgs[data-id="conversations"]');
     await expect(sellerConversations).toContainText(fixture.b2bListingTitle, { timeout: 15_000 });
-    await sellerConversations.locator('.cv-row').filter({ hasText: fixture.b2bListingTitle }).click();
+    await sellerConversations.locator('.cv-row[data-arg="' + buyerEnquiry.id + '"]').click();
     await expect(seller.locator('#dm')).toBeVisible();
     await expect(seller.getByText('Please confirm the delivery schedule for this B2B offer.')).toBeVisible();
     await seller.locator('#dm').fill('The delivery schedule is five business days after the contract is agreed.');
@@ -274,12 +354,12 @@ test('two real browser sessions exchange a PostgreSQL-backed B2B listing enquiry
     expect(sellerEnquiry, 'the seller must see the same persisted enquiry').toBeTruthy();
 
     await buyer.goto('/app');
-    await expect(buyer.locator('#app .view')).toBeVisible();
+    await waitForAppReady(buyer);
     await buyer.locator('#sbar [data-f="More"]').click();
     await buyer.getByRole('button', { name: 'Conversations', exact: true }).click();
     const buyerConversations = buyer.locator('#pg .pgs[data-id="conversations"]');
     await expect(buyerConversations).toContainText(fixture.b2bListingTitle, { timeout: 15_000 });
-    await buyerConversations.locator('.cv-row').filter({ hasText: fixture.b2bListingTitle }).click();
+    await buyerConversations.locator('.cv-row[data-arg="' + buyerEnquiry.id + '"]').click();
     await expect(buyer.getByText('The delivery schedule is five business days after the contract is agreed.')).toBeVisible();
 
     const durableMessages = await buyer.request.get('/api/market/enquiries/' + buyerEnquiry.id + '/messages');
@@ -288,6 +368,9 @@ test('two real browser sessions exchange a PostgreSQL-backed B2B listing enquiry
     expect(messagePayload.data.messages).toEqual(expect.arrayContaining([
       expect.objectContaining({ message: 'Please confirm the delivery schedule for this B2B offer.' }),
       expect.objectContaining({ message: 'The delivery schedule is five business days after the contract is agreed.' }),
+    ]));
+    expect(messagePayload.data.messages).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ message: 'Thanks for your message. I will get back to you shortly.' }),
     ]));
   } finally {
     await Promise.allSettled([buyerContext?.close(), sellerContext?.close()]);
