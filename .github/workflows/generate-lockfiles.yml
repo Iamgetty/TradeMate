@@ -33,7 +33,7 @@ jobs:
 
     steps:
       - name: Check out PR branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: fix/audit-remediation-2026-11-18
           fetch-depth: 0
