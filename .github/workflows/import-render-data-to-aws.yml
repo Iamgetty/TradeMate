@@ -97,6 +97,30 @@ jobs:
           table_counts > "$WORK/source-counts.txt"
           test -s "$WORK/source-counts.txt"
 
+          # Refuse a populated AWS target before any schema reconciliation writes.
+          set -a
+          source "$WORK/target.env"
+          set +a
+          table_counts > "$WORK/target-before-counts.txt"
+          if awk -F'|' '$2 != 0 && $1 != "auth_rate_limits" { print "Target contains existing application rows in table " $1 > "/dev/stderr"; bad=1 } END { exit bad }' "$WORK/target-before-counts.txt"; then
+            :
+          else
+            echo "::error::Refusing to import: AWS target is not empty. No target rows were changed."
+            exit 1
+          fi
+
+          # Schema and integrity comparisons must run after the guard and reconciliation,
+          # otherwise a missing definition supplied by migrations 051/052 fails too early.
+          set -a
+          source "$WORK/target.env"
+          set +a
+          pg_isready
+          # Migration 051 enforces Render's NOT NULL author identity after checking for null rows.
+          psql -X -v ON_ERROR_STOP=1 -f "TradeMate-main/apps/api/database/migrations/051_p2p_dispute_resolution_columns.sql"
+          psql -X -v ON_ERROR_STOP=1 -q -c "INSERT INTO public.schema_migrations (migration_name) VALUES ('051_p2p_dispute_resolution_columns.sql') ON CONFLICT (migration_name) DO NOTHING;"
+          psql -X -v ON_ERROR_STOP=1 -f "TradeMate-main/apps/api/database/migrations/052_render_view_reconciliation.sql"
+          psql -X -v ON_ERROR_STOP=1 -q -c "INSERT INTO public.schema_migrations (migration_name) VALUES ('052_render_view_reconciliation.sql') ON CONFLICT (migration_name) DO NOTHING;"
+
           # Fail closed unless every source column exists on AWS with the same PostgreSQL type and nullability.
           set -a
           source "$WORK/source.env"
@@ -176,26 +200,6 @@ jobs:
               raise SystemExit("Source and AWS integrity definitions differ; import was not attempted.")
           print("Source constraints and indexes are present on AWS.")
           PY
-
-          table_counts > "$WORK/target-before-counts.txt"
-          if awk -F'|' '$2 != 0 && $1 != "auth_rate_limits" { print "Target contains existing application rows in table " $1 > "/dev/stderr"; bad=1 } END { exit bad }' "$WORK/target-before-counts.txt"; then
-            :
-          else
-            echo "::error::Refusing to import: AWS target is not empty. No target rows were changed."
-            exit 1
-          fi
-
-          # Only after the empty-target guard passes may schema reconciliation mutate AWS.
-          # These migrations are additive/definition updates but are still target writes.
-          set -a
-          source "$WORK/target.env"
-          set +a
-          pg_isready
-          # Migration 051 enforces Render's NOT NULL author identity after checking for null rows.
-          psql -X -v ON_ERROR_STOP=1 -f "TradeMate-main/apps/api/database/migrations/051_p2p_dispute_resolution_columns.sql"
-          psql -X -v ON_ERROR_STOP=1 -q -c "INSERT INTO public.schema_migrations (migration_name) VALUES ('051_p2p_dispute_resolution_columns.sql') ON CONFLICT (migration_name) DO NOTHING;"
-          psql -X -v ON_ERROR_STOP=1 -f "TradeMate-main/apps/api/database/migrations/052_render_view_reconciliation.sql"
-          psql -X -v ON_ERROR_STOP=1 -q -c "INSERT INTO public.schema_migrations (migration_name) VALUES ('052_render_view_reconciliation.sql') ON CONFLICT (migration_name) DO NOTHING;"
 
           if [[ "$(cut -d'|' -f1 "$WORK/source-counts.txt" | sort)" != "$(cut -d'|' -f1 "$WORK/target-before-counts.txt" | sort)" ]]; then
             echo "::error::Source and target public table sets differ. No import attempted."
