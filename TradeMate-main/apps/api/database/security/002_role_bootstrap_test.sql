@@ -270,6 +270,37 @@ BEGIN
     RAISE EXCEPTION 'Expected global default function privileges to revoke PUBLIC execute for trademate_migrator.';
   END IF;
 
+  -- Future application tables/sequences must not silently inherit runtime access.
+  IF EXISTS (
+    SELECT 1
+    FROM pg_default_acl d
+    LEFT JOIN pg_namespace n ON n.oid = d.defaclnamespace
+    JOIN pg_roles owner_role ON owner_role.oid = d.defaclrole
+    CROSS JOIN LATERAL aclexplode(d.defaclacl) AS acl
+    WHERE owner_role.rolname = 'trademate_migrator'
+      AND (d.defaclnamespace = 0 OR n.nspname = 'public')
+      AND d.defaclobjtype = 'r'
+      AND acl.grantee = (SELECT oid FROM pg_roles WHERE rolname = 'trademate_app')
+      AND acl.privilege_type IN ('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER')
+  ) THEN
+    RAISE EXCEPTION 'Future public tables must not inherit privileges for trademate_app; add reviewed object-specific grants in migrations.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM pg_default_acl d
+    LEFT JOIN pg_namespace n ON n.oid = d.defaclnamespace
+    JOIN pg_roles owner_role ON owner_role.oid = d.defaclrole
+    CROSS JOIN LATERAL aclexplode(d.defaclacl) AS acl
+    WHERE owner_role.rolname = 'trademate_migrator'
+      AND (d.defaclnamespace = 0 OR n.nspname = 'public')
+      AND d.defaclobjtype = 'S'
+      AND acl.grantee = (SELECT oid FROM pg_roles WHERE rolname = 'trademate_app')
+      AND acl.privilege_type IN ('USAGE', 'SELECT', 'UPDATE')
+  ) THEN
+    RAISE EXCEPTION 'Future public sequences must not inherit privileges for trademate_app; add reviewed object-specific grants in migrations.';
+  END IF;
+
   IF (
     SELECT count(*)
     FROM pg_proc p

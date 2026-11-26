@@ -190,11 +190,14 @@ GRANT SELECT (user_id) ON TABLE public.user_sessions TO trademate_app;
 REVOKE UPDATE, DELETE ON TABLE public.audit_events FROM trademate_app;
 REVOKE ALL ON TABLE public.schema_migrations FROM trademate_app;
 
--- Objects created by the migrator in future migrations receive runtime grants.
+-- New tables and sequences must not silently inherit broad runtime access.
+-- Each migration that introduces an application object must add an explicit,
+-- reviewed grant for the API and/or worker after the object's data sensitivity
+-- and call sites have been assessed. Existing object grants above are unchanged.
 ALTER DEFAULT PRIVILEGES FOR ROLE trademate_migrator IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO trademate_app;
+  REVOKE ALL PRIVILEGES ON TABLES FROM trademate_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE trademate_migrator IN SCHEMA public
-  GRANT USAGE, SELECT ON SEQUENCES TO trademate_app;
+  REVOKE ALL PRIVILEGES ON SEQUENCES FROM trademate_app;
 
 -- The runtime role is not an owner, schema creator, superuser or RLS bypass.
 
