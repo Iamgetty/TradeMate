@@ -246,8 +246,8 @@ class PersonaWebhookController {
 const verifyPersonaWebhookSignature = (rawBody: Buffer, signatureHeader: string, secret: string): boolean => {
   if (!signatureHeader || !secret) return false;
   const nowSeconds = Math.floor(Date.now() / 1000);
-  for (const signatureSet of signatureHeader.trim().split(/\\s+/)) {
-    const timestampMatch = signatureSet.match(/(?:^|,)t=(\\d+)/);
+  for (const signatureSet of signatureHeader.trim().split(/\s+/)) {
+    const timestampMatch = signatureSet.match(/(?:^|,)t=(\d+)/);
     const signatureMatch = signatureSet.match(/(?:^|,)v1=([a-f0-9]{64})(?:,|$)/i);
     if (!timestampMatch || !signatureMatch) continue;
     const timestamp = Number(timestampMatch[1]);
