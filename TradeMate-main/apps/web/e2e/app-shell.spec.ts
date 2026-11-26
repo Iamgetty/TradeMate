@@ -171,3 +171,101 @@ test('an unrelated unhandled promise rejection does not replace the rendered app
   await expect(page.locator('main[role="alert"]')).toHaveCount(0);
   await expect(page.locator('#land')).toBeVisible();
 });
+
+
+test('Pick page module uses explicit live-state dependencies', async ({ page }) => {
+  await page.goto('/app');
+  await page.addScriptTag({ url: '/tm/pick-page-module.js' });
+
+  const result = await page.evaluate(() => {
+    const renderCalls: Array<{ offer: unknown; pageMode: boolean; eligible: unknown[] }> = [];
+    let connected = true;
+    let items: Array<{ name: string; srv?: boolean }> = [
+      { name: 'Private', srv: false },
+      { name: 'First service', srv: true },
+      { name: 'Second service', srv: true },
+    ];
+    let selected = 'Second service';
+    const module = (window as Window & { TM_PICK_PAGE_MODULE?: { create: (deps: Record<string, unknown>) => { render: () => string } } }).TM_PICK_PAGE_MODULE;
+    if (!module || typeof module.create !== 'function') throw new Error('Pick module did not initialize');
+
+    const pageModule = module.create({
+      isConnected: () => connected,
+      getItems: () => items,
+      getSelectedOffer: () => selected,
+      resolveOffer: (name: unknown) => items.find(item => item.name === name) || null,
+      renderProposal: (offer: unknown, pageMode: boolean, eligible: unknown[]) => {
+        renderCalls.push({ offer, pageMode, eligible });
+        return 'rendered';
+      },
+    });
+
+    const first = pageModule.render();
+    selected = 'missing';
+    const second = pageModule.render();
+    connected = false;
+    const third = pageModule.render();
+
+    return {
+      first,
+      second,
+      third,
+      calls: renderCalls.map(call => ({
+        offer: call.offer && (call.offer as { name: string }).name,
+        pageMode: call.pageMode,
+        eligible: call.eligible.map(item => (item as { name: string }).name),
+      })),
+    };
+  });
+
+  expect(result.first).toBe('rendered');
+  expect(result.second).toBe('rendered');
+  expect(result.third).toBe('rendered');
+  expect(result.calls).toEqual([
+    { offer: 'Second service', pageMode: true, eligible: ['First service', 'Second service'] },
+    { offer: 'First service', pageMode: true, eligible: ['First service', 'Second service'] },
+    { offer: null, pageMode: true, eligible: [] },
+  ]);
+});
+
+test('P2P page module uses explicit live state and cache dependencies', async ({ page }) => {
+  await page.goto('/app');
+  await page.addScriptTag({ url: '/tm/p2p-page-module.js' });
+  const result = await page.evaluate(() => {
+    const state = { side: 'Buy', coin: 'USDT', fiat: 'NGN', amt: '500', };
+    const cache = {
+      loading: false,
+      updated: 0,
+      book: [
+        { id: 'excluded', side: 'buy', asset_code: 'USDT', fiat_code: 'NGN', min_fiat_amount: 100, max_fiat_amount: 1000, price: 1500, quantity: 2, created_at: '2026-01-01T00:00:00Z' },
+        { id: 'included', side: 'sell', asset_code: 'USDT', fiat_code: 'NGN', min_fiat_amount: 200, max_fiat_amount: 800, price: 1500, quantity: 2, created_at: '2026-01-01T00:00:00Z', payment_methods: ['Bank transfer'] },
+        { id: 'out-of-range', side: 'sell', asset_code: 'USDT', fiat_code: 'NGN', min_fiat_amount: 600, max_fiat_amount: 900, price: 1500, quantity: 2, created_at: '2026-01-01T00:00:00Z' },
+      ],
+    };
+    let loads = 0;
+    const module = (window as Window & { TM_P2P_PAGE_MODULE?: { create: (deps: Record<string, unknown>) => { render: () => string } } }).TM_P2P_PAGE_MODULE;
+    if (!module) throw new Error('P2P module did not initialize');
+    const pageModule = module.create({
+      getState: () => state,
+      getCache: () => cache,
+      loadP2P: () => { loads += 1; },
+      header: (title: string) => '<header>' + title + '</header>',
+      formatFiat: (value: number) => String(value),
+      formatAmount: (value: number) => String(value),
+      formatTime: () => 'time',
+      escapeHtml: (value: unknown) => String(value ?? ''),
+      emptyState: () => '<div>empty</div>',
+      icon: () => '<svg></svg>',
+    });
+    const html = pageModule.render();
+    state.amt = '550';
+    const changed = pageModule.render();
+    return { html, changed, loads };
+  });
+  expect(result.loads).toBe(2);
+  expect(result.html).toContain('data-arg="included"');
+  expect(result.html).not.toContain('data-arg="excluded"');
+  expect(result.html).not.toContain('data-arg="out-of-range"');
+  expect(result.changed).toContain('data-arg="included"');
+  expect(result.changed).not.toContain('data-arg="out-of-range"');
+});
