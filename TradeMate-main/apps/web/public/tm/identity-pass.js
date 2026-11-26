@@ -39,7 +39,7 @@
 .idp-bt{position:absolute;left:18px;right:18px;bottom:14px;display:flex;align-items:flex-end;justify-content:space-between;z-index:1}
 .idp-bt>div{display:flex;gap:8px;flex-wrap:wrap}
 .idp-ok{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border-radius:999px;border:1px solid color-mix(in srgb,var(--up) 45%,transparent);background:color-mix(in srgb,var(--up) 14%,transparent);color:var(--up);font:700 11.5px 'Hanken Grotesk',sans-serif;cursor:pointer}
-.idp-ok svg{width:14px;height:14px}
+.idp-ok svg{width:14px;height:14px}.idp-ok.pending{border-color:color-mix(in srgb,var(--dn) 45%,transparent);background:color-mix(in srgb,var(--dn) 12%,transparent);color:var(--dn)}
 .idp-sq{display:flex;align-items:center;gap:10px;min-height:62px;padding:0 12px;border-radius:16px;border:1px solid var(--line);background:var(--s2);color:var(--txt);font:700 13px 'Hanken Grotesk',sans-serif;cursor:pointer;text-align:left}
 .idp-sq svg{color:var(--am);flex:none}.idp-sq small{display:block;color:var(--mut);font-weight:600;font-size:11px;margin-top:2px}
 .idp-sqs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;position:relative;z-index:1}
@@ -151,34 +151,34 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
   var SH = [["Card", "TradeMate Card", "Join waitlist", "card"], ["Rewards", "Rewards Hub", "Check now", "gift"], ["Contracts", "Contracts", "View all", "box"], ["Referral", "Invite Friends", "Invite now", "users"]];
   function flip(label) { return '<button class="idp-gl" data-idp-flip aria-label="Flip the pass">' + label + ic("swap", "width:15px;height:15px") + "</button>"; }
   function pass() {
-    var t = st.me, e = "Seller" === st.mode, n = idvDone();
+    var t = st.me, verified = typeof idvVerified === "function" && idvVerified();
     return '<div class="idp-c3' + (flipped ? " flip" : "") + '"><div class="idp-ci">' +
-      '<div class="idp-cf"><div class="idp-top"><span class="idp-cm">TradeMate · Identity pass' + (e ? '<span class="idp-ab">ALPHA</span>' : "") + "</span>" + flip("Flip ") + "</div>" +
+      '<div class="idp-cf"><div class="idp-top"><span class="idp-cm">TradeMate · Identity pass</span>' + flip("Flip ") + "</div>" +
       '<div class="idp-id"><button class="idp-pav" data-pg="avatar" aria-label="Change profile picture">' + avHTML(76, 22) + '</button><div style="min-width:0"><h1 class="idp-nm">' + esc(t.nick) + '</h1><button class="idp-gl" data-act="copy" data-arg="' + t.uid + '" aria-label="Copy UID" style="height:30px">UID ' + t.uid + ic("copy", "width:14px;height:14px") + "</button></div></div>" +
-      '<div class="idp-bt"><div><button class="idp-ok" data-pg="kycinfo">' + PT_SHIELD_G + "Lv." + t.lvl + ' verified</button><button class="idp-gl" data-pg="level" style="height:28px;padding:0 10px;font-size:11.5px">' + (e ? "Alpha" : "Clients") + ic("chev", "width:12px;height:12px") + "</button></div>" + ring(n) + "</div></div>" +
+      '<div class="idp-bt"><span class="idp-ok' + (verified ? "" : " pending") + '" data-pg="kycinfo">' + PT_SHIELD_G + (verified ? "Verified" : "Not verified") + "</span></div></div>" +
       '<div class="idp-cb"><div class="idp-top"><span class="idp-cm">Shortcuts</span>' + flip("Flip ") + '</div><div class="idp-sqs">' +
       SH.map(function (x) { return '<button class="idp-sq" data-f="' + x[0] + '">' + ic(x[3]) + "<span>" + x[1] + "<small>" + x[2] + "</small></span></button>"; }).join("") +
       "</div></div></div></div>";
   }
-  function verify(n, e) {
-    return '<div class="idp-vc"><div class="idp-vh"><span class="idp-sh">' + PT_SHIELD + "</span><div><h3>" + (e ? "Build your Alpha profile" : "Build your client profile") + "</h3><p>" + (e ? "Complete identity verification to unlock higher offer limits and the verified badge." : "Complete identity verification to build trust with counterparties and strengthen the profile.") + "</p></div></div>" +
-      '<div class="idp-steps">' + [0, 1, 2].map(function (i) { return '<i class="' + (i < n ? "on" : i === n ? "now" : "") + '"></i>'; }).join("") + "</div>" +
-      '<div class="idp-vm"><small>Verification: ' + n + ' of 3 steps</small><button data-idp-acc aria-expanded="' + openAcc + '">' + (e ? "Alpha benefits" : "Trust & verification") + ic("chev", "width:14px;height:14px") + '</button></div>' +
-      '<div class="idp-acc' + (openAcc ? " open" : "") + '"><div>' + ["Personal Information", "Identity Document", "Live Selfie"].map(function (nm, i) { var d = i < n, nx = i === n && n < 3; return '<div class="idp-st' + (d ? " d" : nx ? " n" : "") + '"><span class="idp-dot">' + (d ? '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>' : nx ? "<i></i>" : "") + "</span><b>" + nm + "</b><em>" + (d ? "Done" : nx ? "Up next" : "Locked") + "</em></div>"; }).join("") + '<p class="idp-hint">Tap Verify now to continue. Each step opens your verification flow.</p><button class="idp-lnk" data-pg="level">' + (e ? "View Alpha benefits" : "View verification levels & benefits") + ' \u2192</button></div></div>' +
-      '<button class="idp-cta" data-pc="kyc">Verify now</button></div>';
+  function verify() {
+    var verified = typeof idvVerified === "function" && idvVerified();
+    return '<div class="idp-vc"><div class="idp-vh"><span class="idp-sh">' + PT_SHIELD + "</span><div><h3>" + (verified ? "Identity verified" : "Identity verification") + "</h3><p>" + (verified ? "Your identity status is confirmed by TradeMate." : "Your account is not verified. Live identity verification is not connected yet, so no progress or verified badge will be shown.") + "</p></div></div>" +
+      '<div class="idp-vm"><small>' + (verified ? "Verification complete" : "Not verified") + "</small></div>" +
+      (verified ? "" : '<div class="idp-hint">Verification will become available here when the live verification service is enabled.</div>') +
+      '<button class="idp-cta" type="button" disabled aria-disabled="true">' + (verified ? "Verified" : "Verification unavailable") + "</button></div>";
   }
   function strip(e) {
     return '<div class="pfoot idp-strip"><button class="idp-sz" data-act="mode" role="switch" aria-checked="' + e + '"><span class="idp-ic">' + ic("swap") + '</span><span>Alpha mode</span><i class="idp-sw' + (e ? " on" : "") + '"></i></button><span class="idp-dv"></span><button class="idp-sz" data-pg="about"><span>About us</span><em>' + ic("chev", "width:16px;height:16px") + "</em></button></div>";
   }
 
   PG.profile = function () {
-    var e = "Seller" === st.mode, n = idvDone();
+    var e = "Seller" === st.mode;
     var chips = st.recent.filter(function (x) { return "More" !== x && (e || "Add Contract" !== x); }).map(function (x) {
       var f = FG.reduce(function (a, b) { return a.concat(b[1]); }, []).filter(function (y) { return y[0] === x; })[0] || ["", "more"];
       return '<button class="idp-chip" data-f="' + x + '" style="--h:' + HUE[x] + '">' + ic(f[1], "width:16px;height:16px") + x + "</button>";
     }).join("");
     return '<header class="ph"><button class="bk2" data-back aria-label="Back">' + ic("left") + '</button><span style="flex:1"></span><div class="rts"><button class="rt" data-pg="support" aria-label="Support">' + ic("headset") + '</button><button class="rt" data-act="uc" data-arg="My info" aria-label="User Center">' + ic("settings") + "</button></div></header>" +
-      '<div class="pbody"><div class="idp-cq"><div class="idp-grid"><div class="idp-l" style="display:grid;gap:14px;align-content:start">' + pass() + verify(n, e) + '</div><div class="idp-r"><div class="sec" style="padding-left:2px">RECENTLY USED</div><div class="idp-rc">' + chips + '</div><div class="idp-all"><button class="idp-allbtn" data-f="More">All Services</button></div></div></div></div></div>' + strip(e);
+      '<div class="pbody"><div class="idp-cq"><div class="idp-grid"><div class="idp-l" style="display:grid;gap:14px;align-content:start">' + pass() + verify() + '</div><div class="idp-r"><div class="sec" style="padding-left:2px">RECENTLY USED</div><div class="idp-rc">' + chips + '</div><div class="idp-all"><button class="idp-allbtn" data-f="More">All Services</button></div></div></div></div></div>' + strip(e);
   };
 
   // Security level comes from the account's real setup: password (always), authenticator 2FA, verified identity.

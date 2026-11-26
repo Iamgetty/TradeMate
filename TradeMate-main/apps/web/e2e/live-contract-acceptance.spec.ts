@@ -152,16 +152,15 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
     await buyer.goto('/app');
     await waitForAppReady(buyer);
     await openProfilePage(buyer);
-    // The identity pass has its own level pill; the verification card has a separate benefits link.
-    // Scope to the pass so the test exercises the actual account-level navigation control.
+    // The identity pass must show the real verification state and must not expose
+    // the retired Alpha/Clients level navigation or locally simulated progress.
     const profileHero = buyer.locator('#pg .idp-cq .idp-c3');
     await expect(profileHero).toBeVisible();
-    const levelPill = profileHero.locator('button[data-pg="level"]');
-    await expect(levelPill).toHaveCount(1);
-    await expect(levelPill).toBeVisible();
-    await levelPill.click();
-    await expect(buyer.locator('#pg')).toContainText('No live level, qualification or progress record is currently connected');
-    await expect(buyer.locator('#pg')).not.toContainText('10 completed contracts');
+    await expect(profileHero).toContainText('Not verified');
+    await expect(profileHero.locator('button[data-pg="level"]')).toHaveCount(0);
+    await expect(profileHero).not.toContainText('Lv.1 verified');
+    await expect(profileHero).not.toContainText('Alpha');
+    await expect(buyer.locator('#pg')).not.toContainText('0/3');
     await buyer.close();
     buyer = await buyerContext.newPage();
     // The remaining steps drive the app shell (#sbar, #app .view), so return to /app
