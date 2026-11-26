@@ -28,7 +28,7 @@ jobs:
           echo "Selected immutable source revision: $RELEASE_SHA"
 
       - name: Assume the narrowly scoped staging deployment role
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd
         with:
           role-to-assume: arn:aws:iam::661406600284:role/TradeMateGitHubStagingDeployRole
           aws-region: eu-north-1
