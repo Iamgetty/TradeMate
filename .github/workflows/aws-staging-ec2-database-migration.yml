@@ -173,7 +173,7 @@ jobs:
               "NODE_ENV": "production",
               "MIGRATION_DATABASE_URL": migration_url,
               "RLS_CONTEXT_HMAC_KEY": verifier_key,
-              "PGSSLMODE": "require",
+              "PGSSLMODE": "verify-full",
               "NODE_EXTRA_CA_CERTS": ca_bundle,
           })
           subprocess.run(["npm", "run", "db:migrate"], cwd="TradeMate-main/apps/api", env=env, check=True)
