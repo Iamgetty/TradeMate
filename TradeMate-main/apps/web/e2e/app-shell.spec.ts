@@ -83,6 +83,23 @@ test('homepage shortcut cards do not use the legacy view-entry animation after l
   await expectHomepageEntranceAnimationRemoved();
 });
 
+test('Scout restores its visible scan phase before showing ranked results', async ({ page }) => {
+  await isolateApi(page);
+  await page.goto('/app');
+  await expectPublicLanding(page);
+
+  const response = await page.request.get('/tm/app.js?v=175');
+  expect(response.ok()).toBeTruthy();
+  const source = await response.text();
+
+  expect(source).toContain('var SC={phase:"idle",step:0,tab:"Trending",full:!1,t:null}');
+  expect(source).toContain('SC.phase="scanning",SC.t=setInterval(scoutTick,900)');
+  expect(source).toContain('Refreshing live market snapshot');
+  expect(source).toContain('Reading available live quotes');
+  expect(source).toContain('Filtering 24-hour market movers');
+  expect(source).toContain('Ranking current market activity');
+});
+
 test('Scout map image is preloaded before the legacy app bundle', async ({ page }) => {
   await isolateApi(page);
   const requestedAssets: string[] = [];
