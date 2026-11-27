@@ -22,27 +22,16 @@ jobs:
     environment: aws-staging-image-publish
     timeout-minutes: 15
     env:
-      PERSONA_API_KEY: ${{ secrets.PERSONA_API_KEY }}
-      PERSONA_INQUIRY_TEMPLATE_ID: ${{ vars.PERSONA_INQUIRY_TEMPLATE_ID }}
       AWS_STAGING_PUBLISH_ROLE_ARN: ${{ vars.AWS_STAGING_PUBLISH_ROLE_ARN }}
       AWS_STAGING_ACCOUNT_ID: ${{ vars.AWS_STAGING_ACCOUNT_ID }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Validate inputs and service configuration
+      - name: Validate AWS role and service configuration
         shell: bash
         run: |
           set -euo pipefail
-          set +x
-          if [[ -z "${PERSONA_API_KEY:-}" || -z "${PERSONA_INQUIRY_TEMPLATE_ID:-}" ]]; then
-            echo "::error::Configure the PERSONA_API_KEY repository secret and PERSONA_INQUIRY_TEMPLATE_ID environment variable."
-            exit 1
-          fi
-          if [[ ! "$PERSONA_INQUIRY_TEMPLATE_ID" =~ ^itmpl_[A-Za-z0-9]+$ ]]; then
-            echo "::error::PERSONA_INQUIRY_TEMPLATE_ID has an invalid format; its value was not displayed."
-            exit 1
-          fi
           if [[ ! "$AWS_STAGING_PUBLISH_ROLE_ARN" =~ ^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$ || ! "$AWS_STAGING_ACCOUNT_ID" =~ ^[0-9]{12}$ ]]; then
             echo "::error::Configure the AWS staging role ARN and account ID in the aws-staging-image-publish environment."
             exit 1
@@ -60,58 +49,33 @@ jobs:
           aws-region: eu-north-1
           role-session-name: trademate-persona-runtime-config
 
-      - name: Store Persona settings in the existing AWS API secret
+      - name: Install Persona settings from AWS Secrets Manager
         shell: bash
         run: |
           set -euo pipefail
           set +x
-          python3 - <<'PY'
-          import json
-          import os
-          import subprocess
-          import tempfile
-
-          secret_id = "trademate/staging/api"
-          current = subprocess.run(
-              ["aws", "secretsmanager", "get-secret-value", "--secret-id", secret_id,
-               "--query", "SecretString", "--output", "text"],
-              check=True, capture_output=True, text=True,
-          ).stdout
-          values = json.loads(current)
-          if not isinstance(values, dict):
-              raise SystemExit("Existing API secret is not a JSON object")
-          values["PERSONA_API_KEY"] = os.environ["PERSONA_API_KEY"]
-          values["PERSONA_INQUIRY_TEMPLATE_ID"] = os.environ["PERSONA_INQUIRY_TEMPLATE_ID"]
-          fd, temporary = tempfile.mkstemp(prefix="trademate-persona-", suffix=".json")
-          try:
-              os.fchmod(fd, 0o600)
-              with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                  json.dump(values, handle)
-              subprocess.run(
-                  ["aws", "secretsmanager", "put-secret-value", "--secret-id", secret_id,
-                   "--secret-string", "file://" + temporary],
-                  check=True, capture_output=True, text=True,
-              )
-          finally:
-              try:
-                  os.unlink(temporary)
-              except FileNotFoundError:
-                  pass
-          print("Persona settings stored in the existing AWS staging API secret; values were not displayed.")
+          python3 - <<'PY' | sudo -n install -o root -g root -m 0755 /dev/stdin /usr/local/sbin/trademate-configure-persona-runtime
+          import pathlib
+          print(pathlib.Path(".github/scripts/configure-persona-runtime.py").read_text(), end="")
           PY
-
-      - name: Install settings and verify the live API process
-        shell: bash
-        run: |
-          set -euo pipefail
-          set +x
-          sudo -n install -o root -g root -m 0755 .github/scripts/configure-persona-runtime.py /usr/local/sbin/trademate-configure-persona-runtime
           python3 - <<'PY' | sudo -n /usr/local/sbin/trademate-configure-persona-runtime
           import json
-          import os
+          import subprocess
           import sys
-          json.dump({
-              "api_key": os.environ["PERSONA_API_KEY"],
-              "template_id": os.environ["PERSONA_INQUIRY_TEMPLATE_ID"],
-          }, sys.stdout)
+
+          result = subprocess.run(
+              ["aws", "secretsmanager", "get-secret-value", "--secret-id", "trademate/staging/api",
+               "--query", "SecretString", "--output", "text"],
+              check=True, capture_output=True, text=True,
+          )
+          values = json.loads(result.stdout)
+          if not isinstance(values, dict):
+              raise SystemExit("The staging API secret is not a JSON object.")
+          api_key = values.get("PERSONA_API_KEY", "")
+          template_id = values.get("PERSONA_INQUIRY_TEMPLATE_ID", "")
+          if not isinstance(api_key, str) or not api_key:
+              raise SystemExit("PERSONA_API_KEY is missing from the staging API secret.")
+          if not isinstance(template_id, str) or not template_id.startswith("itmpl_"):
+              raise SystemExit("PERSONA_INQUIRY_TEMPLATE_ID is missing or invalid in the staging API secret.")
+          json.dump({"api_key": api_key, "template_id": template_id}, sys.stdout)
           PY
