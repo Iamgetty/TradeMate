@@ -295,6 +295,14 @@ class PersonaInquiryController {
     if (!apiKey || !/^itmpl_[A-Za-z0-9]+$/.test(templateId)) {
       throw new HttpException('Identity verification is being configured. Please try again shortly.', HttpStatus.SERVICE_UNAVAILABLE);
     }
+    const redirectUri = process.env.PERSONA_REDIRECT_URI || 'https://trademate.cfd/';
+    let redirectTarget: URL;
+    try { redirectTarget = new URL(redirectUri); } catch {
+      throw new HttpException('Persona return address is not configured correctly.', HttpStatus.SERVICE_UNAVAILABLE);
+    }
+    if (redirectTarget.protocol !== 'https:' || !['trademate.cfd', 'www.trademate.cfd'].includes(redirectTarget.hostname)) {
+      throw new HttpException('Persona return address must use the TradeMate HTTPS domain.', HttpStatus.SERVICE_UNAVAILABLE);
+    }
     const existing = await databasePool!.query(
       `SELECT inquiry_id, status FROM persona_user_inquiries
        WHERE user_id = $1 AND status IN ('pending','in_progress','submitted','review')
@@ -322,6 +330,7 @@ class PersonaInquiryController {
         if (parsed.protocol !== 'https:' || !['inquiry.withpersona.com', 'withpersona.com', 'go.perso.na'].includes(parsed.hostname)) {
           throw new HttpException('Persona returned an unsafe verification link.', HttpStatus.BAD_GATEWAY);
         }
+        parsed.searchParams.set('redirect-uri', redirectTarget.toString());
         hostedUrl = parsed.toString();
       }
     }
