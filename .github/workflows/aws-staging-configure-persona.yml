@@ -54,10 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           set +x
-          python3 - <<'PY' | sudo -n install -o root -g root -m 0755 /dev/stdin /usr/local/sbin/trademate-configure-persona-runtime
-          import pathlib
-          print(pathlib.Path(".github/scripts/configure-persona-runtime.py").read_text(), end="")
-          PY
+          sudo -n install -o root -g root -m 0755 .github/scripts/configure-persona-runtime.py /usr/local/sbin/trademate-configure-persona-runtime
           python3 - <<'PY' | sudo -n /usr/local/sbin/trademate-configure-persona-runtime
           import json
           import subprocess
