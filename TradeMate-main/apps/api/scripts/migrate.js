@@ -94,7 +94,9 @@ async function main() {
 
   const pool = new Pool({
     connectionString: migrationDatabaseUrl,
-    ssl: process.env.PGSSLMODE === 'require' ? true : undefined,
+    ssl: process.env.PGSSLMODE === 'verify-full'
+      ? { rejectUnauthorized: true }
+      : (process.env.PGSSLMODE === 'require' ? true : undefined),
     connectionTimeoutMillis: 10000,
     max: 1,
   });
