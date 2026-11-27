@@ -34,38 +34,59 @@ jobs:
         env:
           SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
           GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ ! "$SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]; then
-            echo "::error::TradeMate CI did not provide a valid main commit SHA."
-            exit 1
-          fi
-          CURRENT_MAIN_SHA="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')"
-          if [[ "$SOURCE_SHA" != "$CURRENT_MAIN_SHA" ]]; then
-            echo "::error::main advanced while this migration was waiting; a fresh CI run on the current main SHA must complete before migration."
-            exit 1
-          fi
-          CHECK_RUNS="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA/check-runs?per_page=100" --jq '.check_runs')"
-          REQUIRED_CHECKS=(
-            "Browser app-shell and live API acceptance tests"
-            "AWS API and exchange-feed container builds"
-            "Exchange feed and MT5 tests"
-            "Database migration integration"
-            "Security scanning (SAST, SCA and secrets)"
-            "API TypeScript build"
-            "Web build and runtime syntax"
-            "Isolated Cloudflare Workers frontend build and runtime"
-            "PostgreSQL 18 role and RLS checks"
-            "PostgreSQL 16 role and RLS checks"
-          )
-          for required_check in "${REQUIRED_CHECKS[@]}"; do
-            conclusion="$(jq -r --arg name "$required_check" '[.[] | select(.name==$name)] | sort_by(.completed_at // .started_at) | last | .conclusion // "missing"' <<< "$CHECK_RUNS")"
-            if [[ "$conclusion" != "success" ]]; then
-              echo "::error::Required check '$required_check' is not successful for $SOURCE_SHA (conclusion: $conclusion)."
-              exit 1
-            fi
-          done
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          token = os.environ["GH_TOKEN"]
+          repository = os.environ["GITHUB_REPOSITORY"]
+          source_sha = os.environ["SOURCE_SHA"]
+          if len(source_sha) != 40 or any(c not in "0123456789abcdef" for c in source_sha):
+              raise SystemExit("TradeMate CI did not provide a valid main commit SHA.")
+
+          def github_api(path):
+              request = urllib.request.Request(
+                  "https://api.github.com/repos/" + repository + path,
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Authorization": "Bearer " + token,
+                      "X-GitHub-Api-Version": "2022-11-28",
+                  },
+              )
+              with urllib.request.urlopen(request, timeout=15) as response:
+                  return json.load(response)
+
+          current_main = github_api("/branches/main")["commit"]["sha"]
+          if source_sha != current_main:
+              raise SystemExit("main advanced while this migration was waiting; a fresh CI run on the current main SHA must complete before migration.")
+
+          checks = github_api("/commits/" + source_sha + "/check-runs?per_page=100")["check_runs"]
+          required = [
+              "Browser app-shell and live API acceptance tests",
+              "AWS API and exchange-feed container builds",
+              "Exchange feed and MT5 tests",
+              "Database migration integration",
+              "Security scanning (SAST, SCA and secrets)",
+              "API TypeScript build",
+              "Web build and runtime syntax",
+              "Isolated Cloudflare Workers frontend build and runtime",
+              "PostgreSQL 18 role and RLS checks",
+              "PostgreSQL 16 role and RLS checks",
+          ]
+          for name in required:
+              matching = [item for item in checks if item.get("name") == name]
+              matching.sort(key=lambda item: item.get("completed_at") or item.get("started_at") or "")
+              conclusion = matching[-1].get("conclusion") if matching else None
+              if conclusion != "success":
+                  raise SystemExit("Required check '" + name + "' is not successful for " + source_sha + " (conclusion: " + str(conclusion) + ").")
+
+          print("Exact main SHA and all required CI checks verified.")
+          PY
           if ! systemctl is-active --quiet trademate-api.service; then
             echo "::error::The AWS staging API service is not active; refusing to migrate."
             exit 1
@@ -87,6 +108,17 @@ jobs:
             exit 1
           fi
           aws secretsmanager describe-secret --secret-id trademate/staging/api >/dev/null
+
+      - name: Select the pinned Node.js 24 runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          NODE_HOME="$HOME/.local/opt/node-v24.22.1"
+          if [[ ! -x "$NODE_HOME/bin/node" || "$("$NODE_HOME/bin/node" --version)" != "v24.22.1" ]]; then
+            echo "::error::The pinned Node.js 24.22.1 runtime is not installed on the staging runner."
+            exit 1
+          fi
+          echo "$NODE_HOME/bin" >> "$GITHUB_PATH"
 
       - name: Install API dependencies
         working-directory: TradeMate-main/apps/api
