@@ -197,7 +197,7 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
     var cta = verified || status.verified
       ? '<button class="idp-cta idp-verified" type="button" disabled>' + ic("check") + ' Identity verified</button>'
       : '<button class="idp-cta" type="button" data-persona-start>' + (active ? "Check verification status" : failed ? "Retry verification" : "Start verification") + ic("right", "width:18px;height:18px") + '</button>';
-    var steps = [["user","Personal details","Confirm your basic information"],["id","Identity document","Scan a valid government ID"],["camera","Selfie check","Match your face to your ID"]];
+    var steps = [["person","Personal details","Confirm your basic information"],["id","Identity document","Scan a valid government ID"],["cam","Selfie check","Match your face to your ID"]];
     return '<section class="idp-verify"><div class="idp-vtop"><div class="idp-vbadge">' + PT_SHIELD + '</div><div class="idp-vheading"><div class="idp-veyebrow">ACCOUNT TRUST</div><h3>Identity verification</h3><p>' + intro + '</p></div><span class="idp-vstatus' + (verified || status.verified ? " success" : failed ? " warning" : active ? " progress" : "") + '">' + label + '</span></div>' +
       '<div class="idp-vsteps">' + steps.map(function(x,i){return '<div class="idp-vstep"><span class="idp-vstep-icon">' + ic(x[0]) + '</span><b>' + x[1] + '</b><small>' + x[2] + '</small></div>'+(i<2?'<span class="idp-vconnector"></span>':'');}).join("") + '</div>' +
       '<div class="idp-vfoot">' + cta + '<div class="idp-vprivacy">' + ic("lock", "width:15px;height:15px") + '<span>Secure verification powered by Persona<br><small>Your details are handled securely and used for verification.</small></span></div></div></section>';
