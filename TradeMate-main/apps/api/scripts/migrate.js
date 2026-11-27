@@ -59,6 +59,7 @@ const MIGRATIONS = [
   '050_signed_transaction_rls_identity.sql',
   '051_p2p_dispute_resolution_columns.sql',
   '052_render_view_reconciliation.sql',
+  '053_persona_webhook_events.sql',
 ];
 
 async function main() {

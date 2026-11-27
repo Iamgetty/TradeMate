@@ -7,6 +7,7 @@ import { createRlsAwarePool, sessionTokenFromCookieHeader } from './database-con
 import { decodeProfileImageDataUrl, hasMatchingUploadSignature } from './upload-validation';
 import { decimalToUnits, fiatCentsToQuantityUnits, productToFiatCents, unitsToDecimal } from './p2p-decimal';
 import { renderTradeMateEmail } from './email-templates';
+import { verifyPersonaWebhookSignature } from './persona-webhook-signature';
 import { announcementBodySchema, changePasswordBodySchema, contractCreateBodySchema, contractDecisionBodySchema, contractMessageBodySchema, deletionCancelBodySchema, deletionRequestBodySchema, displayNameBodySchema, emailVerificationBodySchema, enquiryCreateBodySchema, enquiryReplyBodySchema, feedCommentBodySchema, feedModerationBodySchema, feedPinBodySchema, feedPostBodySchema, feedReactionBodySchema, feedReshareBodySchema, feedPostsQuerySchema, feedReportBodySchema, feedbackBodySchema, listingBodySchema, loginBodySchema, marketActivityQuerySchema, marketCompletedQuerySchema, marketQuotesQuerySchema, marketplaceBrowseQuerySchema, organizationCreateBodySchema, organizationDocumentManagerRoleSchema, organizationDocumentsBodySchema, organizationNameBodySchema, p2pAdBodySchema, p2pDisputeBodySchema, p2pMarketQuerySchema, p2pOrderBodySchema, p2pPaymentSentBodySchema, parseBody, parseUuidParam, preferencesBodySchema, passwordResetCompleteBodySchema, passwordResetRequestBodySchema, publicProfileBodySchema, registerBodySchema, reviewDecisionBodySchema, supportReplyBodySchema, supportTicketBodySchema, totpChallengeBodySchema, totpCodeBodySchema, sportsProfileCreateBodySchema, sportsProfileUpdateBodySchema, sportsConsentGrantBodySchema, sportsOrganizationCreateBodySchema, sportsOrganizationMembershipInviteBodySchema, sportsRepresentativeMandateCreateBodySchema, sportsRepresentativeMandateResponseBodySchema, sportsTransferOpportunityCreateBodySchema } from './validation';
 
 const deriveScrypt = (password: string, salt: Buffer, keyLength: number, options: { N: number; r: number; p: number; maxmem: number }): Promise<Buffer> =>
@@ -186,6 +187,60 @@ class HealthController {
     } catch {
       return { status: 'error', database: { configured: true, connected: false } };
     }
+  }
+}
+
+
+@Controller('integrations/persona')
+class PersonaWebhookController {
+  @Post('webhook')
+  @HttpCode(200)
+  async receive(@Req() request: Request, @Body() body: unknown) {
+    const secret = process.env.PERSONA_WEBHOOK_SECRET;
+    if (!secret) throw new HttpException('Persona webhook integration is not configured.', HttpStatus.SERVICE_UNAVAILABLE);
+
+    const rawBody = (request as Request & { rawBody?: Buffer }).rawBody;
+    const signature = request.get('persona-signature') || '';
+    if (!rawBody?.length || !verifyPersonaWebhookSignature(rawBody, signature, secret)) {
+      throw new UnauthorizedException('Invalid Persona webhook signature.');
+    }
+    if (!isRecord(body) || !isRecord(body.data) || !isRecord(body.data.attributes)) {
+      throw new BadRequestException('Invalid Persona webhook payload.');
+    }
+
+    const eventId = typeof body.data.id === 'string' ? body.data.id : '';
+    const attributes = body.data.attributes;
+    const eventName = typeof attributes.name === 'string' ? attributes.name : '';
+    const supportedEvents = new Set([
+      'inquiry.created', 'inquiry.started', 'inquiry.completed', 'inquiry.approved',
+      'inquiry.declined', 'inquiry.marked-for-review', 'inquiry.failed', 'inquiry.expired',
+    ]);
+    if (!/^evt_[A-Za-z0-9]+$/.test(eventId) || !supportedEvents.has(eventName)) {
+      throw new BadRequestException('Unsupported Persona webhook event.');
+    }
+
+    const eventPayload = isRecord(attributes.payload) ? attributes.payload : null;
+    const inquiry = eventPayload && isRecord(eventPayload.data) ? eventPayload.data : null;
+    const inquiryId = inquiry && typeof inquiry.id === 'string' ? inquiry.id : '';
+    const inquiryAttributes = inquiry && isRecord(inquiry.attributes) ? inquiry.attributes : null;
+    const inquiryStatus = inquiryAttributes && typeof inquiryAttributes.status === 'string'
+      ? inquiryAttributes.status : null;
+    const eventCreatedAt = typeof attributes['created-at'] === 'string'
+      ? new Date(attributes['created-at']) : null;
+    if (!/^inq_[A-Za-z0-9]+$/.test(inquiryId) || (eventCreatedAt && !Number.isFinite(eventCreatedAt.getTime()))) {
+      throw new BadRequestException('Persona webhook is missing a valid inquiry reference.');
+    }
+    if (!databasePool) throw new HttpException('TradeMate database is unavailable.', HttpStatus.SERVICE_UNAVAILABLE);
+
+    const digest = createHash('sha256').update(rawBody).digest('hex');
+    const inserted = await databasePool.query(
+      `INSERT INTO persona_webhook_events
+         (event_id, event_name, inquiry_id, inquiry_status, event_created_at, payload_sha256)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (event_id) DO NOTHING`,
+      [eventId, eventName, inquiryId, inquiryStatus, eventCreatedAt, digest],
+    );
+    return { received: true, duplicate: inserted.rowCount === 0 };
   }
 }
 
@@ -4163,7 +4218,7 @@ class SportsTransferOpportunitiesController {
   }
 }
 
-@Module({ controllers: [SportsTransferOpportunitiesController, SportsTransferMandatesController, SportsTransferOrganizationsController, SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController] })
+@Module({ controllers: [SportsTransferOpportunitiesController, SportsTransferMandatesController, SportsTransferOrganizationsController, SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController, PersonaWebhookController] })
 export class AppModule implements OnModuleDestroy {
   async onModuleDestroy() {
     if (databasePool) await databasePool.end();
