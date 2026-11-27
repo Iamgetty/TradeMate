@@ -272,7 +272,7 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
   function loadPersonaStatus() {
     fetch('/api/integrations/persona/status', { credentials: 'include', cache: 'no-store' })
       .then(function (r) { if (!r.ok) throw new Error('status'); return r.json(); })
-      .then(function (data) { window.__tmPersonaStatus = data; if (typeof draw === 'function') draw(); })
+      .then(function (data) { window.__tmPersonaStatus = data; if (typeof drawPage === 'function') drawPage(); })
       .catch(function () { window.__tmPersonaStatus = { status: 'not_started', verified: false }; });
   }
   document.addEventListener('click', function (event) {
