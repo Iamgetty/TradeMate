@@ -41,9 +41,8 @@ jobs:
             echo "::error::trademate-api.service is not configured to load /etc/trademate/api.env; refusing to modify the host."
             exit 1
           fi
-          sudo -n -l /usr/local/sbin/trademate-configure-resend-runtime >/dev/null
           expected="$(sha256sum .github/scripts/configure-resend-runtime.py | awk '{print $1}')"
-          actual="$(sudo sha256sum /usr/local/sbin/trademate-configure-resend-runtime | awk '{print $1}')"
+          actual="$(sha256sum /usr/local/sbin/trademate-configure-resend-runtime | awk '{print $1}')"
           if [[ "$expected" != "$actual" ]]; then
             echo "::error::The root-owned Persona runtime helper is not installed at the reviewed source version."
             exit 1
