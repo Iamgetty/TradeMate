@@ -357,6 +357,35 @@ class PersonaInquiryController {
       await databasePool!.query(
         `INSERT INTO persona_user_inquiries (user_id, inquiry_id, status)
          VALUES ($1, $2, 'pending') ON CONFLICT (inquiry_id) DO NOTHING`, [userId, inquiryId]);
+      // A webhook can arrive before the API request has stored the inquiry mapping.
+      // Reconcile the most recent signed event after inserting the mapping.
+      await databasePool!.query(
+        `UPDATE persona_user_inquiries AS inquiry
+         SET status = CASE event.event_name
+           WHEN 'inquiry.created' THEN 'pending'
+           WHEN 'inquiry.started' THEN 'in_progress'
+           WHEN 'inquiry.completed' THEN 'submitted'
+           WHEN 'inquiry.approved' THEN 'approved'
+           WHEN 'inquiry.declined' THEN 'declined'
+           WHEN 'inquiry.marked-for-review' THEN 'review'
+           WHEN 'inquiry.failed' THEN 'failed'
+           WHEN 'inquiry.expired' THEN 'expired'
+           ELSE inquiry.status
+         END,
+         updated_at = now(),
+         approved_at = CASE WHEN event.event_name = 'inquiry.approved'
+           THEN COALESCE(inquiry.approved_at, event.event_created_at, now())
+           ELSE inquiry.approved_at END
+         FROM (
+           SELECT event_name, event_created_at
+           FROM persona_webhook_events
+           WHERE inquiry_id = $1
+           ORDER BY event_created_at DESC NULLS LAST, received_at DESC
+           LIMIT 1
+         ) AS event
+         WHERE inquiry.inquiry_id = $1
+           AND (inquiry.status <> 'approved' OR event.event_name = 'inquiry.approved')`,
+        [inquiryId]);
     }
     return { inquiryId, url: hostedUrl, status: 'pending' };
   }
