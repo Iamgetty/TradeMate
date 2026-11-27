@@ -1,0 +1,170 @@
+name: AWS Staging Database Role Bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_bootstrap:
+        description: Apply the reviewed role and ownership bootstrap to AWS staging RDS.
+        type: choice
+        required: true
+        options:
+          - "no"
+          - "yes"
+      source_sha:
+        description: Full 40-character main commit SHA that passed the required CI checks.
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  checks: read
+  id-token: write
+
+concurrency:
+  group: trademate-aws-staging-db-role-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    name: Bootstrap and verify staging database roles
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+      - aws-staging
+    timeout-minutes: 15
+    environment:
+      name: aws-staging-image-publish
+    env:
+      AWS_STAGING_PUBLISH_ROLE_ARN: ${{ vars.AWS_STAGING_PUBLISH_ROLE_ARN }}
+      AWS_STAGING_ACCOUNT_ID: ${{ vars.AWS_STAGING_ACCOUNT_ID }}
+    steps:
+      - name: Validate exact main release and successful checks
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          CONFIRM_BOOTSTRAP: ${{ inputs.confirm_bootstrap }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          if os.environ["CONFIRM_BOOTSTRAP"] != "yes":
+              raise SystemExit("Bootstrap confirmation was not yes; refusing to continue.")
+          if os.environ.get("GITHUB_REF") != "refs/heads/main":
+              raise SystemExit("Staging database bootstrap may only run from main.")
+          source_sha = os.environ["SOURCE_SHA"]
+          if len(source_sha) != 40 or any(c not in "0123456789abcdef" for c in source_sha):
+              raise SystemExit("A valid full main commit SHA is required.")
+
+          def github_api(path):
+              request = urllib.request.Request(
+                  "https://api.github.com/repos/" + os.environ["GITHUB_REPOSITORY"] + path,
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Authorization": "Bearer " + os.environ["GH_TOKEN"],
+                      "X-GitHub-Api-Version": "2022-11-28",
+                  },
+              )
+              with urllib.request.urlopen(request, timeout=15) as response:
+                  return json.load(response)
+
+          if github_api("/branches/main")["commit"]["sha"] != source_sha:
+              raise SystemExit("main advanced; rerun CI and use the current main SHA.")
+
+          checks = github_api("/commits/" + source_sha + "/check-runs?per_page=100")["check_runs"]
+          required = [
+              "Browser app-shell and live API acceptance tests",
+              "AWS API and exchange-feed container builds",
+              "Exchange feed and MT5 tests",
+              "Database migration integration",
+              "Security scanning (SAST, SCA and secrets)",
+              "API TypeScript build",
+              "Web build and runtime syntax",
+              "Isolated Cloudflare Workers frontend build and runtime",
+              "PostgreSQL 18 role and RLS checks",
+              "PostgreSQL 16 role and RLS checks",
+          ]
+          for name in required:
+              matching = [item for item in checks if item.get("name") == name]
+              matching.sort(key=lambda item: item.get("completed_at") or item.get("started_at") or "")
+              conclusion = matching[-1].get("conclusion") if matching else None
+              if conclusion != "success":
+                  raise SystemExit("Required check '" + name + "' is not successful (conclusion: " + str(conclusion) + ").")
+          print("Current main SHA and all required checks verified.")
+          PY
+
+      - name: Validate the approved staging AWS role
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$AWS_STAGING_PUBLISH_ROLE_ARN" =~ ^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$ || "$AWS_STAGING_ACCOUNT_ID" != "661406600284" ]]; then
+            echo "::error::The approved TradeMate staging AWS role or account is not configured."
+            exit 1
+          fi
+
+      - name: Assume the restricted AWS staging role
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_STAGING_PUBLISH_ROLE_ARN }}
+          aws-region: eu-north-1
+          role-session-name: trademate-staging-db-bootstrap
+
+      - name: Check out the exact tested main commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Bootstrap and test staging database roles
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+
+          secret_result = subprocess.run(
+              ["aws", "secretsmanager", "get-secret-value", "--region", "eu-north-1",
+               "--secret-id", "trademate/staging/db-admin", "--query", "SecretString", "--output", "text"],
+              check=True, capture_output=True, text=True,
+          )
+          values = json.loads(secret_result.stdout)
+          password = values.get("trademate_db_password")
+          if not isinstance(password, str) or not password:
+              raise SystemExit("The staging database administrator secret is missing its password field.")
+
+          ca_bundle = "/opt/actions-runner/rds-global-bundle.pem"
+          if not os.path.isfile(ca_bundle):
+              raise SystemExit("The approved RDS CA bundle is missing from the staging runner.")
+
+          env = os.environ.copy()
+          env.update({
+              "PGPASSWORD": password,
+              "PGSSLMODE": "verify-full",
+              "PGSSLROOTCERT": ca_bundle,
+          })
+          connection = [
+              "/usr/bin/psql", "-X", "-v", "ON_ERROR_STOP=1",
+              "-h", "trademate-db.cnoaequa8k6z.eu-north-1.rds.amazonaws.com",
+              "-p", "5432", "-U", "trademate_admin", "-d", "trademate",
+          ]
+          root = "TradeMate-main/apps/api/database/security"
+          for script in ("001_role_bootstrap.sql", "002_role_bootstrap_test.sql"):
+              result = subprocess.run(
+                  connection + ["-f", os.path.join(root, script)],
+                  env=env, capture_output=True, text=True,
+              )
+              if result.returncode:
+                  print("Staging database bootstrap/test failed in " + script + ".")
+                  if result.stderr:
+                      print(result.stderr[-3000:])
+                  raise SystemExit(result.returncode)
+          print("Staging database role bootstrap and companion security assertions passed. Secret values were not printed.")
+          PY
