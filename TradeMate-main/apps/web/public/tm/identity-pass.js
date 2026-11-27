@@ -129,6 +129,33 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
 .pgs .sp-qi:hover,.pgs .sp-row:hover{border-color:color-mix(in srgb,var(--am) 40%,var(--line))!important}
 @media(prefers-reduced-motion:reduce){.idp-ci,.idp-steps i:after,.idp-sw,.idp-sw:after{animation:none!important;transition:none!important}}
 `;
+
+.idp-verify{border:1px solid color-mix(in srgb,var(--am) 28%,var(--line));border-radius:22px;padding:20px;background:linear-gradient(145deg,var(--s2),var(--s1));box-shadow:0 18px 42px rgba(0,0,0,.16);position:relative;overflow:hidden}
+.idp-verify:before{content:"";position:absolute;right:-65px;top:-95px;width:230px;height:230px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--am) 12%,transparent),transparent 70%);pointer-events:none}
+.idp-vtop{display:flex;align-items:flex-start;gap:12px;position:relative}
+.idp-vbadge{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:color-mix(in srgb,var(--am) 13%,var(--s2));color:var(--am);flex:none}
+.idp-vheading{min-width:0;flex:1}
+.idp-veyebrow{font:700 10px 'DM Mono',monospace;letter-spacing:.15em;color:var(--am);margin:0 0 5px}
+.idp-vheading h3{font:800 19px 'Bricolage Grotesque','Hanken Grotesk',sans-serif;margin:0;color:var(--txt)}
+.idp-vheading p{font-size:13px;color:var(--mut);line-height:1.45;margin:5px 0 0}
+.idp-vstatus{font:700 11px 'Hanken Grotesk',sans-serif;border-radius:999px;padding:7px 10px;white-space:nowrap;background:color-mix(in srgb,var(--am) 13%,var(--s2));color:var(--am);border:1px solid color-mix(in srgb,var(--am) 24%,var(--line))}
+.idp-vstatus.success{color:var(--up);background:color-mix(in srgb,var(--up) 12%,var(--s2));border-color:color-mix(in srgb,var(--up) 28%,var(--line))}
+.idp-vstatus.warning{color:var(--dn);background:color-mix(in srgb,var(--dn) 10%,var(--s2));border-color:color-mix(in srgb,var(--dn) 28%,var(--line))}
+.idp-vsteps{display:flex;align-items:stretch;gap:7px;margin:20px 0 18px;position:relative}
+.idp-vstep{display:flex;flex:1;min-width:0;flex-direction:column;gap:5px;align-items:center;text-align:center}
+.idp-vstep-icon{width:38px;height:38px;border:1px solid var(--line);border-radius:50%;display:grid;place-items:center;color:var(--am);background:var(--s1)}
+.idp-vstep-icon svg{width:18px;height:18px}
+.idp-vstep b{font-size:12px;color:var(--txt)}
+.idp-vstep small{font-size:10.5px;line-height:1.35;color:var(--mut)}
+.idp-vconnector{height:1px;flex:0 0 9%;margin-top:19px;background:linear-gradient(90deg,var(--line),color-mix(in srgb,var(--am) 50%,var(--line)))}
+.idp-vfoot{display:grid;gap:12px}
+.idp-verify .idp-cta{min-height:48px;display:flex;align-items:center;justify-content:center;gap:10px}
+.idp-verify .idp-cta.idp-verified{background:color-mix(in srgb,var(--up) 15%,var(--s2));color:var(--up);box-shadow:none;border:1px solid color-mix(in srgb,var(--up) 25%,var(--line))}
+.idp-vprivacy{display:flex;justify-content:center;align-items:center;gap:8px;text-align:left;color:var(--mut);font-size:11px;line-height:1.45}
+.idp-vprivacy svg{color:var(--am);flex:none}
+.idp-vprivacy small{font-size:10px;color:var(--mut)}
+@media(max-width:420px){.idp-verify{padding:15px;border-radius:18px}.idp-vstatus{font-size:10px;padding:6px 8px}.idp-vstep-icon{width:34px;height:34px}.idp-vconnector{margin-top:17px;flex-basis:5%}.idp-vstep small{font-size:10px}}
+
   var s = document.createElement("style");
   s.id = "tm-idpass-css";
   s.textContent = CSS;
@@ -164,12 +191,16 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
     var verified = typeof idvVerified === "function" && idvVerified();
     var status = window.__tmPersonaStatus || { status: "not_started", verified: false };
     var active = ["pending","in_progress","submitted","review"].indexOf(status.status) >= 0;
-    var label = verified || status.verified ? "Verified" : active ? "Verification in progress" : "Not verified";
-    var action = verified || status.verified
-      ? '<button class="idp-cta" type="button" disabled>Identity verified</button>'
-      : '<button class="idp-cta" type="button" data-persona-start>' + (active ? "Continue verification" : "Verify identity") + '</button>';
-    return '<div class="idp-vc"><div class="idp-vh"><span class="idp-sh">' + PT_SHIELD + '</span><div><h3>Identity verification</h3><p>' + (verified || status.verified ? "Your identity has been verified." : "Verify securely with Persona.") + '</p></div></div>' +
-      '<div class="idp-vm"><small>' + label + '</small></div>' + action + '</div>';
+    var failed = ["failed","rejected","needs_retry","action_required"].indexOf(status.status) >= 0;
+    var label = verified || status.verified ? "Verified" : active ? "In review" : failed ? "Action required" : "Not verified";
+    var intro = verified || status.verified ? "Your identity is confirmed. You're all set." : active ? "Your submission is being reviewed. We'll update your status here." : failed ? "A little more information is needed to complete verification." : "A secure, guided process to help build trust on TradeMate.";
+    var cta = verified || status.verified
+      ? '<button class="idp-cta idp-verified" type="button" disabled>' + ic("check") + ' Identity verified</button>'
+      : '<button class="idp-cta" type="button" data-persona-start>' + (active ? "Check verification status" : failed ? "Retry verification" : "Start verification") + ic("right", "width:18px;height:18px") + '</button>';
+    var steps = [["user","Personal details","Confirm your basic information"],["id","Identity document","Scan a valid government ID"],["camera","Selfie check","Match your face to your ID"]];
+    return '<section class="idp-verify"><div class="idp-vtop"><div class="idp-vbadge">' + PT_SHIELD + '</div><div class="idp-vheading"><div class="idp-veyebrow">ACCOUNT TRUST</div><h3>Identity verification</h3><p>' + intro + '</p></div><span class="idp-vstatus' + (verified || status.verified ? " success" : failed ? " warning" : active ? " progress" : "") + '">' + label + '</span></div>' +
+      '<div class="idp-vsteps">' + steps.map(function(x,i){return '<div class="idp-vstep"><span class="idp-vstep-icon">' + ic(x[0]) + '</span><b>' + x[1] + '</b><small>' + x[2] + '</small></div>'+(i<2?'<span class="idp-vconnector"></span>':'');}).join("") + '</div>' +
+      '<div class="idp-vfoot">' + cta + '<div class="idp-vprivacy">' + ic("lock", "width:15px;height:15px") + '<span>Secure verification powered by Persona<br><small>Your details are handled securely and used for verification.</small></span></div></div></section>';
   }
   function strip(e) {
     return '<div class="pfoot idp-strip"><button class="idp-sz" data-act="mode" role="switch" aria-checked="' + e + '"><span class="idp-ic">' + ic("swap") + '</span><span>Alpha mode</span><i class="idp-sw' + (e ? " on" : "") + '"></i></button><span class="idp-dv"></span><button class="idp-sz" data-pg="about"><span>About us</span><em>' + ic("chev", "width:16px;height:16px") + "</em></button></div>";
