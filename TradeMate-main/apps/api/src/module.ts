@@ -225,6 +225,8 @@ class PersonaWebhookController {
     const inquiryAttributes = inquiry && isRecord(inquiry.attributes) ? inquiry.attributes : null;
     const inquiryStatus = inquiryAttributes && typeof inquiryAttributes.status === 'string'
       ? inquiryAttributes.status : null;
+    const referenceId = inquiryAttributes && typeof inquiryAttributes['reference-id'] === 'string'
+      ? inquiryAttributes['reference-id'] : '';
     const eventCreatedAt = typeof attributes['created-at'] === 'string'
       ? new Date(attributes['created-at']) : null;
     if (!/^inq_[A-Za-z0-9]+$/.test(inquiryId) || (eventCreatedAt && !Number.isFinite(eventCreatedAt.getTime()))) {
@@ -245,7 +247,15 @@ class PersonaWebhookController {
       'inquiry.approved': 'approved', 'inquiry.declined': 'declined', 'inquiry.marked-for-review': 'review',
       'inquiry.failed': 'failed', 'inquiry.expired': 'expired',
     };
-    await databasePool.query(
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(referenceId)) {
+      await databasePool.query(
+        `INSERT INTO persona_user_inquiries (user_id, inquiry_id, status)
+         SELECT id, $2, $3 FROM users WHERE id = $1 AND status = 'active'
+         ON CONFLICT (inquiry_id) DO NOTHING`,
+        [referenceId, inquiryId, statusByEvent[eventName]],
+      );
+    }
+    await databasePool.query(`
       `UPDATE persona_user_inquiries SET status = $1, updated_at = now(),
        approved_at = CASE WHEN $1 = 'approved' THEN COALESCE(approved_at, now()) ELSE approved_at END
        WHERE inquiry_id = $2 AND (status <> 'approved' OR $1 = 'approved')`,
