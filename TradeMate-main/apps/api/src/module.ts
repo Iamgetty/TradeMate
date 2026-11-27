@@ -302,20 +302,27 @@ class PersonaInquiryController {
     let inquiryId = existing.rows[0]?.inquiry_id as string | undefined;
     let hostedUrl = '';
     if (inquiryId) {
-      const resume = await fetch('https://api.withpersona.com/api/v1/inquiries/' + encodeURIComponent(inquiryId) + '/resume', {
-        method: 'POST', headers: { Authorization: 'Bearer ' + apiKey, 'Persona-Version': '2026-09-29', Accept: 'application/json' },
+      const linkResponse = await fetch('https://api.withpersona.com/api/v1/inquiries/' + encodeURIComponent(inquiryId) + '/generate-one-time-link', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + apiKey, 'Persona-Version': '2026-09-29', Accept: 'application/json' },
         signal: AbortSignal.timeout(10000),
       });
-      if (resume.ok) {
-        const resumed: unknown = await resume.json();
-        const meta = isRecord(resumed) && isRecord(resumed.meta) ? resumed.meta : null;
-        const token = meta && typeof meta['session-token'] === 'string' ? meta['session-token'] : '';
-        if (!token) throw new HttpException('Persona did not return a secure resume session.', HttpStatus.BAD_GATEWAY);
-        hostedUrl = 'https://inquiry.withpersona.com/verify?inquiry-id=' + encodeURIComponent(inquiryId) + '&session-token=' + encodeURIComponent(token);
-      } else if ([404,409,422].includes(resume.status)) {
-        inquiryId = undefined;
+      if (!linkResponse.ok) {
+        if ([404, 409, 422].includes(linkResponse.status)) {
+          inquiryId = undefined;
+        } else {
+          throw new HttpException('Persona could not create a secure verification link. Please try again.', HttpStatus.BAD_GATEWAY);
+        }
       } else {
-        throw new HttpException('Persona could not resume your verification. Please try again.', HttpStatus.BAD_GATEWAY);
+        const linkPayload: unknown = await linkResponse.json();
+        const linkMeta = isRecord(linkPayload) && isRecord(linkPayload.meta) ? linkPayload.meta : null;
+        const oneTimeLink = linkMeta && typeof linkMeta['one-time-link'] === 'string' ? linkMeta['one-time-link'] : '';
+        if (!oneTimeLink) throw new HttpException('Persona did not return a secure one-time link.', HttpStatus.BAD_GATEWAY);
+        const parsed = new URL(oneTimeLink);
+        if (parsed.protocol !== 'https:' || !['inquiry.withpersona.com', 'withpersona.com', 'go.perso.na'].includes(parsed.hostname)) {
+          throw new HttpException('Persona returned an unsafe verification link.', HttpStatus.BAD_GATEWAY);
+        }
+        hostedUrl = parsed.toString();
       }
     }
     if (!inquiryId) {
@@ -345,7 +352,7 @@ class PersonaInquiryController {
       }
       if (!oneTimeLink) throw new HttpException('Persona did not return a secure verification link.', HttpStatus.BAD_GATEWAY);
       const parsed = new URL(oneTimeLink);
-      if (parsed.protocol !== 'https:' || !['inquiry.withpersona.com','go.perso.na'].includes(parsed.hostname)) throw new HttpException('Persona returned an unsafe verification link.', HttpStatus.BAD_GATEWAY);
+      if (parsed.protocol !== 'https:' || !['inquiry.withpersona.com','withpersona.com','go.perso.na'].includes(parsed.hostname)) throw new HttpException('Persona returned an unsafe verification link.', HttpStatus.BAD_GATEWAY);
       hostedUrl = parsed.toString();
       await databasePool!.query(
         `INSERT INTO persona_user_inquiries (user_id, inquiry_id, status)
