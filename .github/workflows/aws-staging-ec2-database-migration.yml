@@ -1,19 +1,13 @@
 name: AWS Staging Database Migration on EC2
 
 on:
-  workflow_dispatch:
-    inputs:
-      confirm_migration:
-        description: Apply the migration set from the exact current main commit to the AWS staging RDS database.
-        type: choice
-        required: true
-        options:
-          - "no"
-          - "yes"
-      source_sha:
-        description: Full 40-character commit SHA on main containing the migration to apply.
-        type: string
-        required: true
+  workflow_run:
+    workflows:
+      - TradeMate CI
+    types:
+      - completed
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -26,7 +20,7 @@ concurrency:
 jobs:
   migrate:
     name: Apply reviewed migrations to AWS staging RDS
-    if: ${{ inputs.confirm_migration == 'yes' && github.ref == 'refs/heads/main' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
     runs-on:
       - self-hosted
       - Linux
@@ -38,13 +32,13 @@ jobs:
     steps:
       - name: Validate exact main release and successful checks
         env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ ! "$SOURCE_SHA" =~ ^[a-f0-9]{40}$ || "$SOURCE_SHA" != "$GITHUB_SHA" ]]; then
-            echo "::error::source_sha must exactly match the main commit that dispatched this workflow."
+          if [[ ! "$SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]; then
+            echo "::error::TradeMate CI did not provide a valid main commit SHA."
             exit 1
           fi
           CURRENT_MAIN_SHA="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')"
@@ -80,7 +74,7 @@ jobs:
       - name: Check out the exact tested main commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.source_sha }}
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 1
 
       - name: Verify staging instance identity and secret access
