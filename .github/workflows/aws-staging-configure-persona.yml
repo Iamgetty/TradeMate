@@ -1,0 +1,62 @@
+name: AWS Staging Configure Persona Runtime
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trademate-aws-staging-persona-runtime
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    name: Configure Persona on the staging API
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+      - aws-staging
+    timeout-minutes: 10
+    env:
+      PERSONA_API_KEY: ${{ secrets.PERSONA_API_KEY }}
+      PERSONA_INQUIRY_TEMPLATE_ID: ${{ vars.PERSONA_INQUIRY_TEMPLATE_ID }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Validate inputs and service configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          if [[ -z "${PERSONA_API_KEY:-}" || -z "${PERSONA_INQUIRY_TEMPLATE_ID:-}" ]]; then
+            echo "::error::Configure the PERSONA_API_KEY repository secret and PERSONA_INQUIRY_TEMPLATE_ID repository variable."
+            exit 1
+          fi
+          if [[ ! "$PERSONA_INQUIRY_TEMPLATE_ID" =~ ^itmpl_[A-Za-z0-9]+$ ]]; then
+            echo "::error::PERSONA_INQUIRY_TEMPLATE_ID has an invalid format; its value was not displayed."
+            exit 1
+          fi
+          sudo -n -l /usr/local/sbin/trademate-configure-persona-runtime >/dev/null
+          env_files="$(systemctl show trademate-api.service --property=EnvironmentFiles --value)"
+          if [[ "$env_files" != *"/etc/trademate/api.env"* ]]; then
+            echo "::error::trademate-api.service is not configured to load /etc/trademate/api.env; refusing to modify the host."
+            exit 1
+          fi
+
+      - name: Install settings and verify the live API process
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          python3 - <<'PY' | sudo -n /usr/local/sbin/trademate-configure-persona-runtime
+          import json
+          import os
+          import sys
+          json.dump({
+              "api_key": os.environ["PERSONA_API_KEY"],
+              "template_id": os.environ["PERSONA_INQUIRY_TEMPLATE_ID"],
+          }, sys.stdout)
+          PY
