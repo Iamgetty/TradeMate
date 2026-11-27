@@ -280,18 +280,35 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
     if (!button) return;
     button.disabled = true;
     button.textContent = 'Connecting to Persona…';
-    fetch('/api/integrations/persona/inquiry', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}' })
-      .then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.message || 'Could not start verification.'); return data; }); })
+    fetch('/api/integrations/persona/inquiry', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: '{}' })
+      .then(function (response) {
+        return response.text().then(function (raw) {
+          var data = null;
+          try { data = raw ? JSON.parse(raw) : {}; } catch (_) {}
+          if (!response.ok) {
+            var detail = data && (data.message || data.error);
+            throw new Error('HTTP ' + response.status + (detail ? ': ' + detail : ': ' + (raw || response.statusText).slice(0, 120)));
+          }
+          if (!data || typeof data !== 'object') {
+            throw new Error('HTTP ' + response.status + ': non-JSON response: ' + (raw || '').slice(0, 120));
+          }
+          return data;
+        });
+      })
       .then(function (data) {
         if (typeof data.url !== 'string' || !data.url) throw new Error('Persona did not return a verification link.');
         var target;
-        try { target = new URL(data.url); } catch (_) { throw new Error('Persona returned an invalid verification link. Please try again.'); }
+        try { target = new URL(data.url); } catch (_) { throw new Error('Persona returned an invalid verification link.'); }
         if (target.protocol !== 'https:' || ['inquiry.withpersona.com', 'withpersona.com', 'go.perso.na'].indexOf(target.hostname) < 0) {
           throw new Error('Persona returned an unsafe verification link. Please contact support.');
         }
         window.location.assign(target.href);
       })
-      .catch(function (error) { button.disabled = false; button.textContent = 'Verify identity'; window.alert(error.message || 'Could not start verification. Please try again.'); });
+      .catch(function (error) {
+        button.disabled = false;
+        button.textContent = 'Verify identity';
+        window.alert(error && error.message ? error.message : 'Could not start verification. Please try again.');
+      });
   });
   loadPersonaStatus();
 })();
