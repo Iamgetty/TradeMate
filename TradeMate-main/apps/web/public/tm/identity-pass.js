@@ -282,15 +282,11 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
     button.textContent = 'Connecting to Persona…';
     fetch('/api/integrations/persona/inquiry', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: '{}' })
       .then(function (response) {
-        return response.text().then(function (raw) {
-          var data = null;
-          try { data = raw ? JSON.parse(raw) : {}; } catch (_) {}
-          if (!response.ok) {
-            var detail = data && (data.message || data.error);
-            throw new Error('HTTP ' + response.status + (detail ? ': ' + detail : ': ' + (raw || response.statusText).slice(0, 120)));
-          }
-          if (!data || typeof data !== 'object') {
-            throw new Error('HTTP ' + response.status + ': non-JSON response: ' + (raw || '').slice(0, 120));
+        return response.text().then(function (text) {
+          var data = {};
+          try { data = JSON.parse(text); } catch (_) {}
+          if (!response.ok || !data.url) {
+            throw new Error(data.message || ('Verification failed (HTTP ' + response.status + '): ' + text.slice(0, 120)));
           }
           return data;
         });
