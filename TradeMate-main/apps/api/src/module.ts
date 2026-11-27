@@ -322,15 +322,22 @@ class PersonaInquiryController {
       inquiryId = data && typeof data.id === 'string' ? data.id : undefined;
       if (!inquiryId || !/^inq_[A-Za-z0-9]+$/.test(inquiryId)) throw new HttpException('Persona returned an invalid inquiry reference.', HttpStatus.BAD_GATEWAY);
       const meta = isRecord(payload) && isRecord(payload.meta) ? payload.meta : null;
-      const oneTimeLink = meta && typeof meta['one-time-link'] === 'string' ? meta['one-time-link'] : '';
-      if (oneTimeLink) {
-        const parsed = new URL(oneTimeLink);
-        if (parsed.protocol !== 'https:' || !['inquiry.withpersona.com','go.perso.na'].includes(parsed.hostname)) throw new HttpException('Persona returned an unsafe verification link.', HttpStatus.BAD_GATEWAY);
-        hostedUrl = parsed.toString();
-      } else {
-        hostedUrl = 'https://inquiry.withpersona.com/verify?inquiry-id=' + encodeURIComponent(inquiryId);
+      let oneTimeLink = meta && typeof meta['one-time-link'] === 'string' ? meta['one-time-link'] : '';
+      if (!oneTimeLink) {
+        const linkResponse = await fetch('https://api.withpersona.com/api/v1/inquiries/' + encodeURIComponent(inquiryId) + '/generate-one-time-link', {
+          method: 'POST', headers: { Authorization: 'Bearer ' + apiKey, 'Persona-Version': '2026-09-29', Accept: 'application/json' },
+          signal: AbortSignal.timeout(10000),
+        });
+        if (!linkResponse.ok) throw new HttpException('Persona created the inquiry but could not generate a secure access link.', HttpStatus.BAD_GATEWAY);
+        const linkPayload: unknown = await linkResponse.json();
+        const linkMeta = isRecord(linkPayload) && isRecord(linkPayload.meta) ? linkPayload.meta : null;
+        oneTimeLink = linkMeta && typeof linkMeta['one-time-link'] === 'string' ? linkMeta['one-time-link'] : '';
       }
-      await databasePool!.query(
+      if (!oneTimeLink) throw new HttpException('Persona did not return a secure verification link.', HttpStatus.BAD_GATEWAY);
+      const parsed = new URL(oneTimeLink);
+      if (parsed.protocol !== 'https:' || !['inquiry.withpersona.com','go.perso.na'].includes(parsed.hostname)) throw new HttpException('Persona returned an unsafe verification link.', HttpStatus.BAD_GATEWAY);
+      hostedUrl = parsed.toString();
+      await databasePool!.query(`
         `INSERT INTO persona_user_inquiries (user_id, inquiry_id, status)
          VALUES ($1, $2, 'pending') ON CONFLICT (inquiry_id) DO NOTHING`, [userId, inquiryId]);
     }
