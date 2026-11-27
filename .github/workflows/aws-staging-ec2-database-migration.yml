@@ -12,6 +12,7 @@ on:
 permissions:
   contents: read
   checks: read
+  id-token: write
 
 concurrency:
   group: trademate-aws-staging-ec2-database-migration
@@ -29,6 +30,9 @@ jobs:
     timeout-minutes: 20
     environment:
       name: aws-staging-image-publish
+    env:
+      AWS_STAGING_PUBLISH_ROLE_ARN: ${{ vars.AWS_STAGING_PUBLISH_ROLE_ARN }}
+      AWS_STAGING_ACCOUNT_ID: ${{ vars.AWS_STAGING_ACCOUNT_ID }}
     steps:
       - name: Validate exact main release and successful checks
         env:
@@ -98,16 +102,21 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 1
 
-      - name: Verify staging instance identity and secret access
+      - name: Validate the approved staging role
         shell: bash
         run: |
           set -euo pipefail
-          ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
-          if [[ "$ACCOUNT" != "661406600284" ]]; then
-            echo "::error::The self-hosted runner is not using the approved TradeMate staging AWS account."
+          if [[ ! "$AWS_STAGING_PUBLISH_ROLE_ARN" =~ ^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$ || "$AWS_STAGING_ACCOUNT_ID" != "661406600284" ]]; then
+            echo "::error::The approved TradeMate staging AWS role or account is not configured."
             exit 1
           fi
-          aws secretsmanager describe-secret --secret-id trademate/staging/api >/dev/null
+
+      - name: Assume the restricted AWS staging role
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_STAGING_PUBLISH_ROLE_ARN }}
+          aws-region: eu-north-1
+          role-session-name: trademate-staging-migration
 
       - name: Select the pinned Node.js 24 runtime
         shell: bash
