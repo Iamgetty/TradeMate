@@ -27,7 +27,6 @@ concurrency:
 jobs:
   migrate:
     name: Apply reviewed migrations to AWS staging RDS
-    if: ${{ inputs.confirm_migration == 'yes' && github.ref == 'refs/heads/main' }}
     runs-on:
       - self-hosted
       - Linux
@@ -43,6 +42,7 @@ jobs:
       - name: Validate exact main release and successful checks
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
+          CONFIRM_MIGRATION: ${{ inputs.confirm_migration }}
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         shell: bash
@@ -56,6 +56,10 @@ jobs:
           token = os.environ["GH_TOKEN"]
           repository = os.environ["GITHUB_REPOSITORY"]
           source_sha = os.environ["SOURCE_SHA"]
+          if os.environ["CONFIRM_MIGRATION"] != "yes":
+              raise SystemExit("Migration confirmation was not yes; refusing to continue.")
+          if os.environ.get("GITHUB_REF") != "refs/heads/main":
+              raise SystemExit("Staging migrations may only run from the main branch.")
           if len(source_sha) != 40 or any(c not in "0123456789abcdef" for c in source_sha):
               raise SystemExit("TradeMate CI did not provide a valid main commit SHA.")
 
