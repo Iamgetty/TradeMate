@@ -265,6 +265,23 @@ class PersonaWebhookController {
 }
 
 
+function parsePersonaHostedLink(value: string): URL {
+  // Persona's API can return surrounding whitespace; normalize it before parsing.
+  // Convert URL parser failures into a deliberate upstream error instead of
+  // leaking a runtime TypeError to the browser.
+  let parsed: URL;
+  try {
+    parsed = new URL(value.trim());
+  } catch {
+    throw new HttpException('Persona returned an invalid verification link. Please try again.', HttpStatus.BAD_GATEWAY);
+  }
+  if (parsed.protocol !== 'https:' || !['inquiry.withpersona.com', 'withpersona.com', 'go.perso.na'].includes(parsed.hostname)) {
+    throw new HttpException('Persona returned an unsafe verification link.', HttpStatus.BAD_GATEWAY);
+  }
+  return parsed;
+}
+
+
 @Controller('integrations/persona')
 class PersonaInquiryController {
   private async currentUser(request: Request): Promise<string> {
@@ -326,10 +343,7 @@ class PersonaInquiryController {
         const linkMeta = isRecord(linkPayload) && isRecord(linkPayload.meta) ? linkPayload.meta : null;
         const oneTimeLink = linkMeta && typeof linkMeta['one-time-link'] === 'string' ? linkMeta['one-time-link'] : '';
         if (!oneTimeLink) throw new HttpException('Persona did not return a secure one-time link.', HttpStatus.BAD_GATEWAY);
-        const parsed = new URL(oneTimeLink);
-        if (parsed.protocol !== 'https:' || !['inquiry.withpersona.com', 'withpersona.com', 'go.perso.na'].includes(parsed.hostname)) {
-          throw new HttpException('Persona returned an unsafe verification link.', HttpStatus.BAD_GATEWAY);
-        }
+        const parsed = parsePersonaHostedLink(oneTimeLink);
         parsed.searchParams.set('redirect-uri', redirectTarget.toString());
         hostedUrl = parsed.toString();
       }
@@ -360,8 +374,7 @@ class PersonaInquiryController {
         oneTimeLink = linkMeta && typeof linkMeta['one-time-link'] === 'string' ? linkMeta['one-time-link'] : '';
       }
       if (!oneTimeLink) throw new HttpException('Persona did not return a secure verification link.', HttpStatus.BAD_GATEWAY);
-      const parsed = new URL(oneTimeLink);
-      if (parsed.protocol !== 'https:' || !['inquiry.withpersona.com','withpersona.com','go.perso.na'].includes(parsed.hostname)) throw new HttpException('Persona returned an unsafe verification link.', HttpStatus.BAD_GATEWAY);
+      const parsed = parsePersonaHostedLink(oneTimeLink);
       parsed.searchParams.set('redirect-uri', redirectTarget.toString());
       hostedUrl = parsed.toString();
       await databasePool!.query(
