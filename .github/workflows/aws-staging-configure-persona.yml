@@ -41,9 +41,9 @@ jobs:
             echo "::error::trademate-api.service is not configured to load /etc/trademate/api.env; refusing to modify the host."
             exit 1
           fi
-          sudo -n -l /usr/local/sbin/trademate-configure-persona-runtime >/dev/null
-          expected="$(sha256sum .github/scripts/configure-persona-runtime.py | awk '{print $1}')"
-          actual="$(sudo sha256sum /usr/local/sbin/trademate-configure-persona-runtime | awk '{print $1}')"
+          sudo -n -l /usr/local/sbin/trademate-configure-resend-runtime >/dev/null
+          expected="$(sha256sum .github/scripts/configure-resend-runtime.py | awk '{print $1}')"
+          actual="$(sudo sha256sum /usr/local/sbin/trademate-configure-resend-runtime | awk '{print $1}')"
           if [[ "$expected" != "$actual" ]]; then
             echo "::error::The root-owned Persona runtime helper is not installed at the reviewed source version."
             exit 1
@@ -61,7 +61,7 @@ jobs:
         run: |
           set -euo pipefail
           set +x
-          python3 - <<'PY' | sudo -n /usr/local/sbin/trademate-configure-persona-runtime
+          python3 - <<'PY' | sudo -n /usr/local/sbin/trademate-configure-resend-runtime
           import json
           import subprocess
           import sys
@@ -80,5 +80,5 @@ jobs:
               raise SystemExit("PERSONA_API_KEY is missing from the staging API secret.")
           if not isinstance(template_id, str) or not template_id.startswith("itmpl_"):
               raise SystemExit("PERSONA_INQUIRY_TEMPLATE_ID is missing or invalid in the staging API secret.")
-          json.dump({"api_key": api_key, "template_id": template_id}, sys.stdout)
+          json.dump({"persona_api_key": api_key, "persona_template_id": template_id}, sys.stdout)
           PY
