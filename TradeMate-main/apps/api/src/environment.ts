@@ -23,6 +23,9 @@ const environmentSchema = z.object({
     'Every configured web origin must use HTTPS (HTTP is allowed only for localhost).',
   ).optional(),
   PERSONA_WEBHOOK_SECRET: z.string().min(1).optional(),
+  PERSONA_API_KEY: z.string().min(1).optional(),
+  PERSONA_INQUIRY_TEMPLATE_ID: z.string().regex(/^itmpl_[A-Za-z0-9]+$/).optional(),
+  PERSONA_REDIRECT_URI: z.string().url().refine((value) => { const url = new URL(value); return url.protocol === 'https:' && ['trademate.cfd', 'www.trademate.cfd'].includes(url.hostname); }, 'Must be an HTTPS TradeMate domain.').optional(),
   RESEND_API_KEY: z.string().min(1).optional(),
   RESEND_FROM_EMAIL: z.string().refine((value) => {
     const trimmed = value.trim();

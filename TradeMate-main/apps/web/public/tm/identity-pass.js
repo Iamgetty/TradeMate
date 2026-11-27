@@ -162,10 +162,14 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
   }
   function verify() {
     var verified = typeof idvVerified === "function" && idvVerified();
-    return '<div class="idp-vc"><div class="idp-vh"><span class="idp-sh">' + PT_SHIELD + "</span><div><h3>" + (verified ? "Identity verified" : "Identity verification") + "</h3><p>" + (verified ? "Your identity status is confirmed by TradeMate." : "Your account is not verified. Live identity verification is not connected yet, so no progress or verified badge will be shown.") + "</p></div></div>" +
-      '<div class="idp-vm"><small>' + (verified ? "Verification complete" : "Not verified") + "</small></div>" +
-      (verified ? "" : '<div class="idp-hint">Verification will become available here when the live verification service is enabled.</div>') +
-      '<button class="idp-cta" type="button" disabled aria-disabled="true">' + (verified ? "Verified" : "Verification unavailable") + "</button></div>";
+    var status = window.__tmPersonaStatus || { status: "not_started", verified: false };
+    var active = ["pending","in_progress","submitted","review"].indexOf(status.status) >= 0;
+    var label = verified || status.verified ? "Verified" : active ? "Verification in progress" : "Not verified";
+    var action = verified || status.verified
+      ? '<button class="idp-cta" type="button" disabled>Identity verified</button>'
+      : '<button class="idp-cta" type="button" data-persona-start>' + (active ? "Continue verification" : "Verify identity") + '</button>';
+    return '<div class="idp-vc"><div class="idp-vh"><span class="idp-sh">' + PT_SHIELD + '</span><div><h3>Identity verification</h3><p>' + (verified || status.verified ? "Your identity has been verified." : "Verify securely with Persona.") + '</p></div></div>' +
+      '<div class="idp-vm"><small>' + label + '</small></div>' + action + '</div>';
   }
   function strip(e) {
     return '<div class="pfoot idp-strip"><button class="idp-sz" data-act="mode" role="switch" aria-checked="' + e + '"><span class="idp-ic">' + ic("swap") + '</span><span>Alpha mode</span><i class="idp-sw' + (e ? " on" : "") + '"></i></button><span class="idp-dv"></span><button class="idp-sz" data-pg="about"><span>About us</span><em>' + ic("chev", "width:16px;height:16px") + "</em></button></div>";
@@ -264,4 +268,22 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
   });
 
   try { drawPage(); } catch (x) {}
+
+  function loadPersonaStatus() {
+    fetch('/api/integrations/persona/status', { credentials: 'include', cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('status'); return r.json(); })
+      .then(function (data) { window.__tmPersonaStatus = data; if (typeof drawPage === 'function') drawPage(); })
+      .catch(function () { window.__tmPersonaStatus = { status: 'not_started', verified: false }; });
+  }
+  document.addEventListener('click', function (event) {
+    var button = event.target && event.target.closest ? event.target.closest('[data-persona-start]') : null;
+    if (!button) return;
+    button.disabled = true;
+    button.textContent = 'Connecting to Persona…';
+    fetch('/api/integrations/persona/inquiry', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      .then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.message || 'Could not start verification.'); return data; }); })
+      .then(function (data) { if (!data.url) throw new Error('Persona did not return a verification link.'); window.location.assign(data.url); })
+      .catch(function (error) { button.disabled = false; button.textContent = 'Verify identity'; window.alert(error.message || 'Could not start verification. Please try again.'); });
+  });
+  loadPersonaStatus();
 })();

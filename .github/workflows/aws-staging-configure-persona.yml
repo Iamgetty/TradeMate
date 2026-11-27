@@ -1,0 +1,78 @@
+name: AWS Staging Configure Persona Runtime
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: trademate-aws-staging-persona-runtime
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    name: Configure Persona on the staging API
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+      - aws-staging
+    environment: aws-staging-image-publish
+    timeout-minutes: 15
+    env:
+      AWS_STAGING_PUBLISH_ROLE_ARN: ${{ vars.AWS_STAGING_PUBLISH_ROLE_ARN }}
+      AWS_STAGING_ACCOUNT_ID: ${{ vars.AWS_STAGING_ACCOUNT_ID }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Validate AWS role and service configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$AWS_STAGING_PUBLISH_ROLE_ARN" =~ ^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$ || ! "$AWS_STAGING_ACCOUNT_ID" =~ ^[0-9]{12}$ ]]; then
+            echo "::error::Configure the AWS staging role ARN and account ID in the aws-staging-image-publish environment."
+            exit 1
+          fi
+          env_files="$(systemctl show trademate-api.service --property=EnvironmentFiles --value)"
+          if [[ "$env_files" != *"/etc/trademate/api.env"* ]]; then
+            echo "::error::trademate-api.service is not configured to load /etc/trademate/api.env; refusing to modify the host."
+            exit 1
+          fi
+
+      - name: Assume the restricted AWS staging role
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_STAGING_PUBLISH_ROLE_ARN }}
+          aws-region: eu-north-1
+          role-session-name: trademate-persona-runtime-config
+
+      - name: Install Persona settings from AWS Secrets Manager
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          sudo -n install -o root -g root -m 0755 .github/scripts/configure-persona-runtime.py /usr/local/sbin/trademate-configure-persona-runtime
+          python3 - <<'PY' | sudo -n /usr/local/sbin/trademate-configure-persona-runtime
+          import json
+          import subprocess
+          import sys
+
+          result = subprocess.run(
+              ["aws", "secretsmanager", "get-secret-value", "--secret-id", "trademate/staging/api",
+               "--query", "SecretString", "--output", "text"],
+              check=True, capture_output=True, text=True,
+          )
+          values = json.loads(result.stdout)
+          if not isinstance(values, dict):
+              raise SystemExit("The staging API secret is not a JSON object.")
+          api_key = values.get("PERSONA_API_KEY", "")
+          template_id = values.get("PERSONA_INQUIRY_TEMPLATE_ID", "")
+          if not isinstance(api_key, str) or not api_key:
+              raise SystemExit("PERSONA_API_KEY is missing from the staging API secret.")
+          if not isinstance(template_id, str) or not template_id.startswith("itmpl_"):
+              raise SystemExit("PERSONA_INQUIRY_TEMPLATE_ID is missing or invalid in the staging API secret.")
+          json.dump({"api_key": api_key, "template_id": template_id}, sys.stdout)
+          PY
