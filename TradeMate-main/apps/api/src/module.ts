@@ -306,6 +306,9 @@ class PersonaInquiryController {
   @Post('inquiry')
   @HttpCode(200)
   async createInquiry(@Req() request: Request) {
+    let diagnosticStage = 'session';
+    let upstreamStatus: number | null = null;
+    try {
     const userId = await this.currentUser(request);
     const apiKey = process.env.PERSONA_API_KEY || '';
     const templateId = process.env.PERSONA_INQUIRY_TEMPLATE_ID || '';
@@ -320,6 +323,7 @@ class PersonaInquiryController {
     if (redirectTarget.protocol !== 'https:' || !['trademate.cfd', 'www.trademate.cfd'].includes(redirectTarget.hostname)) {
       throw new HttpException('Persona return address must use the TradeMate HTTPS domain.', HttpStatus.SERVICE_UNAVAILABLE);
     }
+    diagnosticStage = 'lookup_existing_inquiry';
     const existing = await databasePool!.query(
       `SELECT inquiry_id, status FROM persona_user_inquiries
        WHERE user_id = $1 AND status IN ('pending','in_progress','submitted','review')
@@ -327,11 +331,14 @@ class PersonaInquiryController {
     let inquiryId = existing.rows[0]?.inquiry_id as string | undefined;
     let hostedUrl = '';
     if (inquiryId) {
+      diagnosticStage = 'generate_existing_inquiry_link';
+      upstreamStatus = null;
       const linkResponse = await fetch('https://api.withpersona.com/api/v1/inquiries/' + encodeURIComponent(inquiryId) + '/generate-one-time-link', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + apiKey, 'Persona-Version': '2026-09-29', Accept: 'application/json' },
         signal: AbortSignal.timeout(10000),
       });
+      upstreamStatus = linkResponse.status;
       if (!linkResponse.ok) {
         if ([404, 409, 422].includes(linkResponse.status)) {
           inquiryId = undefined;
@@ -349,6 +356,8 @@ class PersonaInquiryController {
       }
     }
     if (!inquiryId) {
+      diagnosticStage = 'create_persona_inquiry';
+      upstreamStatus = null;
       const created = await fetch('https://api.withpersona.com/api/v1/inquiries', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + apiKey, 'Persona-Version': '2026-09-29', 'Content-Type': 'application/json', Accept: 'application/json',
@@ -356,6 +365,7 @@ class PersonaInquiryController {
         body: JSON.stringify({ data: { attributes: { 'inquiry-template-id': templateId, 'reference-id': userId } } }),
         signal: AbortSignal.timeout(15000),
       });
+      upstreamStatus = created.status;
       if (!created.ok) throw new HttpException('Persona could not start verification. Please try again later.', created.status === 401 || created.status === 403 ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.BAD_GATEWAY);
       const payload: unknown = await created.json();
       const data = isRecord(payload) && isRecord(payload.data) ? payload.data : null;
@@ -364,10 +374,13 @@ class PersonaInquiryController {
       const meta = isRecord(payload) && isRecord(payload.meta) ? payload.meta : null;
       let oneTimeLink = meta && typeof meta['one-time-link'] === 'string' ? meta['one-time-link'] : '';
       if (!oneTimeLink) {
+        diagnosticStage = 'generate_new_inquiry_link';
+        upstreamStatus = null;
         const linkResponse = await fetch('https://api.withpersona.com/api/v1/inquiries/' + encodeURIComponent(inquiryId) + '/generate-one-time-link', {
           method: 'POST', headers: { Authorization: 'Bearer ' + apiKey, 'Persona-Version': '2026-09-29', Accept: 'application/json' },
           signal: AbortSignal.timeout(10000),
         });
+        upstreamStatus = linkResponse.status;
         if (!linkResponse.ok) throw new HttpException('Persona created the inquiry but could not generate a secure access link.', HttpStatus.BAD_GATEWAY);
         const linkPayload: unknown = await linkResponse.json();
         const linkMeta = isRecord(linkPayload) && isRecord(linkPayload.meta) ? linkPayload.meta : null;
@@ -377,11 +390,13 @@ class PersonaInquiryController {
       const parsed = parsePersonaHostedLink(oneTimeLink);
       parsed.searchParams.set('redirect-uri', redirectTarget.toString());
       hostedUrl = parsed.toString();
+      diagnosticStage = 'persist_persona_inquiry';
       await databasePool!.query(
         `INSERT INTO persona_user_inquiries (user_id, inquiry_id, status)
          VALUES ($1, $2, 'pending') ON CONFLICT (inquiry_id) DO NOTHING`, [userId, inquiryId]);
       // A webhook can arrive before the API request has stored the inquiry mapping.
       // Reconcile the most recent signed event after inserting the mapping.
+      diagnosticStage = 'reconcile_persona_webhook';
       await databasePool!.query(
         `UPDATE persona_user_inquiries AS inquiry
          SET status = CASE event.event_name
@@ -411,6 +426,19 @@ class PersonaInquiryController {
         [inquiryId]);
     }
     return { inquiryId, url: hostedUrl, status: 'pending' };
+    } catch (error) {
+      const status = error instanceof HttpException ? error.getStatus() : 500;
+      const reason = error instanceof HttpException
+        ? error.message
+        : error instanceof Error ? error.name : 'UnknownError';
+      console.error('[persona] inquiry request failed', {
+        stage: diagnosticStage,
+        status,
+        upstreamStatus,
+        reason: String(reason).slice(0, 160),
+      });
+      throw error;
+    }
   }
 }
 
