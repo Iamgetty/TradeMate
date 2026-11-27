@@ -362,6 +362,7 @@ class PersonaInquiryController {
       if (!oneTimeLink) throw new HttpException('Persona did not return a secure verification link.', HttpStatus.BAD_GATEWAY);
       const parsed = new URL(oneTimeLink);
       if (parsed.protocol !== 'https:' || !['inquiry.withpersona.com','withpersona.com','go.perso.na'].includes(parsed.hostname)) throw new HttpException('Persona returned an unsafe verification link.', HttpStatus.BAD_GATEWAY);
+      parsed.searchParams.set('redirect-uri', redirectTarget.toString());
       hostedUrl = parsed.toString();
       await databasePool!.query(
         `INSERT INTO persona_user_inquiries (user_id, inquiry_id, status)
