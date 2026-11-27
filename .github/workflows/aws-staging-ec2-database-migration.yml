@@ -43,7 +43,7 @@ jobs:
           fi
           CURRENT_MAIN_SHA="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')"
           if [[ "$SOURCE_SHA" != "$CURRENT_MAIN_SHA" ]]; then
-            echo "::error::main advanced; dispatch migration again for the exact current main SHA."
+            echo "::error::main advanced while this migration was waiting; a fresh CI run on the current main SHA must complete before migration."
             exit 1
           fi
           CHECK_RUNS="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA/check-runs?per_page=100" --jq '.check_runs')"
