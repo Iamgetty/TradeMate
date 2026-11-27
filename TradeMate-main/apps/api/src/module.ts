@@ -337,7 +337,7 @@ class PersonaInquiryController {
       const parsed = new URL(oneTimeLink);
       if (parsed.protocol !== 'https:' || !['inquiry.withpersona.com','go.perso.na'].includes(parsed.hostname)) throw new HttpException('Persona returned an unsafe verification link.', HttpStatus.BAD_GATEWAY);
       hostedUrl = parsed.toString();
-      await databasePool!.query(`
+      await databasePool!.query(
         `INSERT INTO persona_user_inquiries (user_id, inquiry_id, status)
          VALUES ($1, $2, 'pending') ON CONFLICT (inquiry_id) DO NOTHING`, [userId, inquiryId]);
     }
