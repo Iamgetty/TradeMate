@@ -44,7 +44,7 @@ var tmFeeds={},tmFeedSymbol="",tmMarketSocket=null,tmMarketReconnect=null,tmFeed
  '<div class="pm-st"><div class="pm-seg" aria-hidden="true"><i style="flex:1;background:var(--line)"></i></div><div><small><i style="background:var(--pm-act)"></i>Holdings</small><b>—</b></div><div><small><i style="background:var(--pm-pen)"></i>Performance</small><b>—</b></div><div><small><i style="background:var(--pm-ok)"></i>Allocation</small><b>—</b></div></div>'+
  '<div class="pm-sp off" aria-label="Portfolio performance unavailable"><svg viewBox="0 0 400 62" preserveAspectRatio="none"><path d="M0 46H400" class="pm-sl"/></svg></div></div>'+
  '<div class="pm-h" style="margin-top:18px"><h2>Owned contracts</h2><button class="pm-pill" data-pg="ownedc">View All '+pmI("chev")+'</button></div>'+
- '<div class="pm-wb" style="grid-template-columns:1fr"><div class="pm-bal"><small>Owned contract value</small><b>'+ (hidden?"******":contractValue) +'</b><span class="pm-lv">Awaiting verified ownership and valuation data</span></div></div>'+
+ '<div class="pm-none"><b>Owned contract value: '+(hidden?"******":"—")+'</b><p>Awaiting verified ownership and valuation data.</p></div>'+
  '<div class="pm-dg">'+contractsContent+'</div></section>'+
  '<section class="pm-card"><div class="pm-h"><svg viewBox="0 0 34 34" aria-hidden="true"><rect x="2" y="8" width="30" height="22" rx="5" fill="currentColor"/><path d="M6 8l18-5 2 5z" fill="currentColor" opacity=".6"/></svg><h2>Wallet</h2></div>'+
  '<div class="pm-wb"><div class="pm-bal"><small>Available balance</small><b>'+masked+'</b><span class="pm-lv">Wallet ledger not connected</span></div>'+
