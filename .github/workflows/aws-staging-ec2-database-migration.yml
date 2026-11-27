@@ -1,0 +1,132 @@
+name: AWS Staging Database Migration on EC2
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_migration:
+        description: Apply the migration set from the exact current main commit to the AWS staging RDS database.
+        type: choice
+        required: true
+        options:
+          - "no"
+          - "yes"
+      source_sha:
+        description: Full 40-character commit SHA on main containing the migration to apply.
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  checks: read
+
+concurrency:
+  group: trademate-aws-staging-ec2-database-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Apply reviewed migrations to AWS staging RDS
+    if: ${{ inputs.confirm_migration == 'yes' && github.ref == 'refs/heads/main' }}
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+      - aws-staging
+    timeout-minutes: 20
+    environment:
+      name: aws-staging-migrations
+    steps:
+      - name: Validate exact main release and successful checks
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$SOURCE_SHA" =~ ^[a-f0-9]{40}$ || "$SOURCE_SHA" != "$GITHUB_SHA" ]]; then
+            echo "::error::source_sha must exactly match the main commit that dispatched this workflow."
+            exit 1
+          fi
+          CURRENT_MAIN_SHA="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')"
+          if [[ "$SOURCE_SHA" != "$CURRENT_MAIN_SHA" ]]; then
+            echo "::error::main advanced; dispatch migration again for the exact current main SHA."
+            exit 1
+          fi
+          CHECK_RUNS="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA/check-runs?per_page=100" --jq '.check_runs')"
+          REQUIRED_CHECKS=(
+            "Browser app-shell and live API acceptance tests"
+            "AWS API and exchange-feed container builds"
+            "Exchange feed and MT5 tests"
+            "Database migration integration"
+            "Security scanning (SAST, SCA and secrets)"
+            "API TypeScript build"
+            "Web build and runtime syntax"
+            "Isolated Cloudflare Workers frontend build and runtime"
+            "PostgreSQL 18 role and RLS checks"
+            "PostgreSQL 16 role and RLS checks"
+          )
+          for required_check in "${REQUIRED_CHECKS[@]}"; do
+            conclusion="$(jq -r --arg name "$required_check" '[.[] | select(.name==$name)] | sort_by(.completed_at // .started_at) | last | .conclusion // "missing"' <<< "$CHECK_RUNS")"
+            if [[ "$conclusion" != "success" ]]; then
+              echo "::error::Required check '$required_check' is not successful for $SOURCE_SHA (conclusion: $conclusion)."
+              exit 1
+            fi
+          done
+          if ! systemctl is-active --quiet trademate-api.service; then
+            echo "::error::The AWS staging API service is not active; refusing to migrate."
+            exit 1
+          fi
+
+      - name: Check out the exact tested main commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Verify staging instance identity and secret access
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
+          if [[ "$ACCOUNT" != "661406600284" ]]; then
+            echo "::error::The self-hosted runner is not using the approved TradeMate staging AWS account."
+            exit 1
+          fi
+          aws secretsmanager describe-secret --secret-id trademate/staging/api >/dev/null
+
+      - name: Install API dependencies
+        working-directory: TradeMate-main/apps/api
+        run: npm ci --no-audit --no-fund
+
+      - name: Apply migrations using the dedicated staging migrator credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+
+          secret_result = subprocess.run(
+              ["aws", "secretsmanager", "get-secret-value", "--secret-id", "trademate/staging/api",
+               "--query", "SecretString", "--output", "text"],
+              check=True, capture_output=True, text=True,
+          )
+          values = json.loads(secret_result.stdout)
+          migration_url = values.get("MIGRATION_DATABASE_URL", "")
+          verifier_key = values.get("RLS_CONTEXT_HMAC_KEY", "")
+          if not isinstance(migration_url, str) or not migration_url.startswith(("postgres://", "postgresql://")):
+              raise SystemExit("The dedicated staging MIGRATION_DATABASE_URL is missing or invalid.")
+          if not isinstance(verifier_key, str) or len(verifier_key) != 64 or any(c not in "0123456789abcdefABCDEF" for c in verifier_key):
+              raise SystemExit("The staging RLS_CONTEXT_HMAC_KEY is missing or invalid.")
+          env = os.environ.copy()
+          env.update({
+              "NODE_ENV": "production",
+              "MIGRATION_DATABASE_URL": migration_url,
+              "RLS_CONTEXT_HMAC_KEY": verifier_key,
+              "PGSSLMODE": "require",
+          })
+          subprocess.run(["npm", "run", "db:migrate"], cwd="TradeMate-main/apps/api", env=env, check=True)
+          print("AWS staging database migrations completed successfully. Secret values were not printed.")
+          PY
