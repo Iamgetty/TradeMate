@@ -21,9 +21,32 @@ BEGIN
 END
 $$;
 
-ALTER ROLE trademate_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
-ALTER ROLE trademate_migrator LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
-ALTER ROLE trademate_worker LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+-- RDS administrator roles cannot change SUPERUSER attributes. Roles created
+-- above already have the required safe attributes; existing roles must be
+-- verified, never "repaired" by attempting privileged ALTER ROLE operations.
+DO $role_safety$
+DECLARE
+  role_record RECORD;
+BEGIN
+  FOR role_record IN
+    SELECT rolname, rolsuper, rolcreatedb, rolcreaterole, rolbypassrls,
+           rolcanlogin, rolinherit
+    FROM pg_roles
+    WHERE rolname IN ('trademate_app', 'trademate_migrator', 'trademate_worker')
+  LOOP
+    IF role_record.rolsuper
+       OR role_record.rolcreatedb
+       OR role_record.rolcreaterole
+       OR role_record.rolbypassrls
+       OR NOT role_record.rolcanlogin
+       OR role_record.rolinherit THEN
+      RAISE EXCEPTION
+        'Role % has unsafe or unexpected attributes; refusing bootstrap without attempting privileged role changes.',
+        role_record.rolname;
+    END IF;
+  END LOOP;
+END
+$role_safety$;
 
 -- Permit the current administrator to transfer existing object ownership.
 GRANT trademate_migrator TO CURRENT_USER;
