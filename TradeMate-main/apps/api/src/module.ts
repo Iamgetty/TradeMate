@@ -240,7 +240,101 @@ class PersonaWebhookController {
        ON CONFLICT (event_id) DO NOTHING`,
       [eventId, eventName, inquiryId, inquiryStatus, eventCreatedAt, digest],
     );
+    const statusByEvent: Record<string, string> = {
+      'inquiry.created': 'pending', 'inquiry.started': 'in_progress', 'inquiry.completed': 'submitted',
+      'inquiry.approved': 'approved', 'inquiry.declined': 'declined', 'inquiry.marked-for-review': 'review',
+      'inquiry.failed': 'failed', 'inquiry.expired': 'expired',
+    };
+    await databasePool.query(
+      `UPDATE persona_user_inquiries SET status = $1, updated_at = now(),
+       approved_at = CASE WHEN $1 = 'approved' THEN COALESCE(approved_at, now()) ELSE approved_at END
+       WHERE inquiry_id = $2 AND (status <> 'approved' OR $1 = 'approved')`,
+      [statusByEvent[eventName], inquiryId]);
     return { received: true, duplicate: inserted.rowCount === 0 };
+  }
+}
+
+
+@Controller('integrations/persona')
+class PersonaInquiryController {
+  private async currentUser(request: Request): Promise<string> {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to verify your identity.');
+    const session = await resolvePresentedSessionUser(token);
+    if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    return session.rows[0].id as string;
+  }
+
+  @Get('status')
+  async status(@Req() request: Request) {
+    const userId = await this.currentUser(request);
+    const result = await databasePool!.query(
+      `SELECT status, updated_at FROM persona_user_inquiries
+       WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`, [userId]);
+    const row = result.rows[0] || null;
+    return { status: row?.status || 'not_started', verified: row?.status === 'approved', updatedAt: row?.updated_at || null };
+  }
+
+  @Post('inquiry')
+  @HttpCode(200)
+  async createInquiry(@Req() request: Request) {
+    const userId = await this.currentUser(request);
+    const apiKey = process.env.PERSONA_API_KEY || '';
+    const templateId = process.env.PERSONA_INQUIRY_TEMPLATE_ID || '';
+    if (!apiKey || !/^itmpl_[A-Za-z0-9]+$/.test(templateId)) {
+      throw new HttpException('Identity verification is being configured. Please try again shortly.', HttpStatus.SERVICE_UNAVAILABLE);
+    }
+    const existing = await databasePool!.query(
+      `SELECT inquiry_id, status FROM persona_user_inquiries
+       WHERE user_id = $1 AND status IN ('pending','in_progress','submitted','review')
+       ORDER BY created_at DESC LIMIT 1`, [userId]);
+    let inquiryId = existing.rows[0]?.inquiry_id as string | undefined;
+    let hostedUrl = '';
+    if (inquiryId) {
+      const resume = await fetch('https://api.withpersona.com/api/v1/inquiries/' + encodeURIComponent(inquiryId) + '/resume', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + apiKey, 'Persona-Version': '2026-09-29', Accept: 'application/json' },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (resume.ok) {
+        const resumed: unknown = await resume.json();
+        const meta = isRecord(resumed) && isRecord(resumed.meta) ? resumed.meta : null;
+        const token = meta && typeof meta['session-token'] === 'string' ? meta['session-token'] : '';
+        if (!token) throw new HttpException('Persona did not return a secure resume session.', HttpStatus.BAD_GATEWAY);
+        hostedUrl = 'https://inquiry.withpersona.com/verify?inquiry-id=' + encodeURIComponent(inquiryId) + '&session-token=' + encodeURIComponent(token);
+      } else if ([404,409,422].includes(resume.status)) {
+        inquiryId = undefined;
+      } else {
+        throw new HttpException('Persona could not resume your verification. Please try again.', HttpStatus.BAD_GATEWAY);
+      }
+    }
+    if (!inquiryId) {
+      const created = await fetch('https://api.withpersona.com/api/v1/inquiries', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + apiKey, 'Persona-Version': '2026-09-29', 'Content-Type': 'application/json', Accept: 'application/json',
+          'Idempotency-Key': 'trademate-identity-' + userId + '-' + randomBytes(12).toString('hex') },
+        body: JSON.stringify({ data: { attributes: { 'inquiry-template-id': templateId, 'reference-id': userId } } }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!created.ok) throw new HttpException('Persona could not start verification. Please try again later.', created.status === 401 || created.status === 403 ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.BAD_GATEWAY);
+      const payload: unknown = await created.json();
+      const data = isRecord(payload) && isRecord(payload.data) ? payload.data : null;
+      inquiryId = data && typeof data.id === 'string' ? data.id : undefined;
+      if (!inquiryId || !/^inq_[A-Za-z0-9]+$/.test(inquiryId)) throw new HttpException('Persona returned an invalid inquiry reference.', HttpStatus.BAD_GATEWAY);
+      const meta = isRecord(payload) && isRecord(payload.meta) ? payload.meta : null;
+      const oneTimeLink = meta && typeof meta['one-time-link'] === 'string' ? meta['one-time-link'] : '';
+      if (oneTimeLink) {
+        const parsed = new URL(oneTimeLink);
+        if (parsed.protocol !== 'https:' || !['inquiry.withpersona.com','go.perso.na'].includes(parsed.hostname)) throw new HttpException('Persona returned an unsafe verification link.', HttpStatus.BAD_GATEWAY);
+        hostedUrl = parsed.toString();
+      } else {
+        hostedUrl = 'https://inquiry.withpersona.com/verify?inquiry-id=' + encodeURIComponent(inquiryId);
+      }
+      await databasePool!.query(
+        `INSERT INTO persona_user_inquiries (user_id, inquiry_id, status)
+         VALUES ($1, $2, 'pending') ON CONFLICT (inquiry_id) DO NOTHING`, [userId, inquiryId]);
+    }
+    return { inquiryId, url: hostedUrl, status: 'pending' };
   }
 }
 
@@ -4218,7 +4312,7 @@ class SportsTransferOpportunitiesController {
   }
 }
 
-@Module({ controllers: [SportsTransferOpportunitiesController, SportsTransferMandatesController, SportsTransferOrganizationsController, SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController, PersonaWebhookController] })
+@Module({ controllers: [SportsTransferOpportunitiesController, SportsTransferMandatesController, SportsTransferOrganizationsController, SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController, PersonaWebhookController, PersonaInquiryController] })
 export class AppModule implements OnModuleDestroy {
   async onModuleDestroy() {
     if (databasePool) await databasePool.end();
