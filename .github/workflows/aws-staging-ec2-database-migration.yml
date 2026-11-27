@@ -1,13 +1,19 @@
 name: AWS Staging Database Migration on EC2
 
 on:
-  workflow_run:
-    workflows:
-      - TradeMate CI
-    types:
-      - completed
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      confirm_migration:
+        description: Apply the reviewed migration set to AWS staging RDS.
+        type: choice
+        required: true
+        options:
+          - "no"
+          - "yes"
+      source_sha:
+        description: Full 40-character main commit SHA that passed the required CI checks.
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -21,7 +27,7 @@ concurrency:
 jobs:
   migrate:
     name: Apply reviewed migrations to AWS staging RDS
-    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
+    if: ${{ inputs.confirm_migration == 'yes' && github.ref == 'refs/heads/main' }}
     runs-on:
       - self-hosted
       - Linux
@@ -36,7 +42,7 @@ jobs:
     steps:
       - name: Validate exact main release and successful checks
         env:
-          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         shell: bash
@@ -99,7 +105,7 @@ jobs:
       - name: Check out the exact tested main commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ inputs.source_sha }}
           fetch-depth: 1
 
       - name: Validate the approved staging role
@@ -155,12 +161,16 @@ jobs:
               raise SystemExit("The dedicated staging MIGRATION_DATABASE_URL is missing or invalid.")
           if not isinstance(verifier_key, str) or len(verifier_key) != 64 or any(c not in "0123456789abcdefABCDEF" for c in verifier_key):
               raise SystemExit("The staging RLS_CONTEXT_HMAC_KEY is missing or invalid.")
+          ca_bundle = "/opt/actions-runner/rds-global-bundle.pem"
+          if not os.path.isfile(ca_bundle):
+              raise SystemExit("The staging runner's approved RDS CA bundle is missing.")
           env = os.environ.copy()
           env.update({
               "NODE_ENV": "production",
               "MIGRATION_DATABASE_URL": migration_url,
               "RLS_CONTEXT_HMAC_KEY": verifier_key,
               "PGSSLMODE": "require",
+              "NODE_EXTRA_CA_CERTS": ca_bundle,
           })
           subprocess.run(["npm", "run", "db:migrate"], cwd="TradeMate-main/apps/api", env=env, check=True)
           print("AWS staging database migrations completed successfully. Secret values were not printed.")
