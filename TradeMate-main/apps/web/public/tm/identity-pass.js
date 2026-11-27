@@ -128,8 +128,6 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
 .pgs .sp-cta{background:var(--grad)!important;color:var(--ongrad,#1b1006)!important}
 .pgs .sp-qi:hover,.pgs .sp-row:hover{border-color:color-mix(in srgb,var(--am) 40%,var(--line))!important}
 @media(prefers-reduced-motion:reduce){.idp-ci,.idp-steps i:after,.idp-sw,.idp-sw:after{animation:none!important;transition:none!important}}
-`;
-
 .idp-verify{border:1px solid color-mix(in srgb,var(--am) 28%,var(--line));border-radius:22px;padding:20px;background:linear-gradient(145deg,var(--s2),var(--s1));box-shadow:0 18px 42px rgba(0,0,0,.16);position:relative;overflow:hidden}
 .idp-verify:before{content:"";position:absolute;right:-65px;top:-95px;width:230px;height:230px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--am) 12%,transparent),transparent 70%);pointer-events:none}
 .idp-vtop{display:flex;align-items:flex-start;gap:12px;position:relative}
@@ -155,8 +153,9 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
 .idp-vprivacy svg{color:var(--am);flex:none}
 .idp-vprivacy small{font-size:10px;color:var(--mut)}
 @media(max-width:420px){.idp-verify{padding:15px;border-radius:18px}.idp-vstatus{font-size:10px;padding:6px 8px}.idp-vstep-icon{width:34px;height:34px}.idp-vconnector{margin-top:17px;flex-basis:5%}.idp-vstep small{font-size:10px}}
+`;
 
-  var s = document.createElement("style");
+var s = document.createElement("style");
   s.id = "tm-idpass-css";
   s.textContent = CSS;
   document.head.appendChild(s);
