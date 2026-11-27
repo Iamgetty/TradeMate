@@ -155,12 +155,16 @@ jobs:
               raise SystemExit("The dedicated staging MIGRATION_DATABASE_URL is missing or invalid.")
           if not isinstance(verifier_key, str) or len(verifier_key) != 64 or any(c not in "0123456789abcdefABCDEF" for c in verifier_key):
               raise SystemExit("The staging RLS_CONTEXT_HMAC_KEY is missing or invalid.")
+          ca_bundle = "/opt/actions-runner/rds-global-bundle.pem"
+          if not os.path.isfile(ca_bundle):
+              raise SystemExit("The staging runner's approved RDS CA bundle is missing.")
           env = os.environ.copy()
           env.update({
               "NODE_ENV": "production",
               "MIGRATION_DATABASE_URL": migration_url,
               "RLS_CONTEXT_HMAC_KEY": verifier_key,
               "PGSSLMODE": "require",
+              "NODE_EXTRA_CA_CERTS": ca_bundle,
           })
           subprocess.run(["npm", "run", "db:migrate"], cwd="TradeMate-main/apps/api", env=env, check=True)
           print("AWS staging database migrations completed successfully. Secret values were not printed.")
