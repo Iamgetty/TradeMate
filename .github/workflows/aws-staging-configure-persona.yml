@@ -5,6 +5,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: trademate-aws-staging-persona-runtime
@@ -18,10 +19,13 @@ jobs:
       - Linux
       - X64
       - aws-staging
-    timeout-minutes: 10
+    environment: aws-staging-image-publish
+    timeout-minutes: 15
     env:
       PERSONA_API_KEY: ${{ secrets.PERSONA_API_KEY }}
       PERSONA_INQUIRY_TEMPLATE_ID: ${{ vars.PERSONA_INQUIRY_TEMPLATE_ID }}
+      AWS_STAGING_PUBLISH_ROLE_ARN: ${{ vars.AWS_STAGING_PUBLISH_ROLE_ARN }}
+      AWS_STAGING_ACCOUNT_ID: ${{ vars.AWS_STAGING_ACCOUNT_ID }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -32,25 +36,79 @@ jobs:
           set -euo pipefail
           set +x
           if [[ -z "${PERSONA_API_KEY:-}" || -z "${PERSONA_INQUIRY_TEMPLATE_ID:-}" ]]; then
-            echo "::error::Configure the PERSONA_API_KEY repository secret and PERSONA_INQUIRY_TEMPLATE_ID repository variable."
+            echo "::error::Configure the PERSONA_API_KEY repository secret and PERSONA_INQUIRY_TEMPLATE_ID environment variable."
             exit 1
           fi
           if [[ ! "$PERSONA_INQUIRY_TEMPLATE_ID" =~ ^itmpl_[A-Za-z0-9]+$ ]]; then
             echo "::error::PERSONA_INQUIRY_TEMPLATE_ID has an invalid format; its value was not displayed."
             exit 1
           fi
-          sudo -n -l /usr/local/sbin/trademate-configure-persona-runtime >/dev/null
+          if [[ ! "$AWS_STAGING_PUBLISH_ROLE_ARN" =~ ^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$ || ! "$AWS_STAGING_ACCOUNT_ID" =~ ^[0-9]{12}$ ]]; then
+            echo "::error::Configure the AWS staging role ARN and account ID in the aws-staging-image-publish environment."
+            exit 1
+          fi
           env_files="$(systemctl show trademate-api.service --property=EnvironmentFiles --value)"
           if [[ "$env_files" != *"/etc/trademate/api.env"* ]]; then
             echo "::error::trademate-api.service is not configured to load /etc/trademate/api.env; refusing to modify the host."
             exit 1
           fi
 
+      - name: Assume the restricted AWS staging role
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_STAGING_PUBLISH_ROLE_ARN }}
+          aws-region: eu-north-1
+          role-session-name: trademate-persona-runtime-config
+
+      - name: Store Persona settings in the existing AWS API secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          import tempfile
+
+          secret_id = "trademate/staging/api"
+          current = subprocess.run(
+              ["aws", "secretsmanager", "get-secret-value", "--secret-id", secret_id,
+               "--query", "SecretString", "--output", "text"],
+              check=True, capture_output=True, text=True,
+          ).stdout
+          values = json.loads(current)
+          if not isinstance(values, dict):
+              raise SystemExit("Existing API secret is not a JSON object")
+          values["PERSONA_API_KEY"] = os.environ["PERSONA_API_KEY"]
+          values["PERSONA_INQUIRY_TEMPLATE_ID"] = os.environ["PERSONA_INQUIRY_TEMPLATE_ID"]
+          fd, temporary = tempfile.mkstemp(prefix="trademate-persona-", suffix=".json")
+          try:
+              os.fchmod(fd, 0o600)
+              with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                  json.dump(values, handle)
+              subprocess.run(
+                  ["aws", "secretsmanager", "put-secret-value", "--secret-id", secret_id,
+                   "--secret-string", "file://" + temporary],
+                  check=True, capture_output=True, text=True,
+              )
+          finally:
+              try:
+                  os.unlink(temporary)
+              except FileNotFoundError:
+                  pass
+          print("Persona settings stored in the existing AWS staging API secret; values were not displayed.")
+          PY
+
       - name: Install settings and verify the live API process
         shell: bash
         run: |
           set -euo pipefail
           set +x
+          python3 - <<'PY' | sudo -n install -o root -g root -m 0755 /dev/stdin /usr/local/sbin/trademate-configure-persona-runtime
+          import pathlib
+          print(pathlib.Path(".github/scripts/configure-persona-runtime.py").read_text(), end="")
+          PY
           python3 - <<'PY' | sudo -n /usr/local/sbin/trademate-configure-persona-runtime
           import json
           import os
