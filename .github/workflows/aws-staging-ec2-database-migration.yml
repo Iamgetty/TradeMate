@@ -34,7 +34,7 @@ jobs:
       - aws-staging
     timeout-minutes: 20
     environment:
-      name: aws-staging-migrations
+      name: aws-staging-image-publish
     steps:
       - name: Validate exact main release and successful checks
         env:
