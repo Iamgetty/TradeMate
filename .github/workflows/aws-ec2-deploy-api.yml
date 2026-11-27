@@ -3,7 +3,7 @@ name: Deploy TradeMate API to AWS staging
 on:
   workflow_run:
     workflows:
-      - AWS Staging EC2 Database Migration
+      - AWS Staging Database Migration on EC2
     types:
       - completed
     branches:
