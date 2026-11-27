@@ -308,6 +308,8 @@ var s = document.createElement("style");
   document.addEventListener('click', function (event) {
     var button = event.target && event.target.closest ? event.target.closest('[data-persona-start]') : null;
     if (!button) return;
+    var priorError = button.parentNode && button.parentNode.querySelector('.idp-inline-error');
+    if (priorError) priorError.remove();
     button.disabled = true;
     button.textContent = 'Connecting to Persona…';
     fetch('/api/integrations/persona/inquiry', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: '{}' })
@@ -332,8 +334,20 @@ var s = document.createElement("style");
       })
       .catch(function (error) {
         button.disabled = false;
-        button.textContent = 'Verify identity';
-        window.alert(error && error.message ? error.message : 'Could not start verification. Please try again.');
+        button.textContent = 'Start verification';
+        var message = error && error.message ? error.message : 'Could not start verification. Please try again.';
+        var host = button.parentNode;
+        if (host) {
+          var notice = host.querySelector('.idp-inline-error');
+          if (!notice) {
+            notice = document.createElement('p');
+            notice.className = 'idp-inline-error';
+            notice.setAttribute('role', 'alert');
+            notice.style.cssText = 'margin:0;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--dn) 10%,var(--s2));color:var(--dn);font-size:12px;line-height:1.45';
+            host.appendChild(notice);
+          }
+          notice.textContent = message;
+        }
       });
   });
   loadPersonaStatus();
