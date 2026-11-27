@@ -255,7 +255,7 @@ class PersonaWebhookController {
         [referenceId, inquiryId, statusByEvent[eventName]],
       );
     }
-    await databasePool.query(`
+    await databasePool.query(
       `UPDATE persona_user_inquiries SET status = $1, updated_at = now(),
        approved_at = CASE WHEN $1 = 'approved' THEN COALESCE(approved_at, now()) ELSE approved_at END
        WHERE inquiry_id = $2 AND (status <> 'approved' OR $1 = 'approved')`,
