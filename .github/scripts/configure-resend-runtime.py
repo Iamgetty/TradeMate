@@ -16,7 +16,7 @@ from_email = data.get("from_email", "")
 if api_key or from_email:
     if not re.fullmatch(r"re_[A-Za-z0-9_-]+", api_key):
         raise SystemExit("RESEND_API_KEY is missing or has an invalid format; value not displayed.")
-    if not re.fullmatch(r"[^\\s@<>]+@[^\\s@<>]+\\.[^\\s@<>]+", from_email):
+    if not re.fullmatch(r"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+", from_email):
         raise SystemExit("RESEND_FROM_EMAIL is missing or invalid; value not displayed.")
     updates["RESEND_API_KEY"] = api_key
     updates["RESEND_FROM_EMAIL"] = from_email
@@ -24,7 +24,7 @@ if api_key or from_email:
 persona_api_key = data.get("persona_api_key", "")
 persona_template_id = data.get("persona_template_id", "")
 if persona_api_key or persona_template_id:
-    if not isinstance(persona_api_key, str) or not persona_api_key or re.search(r"[\\r\\n\\x00]", persona_api_key):
+    if not isinstance(persona_api_key, str) or not persona_api_key or re.search(r"[\r\n\x00]", persona_api_key):
         raise SystemExit("PERSONA_API_KEY is missing or contains unsupported control characters; value not displayed.")
     if not isinstance(persona_template_id, str) or not re.fullmatch(r"itmpl_[A-Za-z0-9]+", persona_template_id):
         raise SystemExit("PERSONA_INQUIRY_TEMPLATE_ID is missing or invalid; value not displayed.")
@@ -45,7 +45,7 @@ except FileNotFoundError:
 setting_names = "|".join(re.escape(name) for name in updates)
 lines = [
     line for line in existing.splitlines()
-    if not re.match(r"^\\s*(?:" + setting_names + r")\\s*=", line)
+    if not re.match(r"^\s*(?:" + setting_names + r")\s*=", line)
 ]
 
 def systemd_quote(value):
@@ -57,7 +57,7 @@ content = "\n".join(lines).rstrip("\n")
 if content:
     content += "\n"
 for name, value in updates.items():
-    content += name + "=" + systemd_quote(value) + "\\n"
+    content += name + "=" + systemd_quote(value) + "\n"
 
 fd, temporary = tempfile.mkstemp(prefix=".api.env.", dir=directory)
 try:
