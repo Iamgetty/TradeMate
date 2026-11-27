@@ -4,15 +4,15 @@ DECLARE
   migrator_role RECORD;
   worker_role RECORD;
 BEGIN
-  SELECT rolsuper, rolcreatedb, rolcreaterole, rolbypassrls
+  SELECT rolsuper, rolcreatedb, rolcreaterole, rolbypassrls, rolcanlogin, rolinherit
   INTO app_role
   FROM pg_roles WHERE rolname = 'trademate_app';
 
-  SELECT rolsuper, rolcreatedb, rolcreaterole, rolbypassrls
+  SELECT rolsuper, rolcreatedb, rolcreaterole, rolbypassrls, rolcanlogin, rolinherit
   INTO migrator_role
   FROM pg_roles WHERE rolname = 'trademate_migrator';
 
-  SELECT rolsuper, rolcreatedb, rolcreaterole, rolbypassrls
+  SELECT rolsuper, rolcreatedb, rolcreaterole, rolbypassrls, rolcanlogin, rolinherit
   INTO worker_role
   FROM pg_roles WHERE rolname = 'trademate_worker';
 
@@ -20,15 +20,15 @@ BEGIN
     RAISE EXCEPTION 'TradeMate database roles were not created.';
   END IF;
 
-  IF app_role.rolsuper OR app_role.rolcreatedb OR app_role.rolcreaterole OR app_role.rolbypassrls THEN
+  IF app_role.rolsuper OR app_role.rolcreatedb OR app_role.rolcreaterole OR app_role.rolbypassrls OR NOT app_role.rolcanlogin OR app_role.rolinherit THEN
     RAISE EXCEPTION 'trademate_app has excessive role attributes.';
   END IF;
 
-  IF migrator_role.rolsuper OR migrator_role.rolcreatedb OR migrator_role.rolcreaterole OR migrator_role.rolbypassrls THEN
+  IF migrator_role.rolsuper OR migrator_role.rolcreatedb OR migrator_role.rolcreaterole OR migrator_role.rolbypassrls OR NOT migrator_role.rolcanlogin OR migrator_role.rolinherit THEN
     RAISE EXCEPTION 'trademate_migrator has excessive role attributes.';
   END IF;
 
-  IF worker_role.rolsuper OR worker_role.rolcreatedb OR worker_role.rolcreaterole OR worker_role.rolbypassrls THEN
+  IF worker_role.rolsuper OR worker_role.rolcreatedb OR worker_role.rolcreaterole OR worker_role.rolbypassrls OR NOT worker_role.rolcanlogin OR worker_role.rolinherit THEN
     RAISE EXCEPTION 'trademate_worker has excessive role attributes.';
   END IF;
 
