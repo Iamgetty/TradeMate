@@ -282,7 +282,15 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
     button.textContent = 'Connecting to Persona…';
     fetch('/api/integrations/persona/inquiry', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}' })
       .then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.message || 'Could not start verification.'); return data; }); })
-      .then(function (data) { if (!data.url) throw new Error('Persona did not return a verification link.'); window.location.assign(data.url); })
+      .then(function (data) {
+        if (typeof data.url !== 'string' || !data.url) throw new Error('Persona did not return a verification link.');
+        var target;
+        try { target = new URL(data.url); } catch (_) { throw new Error('Persona returned an invalid verification link. Please try again.'); }
+        if (target.protocol !== 'https:' || ['inquiry.withpersona.com', 'withpersona.com', 'go.perso.na'].indexOf(target.hostname) < 0) {
+          throw new Error('Persona returned an unsafe verification link. Please contact support.');
+        }
+        window.location.assign(target.href);
+      })
       .catch(function (error) { button.disabled = false; button.textContent = 'Verify identity'; window.alert(error.message || 'Could not start verification. Please try again.'); });
   });
   loadPersonaStatus();
