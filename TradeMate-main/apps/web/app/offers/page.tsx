@@ -92,6 +92,26 @@ export default function MyOffersPage() {
     }
   }
 
+  async function submitOffer(offer: Offer) {
+    if (offer.status !== 'draft') return;
+    setBusyId(offer.id);
+    setActionError('');
+    try {
+      const response = await fetch('/api/market/listings/' + encodeURIComponent(offer.id) + '/submit', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const result = await response.json().catch(() => ({}));
+      if (response.status === 401) { router.replace('/auth?mode=login'); return; }
+      if (!response.ok) throw new Error(result.message || 'Could not submit this offer for review.');
+      await loadOffers();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Could not submit this offer for review.');
+    } finally {
+      setBusyId('');
+    }
+  }
+
   async function deleteOffer(offer: Offer) {
     if (offer.status !== 'draft') return;
     if (!window.confirm('Delete the draft “' + offer.title + '”? This cannot be undone.')) return;
@@ -152,7 +172,7 @@ export default function MyOffersPage() {
             </>}
           </div>
           <div className="offer-row-price"><strong>{money(offer.price_minor_units, offer.currency_code)}</strong><span>{offer.listing_type === 'service' ? 'Service offer' : 'B2B opportunity'}</span>
-            {offer.status === 'draft' && editingId !== offer.id && <div className="offer-actions offer-actions-stack"><button className="offer-action-secondary" type="button" onClick={() => startEditing(offer)}>Edit draft</button><button className="offer-action-danger" type="button" disabled={busyId === offer.id} onClick={() => void deleteOffer(offer)}>{busyId === offer.id ? 'Working…' : 'Delete draft'}</button></div>}
+            {offer.status === 'draft' && editingId !== offer.id && <div className="offer-actions offer-actions-stack"><button className="offer-action-primary" type="button" disabled={busyId === offer.id} onClick={() => void submitOffer(offer)}>{busyId === offer.id ? 'Submitting…' : 'Submit for review'}</button><button className="offer-action-secondary" type="button" onClick={() => startEditing(offer)}>Edit draft</button><button className="offer-action-danger" type="button" disabled={busyId === offer.id} onClick={() => void deleteOffer(offer)}>{busyId === offer.id ? 'Working…' : 'Delete draft'}</button></div>}
           </div>
         </article>)}
       </div>}
