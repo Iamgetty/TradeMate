@@ -60,6 +60,7 @@ const MIGRATIONS = [
   '051_p2p_dispute_resolution_columns.sql',
   '052_render_view_reconciliation.sql',
   '053_persona_webhook_events.sql',
+  '054_persona_user_inquiries.sql',
 ];
 
 async function main() {
