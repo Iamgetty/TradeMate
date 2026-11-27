@@ -30,9 +30,7 @@ var tmFeeds={},tmFeedSymbol="",tmMarketSocket=null,tmMarketReconnect=null,tmFeed
  var hidden=!!st.hide,masked=hidden?"******":"—";
  var accountStatus=CONNECTED?"Account connected":"Sign in to access your account";
  var contracts=(st.contracts||[]).filter(function(x){return "accepted"===x.status||"completed"===x.status;});
- var totals={},currencies=[];
- contracts.forEach(function(x){var c=x.currency_code||"";if(!c)return;if(!(c in totals)){totals[c]=0;currencies.push(c)}totals[c]+=Number(x.amount_minor_units||0)/100});
- var contractValue=currencies.length?currencies.map(function(c){return (CSYM[c]||c)+" "+fx2(totals[c],2)}).join(" · "):"—";
+ var contractValue="—";
  var contractRows=contracts.slice(0,4).map(function(x){
   var c=x.currency_code||"",amount=x.amount||((CSYM[c]||c)+" "+fx2(Number(x.amount_minor_units||0)/100,2));
   return '<div class="lr" style="cursor:default"><span class="t">'+esc(x.title||x.listing_title||"Contract")+'<small>'+esc(x.counterparty||x.seller_name||x.buyer_name||"TradeMate member")+' · '+esc(contractStatusLabel(x.status))+'</small></span><em>'+esc(amount)+'</em></div>';
@@ -46,7 +44,7 @@ var tmFeeds={},tmFeedSymbol="",tmMarketSocket=null,tmMarketReconnect=null,tmFeed
  '<div class="pm-st"><div class="pm-seg" aria-hidden="true"><i style="flex:1;background:var(--line)"></i></div><div><small><i style="background:var(--pm-act)"></i>Holdings</small><b>'+contracts.length+'</b></div><div><small><i style="background:var(--pm-pen)"></i>Performance</small><b>—</b></div><div><small><i style="background:var(--pm-ok)"></i>Allocation</small><b>—</b></div></div>'+
  '<div class="pm-sp off" aria-label="Portfolio performance unavailable"><svg viewBox="0 0 400 62" preserveAspectRatio="none"><path d="M0 46H400" class="pm-sl"/></svg></div></div>'+
  '<div class="pm-h" style="margin-top:18px"><h2>Owned contracts</h2><button class="pm-pill" data-pg="ownedc">View All '+pmI("chev")+'</button></div>'+
- '<div class="pm-wb" style="grid-template-columns:1fr"><div class="pm-bal"><small>Owned contract value</small><b>'+ (hidden?"******":esc(contractValue)) +'</b><span class="pm-lv">'+contracts.length+' accepted or completed contracts · by currency</span></div></div>'+
+ '<div class="pm-wb" style="grid-template-columns:1fr"><div class="pm-bal"><small>Owned contract value</small><b>'+ (hidden?"******":contractValue) +'</b><span class="pm-lv">Awaiting verified ownership and valuation data</span></div></div>'+
  '<div class="pm-dg">'+contractsContent+'</div></section>'+
  '<section class="pm-card"><div class="pm-h"><svg viewBox="0 0 34 34" aria-hidden="true"><rect x="2" y="8" width="30" height="22" rx="5" fill="currentColor"/><path d="M6 8l18-5 2 5z" fill="currentColor" opacity=".6"/></svg><h2>Wallet</h2></div>'+
  '<div class="pm-wb"><div class="pm-bal"><small>Available balance</small><b>'+masked+'</b><span class="pm-lv">Wallet ledger not connected</span></div>'+
