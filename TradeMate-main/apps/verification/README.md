@@ -1,16 +1,33 @@
 # Verification Service
 
-This directory is reserved for the independently deployable verification engine. It is deliberately separate from `apps/api` (TradeMate's application API).
+Standalone, provider-neutral service boundary. It does not depend on TradeMate sessions, users, organizations or database tables.
 
-The first implementation slice must remain provider-neutral:
-- independent process and configuration;
-- versioned public API contract;
-- tenant-scoped integration authentication;
-- health/readiness endpoints;
-- typed provider adapter interfaces;
-- normalized result types;
-- no dependency on TradeMate cookies, users, organizations or database tables.
+## Local development
 
-Do not add live provider integrations, provider credentials, real identity-data persistence, or deployment resources until the relevant product and legal decisions are approved.
+Requires Node.js 24 or later.
 
-See [the architecture baseline](../../docs/verification-platform/architecture.md).
+```sh
+npm install
+npm run typecheck
+npm test
+npm start
+```
+
+The service listens on `0.0.0.0:8080` by default. Set `PORT` and `HOST` to override.
+
+## Initial HTTP surface
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/health/live` | Process liveness |
+| GET | `/health/ready` | Readiness, including catalogue availability |
+| GET | `/v1/products` | Discover separately selectable products |
+| GET | `/v1/products/:product/versions` | Discover releases for one product |
+
+All responses are JSON, include request IDs, and use `Cache-Control: no-store`.
+
+## Scope and security boundary
+
+This first HTTP runtime exposes public catalogue metadata only. It does not yet create tenants, issue or validate integration API keys, activate product entitlements, accept identity evidence, execute checks, or call providers. Do not treat catalogue visibility or a local CLI selection as authorization.
+
+The next service layer must add tenant-scoped authentication and server-side entitlement enforcement before any verification request endpoint is exposed. Do not persist raw identity documents, biometrics, government identifiers or provider payloads. Live provider adapters require explicit legal/provider approval.
