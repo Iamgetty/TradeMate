@@ -915,6 +915,7 @@ class PersonaInquiryController {
   async createInquiry(@Req() request: Request) {
     let diagnosticStage = 'session';
     let upstreamStatus: number | null = null;
+    let upstreamErrorCount = 0;
     try {
     const userId = await this.currentUser(request);
     const consent = await databasePool!.query(
@@ -978,7 +979,13 @@ class PersonaInquiryController {
         signal: AbortSignal.timeout(15000),
       });
       upstreamStatus = created.status;
-      if (!created.ok) throw new HttpException('Persona could not start verification. Please try again later.', created.status === 401 || created.status === 403 ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.BAD_GATEWAY);
+      if (!created.ok) {
+        // Never log raw upstream response fields; they may contain user data.
+        const errorPayload: unknown = await created.json().catch(() => null);
+        const errors = isRecord(errorPayload) && Array.isArray(errorPayload.errors) ? errorPayload.errors : [];
+        upstreamErrorCount = errors.length;
+        throw new HttpException('Persona could not start verification. Please try again later.', created.status === 401 || created.status === 403 ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.BAD_GATEWAY);
+      }
       const payload: unknown = await created.json();
       const data = isRecord(payload) && isRecord(payload.data) ? payload.data : null;
       inquiryId = data && typeof data.id === 'string' ? data.id : undefined;
@@ -1048,6 +1055,7 @@ class PersonaInquiryController {
         stage: diagnosticStage,
         status,
         upstreamStatus,
+        upstreamErrorCount,
         reason: String(reason).slice(0, 160),
       });
       throw error;
