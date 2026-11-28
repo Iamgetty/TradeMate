@@ -77,7 +77,7 @@ export interface NewVerificationRequest {
   createdAt: string;
 }
 
-export interface VerificationRequestRecord extends NewVerificationRequest {
+export interface VerificationRequestRecord extends Omit<NewVerificationRequest, 'status'> {
   status: 'accepted' | 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled';
   outcome: 'clear' | 'review' | 'declined' | null;
   updatedAt: string;
