@@ -1,4 +1,4 @@
-# Standalone Verification Platform — Architecture Baseline
+# Metadusk VeriFire — Architecture Baseline
 
 **Status:** Initial architecture baseline; implementation is not production-ready.  
 **Product boundary:** Independent verification infrastructure. TradeMate is the first intended integration client, not the platform's identity or tenancy boundary.
@@ -10,10 +10,10 @@ The product is installed and configured from a terminal, in the spirit of instal
 Illustrative developer journey (package name and commands are provisional until product naming and registry ownership are confirmed):
 
 ```sh
-npm install --global @metadusk/verification-cli
-verification init
-verification connect
-verification doctor
+npm install --global @metadusk/verifire-cli
+verifire init
+verifire connect
+verifire doctor
 ```
 
 Applications then call a versioned hosted API, for example:
