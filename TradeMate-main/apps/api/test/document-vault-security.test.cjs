@@ -68,3 +68,13 @@ test('new contract proposals generate a private participant-visible vault PDF wi
   assert.match(moduleSource, /completed \? 'completed' : 'fulfilment-confirmed'/);
   assert.match(moduleSource, /signature_status: 'not_signed'/);
 });
+
+test('organization creation generates an honest registration-event PDF in the organization vault', () => {
+  assert.match(moduleSource, /const buildOrganizationRegistrationPdf =/);
+  assert.match(moduleSource, /TRADEMATE ORGANIZATION REGISTRATION RECORD/);
+  assert.match(moduleSource, /not a certificate of incorporation/);
+  assert.match(moduleSource, /'organization_registration'/);
+  assert.match(moduleSource, /'organization','generated','organization'/);
+  assert.match(moduleSource, /organization_registration_event/);
+  assert.match(moduleSource, /legal_registration_certificate: false/);
+});
