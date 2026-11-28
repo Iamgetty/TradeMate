@@ -149,8 +149,9 @@ test('completed P2P trades generate private receipt PDFs for both parties in the
   for (const field of ['TRADEMATE P2P TRANSACTION RECEIPT', 'Transaction reference:', 'Buyer account:', 'Seller account:', 'Fiat total:', 'not proof of a bank transfer']) {
     assert.ok(receiptPdfBuilder.includes(field), `receipt PDF missing ${field}`);
   }
-  assert.ok(receiptPdfBuilder.includes('createHash'));
+
   const receiptSaver = moduleSource.slice(moduleSource.indexOf('const saveP2PTradeReceiptVaultDocuments'), moduleSource.indexOf('const buildContractRecordPdf'));
+  assert.ok(receiptSaver.includes("createHash('sha256')"));
   for (const field of [
     'for (const ownerUserId of [String(trade.buyer_user_id), String(trade.seller_user_id)]',
     'SELECT document_id FROM p2p_trade_receipt_documents WHERE p2p_trade_id = $1 AND user_id = $2',
