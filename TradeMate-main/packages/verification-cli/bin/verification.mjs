@@ -97,7 +97,7 @@ async function versions(productId) {
 }
 
 async function install(spec) {
-  const match = /^([a-z][a-z0-9-]*)@([0-9]+\\.[0-9]+\\.[0-9]+)$/.exec(spec ?? '');
+  const match = /^([a-z][a-z0-9-]*)@([0-9]+\.[0-9]+\.[0-9]+)$/.exec(spec ?? '');
   if (!match) throw new Error('Use an explicit product version, for example: verification install kyc@1.0.0');
   const [, productId, version] = match;
   const data = await catalog();
