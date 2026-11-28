@@ -363,14 +363,14 @@ var s = document.createElement("style");
     var body = document.createElement('div');
     body.className = 'tm-consent-body';
     body.style.cssText = 'padding:22px 24px 26px;overflow:auto;min-height:0;color:var(--txt,#fff);font-family:inherit;font-size:14px;line-height:1.65;font-weight:400';
-    var rawLines = String(agreement.content || '').split(/\\r?\\n/);
+    var rawLines = String(agreement.content || '').split(/\r?\n/);
     // The document title is already prominent in the dialog header; do not repeat it.
     if (rawLines.length && /^TRADEMATE IDENTITY VERIFICATION AGREEMENT$/i.test(rawLines[0].trim())) rawLines.shift();
     var currentList = null, currentItem = null, sectionCount = 0;
     function addConsentParagraph(text, className) {
       var p = document.createElement('p');
       p.className = className || 'tm-consent-paragraph';
-      var urlPattern = /(https:\\/\\/withpersona\\.com\\/legal\\/privacy-policy)/g;
+      var urlPattern = new RegExp('https://withpersona[.]com/legal/privacy-policy', 'g');
       var parts = text.split(urlPattern);
       parts.forEach(function (part) {
         if (!part) return;
@@ -395,7 +395,7 @@ var s = document.createElement("style");
         currentList.className = 'tm-consent-list';
         body.appendChild(currentList);
       }
-      var match = line.match(/^\\d+\\.\\s*(.*)$/);
+      var match = line.match(/^\d+\.\s*(.*)$/);
       currentItem = document.createElement('li');
       currentItem.textContent = match ? match[1] : line;
       currentList.appendChild(currentItem);
@@ -403,7 +403,7 @@ var s = document.createElement("style");
     rawLines.forEach(function (raw) {
       var line = raw.trim();
       if (!line) { flushList(); return; }
-      if (/^Version\\s/i.test(line)) {
+      if (/^Version\s/i.test(line)) {
         flushList();
         var meta = document.createElement('div');
         meta.className = 'tm-consent-version';
@@ -420,7 +420,7 @@ var s = document.createElement("style");
         body.appendChild(h);
         return;
       }
-      if (/^\\d+\\.\\s/.test(line)) { addClause(line); return; }
+      if (/^\d+\.\s/.test(line)) { addClause(line); return; }
       if (currentItem) {
         currentItem.appendChild(document.createTextNode(' ' + line));
         return;
