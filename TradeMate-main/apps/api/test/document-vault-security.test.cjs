@@ -53,3 +53,12 @@ test('Portfolio all-documents panel waits for the live vault list before renderi
   const portfolioSource = readFileSync(join(root, '..', 'web', 'public', 'tm', 'app.js'), 'utf8');
   assert.match(portfolioSource, /pmLoadDocs\(\)\.then\(pmAllDocs\)/);
 });
+test('new contract proposals generate a private participant-visible vault PDF without claiming signature', () => {
+  assert.match(moduleSource, /const buildContractRecordPdf =/);
+  assert.match(moduleSource, /TRADEMATE CONTRACT RECORD/);
+  assert.match(moduleSource, /It is not a signed agreement, digital signature, or proof of acceptance/);
+  assert.match(moduleSource, /const contractPdf = buildContractRecordPdf\(created\.rows\[0\], 'proposal'\)/);
+  assert.match(moduleSource, /'contract','contract','generated','contract_participants'/);
+  assert.match(moduleSource, /signature_status: 'not_signed'/);
+  assert.match(moduleSource, /TradeMate-Contract-Proposal-/);
+});
