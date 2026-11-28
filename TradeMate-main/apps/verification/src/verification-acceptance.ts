@@ -70,6 +70,8 @@ export async function acceptVerificationRequest(
     !request.consent ||
     request.consent.captured !== true ||
     !Number.isFinite(Date.parse(request.consent.capturedAt)) ||
+    Date.parse(request.consent.capturedAt) > now.getTime() ||
+    (request.callback !== undefined && request.callback.eventProfile !== 'standard') ||
     typeof request.consent.noticeVersion !== 'string' ||
     !/^[A-Za-z0-9._-]{1,64}$/.test(request.consent.noticeVersion) ||
     typeof policyVersion !== 'string' ||
