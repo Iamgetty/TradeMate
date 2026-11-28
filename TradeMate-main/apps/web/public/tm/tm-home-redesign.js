@@ -73,7 +73,7 @@
     /* ---------- Slide banner (same slides, v10 look) ---------- */
     H + '>.tbn,' + H + '>.home-promo-tbn{position:relative;margin:38px 20px 0!important}',
     H + ' .tbn-track{border:1px solid var(--line)!important;border-radius:24px!important;background:var(--s1)!important;box-shadow:none!important}',
-    H + ' .tbn-s{position:relative;display:block!important;grid-template-columns:none!important;padding:20px 18px 48px!important;min-height:236px!important;height:auto!important;background:none!important;overflow:hidden}',
+    H + ' .tbn-s{position:relative;display:block!important;grid-template-columns:none!important;padding:18px!important;min-height:168px!important;height:auto!important;background:none!important;overflow:hidden}',
     H + ' .tbn-s:after{content:none!important}',
     H + ' .tbn-tag{font:500 9px "DM Mono",monospace!important;letter-spacing:.16em;padding:4px 8px!important;border-radius:6px!important;background:var(--bg)!important;border:0!important;color:var(--am)!important}',
     H + ' .tbn-copy{position:relative;z-index:2;max-width:calc(100% - 96px)!important}',
@@ -105,7 +105,7 @@
     '.tm-sec .tm-va{background:none;border:0;padding:0;cursor:pointer;font-weight:700;font-size:12.5px;color:var(--am)}',
 
     /* ---------- Top Categories ---------- */
-    H + '>.home-market-shortcuts{display:flex!important;grid-template-columns:none!important;gap:10px!important;overflow-x:auto;scrollbar-width:none;margin:0!important;padding:0 20px 2px!important}',
+    H + '>.tm-sec-cats,H +>.home-market-shortcuts{display:none!important}',
     H + '>.home-market-shortcuts::-webkit-scrollbar{display:none}',
     H + '>.home-market-shortcuts .mk-card{flex:none!important;width:60px!important;min-width:0!important;height:auto!important;min-height:0!important;padding:0!important;display:flex!important;flex-direction:column!important;align-items:center!important;gap:7px!important;background:none!important;border:0!important;box-shadow:none!important}',
     H + '>.home-market-shortcuts .mk-ico{width:54px!important;height:54px!important;border-radius:50%!important;background:var(--s2)!important;color:var(--am)!important;display:grid!important;place-items:center!important;border:0!important;box-shadow:none!important}',
@@ -367,11 +367,25 @@
     if (!nav) return;
     [].forEach.call(nav.querySelectorAll('button'), function (b) {
       var l = b.dataset.tab || (b.dataset.pg === 'scout' ? 'Scout' : '') || b.getAttribute('aria-label') || '';
-      var icon = b.querySelector('svg');
-      var label = el('span', 'tm-nl', l);
-      b.replaceChildren();
-      if (icon) b.appendChild(icon);
-      if (l) b.appendChild(label);
+      var icon = b.querySelector(':scope > svg');
+      var labels = [].slice.call(b.querySelectorAll(':scope > .tm-nl'));
+      var label = labels.shift() || null;
+      var changed = false;
+      [].forEach.call([].slice.call(b.childNodes), function (n) {
+        if (n === icon || n === label) return;
+        n.remove();
+        changed = true;
+      });
+      labels.forEach(function (n) { n.remove(); changed = true; });
+      if (label) {
+        if (label.textContent !== l) { label.textContent = l; changed = true; }
+      } else if (l) {
+        label = el('span', 'tm-nl', l);
+        b.appendChild(label);
+        changed = true;
+      }
+      /* Avoid observer loops: leave an already-normalized button untouched. */
+      if (changed && icon && icon.parentNode !== b) b.insertBefore(icon, b.firstChild);
     });
   }
   function artFor(slide, view) {
