@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { issueApiKey } from '../dist/api-keys.js';
-import { authorizeProductRequest, AuthorizationError } from '../dist/authorization.js';
+import { authorizeProductRequest, requireScope, AuthorizationError } from '../dist/authorization.js';
 
 const NOW = new Date('2026-11-28T12:00:00.000Z');
 
@@ -55,4 +55,11 @@ test('malformed validity timestamps fail closed', async () => {
   const invalidEntitlement = { tenantId:'tenant_1', productId:'kyc', status:'active', startsAt:'not-a-date', expiresAt:null };
   await assert.rejects(() => authorizeProductRequest(issued.plaintext, 'kyc', repositoriesFor(issued, { key: invalidKey }), NOW), AuthorizationError);
   await assert.rejects(() => authorizeProductRequest(issued.plaintext, 'kyc', repositoriesFor(issued, { entitlement: invalidEntitlement }), NOW), AuthorizationError);
+});
+
+test('scope checks require an exact granted scope and fail closed', () => {
+  const context = { tenantId: 'tenant_1', apiKeyId: 'key_1', productId: 'kyc', scopes: ['kyc:submit', 'verification:read'] };
+  assert.doesNotThrow(() => requireScope(context, 'kyc:submit'));
+  assert.throws(() => requireScope(context, 'kyb:submit'), AuthorizationError);
+  assert.throws(() => requireScope(context, 'not a scope'), AuthorizationError);
 });
