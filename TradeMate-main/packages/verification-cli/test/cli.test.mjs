@@ -10,7 +10,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const cli = resolve(here, '../bin/verification.mjs');
 
 async function withProject(fn) {
-  const cwd = await mkdtemp(join(tmpdir(), 'verification-cli-'));
+  const cwd = await mkdtemp(join(tmpdir(), 'verifire-cli-'));
   try { await fn(cwd); } finally { await rm(cwd, { recursive: true, force: true }); }
 }
 
@@ -30,7 +30,7 @@ test('product selection requires an explicit published version', async () => {
     assert.equal(run(cwd, 'init', '--url', 'https://verify.example.test').status, 0);
     const result = run(cwd, 'install', 'kyc@1.0.0');
     assert.equal(result.status, 0, result.stderr);
-    const config = JSON.parse(await readFile(join(cwd, '.verificationrc.json'), 'utf8'));
+    const config = JSON.parse(await readFile(join(cwd, '.verifirerc.json'), 'utf8'));
     assert.equal(config.products.kyc.version, '1.0.0');
     assert.equal(config.products.kyb, undefined);
     assert.match(result.stdout, /does not activate a hosted entitlement/);
@@ -39,33 +39,33 @@ test('product selection requires an explicit published version', async () => {
 
 test('unknown versions are rejected without changing selection', async () => {
   await withProject(async (cwd) => {
-    run(cwd, 'init');
+    run(cwd, 'init', '--url', 'https://verify.example.test');
     const result = run(cwd, 'install', 'kyc@9.9.9');
     assert.notEqual(result.status, 0);
-    const config = JSON.parse(await readFile(join(cwd, '.verificationrc.json'), 'utf8'));
+    const config = JSON.parse(await readFile(join(cwd, '.verifirerc.json'), 'utf8'));
     assert.deepEqual(config.products, {});
   });
 });
 
 test('init never overwrites an existing project configuration', async () => {
   await withProject(async (cwd) => {
-    run(cwd, 'init');
-    const before = await readFile(join(cwd, '.verificationrc.json'), 'utf8');
+    run(cwd, 'init', '--url', 'https://verify.example.test');
+    const before = await readFile(join(cwd, '.verifirerc.json'), 'utf8');
     const result = run(cwd, 'init', '--url', 'https://other.example.test');
     assert.notEqual(result.status, 0);
-    assert.equal(await readFile(join(cwd, '.verificationrc.json'), 'utf8'), before);
+    assert.equal(await readFile(join(cwd, '.verifirerc.json'), 'utf8'), before);
   });
 });
 
 test('products can be listed and removed independently', async () => {
   await withProject(async (cwd) => {
-    run(cwd, 'init');
+    run(cwd, 'init', '--url', 'https://verify.example.test');
     run(cwd, 'install', 'kyc@1.0.0');
     run(cwd, 'install', 'kyb@1.0.0');
     assert.match(run(cwd, 'list').stdout, /kyc@1.0.0/);
     assert.match(run(cwd, 'list').stdout, /kyb@1.0.0/);
     assert.equal(run(cwd, 'remove', 'kyc').status, 0);
-    const config = JSON.parse(await readFile(join(cwd, '.verificationrc.json'), 'utf8'));
+    const config = JSON.parse(await readFile(join(cwd, '.verifirerc.json'), 'utf8'));
     assert.equal(config.products.kyc, undefined);
     assert.equal(config.products.kyb.version, '1.0.0');
   });
