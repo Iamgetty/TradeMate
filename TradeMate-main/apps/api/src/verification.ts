@@ -252,7 +252,7 @@ export function attachVerificationSocket(server: Server) {
     if (pathname !== '/api/verification/socket') return;
     const origin = request.headers.origin;
     if (origin && !allowedOrigins.has(origin)) {
-      socket.write('HTTP/1.1 403 Forbidden\\r\\nConnection: close\\r\\n\\r\\n');
+      socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
       socket.destroy();
       return;
     }
@@ -271,7 +271,7 @@ export function attachVerificationSocket(server: Server) {
           client.on('message', () => client.close(1008, 'Verification socket is server-push only.'));
         });
       } catch {
-        socket.write('HTTP/1.1 401 Unauthorized\\r\\nConnection: close\\r\\n\\r\\n');
+        socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
         socket.destroy();
       }
     })();
