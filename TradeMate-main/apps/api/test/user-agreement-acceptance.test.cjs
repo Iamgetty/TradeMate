@@ -62,11 +62,12 @@ test('Persona verification consent is versioned, saved privately, and required b
   assert.ok(moduleSource.includes('persona_verification_agreement_acceptances WHERE user_id = $1'));
   assert.ok(moduleSource.includes('agreement_sha256 = $4'));
   assert.ok(moduleSource.includes('HttpStatus.PRECONDITION_REQUIRED'));
-  assert.ok(moduleSource.includes('account.persona_verification_consent_accepted'));
+  assert.ok(moduleSource.includes('account.persona_verification_agreement_signed'));
   assert.ok(moduleSource.includes('TradeMate-Verification-Agreement-v1.1.pdf'));
   assert.ok(moduleSource.includes('signature_name'));
   assert.ok(moduleSource.includes('typed_name_and_explicit_sign_action'));
   assert.ok(moduleSource.includes('electronic_signature_evidence'));
+  assert.ok(moduleSource.includes("'agreement', 'signed', 'private'"));
   assert.ok(moduleSource.includes("signatureName.length < 2"));
   assert.ok(moduleSource.includes('PERSONA_AGREEMENT_CONTENT'));
   assert.ok(identityPass.includes('/api/integrations/persona/agreement'));
@@ -78,4 +79,5 @@ test('Persona verification consent is versioned, saved privately, and required b
   assert.ok(personaSignatureMigration.includes('ADD COLUMN IF NOT EXISTS signature_name'));
   assert.ok(personaSignatureMigration.includes('char_length(btrim(signature_name)) BETWEEN 2 AND 120'));
   assert.ok(identityPass.includes('Not now'));
+  assert.ok(appSource.includes('"signed"===d.document_status'));
 });
