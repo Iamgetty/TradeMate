@@ -59,6 +59,7 @@ test('Persona verification consent is versioned, saved privately, and required b
   assert.ok(moduleSource.includes("@Post('agreement/accept')"));
   assert.match(moduleSource, /body\\?\\.accepted !== true/);
   assert.match(moduleSource, /persona_verification_agreement_acceptances WHERE user_id = \\$1/);
+  assert.match(moduleSource, /agreement_sha256 = \\$4/);
   assert.match(moduleSource, /HttpStatus\\.PRECONDITION_REQUIRED/);
   assert.match(moduleSource, /account\\.persona_verification_consent_accepted/);
   assert.match(moduleSource, /TradeMate-Identity-Verification-Consent-v1\\.0\\.pdf/);
