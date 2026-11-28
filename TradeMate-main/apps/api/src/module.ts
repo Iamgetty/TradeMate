@@ -24,7 +24,6 @@ const SESSION_COOKIE = 'trademate_session';
 const SESSION_DAYS = 7;
 const PLATFORM_AGREEMENT_KEY = 'trademate-platform-user-agreement';
 const PLATFORM_AGREEMENT_VERSION = '1.0';
-const PLATFORM_AGREEMENT_SHA256 = 'df3fbc91fa49d36e1e65e956024583beaae0a6de298bd7ead56a905c64fad927';
 const PLATFORM_AGREEMENT_CONTENT = `TradeMate Platform User Agreement
 
 Version 1.0 — Effective 28 November 2026
@@ -654,7 +653,7 @@ class AuthController {
     );
     return {
       required: accepted.rowCount === 0,
-      agreement: { key: PLATFORM_AGREEMENT_KEY, version: PLATFORM_AGREEMENT_VERSION, sha256: PLATFORM_AGREEMENT_SHA256, title: 'TradeMate Platform User Agreement', content: PLATFORM_AGREEMENT_CONTENT },
+      agreement: { key: PLATFORM_AGREEMENT_KEY, version: PLATFORM_AGREEMENT_VERSION, sha256: createHash('sha256').update(PLATFORM_AGREEMENT_CONTENT, 'utf8').digest('hex'), title: 'TradeMate Platform User Agreement', content: PLATFORM_AGREEMENT_CONTENT },
     };
   }
 
@@ -674,15 +673,19 @@ class AuthController {
       `INSERT INTO user_agreement_acceptances
         (user_id, agreement_key, agreement_version, agreement_sha256, acceptance_method, ip_address, user_agent)
        VALUES ($1, $2, $3, $4, 'explicit_in_app', $5, $6)
-       ON CONFLICT (user_id, agreement_key, agreement_version) DO NOTHING`,
-      [userId, PLATFORM_AGREEMENT_KEY, PLATFORM_AGREEMENT_VERSION, PLATFORM_AGREEMENT_SHA256,
+       ON CONFLICT (user_id, agreement_key, agreement_version) DO NOTHING
+       RETURNING id`,
+      [userId, PLATFORM_AGREEMENT_KEY, PLATFORM_AGREEMENT_VERSION,
+       createHash('sha256').update(PLATFORM_AGREEMENT_CONTENT, 'utf8').digest('hex'),
        request.ip || null, request.get('user-agent')?.slice(0, 500) || null],
     );
-    await databasePool.query(
-      `INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata)
-       VALUES ($1, 'account.platform_agreement_accepted', 'user', $1, $2::jsonb)`,
-      [userId, JSON.stringify({ agreement_key: PLATFORM_AGREEMENT_KEY, agreement_version: PLATFORM_AGREEMENT_VERSION, agreement_sha256: PLATFORM_AGREEMENT_SHA256 })],
-    );
+    if (accepted.rowCount) {
+      await databasePool.query(
+        `INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata)
+         VALUES ($1, 'account.platform_agreement_accepted', 'user', $1, $2::jsonb)`,
+        [userId, JSON.stringify({ agreement_key: PLATFORM_AGREEMENT_KEY, agreement_version: PLATFORM_AGREEMENT_VERSION, agreement_sha256: createHash('sha256').update(PLATFORM_AGREEMENT_CONTENT, 'utf8').digest('hex') })],
+      );
+    }
     return { accepted: true, version: PLATFORM_AGREEMENT_VERSION };
   }
 
