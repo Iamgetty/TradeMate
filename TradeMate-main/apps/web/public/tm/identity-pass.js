@@ -305,48 +305,125 @@ var s = document.createElement("style");
       .then(function (data) { window.__tmPersonaStatus = data; if (typeof drawPage === 'function') drawPage(); })
       .catch(function () { window.__tmPersonaStatus = { status: 'not_started', verified: false }; });
   }
+  function personaRequest(url, options) {
+    return fetch(url, Object.assign({ credentials: 'include', cache: 'no-store', headers: { 'Accept': 'application/json' } }, options || {}))
+      .then(function (response) {
+        return response.text().then(function (text) {
+          var data = {};
+          try { data = JSON.parse(text); } catch (_) {}
+          if (!response.ok) throw new Error('Verification could not be started (HTTP ' + response.status + '). Please try again or contact support.');
+          return data;
+        });
+      });
+  }
+  function showPersonaConsent(agreement, onAccept, onDecline) {
+    var overlay = document.createElement('div');
+    overlay.setAttribute('role', 'presentation');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(5,9,18,.78);display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(8px)';
+    var panel = document.createElement('section');
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-labelledby', 'tm-persona-consent-title');
+    panel.style.cssText = 'width:min(680px,100%);max-height:min(88vh,850px);display:flex;flex-direction:column;background:var(--s1,#151a27);color:var(--txt,#fff);border:1px solid var(--line,#394052);border-radius:20px;box-shadow:0 24px 80px rgba(0,0,0,.45);overflow:hidden';
+    var header = document.createElement('div');
+    header.style.cssText = 'padding:20px 22px;border-bottom:1px solid var(--line,#394052)';
+    var eyebrow = document.createElement('div');
+    eyebrow.textContent = 'IDENTITY VERIFICATION';
+    eyebrow.style.cssText = 'font-size:10px;letter-spacing:.16em;font-weight:800;color:var(--am,#ffc24d);margin-bottom:8px';
+    var title = document.createElement('h2');
+    title.id = 'tm-persona-consent-title';
+    title.textContent = agreement.title || 'TradeMate Identity Verification Consent';
+    title.style.cssText = 'font:800 22px inherit;margin:0';
+    header.appendChild(eyebrow); header.appendChild(title);
+    var body = document.createElement('div');
+    body.style.cssText = 'padding:18px 22px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.65 inherit;color:var(--txt,#fff)';
+    body.textContent = agreement.content || '';
+    var signatureWrap = document.createElement('label');
+    signatureWrap.style.cssText = 'display:grid;gap:7px;padding:0 22px 18px;font-size:12px;font-weight:700;color:var(--txt,#fff)';
+    signatureWrap.textContent = 'Type your full legal name to sign';
+    var signatureInput = document.createElement('input');
+    signatureInput.type = 'text'; signatureInput.name = 'signatureName'; signatureInput.autocomplete = 'name';
+    signatureInput.maxLength = 120; signatureInput.required = true; signatureInput.placeholder = 'Full legal name';
+    signatureInput.setAttribute('aria-label', 'Full legal name for electronic signature');
+    signatureInput.style.cssText = 'width:100%;box-sizing:border-box;min-height:48px;padding:0 14px;border:1px solid var(--line,#394052);border-radius:12px;background:var(--s2,#202638);color:var(--txt,#fff);font:600 14px inherit';
+    signatureWrap.appendChild(signatureInput);
+    var footer = document.createElement('div');
+    footer.style.cssText = 'padding:16px 22px;border-top:1px solid var(--line,#394052);display:grid;gap:12px';
+    var note = document.createElement('p');
+    note.textContent = 'Your typed signature and the signed agreement will be recorded and saved in Portfolio → Documents. This is electronic-signature evidence, not a cryptographic signature.';
+    note.style.cssText = 'font-size:11px;line-height:1.45;color:var(--mut,#aab1c2);margin:0';
+    var actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap';
+    var decline = document.createElement('button');
+    decline.type = 'button'; decline.textContent = 'Not now';
+    decline.style.cssText = 'min-height:44px;padding:0 18px;border:1px solid var(--line,#394052);border-radius:12px;background:transparent;color:inherit;font-weight:700;cursor:pointer';
+    var accept = document.createElement('button');
+    accept.type = 'button'; accept.textContent = 'Sign agreement & continue';
+    accept.style.cssText = 'min-height:44px;padding:0 18px;border:0;border-radius:12px;background:var(--am,#ffc24d);color:#17130a;font-weight:800;cursor:pointer';
+    decline.addEventListener('click', function () { overlay.remove(); onDecline(); });
+    accept.addEventListener('click', function () {
+      var signatureName = signatureInput.value.trim();
+      if (signatureName.length < 2) { signatureInput.focus(); signatureInput.setCustomValidity('Enter your full legal name to sign.'); signatureInput.reportValidity(); return; }
+      signatureInput.setCustomValidity('');
+      accept.disabled = true; decline.disabled = true; signatureInput.disabled = true; accept.textContent = 'Saving signed agreement…';
+      onAccept(signatureName).then(function () { overlay.remove(); }).catch(function (error) {
+        accept.disabled = false; decline.disabled = false; signatureInput.disabled = false; accept.textContent = 'Sign agreement & continue';
+        var alert = footer.querySelector('[role="alert"]');
+        if (!alert) { alert = document.createElement('p'); alert.setAttribute('role', 'alert'); alert.style.cssText = 'color:var(--dn,#e66);font-size:12px;margin:0'; footer.insertBefore(alert, actions); }
+        alert.textContent = error && error.message ? error.message : 'Could not save your consent. Please try again.';
+      });
+    });
+    actions.appendChild(decline); actions.appendChild(accept);
+    footer.appendChild(note); footer.appendChild(actions);
+    panel.appendChild(header); panel.appendChild(body); panel.appendChild(signatureWrap); panel.appendChild(footer); overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+    signatureInput.focus();
+  }
+  function openPersonaInquiry(button) {
+    button.disabled = true; button.textContent = 'Connecting to Persona…';
+    personaRequest('/api/integrations/persona/inquiry', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: '{}' })
+      .then(function (data) {
+        if (typeof data.url !== 'string' || !data.url) throw new Error('Persona did not return a verification link.');
+        var target;
+        try { target = new URL(data.url); } catch (_) { throw new Error('Persona returned an invalid verification link.'); }
+        if (target.protocol !== 'https:' || ['inquiry.withpersona.com', 'withpersona.com', 'go.perso.na'].indexOf(target.hostname) < 0) throw new Error('Persona returned an unsafe verification link. Please contact support.');
+        window.location.assign(target.href);
+      })
+      .catch(function (error) {
+        button.disabled = false; button.textContent = 'Start verification';
+        var message = error && error.message ? error.message : 'Could not start verification. Please try again.';
+        var host = button.parentNode;
+        if (host) {
+          var notice = host.querySelector('.idp-inline-error');
+          if (!notice) { notice = document.createElement('p'); notice.className = 'idp-inline-error'; notice.setAttribute('role', 'alert'); notice.style.cssText = 'margin:0;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--dn) 10%,var(--s2));color:var(--dn);font-size:12px;line-height:1.45'; host.appendChild(notice); }
+          notice.textContent = message;
+        }
+      });
+  }
   document.addEventListener('click', function (event) {
     var button = event.target && event.target.closest ? event.target.closest('[data-persona-start]') : null;
     if (!button) return;
     var priorError = button.parentNode && button.parentNode.querySelector('.idp-inline-error');
     if (priorError) priorError.remove();
-    button.disabled = true;
-    button.textContent = 'Connecting to Persona…';
-    fetch('/api/integrations/persona/inquiry', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: '{}' })
-      .then(function (response) {
-        return response.text().then(function (text) {
-          var data = {};
-          try { data = JSON.parse(text); } catch (_) {}
-          if (!response.ok || !data.url) {
-            throw new Error('Verification could not be started (HTTP ' + response.status + '). Please try again or contact support.');
-          }
-          return data;
-        });
-      })
+    button.disabled = true; button.textContent = 'Checking consent…';
+    personaRequest('/api/integrations/persona/agreement')
       .then(function (data) {
-        if (typeof data.url !== 'string' || !data.url) throw new Error('Persona did not return a verification link.');
-        var target;
-        try { target = new URL(data.url); } catch (_) { throw new Error('Persona returned an invalid verification link.'); }
-        if (target.protocol !== 'https:' || ['inquiry.withpersona.com', 'withpersona.com', 'go.perso.na'].indexOf(target.hostname) < 0) {
-          throw new Error('Persona returned an unsafe verification link. Please contact support.');
-        }
-        window.location.assign(target.href);
+        if (!data.required) { openPersonaInquiry(button); return; }
+        button.disabled = false; button.textContent = 'Start verification';
+        showPersonaConsent(data.agreement || {}, function (signatureName) {
+          return personaRequest('/api/integrations/persona/agreement/accept', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ accepted: true, version: data.agreement && data.agreement.version, signatureName: signatureName })
+          }).then(function () { openPersonaInquiry(button); });
+        }, function () {});
       })
       .catch(function (error) {
-        button.disabled = false;
-        button.textContent = 'Start verification';
-        var message = error && error.message ? error.message : 'Could not start verification. Please try again.';
+        button.disabled = false; button.textContent = 'Start verification';
         var host = button.parentNode;
         if (host) {
           var notice = host.querySelector('.idp-inline-error');
-          if (!notice) {
-            notice = document.createElement('p');
-            notice.className = 'idp-inline-error';
-            notice.setAttribute('role', 'alert');
-            notice.style.cssText = 'margin:0;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--dn) 10%,var(--s2));color:var(--dn);font-size:12px;line-height:1.45';
-            host.appendChild(notice);
-          }
-          notice.textContent = message;
+          if (!notice) { notice = document.createElement('p'); notice.className = 'idp-inline-error'; notice.setAttribute('role', 'alert'); notice.style.cssText = 'margin:0;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--dn) 10%,var(--s2));color:var(--dn);font-size:12px;line-height:1.45'; host.appendChild(notice); }
+          notice.textContent = error && error.message ? error.message : 'Could not load the consent. Please try again.';
         }
       });
   });

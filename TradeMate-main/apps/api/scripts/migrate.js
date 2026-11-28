@@ -62,6 +62,13 @@ const MIGRATIONS = [
   '053_persona_webhook_events.sql',
   '054_persona_user_inquiries.sql',
   '055_persona_webhook_event_read_grant.sql',
+  '056_platform_document_vault.sql',
+  '057_user_agreement_acceptances.sql',
+  '058_persona_verification_agreement_acceptances.sql',
+  '059_contract_message_documents.sql',
+  '060_persona_webhook_event_documents.sql',
+  '061_p2p_trade_receipt_documents.sql',
+  '062_persona_verification_agreement_signatures.sql',
 ];
 
 async function main() {
