@@ -115,6 +115,27 @@ test('contract negotiation file sharing is restricted to live contract participa
   assert.match(moduleSource, /Only contract participants can add shared documents/);
 });
 
+test('contract conversation messages link only sender-owned participant-visible vault attachments', () => {
+  const manifestSource = readFileSync(join(root, 'scripts', 'migrate.js'), 'utf8');
+  const migrationSource = readFileSync(join(root, 'database', 'migrations', '059_contract_message_documents.sql'), 'utf8');
+  const webSource = readFileSync(join(root, '..', 'web', 'public', 'tm', 'app.js'), 'utf8');
+  const contractController = moduleSource.slice(moduleSource.indexOf("@Controller('market/contracts')"), moduleSource.indexOf("@Controller('market/trades')"));
+  assert.match(manifestSource, /'059_contract_message_documents\.sql'/);
+  assert.match(migrationSource, /marketplace_contract_message_documents/);
+  assert.match(migrationSource, /REFERENCES public\.marketplace_contract_messages\(id\)/);
+  assert.match(migrationSource, /REFERENCES public\.user_documents\(id\)/);
+  assert.match(contractController, /attachmentDocumentIds/);
+  assert.match(contractController, /owner_user_id = \$2 AND source_type = 'contract_negotiation'/);
+  assert.match(contractController, /source_id = \$3 AND visibility = 'contract_participants'/);
+  assert.match(contractController, /Only your own files uploaded to this contract can be attached/);
+  assert.match(contractController, /marketplace_contract_message_documents/);
+  assert.match(contractController, /'attachments',/);
+  assert.match(webSource, /attachmentDocumentIds:ids/);
+  assert.match(webSource, /t\.attachments\|\|\[\]/);
+  assert.match(webSource, /ct-msg-files/);
+  assert.match(webSource, /contractAttachmentRemove/);
+});
+
 test('new contract proposals generate a private participant-visible vault PDF without claiming signature', () => {
   assert.match(moduleSource, /const buildContractRecordPdf =/);
   assert.match(moduleSource, /TRADEMATE CONTRACT RECORD/);
