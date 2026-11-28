@@ -109,6 +109,11 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
         run: node scripts/test-organization-documents.js
+      - name: Verify platform document vault authorization through PostgreSQL-backed HTTP endpoints
+        working-directory: TradeMate-main/apps/api
+        env:
+          DATABASE_URL: postgres://postgres:trademate_test@localhost:5432/trademate_test
+        run: node scripts/test-document-vault.js
       - name: Verify two-party marketplace contract lifecycle and concurrency
         working-directory: TradeMate-main/apps/api
         env:
