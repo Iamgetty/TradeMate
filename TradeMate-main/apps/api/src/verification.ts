@@ -12,16 +12,17 @@ import {
 import type { IncomingMessage, Server } from 'node:http';
 import { createHash } from 'node:crypto';
 import { Pool } from 'pg';
+import { createRlsAwarePool } from './database-context';
 import { WebSocket, WebSocketServer } from 'ws';
 import type { Request } from 'express';
 
 const pool = process.env.DATABASE_URL
-  ? new Pool({
+  ? createRlsAwarePool(new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: process.env.PGSSLMODE === 'require' ? true : undefined,
       connectionTimeoutMillis: 5000,
       max: 4,
-    })
+    }))
   : null;
 
 type VerificationCaseType = 'kyc' | 'kyb';
@@ -169,6 +170,7 @@ export class VerificationController {
 
     const client = await db.connect();
     let caseRow: Record<string, unknown>;
+    let reused = false;
     try {
       await client.query('BEGIN');
       const inserted = await client.query(
@@ -194,6 +196,7 @@ export class VerificationController {
           [userId, idempotencyKey],
         );
         caseRow = existing.rows[0];
+        reused = true;
       } else if (!inserted.rowCount) {
         throw new HttpException('Unable to create verification case.', HttpStatus.CONFLICT);
       } else {
@@ -218,7 +221,7 @@ export class VerificationController {
       client.release();
     }
     emitUserEvent(userId, { event: 'verification.case_created', case: caseRow });
-    return { case: caseRow, checks: CASE_CHECKS[caseType], reused: caseRow.created_by_user_id === undefined && Boolean(idempotencyKey) };
+    return { case: caseRow, checks: CASE_CHECKS[caseType], reused };
   }
 }
 
