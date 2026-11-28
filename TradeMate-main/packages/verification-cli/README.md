@@ -27,3 +27,7 @@ A product installation requires an explicit product and version. It records that
 The initial catalogue is a versioned product-selection contract. At this stage, `install` records a local selection only. It does **not** activate a hosted entitlement, provision a tenant, connect a provider, install a local verification engine, or imply that the selected product is live. Those require the future hosted control plane and approved provider coverage.
 
 The CLI never collects end-user identity evidence or stores integration API keys in the project configuration. Do not put secrets in source control or shell history.
+
+## Run the CLI tests
+
+From this directory, run `npm test` using Node.js 20 or later.
