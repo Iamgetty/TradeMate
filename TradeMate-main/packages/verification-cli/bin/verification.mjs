@@ -18,7 +18,7 @@ function help() {
   process.stdout.write(`VeriFire CLI v${VERSION}
 
 Usage:
-  verifire init [--url <service-url>]
+  verifire init --url <service-url>
   verifire products
   verifire versions <product>
   verifire install <product>@<version>
