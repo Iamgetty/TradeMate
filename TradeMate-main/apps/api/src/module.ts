@@ -669,24 +669,34 @@ class AuthController {
       throw new BadRequestException('Review the current agreement and explicitly accept its version to continue.');
     }
     const userId = session.rows[0].id as string;
-    const accepted = await databasePool.query(
-      `INSERT INTO user_agreement_acceptances
-        (user_id, agreement_key, agreement_version, agreement_sha256, acceptance_method, ip_address, user_agent)
-       VALUES ($1, $2, $3, $4, 'explicit_in_app', $5, $6)
-       ON CONFLICT (user_id, agreement_key, agreement_version) DO NOTHING
-       RETURNING id`,
-      [userId, PLATFORM_AGREEMENT_KEY, PLATFORM_AGREEMENT_VERSION,
-       createHash('sha256').update(PLATFORM_AGREEMENT_CONTENT, 'utf8').digest('hex'),
-       request.ip || null, request.get('user-agent')?.slice(0, 500) || null],
-    );
-    if (accepted.rowCount) {
-      await databasePool.query(
-        `INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata)
-         VALUES ($1, 'account.platform_agreement_accepted', 'user', $1, $2::jsonb)`,
-        [userId, JSON.stringify({ agreement_key: PLATFORM_AGREEMENT_KEY, agreement_version: PLATFORM_AGREEMENT_VERSION, agreement_sha256: createHash('sha256').update(PLATFORM_AGREEMENT_CONTENT, 'utf8').digest('hex') })],
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const agreementSha256 = createHash('sha256').update(PLATFORM_AGREEMENT_CONTENT, 'utf8').digest('hex');
+      const accepted = await client.query(
+        `INSERT INTO user_agreement_acceptances
+          (user_id, agreement_key, agreement_version, agreement_sha256, acceptance_method, ip_address, user_agent)
+         VALUES ($1, $2, $3, $4, 'explicit_in_app', $5, $6)
+         ON CONFLICT (user_id, agreement_key, agreement_version) DO NOTHING
+         RETURNING id`,
+        [userId, PLATFORM_AGREEMENT_KEY, PLATFORM_AGREEMENT_VERSION, agreementSha256,
+         request.ip || null, request.get('user-agent')?.slice(0, 500) || null],
       );
+      if (accepted.rowCount) {
+        await client.query(
+          `INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata)
+           VALUES ($1, 'account.platform_agreement_accepted', 'user', $1, $2::jsonb)`,
+          [userId, JSON.stringify({ agreement_key: PLATFORM_AGREEMENT_KEY, agreement_version: PLATFORM_AGREEMENT_VERSION, agreement_sha256: agreementSha256 })],
+        );
+      }
+      await client.query('COMMIT');
+      return { accepted: true, version: PLATFORM_AGREEMENT_VERSION };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
     }
-    return { accepted: true, version: PLATFORM_AGREEMENT_VERSION };
   }
 
   @Get('me')
