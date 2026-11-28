@@ -1,6 +1,6 @@
 import type {
-  TenantAdminMembershipRecord,
-  TenantRecordWithTimestamps,
+  TenantAdminMembershipRepository,
+  TenantRepository,
 } from './repository-contracts.js';
 
 export interface VerifiedExternalIdentity {
@@ -10,12 +10,8 @@ export interface VerifiedExternalIdentity {
 }
 
 export interface TenantAdminAuthorizationRepositories {
-  findTenantById(tenantId: string): Promise<TenantRecordWithTimestamps | null>;
-  findTenantAdminByIdentity(
-    tenantId: string,
-    issuer: string,
-    subject: string,
-  ): Promise<TenantAdminMembershipRecord | null>;
+  tenants: Pick<TenantRepository, 'findById'>;
+  tenantAdmins: Pick<TenantAdminMembershipRepository, 'findByIdentity'>;
 }
 
 export interface AuthorizedTenantAdminContext {
@@ -50,10 +46,10 @@ export async function authorizeTenantAdmin(
     throw new TenantAdminAuthorizationError();
   }
 
-  const tenant = await repositories.findTenantById(tenantId);
+  const tenant = await repositories.tenants.findById(tenantId);
   if (!tenant || tenant.status !== 'active') throw new TenantAdminAuthorizationError();
 
-  const membership = await repositories.findTenantAdminByIdentity(
+  const membership = await repositories.tenantAdmins.findByIdentity(
     tenantId,
     identity.issuer,
     identity.subject,
