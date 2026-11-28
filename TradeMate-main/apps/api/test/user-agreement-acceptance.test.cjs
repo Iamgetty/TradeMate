@@ -27,6 +27,12 @@ test('agreement is versioned, served with a content hash, and acceptance require
   assert.match(moduleSource, /body\?\.accepted !== true/);
   assert.match(moduleSource, /body\?\.version !== PLATFORM_AGREEMENT_VERSION/);
   assert.match(moduleSource, /account\.platform_agreement_accepted/);
+  assert.match(moduleSource, /buildAgreementAcceptancePdf/);
+  assert.match(moduleSource, /INSERT INTO user_documents/);
+  assert.match(moduleSource, /TradeMate-Platform-User-Agreement-v1\.0\.pdf/);
+  assert.match(moduleSource, /electronic_acceptance_record/);
+  assert.match(moduleSource, /not a cryptographic signature/);
+  assert.match(moduleSource, /vault_pdf_sha256/);
   assert.match(agreement, /10\. YOUR ACCEPTANCE/i);
   assert.match(agreement, /verification is not a guarantee/i);
 });
