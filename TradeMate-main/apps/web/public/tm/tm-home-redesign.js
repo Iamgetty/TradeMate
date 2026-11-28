@@ -10,7 +10,10 @@
   window.__tmHomeRedesign = true;
 
   var H = 'html body #app .view:has(.home-market-shortcuts)';
-  var PG = 'html body #pg .pgs[data-id="profile"]';
+  /* The Profile bottom sheet is mobile-only. On desktop the Profile page sits to the right of the fixed
+   * sidebar (desktop.css: .tm-desktop .pgs{left:var(--dk-side)}); the sheet's inset:0 and full-screen scrim
+   * would cover the sidebar and intercept every click on it. */
+  var PG = 'html:not(.tm-desktop) body #pg .pgs[data-id="profile"]';
   /* The restructured #mwbar header is mobile-only: desktop.css hides .mw-bar and the desktop
    * header keeps its own .top buttons, so this must never out-specify that rule on desktop. */
   var BAR = 'html:not(.tm-desktop) body #mwbar:has(.tm-hb-l)';
@@ -132,8 +135,8 @@
     '#nav .tm-nl{font-size:10px;font-weight:600;line-height:1}',
     'html:not(.tm-desktop) body:not(.tm-desktop) #nav button.plus{color:var(--txt)}',
 
-    /* ---------- Profile: bottom sheet, same hooks, v10 look ---------- */
-    '#pg:has(.pgs[data-id="profile"])::before{content:"";position:fixed;inset:0;z-index:29;background:var(--scrim)}',
+    /* ---------- Profile: bottom sheet, same hooks, v10 look (mobile only) ---------- */
+    'html:not(.tm-desktop) #pg:has(.pgs[data-id="profile"])::before{content:"";position:fixed;inset:0;z-index:29;background:var(--scrim)}',
     PG + '{inset:auto 0 0 0!important;margin:0 auto!important;width:min(100%,560px)!important;height:min(92vh,860px)!important;border-radius:34px 34px 0 0!important;border:0!important;background:var(--bg)!important;z-index:30!important}',
     PG + '::before{content:"";display:block;width:46px;height:5px;border-radius:3px;background:var(--line);margin:12px auto 0}',
     PG + ' .ph{justify-content:flex-end;padding:12px 20px 0}',
@@ -441,12 +444,13 @@
   }
   start();
 
-  /* keyboard activation for deal cards, and tap-outside to close the Profile sheet */
+  /* keyboard activation for deal cards, and tap-outside to close the Profile sheet (mobile only) */
   document.addEventListener('keydown', function (e) {
     var t = e.target;
     if ((e.key === 'Enter' || e.key === ' ') && t && t.classList && t.classList.contains('tm-deal') && !t.classList.contains('sk')) { e.preventDefault(); t.click(); }
   });
   document.addEventListener('click', function (e) {
+    if (document.documentElement.classList.contains('tm-desktop')) return;
     if (e.target && e.target.id === 'pg' && document.querySelector('#pg .pgs[data-id="profile"]')) {
       var b = document.querySelector('#pg .pgs[data-id="profile"] [data-back]');
       if (b) b.click();
