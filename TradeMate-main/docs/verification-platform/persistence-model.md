@@ -16,6 +16,8 @@
 | Record | Minimum fields | Important constraints |
 |---|---|---|
 | Tenant | id, status, created_at, updated_at | Status is active, suspended, or closed. Closing a tenant blocks new work; retention/deletion follows the approved policy. |
+| Tenant administrator membership | id, tenant_id, identity_issuer, identity_subject, role, status, created_at, updated_at | Tenant-scoped OIDC issuer/subject mapping; same identity may belong to multiple tenants. Never store passwords or identity-provider tokens. |
+| Platform provisioning request | request_key_hash, request_fingerprint, tenant_id, owner_membership_id, product_ids, created_at | Unique request-key hash; fingerprint detects changed-parameter replay. Persist only the hash, never the raw request key. |
 | Integration API key | id, tenant_id, prefix, verifier, status, scopes, created_at, expires_at, last_used_at, revoked_at | Unique prefix; verifier only, never plaintext. Prefix lookup is non-secret. Status is active or revoked. |
 | Product entitlement | id, tenant_id, product_id, status, starts_at, expires_at, created_at, updated_at | Unique active entitlement per tenant/product at a point in time. Status and effective dates are checked server-side. |
 | Entitlement change/audit event | id, tenant_id, actor_type, actor_id, action, target_type, target_id, occurred_at, request_id, metadata_allowlist | Append-only. Metadata must be allowlisted and contain no credentials or identity evidence. |
@@ -79,3 +81,12 @@ Authorization also exposes exact-scope enforcement, and tests cover key expiry, 
 5. Decide whether provider references may be stored and for how long under each provider contract.
 
 Until these decisions are approved, keep persistence behind repository interfaces and use test doubles only. Do not create migrations, databases, secrets, infrastructure, DNS records, or deployments from this proposal.
+
+
+## Tenant provisioning foundation now implemented
+
+The domain service in `apps/verification/src/tenant-provisioning.ts` provisions a tenant, its initial owner membership, selected product entitlements and a platform-admin audit event inside one persistence transaction. It requires explicit entitlement start timestamps and uses an opaque external identity issuer/subject pair; it does not collect email addresses, passwords, provider credentials or identity evidence.
+
+A hashed provisioning request key plus a request fingerprint makes retries safe: identical retries return the original tenant, while changed parameters under the same key are rejected. Production adapters must enforce uniqueness of the request-key hash and atomic rollback. A user identity can own memberships in multiple tenants, so identity lookup is always tenant-scoped.
+
+This is a domain primitive only. The trusted platform-admin authentication, external identity-token validation, tenant-admin authentication middleware, HTTP provisioning endpoint and production database adapter remain unimplemented. Do not expose this operation over HTTP until those controls exist.
