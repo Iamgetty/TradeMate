@@ -16,6 +16,9 @@ test('document vault migration is registered after the Persona event read grant'
   assert.ok(grant < vault);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS user_documents/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS user_document_access/);
+  assert.match(migration, /REVOKE ALL ON TABLE public\\.user_documents FROM PUBLIC/);
+  assert.match(migration, /GRANT SELECT, INSERT ON TABLE public\\.user_documents TO trademate_app/);
+  assert.match(migration, /GRANT SELECT ON TABLE public\\.user_document_access TO trademate_app/);
 });
 
 test('public document upload cannot manufacture signed or trusted workflow records', () => {
