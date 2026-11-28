@@ -681,3 +681,159 @@ Kind regards,
 ### Decision
 
 Egypt is a high-potential regulated market, but the compliance burden is now immediate rather than prospective. The strongest near-term customer-led route appears to be an eligible CBE DFI participant or FRA-regulated institution sponsoring a clearly authorized technology provider; neither delegation nor foreign-processor eligibility is confirmed. The national biometric pilot is initially telecom-operator-led, while Digital Egypt's commercial-registry verification service has no public commercial API entitlement established by the source reviewed. PDPC licensing, local representation and cross-border permits must be resolved before any Egyptian personal data enters VeriFire. No outreach has been sent, no provider selected, no credentials requested, no integration built and no country route enabled.
+
+
+## Senegal — DAF / Ministry of Interior, CDP, RCCM and BCEAO
+
+### Verified institutional access findings
+
+**1. National identity — Direction de l'Automatisation des Fichiers (DAF)**
+
+The Ministry of Interior's official service page identifies DAF as the responsible office for the biometric national identity card. It states that Senegalese citizens aged five and above can apply, with enrolment handled through police stations, gendarmerie brigades, prefectures or sub-prefectures, and gives DAF's public contact number as 800 00 2012. This is an issuance service; it does not establish a private-sector verification API or commercial access to the National Identification Register.
+
+On 5 February 2026, DAF announced a temporary suspension of national identity card production following an incident in its system. DAF said personal data remained intact and that an investigation had been opened. The Ministry later announced renewal operations for expiring ECOWAS biometric identity cards starting 25 September 2026. The latter is evidence that the renewal programme was proceeding, but it does not prove the February incident's root cause was resolved or that all DAF services and any possible third-party interface are fully operational. Treat this as continuity diligence, not as evidence of a data breach.
+
+Official references:
+- [Ministry of Interior — biometric national identity card](https://interieur.gouv.sn/services/services-aux-usagers/carte-nationale-d-identite-biometrique)
+- [DAF incident notice, 5 February 2026](https://interieur.gouv.sn/actualites/communiques/communique-de-la-direction-de-l-automatisation-des-fichiers-du-05-fevrier-2026)
+- [DAF renewal notice, 24 September 2026](https://www.interieur.gouv.sn/media/communique_daf_renouvellement_cni_cedeao_2026_09_24_28bfc89ecf.pdf)
+- Ministry contact: contact@interieur.gouv.sn; +221 33 889 91 00.
+- DAF public information number: 800 00 2012.
+
+**2. Commission de Protection des Données Personnelles (CDP)**
+
+Law No. 2008-12 establishes the CDP and requires prior formalities for personal-data processing. The official CDP formalities page distinguishes:
+- a normal declaration for ordinary information systems and databases (for example customer databases);
+- an authorization request for sensitive processing, expressly including biometrics and interconnected files, and for transfers to a third country; and
+- an opinion request reserved for the State, public establishments, local authorities and private legal persons managing a public service.
+
+The law adds important VeriFire-specific requirements:
+- Article 20 requires CDP authorization for processing involving a national identification number or other general identifier, biometric data, criminal-conviction data and certain interconnections.
+- Article 22 requires filings to identify the controller, purposes, data categories/origin, retention, persons with access, recipients, security, use of a processor and contemplated transfers to third countries. If the controller is not established in Senegal, the filing must identify its duly mandated representative established in Senegal.
+- Article 39 requires the controller to choose a processor with sufficient guarantees and to have a written contract specifying that the processor acts only on the controller's instructions and takes on the required security duties.
+- Article 49 requires a sufficient level of protection in the destination country and prior notification to the CDP before transfer.
+- Article 50 permits limited, one-off, non-massive transfers to a country that does not meet the Article 49 standard where the data subject expressly consents or one of the listed grounds applies.
+- Article 51 allows the CDP to authorize a transfer or set of transfers to a country without adequate protection where sufficient safeguards are demonstrated.
+- Article 52 requires processors and persons acting under the controller/processor authority to process data only on the controller's instructions.
+- Article 53 requires authorization for certain interconnections of personal-data files, including private-sector files with different principal purposes.
+
+For VeriFire, do not assume customer consent alone makes a recurring, bulk or biometric cross-border architecture permissible. Obtain a CDP determination on the required filings, local representative, transfer basis and processor chain before selecting hosting or routing.
+
+Official references:
+- [Law No. 2008-12 — official text](https://www.vie-publique.sn/docs/b1d86a17-d452-4546-a8a4-3fff87c1b05a/loi-protection-donnees-a-caractere-personnel.pdf)
+- [CDP — formalities and forms](https://www.cdp.sn/conformite/formalites)
+- [CDP — legislative texts](https://www.cdp.sn/legislation/textes-legislatifs)
+- [CDP — contact](https://www.cdp.sn/contact)
+- CDP: contact.cdp@cdp.sn; +221 33 859 70 30.
+
+**3. Company verification — SEN'INFOGREFFE / OHADA RCCM**
+
+SEN'INFOGREFFE is a Ministry of Justice initiative providing national RCCM information. Its company search lists RCCM registration/formality number, company name, NINEA and legal form. The OHADA regional RCCM portal says it federates company/trader information from the 17 OHADA member states and is refreshed daily through the local, national and regional registers. Senegal Decree No. 2021-420 establishes the electronic RCCM platform and an information-search facility; the Official Journal indicates online access is subject to prescribed fees and the public-register rules.
+
+This provides a useful official KYB research route, but no public API or bulk commercial redistribution licence was identified. A 2024 Senegal EITI report describes the national portal as having limited public fields and notes that more detailed legal ownership information may require a request to the competent registry. Confirm present-day coverage and field availability rather than relying on historical descriptions.
+
+Official references:
+- [SEN'INFOGREFFE company search](https://seninfogreffe.sn/Home/searchDenomination)
+- [OHADA regional RCCM portal](https://rccm.ohada.org/?id=&lang=fr)
+- [Senegal Decree 2021-420 — Official Journal](https://www.vie-publique.sn/docs/0e01b4a5-9cfe-4475-b3dc-b50e0f69d63e/JO-7415-du-16-avril-2021.pdf)
+- [Senegal EITI report — registry portal scope discussion](https://www.vie-publique.sn/docs/a7a3103d-c153-43c9-ab26-9f9ccbfe9fd1/rapport-itie-du-senegal-1er-semestre-2024-itie-senegal.pdf)
+
+**4. BCEAO PI-SPI — payments ecosystem, not identity source**
+
+BCEAO launched PI-SPI on 30 September 2025 as an interoperable instant-payment platform available continuously across all eight UEMOA countries. As at 24 June 2026, BCEAO reported 80 connected participants and 74 institutions in real-world testing. It set 30 September 2026 as the opening deadline for banks, e-money institutions and payment institutions, and 30 June 2027 for supervised microfinance institutions. Its 9 November 2026 homologated API-Business list records 34 approved APIs region-wide, including 11 Senegalese participants: BIMAO, Ecobank, FBNBank, Orange Finances Mobiles, Touchpoint Financial Services, UM ACEP, African Financial Agent, Mikaty, Samir Money, SESA Digital Finance and Versus Finance Tech-AS.
+
+These are payment-rail API approvals, not identity verification providers or authorization to connect VeriFire. They are useful demand signals and a grounded list for customer discovery among Senegalese digital-finance institutions.
+
+Official references:
+- [BCEAO — PI-SPI connection progress and deadlines](https://www.bceao.int/fr/communique-presse/prolongation-du-delai-de-connexion-a-pi-spi)
+- [BCEAO — homologated API-Business list, 9 November 2026](https://www.bceao.int/fr/communique-presse/liste-actualisee-des-api-business-pi-spi-homologuees-par-la-bceao-au-9-11-2026)
+
+### Questions for DAF / Ministry of Interior
+
+1. Does DAF or another Ministry of Interior unit provide any identity-validation or status-verification service to private-sector institutions, separate from the citizen-facing card-issuance process?
+2. If a private-sector route exists, which legal entities and sectors are eligible, and what lawful-purpose, consent and CDP authorization evidence is required?
+3. Can an eligible Senegalese customer be the direct applicant and contracting party while VeriFire is named as its processor/subprocessor? Does DAF require prior written approval of each technology provider?
+4. Must the applicant or technology provider be established in Senegal, and must a local representative be appointed?
+5. What verification methods are permitted (demographic match, card validation, fingerprint, face, liveness), and is access limited to 1:1 identity verification?
+6. Which attributes/results may be returned, and can the service return only a minimal match/no-match or approved assertion?
+7. What API/interface documentation, authentication, encryption, network requirements, sandbox, certification and test process are available?
+8. What is the current status of the February 2026 DAF system incident and investigation, and what service-continuity, backup, disaster-recovery and incident-notification controls apply to any third-party integration?
+9. What fees, rate limits, availability SLA, support and contract terms apply?
+10. What are the required retention/deletion, audit, remote-support and cross-border processing controls?
+
+### Questions for CDP
+
+1. For VeriFire's proposed flow, which entity is the controller and which is the processor/subprocessor, and must a foreign controller appoint a local representative under Article 2(4)?
+2. Does a customer/tenant need a normal declaration, and does VeriFire need to be identified in that filing as a processor? What evidence of the written Article 39 processor contract is required?
+3. Confirm that processing national identity numbers and biometrics requires Article 20 prior authorization, and whether each customer/use case or a platform-level filing is appropriate.
+4. Does the intended matching workflow constitute an interconnection of files under Articles 53–55, particularly where customer records are linked with external data sources?
+5. What is the required CDP process under Articles 49–51 for recurring transfers of data to a foreign cloud environment, including the adequacy assessment, prior notification and any authorization/safeguards?
+6. Can any Article 50 exception apply to a recurring or bulk service, given its express one-off/non-massive condition? What evidence is expected for explicit consent or other listed grounds?
+7. What localization, remote support, backup, logging and onward-transfer restrictions apply to foreign processors and subprocessors?
+8. What are the current forms, fees, review timelines, renewal obligations, DPO/representative expectations and breach-reporting procedures?
+
+### Questions for Ministry of Justice / RCCM / SEN'INFOGREFFE
+
+1. Is there a documented API or authorized data-service interface for the national RCCM register or SEN'INFOGREFFE?
+2. What data fields can be searched and returned for a company, including RCCM, NINEA, legal form, status, directors, legal ownership and beneficial ownership?
+3. Which fields are publicly accessible online, which require a formal request to the registry/greffe, and which are restricted?
+4. What are the current fees, account/subscription requirements, bulk-search limits, freshness/update cadence and official evidence/certification options?
+5. May an authorized subscriber use the information to provide paid KYB results to customer institutions? Are caching, redistribution, resale or sub-licensing restricted?
+6. Can a foreign technology provider subscribe directly, or must an eligible Senegalese customer hold the account and authorize VeriFire as processor?
+7. Is Senegal's data feed complete in the OHADA regional portal, and what are the dispute/correction processes if local and regional records differ?
+
+### Draft DAF / Ministry of Interior enquiry (not sent)
+
+**To:** contact@interieur.gouv.sn (request routing to the DAF institutional-access team)  
+**Subject:** Demande d'information institutionnelle — vérification d'identité, accès DAF et modèle de prestataire technique autorisé
+
+Madame, Monsieur,
+
+Nous réalisons une étude préliminaire sur les possibilités légales d'intégration institutionnelle avec la Direction de l'Automatisation des Fichiers (DAF) pour Metadusk VeriFire, une plateforme de vérification sans interface utilisateur hébergée, fonctionnant exclusivement par échanges serveur-à-serveur.
+
+Nous avons consulté les informations publiques du Ministère relatives à la carte nationale d'identité biométrique ainsi que les communiqués de la DAF de février et septembre 2026. Nous souhaiterions être orientés vers le service compétent et obtenir des précisions sur les points suivants :
+- l'existence d'un service de vérification de l'identité ou du statut d'une carte destiné aux institutions privées, distinct du service de délivrance des cartes ;
+- les critères d'éligibilité, les secteurs autorisés, les bases légales et les justificatifs de consentement/autorisation CDP requis ;
+- la possibilité pour une institution sénégalaise d'être le demandeur et cocontractant, avec VeriFire comme sous-traitant technique expressément autorisé ;
+- les exigences d'établissement local, de représentant local et d'approbation du prestataire ;
+- les méthodes de vérification, les données/résultats accessibles, la documentation technique, le bac à sable et la certification ;
+- les tarifs, limites d'utilisation, SLA, sécurité, conservation/suppression, audit et transferts transfrontaliers ; et
+- les mesures de continuité de service et le statut des travaux consécutifs à l'incident informatique annoncé en février 2026.
+
+Nous ne sollicitons aucun identifiant technique et ne transmettrons aucune donnée réelle pendant cette phase d'étude. Nous vous remercions de nous indiquer la procédure institutionnelle officielle et les documents à fournir.
+
+Cordialement,
+[Représentant habilité]
+[Entité juridique]
+[Institution cliente sénégalaise, le cas échéant]
+[Adresse professionnelle]
+[Adresse électronique et téléphone]
+
+### Draft CDP enquiry (not sent)
+
+**To:** contact.cdp@cdp.sn  
+**Subject:** Demande d'orientation réglementaire — traitement biométrique, numéro national d'identification et transferts internationaux
+
+Madame, Monsieur,
+
+Nous évaluons un modèle de traitement pour Metadusk VeriFire, une plateforme de vérification sans interface utilisateur destinée à fonctionner comme sous-traitant technique d'institutions clientes. Nous souhaitons confirmer les formalités applicables au titre de la loi n° 2008-12 avant toute intégration ou collecte de données.
+
+Pour un cas d'usage de vérification d'identité pouvant impliquer un numéro national d'identification, des données biométriques et un traitement technique par un prestataire étranger, pourriez-vous préciser :
+- les formalités de déclaration et les autorisations préalables requises au titre des articles 18, 20 et 22 ;
+- les exigences relatives au représentant local d'un responsable de traitement non établi au Sénégal ;
+- les pièces et garanties attendues pour le contrat de sous-traitance prévu à l'article 39 ;
+- la procédure de notification/autorisation des transferts vers un pays tiers au titre des articles 49 à 51, y compris les exigences d'adéquation, de garanties et de localisation ;
+- l'application des articles 53 à 55 aux éventuelles interconnexions de fichiers ; et
+- les formulaires, frais, délais, obligations de sécurité, conservation/suppression et gestion des incidents.
+
+Nous ne transmettrons aucune donnée personnelle réelle et ne solliciterons aucun accès de production pendant cette phase d'étude. Nous vous remercions de nous orienter vers le service compétent et les formulaires officiels.
+
+Cordialement,
+[Représentant habilité]
+[Entité juridique]
+[Adresse professionnelle]
+[Adresse électronique et téléphone]
+
+### Decision
+
+Senegal has a clearly identifiable identity authority (DAF), a formal and comparatively strict CDP filing regime, official national and regional company-register portals, and an active UEMOA instant-payment ecosystem. The strongest near-term KYB path is the public RCCM/SEN'INFOGREFFE information service, subject to coverage, fees and reuse-right confirmation. The identity-verification path remains unproven and is gated by CDP authorization for national ID numbers/biometrics and cross-border approvals. No outreach has been sent, no provider selected, no credentials requested, no integration built and no country route enabled.
