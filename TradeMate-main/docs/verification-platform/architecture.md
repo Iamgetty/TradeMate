@@ -27,6 +27,20 @@ Content-Type: application/json
 
 The CLI may configure a local project file containing a service URL and integration reference. It must not write plaintext API keys into source control, shell history, logs, telemetry, or a committed project file. Prefer an OS credential store where available; otherwise require an explicit environment variable or protected secret injection at runtime.
 
+## Mandatory headless product boundary
+
+**VeriFire does not provide a customer-facing UX interface.** It is a headless, API-first verification platform and developer toolchain—not a hosted verification website or user-facing application.
+
+- The installer/integrator is responsible for designing, building, testing and preparing its own customer-facing interface **before installing or integrating VeriFire**.
+- The integrator owns every end-user screen and interaction: forms, consent notices and controls, identity-data collection, document/biometric capture experience, progress states, error handling, accessibility, branding, and presentation of verification outcomes.
+- VeriFire does not host or supply a customer dashboard, login screen, onboarding flow, verification form, consent UI, embedded widget, or mandatory frontend component.
+- The CLI, SDKs, API, documentation, examples, sandbox and developer diagnostics are integration infrastructure. They are not a substitute for the integrator's finished interface.
+- The integrator's frontend must submit requests to its **own backend**. That backend authenticates to VeriFire over a server-to-server connection. Long-lived VeriFire API keys and other server secrets must never be embedded in browser or mobile application code.
+- The integrator must obtain and record the end user's required consent and legal attestations in its own interface before submitting a check. It should send only the data required for the selected check and jurisdiction.
+- VeriFire returns documented, normalized statuses and reason codes. The integrator decides how those results are communicated to its users and remains responsible for its own UX and customer support.
+
+A deployment or package that introduces a VeriFire-hosted end-user verification flow, or makes an integrator depend on a VeriFire-built frontend, violates this product boundary. Any future optional reference implementation must remain clearly separate, self-hosted by the integrator, and must not become a required VeriFire service.
+
 ## System boundaries
 
 1. **CLI / installer** — install, initialize, validate configuration, authenticate an integration, inspect service health, and generate typed client configuration. It does not collect or persist identity evidence.
