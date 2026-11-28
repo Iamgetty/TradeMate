@@ -56,7 +56,7 @@ test('Persona verification consent is versioned, saved privately, and required b
   assert.doesNotMatch(personaMigration, /INSERT INTO persona_verification_agreement_acceptances/);
   assert.match(moduleSource, /PERSONA_AGREEMENT_VERSION = '1\\.0'/);
   assert.match(moduleSource, /@Get\\('agreement'\\)/);
-  assert.match(moduleSource, /@Post\\('agreement\\/accept'\\)/);
+  assert.ok(moduleSource.includes("@Post('agreement/accept')"));
   assert.match(moduleSource, /body\\?\\.accepted !== true/);
   assert.match(moduleSource, /persona_verification_agreement_acceptances WHERE user_id = \\$1/);
   assert.match(moduleSource, /HttpStatus\\.PRECONDITION_REQUIRED/);
