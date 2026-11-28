@@ -139,12 +139,12 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
     await waitForAppReady(cleanBuyerPage);
     // Continue the assertions using the fresh authenticated page.
     buyer = cleanBuyerPage;
-    await buyer.locator('#app .top button[data-pg="search"]').click();
+    await buyer.locator('#app .top .srch').click();
     await expect(buyer.locator('#pg')).toContainText('Your recent searches will show up here.');
     await expect(buyer.locator('#pg')).not.toContainText('Web design');
     await buyer.goto('/app');
     await waitForAppReady(buyer);
-    await buyer.locator('#app .top button[data-pg="scan"]').click();
+    await buyer.locator('#mwbar .hb[data-pg="scan"]').click();
     await expect(buyer.locator('#pg')).toContainText('wallet connection and payment handoff are not available yet.');
     // A new page resets the feature-page overlay stack; route navigation alone does not.
     await buyer.close();
