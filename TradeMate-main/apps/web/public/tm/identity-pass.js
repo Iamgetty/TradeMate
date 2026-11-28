@@ -153,6 +153,30 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
 .idp-vprivacy svg{color:var(--am);flex:none}
 .idp-vprivacy small{font-size:10px;color:var(--mut)}
 @media(max-width:420px){.idp-verify{padding:15px;border-radius:18px}.idp-vstatus{font-size:10px;padding:6px 8px}.idp-vstep-icon{width:34px;height:34px}.idp-vconnector{margin-top:17px;flex-basis:5%}.idp-vstep small{font-size:10px}}
+/* Persona verification UI refinement: clearer hierarchy, calmer spacing, stronger mobile readability. */
+.idp-verify{border-radius:26px;padding:22px;background:linear-gradient(155deg,color-mix(in srgb,var(--am) 5%,var(--s2)),var(--s1) 48%);border-color:color-mix(in srgb,var(--am) 22%,var(--line));box-shadow:0 14px 36px rgba(0,0,0,.12)}
+.idp-verify:before{right:-55px;top:-75px;width:210px;height:210px;opacity:.8}
+.idp-vtop{gap:14px;align-items:center}
+.idp-vbadge{width:48px;height:48px;border-radius:16px;background:color-mix(in srgb,var(--am) 17%,var(--s2));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--am) 22%,transparent)}
+.idp-veyebrow{letter-spacing:.13em;font-size:10px}
+.idp-vheading h3{font-size:22px;letter-spacing:-.025em}
+.idp-vheading p{font-size:13.5px;line-height:1.5;max-width:40ch}
+.idp-vstatus{padding:8px 12px;font-size:11.5px;box-shadow:0 3px 10px rgba(0,0,0,.05)}
+.idp-vsteps{gap:8px;margin:22px 0 20px}
+.idp-vstep{gap:7px}
+.idp-vstep-icon{width:46px;height:46px;border-radius:15px;background:var(--s2);border-color:color-mix(in srgb,var(--am) 20%,var(--line));box-shadow:0 3px 10px rgba(0,0,0,.06)}
+.idp-vstep-icon svg{width:20px;height:20px}
+.idp-vstep b{font-size:12.5px;letter-spacing:-.01em}
+.idp-vstep small{font-size:11px;max-width:16ch;line-height:1.45}
+.idp-vconnector{height:2px;border-radius:3px;flex-basis:7%;margin-top:22px;opacity:.8}
+.idp-vfoot{gap:14px}
+.idp-verify .idp-cta{min-height:54px;border-radius:17px;font-size:15px;box-shadow:0 8px 20px color-mix(in srgb,var(--am) 18%,transparent);transition:transform .15s ease,filter .15s ease}
+.idp-verify .idp-cta:not(:disabled):active{transform:translateY(1px);filter:saturate(.92)}
+.idp-vprivacy{justify-content:flex-start;padding:12px 14px;border:1px solid var(--line);border-radius:15px;background:color-mix(in srgb,var(--s2) 72%,transparent);font-size:11.5px}
+.idp-vprivacy small{font-size:10.5px}
+@media(max-width:560px){.idp-verify{padding:17px;border-radius:22px}.idp-vtop{align-items:flex-start;flex-wrap:wrap}.idp-vheading{padding-top:2px}.idp-vstatus{margin-left:62px;margin-top:-4px}.idp-vsteps{gap:7px;margin:18px 0}.idp-vstep-icon{width:40px;height:40px;border-radius:13px}.idp-vstep b{font-size:11.5px}.idp-vstep small{font-size:10px;max-width:12ch}.idp-vconnector{flex-basis:4%;margin-top:19px}}
+@media(max-width:380px){.idp-vsteps{flex-direction:column;gap:9px}.idp-vstep{flex-direction:row;align-items:center;text-align:left;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:14px;background:var(--s2)}.idp-vstep-icon{flex:none}.idp-vstep b{min-width:110px}.idp-vstep small{max-width:none;flex:1}.idp-vconnector{display:none}}
+
 `;
 
 var s = document.createElement("style");
