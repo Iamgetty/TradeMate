@@ -50,6 +50,6 @@ test('vault downloads are authenticated and audited', () => {
 });
 
 test('Portfolio all-documents panel waits for the live vault list before rendering', () => {
-  const portfolioSource = readFileSync(join(root, '..', '..', 'web', 'public', 'tm', 'app.js'), 'utf8');
+  const portfolioSource = readFileSync(join(root, '..', 'web', 'public', 'tm', 'app.js'), 'utf8');
   assert.match(portfolioSource, /pmLoadDocs\(\)\.then\(pmAllDocs\)/);
 });
