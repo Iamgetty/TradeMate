@@ -4,7 +4,9 @@
  * - Light theme: pure white background with an indigo accent. Purple theme: graphite base with a violet accent.
  * - Dark theme is NOT touched: nothing below sets any colour for html[data-theme="dark"]; every layout colour
  *   comes from the theme variables (var(--am), var(--s1) ...).
- * - "Deals of the Day" is read from the same backend call the app already uses: GET /api/market/listings.
+ * - No demo content: "Deals of the Day" is read from the same backend call the app already uses:
+ *   GET /api/market/listings. Everything else restyles elements the app already renders.
+ * - Button, slide, card and bottom-bar sizes are intentionally left exactly as the app defines them.
  * Runs as a DOM/CSS patch so app.js does not need to change. */
 (function () {
   'use strict';
@@ -86,7 +88,30 @@
     PG + ' .pt-av{width:112px!important;height:112px!important;flex:none}',
     PG + ' .pt-id{display:flex;flex-direction:column;align-items:center;text-align:center}',
     PG + ' .pt-uid,' + PG + ' .pt-pills{justify-content:center}',
-    PG + ' .rts .rt{width:44px;height:44px;border-radius:50%;background:var(--s2)}'
+    PG + ' .rts .rt{width:44px;height:44px;border-radius:50%;background:var(--s2)}',
+
+    /* ---------- Approved-design arrangement (spacing, type, surfaces only; no button/slide/card sizes) ---------- */
+    /* header: menu/avatar left, brand centred, plain icons right (icon buttons keep their size) */
+    H + '>.top{padding:20px 14px 0!important;row-gap:18px!important}',
+    H + '>.top .tm-brand{justify-self:center}',
+    H + '>.top .tm-brand b{font-size:16px}',
+    H + '>.top .ib{background:none!important;border-radius:0!important}',
+    H + '>.top .srch{margin:0 6px}',
+    /* slide banner: only the gap above it changes, never its size or shape */
+    H + '>.home-promo-tbn,' + H + '>.banner{margin-top:32px!important}',
+    /* Contract Scout quick overview: same live element, designed surface */
+    H + '>.sc-promo{margin:10px 20px 0!important;border:1px solid var(--line)!important;background:var(--s1)!important}',
+    /* section rhythm and type */
+    '.tm-sec{margin:48px 20px 18px}',
+    '.tm-sec b{font-size:17px}',
+    '.tm-sec small{font-size:11px}',
+    '.tm-sec .tm-va{font-size:12.5px}',
+    H + '>.home-market-shortcuts{padding:0 20px 2px!important;justify-content:space-between;gap:10px!important}',
+    '.tm-deals{gap:10px;padding:0 20px 2px}',
+    H + '>.tabs{margin-top:48px!important}',
+    /* Profile: account-trust card surface from the design (live .pt-card content and progress) */
+    PG + ' .pt-card{background:var(--s2)!important;border:1px solid var(--line)!important;border-radius:24px!important}',
+    PG + ' .pt-bar{background:var(--line)!important}'
   ].join('\n');
 
   var style = document.createElement('style');
