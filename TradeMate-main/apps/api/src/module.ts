@@ -1540,7 +1540,7 @@ class UserDocumentsController {
          OR EXISTS (SELECT 1 FROM user_document_access a WHERE a.document_id = d.id AND a.user_id = $2)
          OR (d.visibility = 'organization' AND EXISTS (
            SELECT 1 FROM organization_members om
-           WHERE om.organization_id = d.organization_id AND om.user_id = $2
+           WHERE om.organization_id = d.organization_id AND om.user_id = $2 AND (d.source_type <> 'organization_verification' OR om.member_role IN ('owner','admin'))
          ))
          OR (d.visibility = 'contract_participants' AND d.source_id IS NOT NULL AND EXISTS (
            SELECT 1 FROM marketplace_contracts c
@@ -1571,7 +1571,7 @@ class UserDocumentsController {
           OR EXISTS (SELECT 1 FROM user_document_access a WHERE a.document_id = d.id AND a.user_id = $1)
           OR (d.visibility = 'organization' AND EXISTS (
             SELECT 1 FROM organization_members om
-            WHERE om.organization_id = d.organization_id AND om.user_id = $1
+            WHERE om.organization_id = d.organization_id AND om.user_id = $1 AND (d.source_type <> 'organization_verification' OR om.member_role IN ('owner','admin'))
           ))
           OR (d.visibility = 'contract_participants' AND d.source_id IS NOT NULL AND EXISTS (
             SELECT 1 FROM marketplace_contracts c
