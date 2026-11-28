@@ -25,8 +25,8 @@ Usage:
   verifire list
   verifire remove <product>
   verifire doctor
-  verification --version
-  verification --help
+  verifire --version
+  verifire --help
 
 Products are selected and versioned independently. Installing a product records
 the selection in this project; hosted entitlement and provider availability
