@@ -6,12 +6,12 @@ const LARGE_UPLOAD_JSON_BODY_LIMIT = '28mb';
 
 const isLargeJsonUploadRequest = (method: string, path: string) => {
   if (method !== 'POST') return false;
-  if (path === '/api/feed/posts') return true;
+  if (path === '/api/feed/posts' || path === '/api/documents') return true;
   return /^\/api\/organizations\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\/documents\/?$/i.test(path);
 };
 
 /**
- * Parse JSON once, applying the larger allowance only to the two endpoints
+ * Parse JSON once, applying the larger allowance only to the document-vault and two existing upload endpoints
  * that accept up to four Base64-encoded 5 MiB uploads.
  */
 export const createApiJsonBodyParser = () => {
