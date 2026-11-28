@@ -9,6 +9,12 @@ npm install --global @metadusk/verifire-cli
 verifire init --url <hosted-api-url>
 ```
 
+## Integrator interface requirement
+
+VeriFire is headless and does not provide a customer-facing interface. Before installing or integrating the CLI/API, the installer must already have prepared the application's own customer-facing interface. The installer owns its forms, consent UX, identity-data collection, capture experience, progress/error states, branding and result presentation.
+
+The CLI only configures developer integration. It does not generate or host an end-user verification flow. The integrator's frontend must call its own backend, which communicates with VeriFire; never put a VeriFire API key in browser/mobile code.
+
 ## Browse and select products
 
 ```sh
