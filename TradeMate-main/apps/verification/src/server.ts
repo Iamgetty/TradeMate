@@ -34,7 +34,7 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     return;
   }
   if (url.pathname === '/health/live') {
-    sendJson(response, 200, { status: 'ok', service: 'verification', requestId: id });
+    sendJson(response, 200, { status: 'ok', service: 'verifire', requestId: id });
     return;
   }
   if (url.pathname === '/health/ready') {
@@ -78,7 +78,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const host = process.env.HOST ?? '0.0.0.0';
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT must be an integer between 1 and 65535.');
   const server = createVerificationServer();
-  server.listen(port, host, () => process.stdout.write(`Verification service listening on ${host}:${port}\n`));
+  server.listen(port, host, () => process.stdout.write(`VeriFire service listening on ${host}:${port}\n`));
   const shutdown = () => server.close(() => process.exit(0));
   process.on('SIGTERM', shutdown); process.on('SIGINT', shutdown);
 }
