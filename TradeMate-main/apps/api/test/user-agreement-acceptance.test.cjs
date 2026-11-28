@@ -68,6 +68,7 @@ test('Persona verification consent is versioned, saved privately, and required b
   assert.ok(moduleSource.includes('typed_name_and_explicit_sign_action'));
   assert.ok(moduleSource.includes('electronic_signature_evidence'));
   assert.ok(moduleSource.includes("signatureName.length < 2"));
+  assert.ok(moduleSource.includes("/[[\\]x00-\\]x1F\\]x7F/" ) === false);
   assert.ok(moduleSource.includes('PERSONA_AGREEMENT_CONTENT'));
   assert.ok(identityPass.includes('/api/integrations/persona/agreement'));
   assert.ok(identityPass.includes('/api/integrations/persona/agreement/accept'));
