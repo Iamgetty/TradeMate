@@ -399,6 +399,97 @@ const buildOrganizationRegistrationPdf = (organization: Record<string, unknown>,
   return Buffer.from(pdf, 'ascii');
 };
 
+const buildP2PTradeReceiptPdf = (trade: Record<string, unknown>, generatedAt = new Date()): Buffer => {
+  const rawLines = [
+    'TRADEMATE P2P TRANSACTION RECEIPT', '',
+    'Receipt generated (UTC): ' + generatedAt.toISOString(),
+    'Transaction reference: ' + String(trade.id || ''),
+    'Status: COMPLETED — both parties recorded completion',
+    'Completed at (UTC): ' + String(trade.completed_at || generatedAt.toISOString()),
+    'Buyer account: ' + String(trade.buyer_user_id || ''),
+    'Buyer name: ' + String(trade.buyer_name || 'Not available'),
+    'Seller account: ' + String(trade.seller_user_id || ''),
+    'Seller name: ' + String(trade.seller_name || 'Not available'),
+    'Asset: ' + String(trade.asset_code || ''),
+    'Fiat currency: ' + String(trade.fiat_code || ''),
+    'Price per asset: ' + String(trade.price || ''),
+    'Quantity: ' + String(trade.quantity || ''),
+    'Fiat total: ' + String(trade.fiat_total || '') + ' ' + String(trade.fiat_code || ''),
+    'Order reference: ' + String(trade.order_id || ''),
+    '',
+    'RECEIPT SCOPE',
+    'This receipt records the transaction details and completion status stored in TradeMate.',
+    'TradeMate does not custody funds or provide escrow. This document is not proof of a bank transfer,',
+    'payment receipt from a financial institution, guarantee, or independent verification of funds.',
+  ];
+  const ascii = (value: string) => value.replace(/[’‘]/g, "'").replace(/[“”]/g, '"')
+    .replace(/[—–]/g, '-').replace(/…/g, '...').replace(/[^\x20-\x7E]/g, '');
+  const lines: string[] = [];
+  for (const raw of rawLines) {
+    const line = ascii(raw);
+    if (!line) { lines.push(''); continue; }
+    let remaining = line;
+    while (remaining.length > 92) {
+      let splitAt = remaining.lastIndexOf(' ', 92);
+      if (splitAt < 40) splitAt = 92;
+      lines.push(remaining.slice(0, splitAt));
+      remaining = remaining.slice(splitAt).trimStart();
+    }
+    lines.push(remaining);
+  }
+  const pageLines: string[][] = [];
+  for (let index = 0; index < lines.length; index += 52) pageLines.push(lines.slice(index, index + 52));
+  const objects: string[] = [];
+  objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+  objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
+  const pageRefs: string[] = [];
+  pageLines.forEach((page, index) => {
+    const pageId = 4 + index * 2, contentId = pageId + 1;
+    pageRefs.push(pageId + ' 0 R');
+    const commands = ['BT', '/F1 9 Tf', '48 748 Td', '13 TL'];
+    page.forEach((line, lineIndex) => {
+      if (lineIndex) commands.push('T*');
+      commands.push('(' + line.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)') + ') Tj');
+    });
+    commands.push('ET');
+    const stream = commands.join('\n');
+    objects[pageId] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ' + contentId + ' 0 R >>';
+    objects[contentId] = '<< /Length ' + Buffer.byteLength(stream, 'ascii') + ' >>\nstream\n' + stream + '\nendstream';
+  });
+  objects[2] = '<< /Type /Pages /Kids [' + pageRefs.join(' ') + '] /Count ' + pageRefs.length + ' >>';
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  for (let id = 1; id < objects.length; id++) {
+    offsets[id] = Buffer.byteLength(pdf, 'ascii');
+    pdf += id + ' 0 obj\n' + objects[id] + '\nendobj\n';
+  }
+  const xrefOffset = Buffer.byteLength(pdf, 'ascii');
+  pdf += 'xref\n0 ' + objects.length + '\n0000000000 65535 f \n';
+  for (let id = 1; id < objects.length; id++) pdf += String(offsets[id]).padStart(10, '0') + ' 00000 n \n';
+  pdf += 'trailer\n<< /Size ' + objects.length + ' /Root 1 0 R >>\nstartxref\n' + xrefOffset + '\n%%EOF';
+  return Buffer.from(pdf, 'ascii');
+};
+const saveP2PTradeReceiptVaultDocuments = async (client: PoolClient, trade: Record<string, unknown>) => {
+  const generatedAt = new Date();
+  for (const ownerUserId of [String(trade.buyer_user_id), String(trade.seller_user_id)]) {
+    const existing = await client.query(
+      'SELECT document_id FROM p2p_trade_receipt_documents WHERE p2p_trade_id = $1 AND user_id = $2',
+      [trade.id, ownerUserId],
+    );
+    if (existing.rowCount) continue;
+    const pdf = buildP2PTradeReceiptPdf(trade, generatedAt);
+    const hash = createHash('sha256').update(pdf).digest('hex');
+    const fileName = 'TradeMate-P2P-Receipt-' + String(trade.id) + '.pdf';
+    const document = await client.query(
+      "INSERT INTO user_documents (owner_user_id, source_type, source_id, document_type, document_status, visibility, file_name, mime_type, file_size, file_sha256, file_data, metadata) VALUES ($1,'marketplace_transaction',$2,'receipt','generated','private',$3,'application/pdf',$4,$5,$6,$7::jsonb) RETURNING id",
+      [ownerUserId, trade.id, fileName, pdf.length, hash, pdf, JSON.stringify({ record_type: 'p2p_completed_trade_receipt', transaction_reference: String(trade.id), completed_at: trade.completed_at, generated_at: generatedAt.toISOString(), payment_reference_included: false })],
+    );
+    await client.query(
+      'INSERT INTO p2p_trade_receipt_documents (p2p_trade_id, user_id, document_id) VALUES ($1,$2,$3)',
+      [trade.id, ownerUserId, document.rows[0].id],
+    );
+  }
+};
 const buildContractRecordPdf = (contract: Record<string, unknown>, recordStatus: string, recordedAt = new Date()): Buffer => {
   const amount = (Number(contract.amount_minor_units || 0) / 100).toFixed(2);
   const rawLines = [
