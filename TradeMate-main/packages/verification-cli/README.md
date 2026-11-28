@@ -1,26 +1,26 @@
-# Verification CLI
+# VeriFire CLI
 
 The CLI is the terminal installer and product selector for the standalone verification platform. Each verification product is selected and versioned independently; there is no all-products installation command.
 
 ## Install the CLI
 
 ```sh
-npm install --global @metadusk/verification-cli
-verification init
+npm install --global @metadusk/verifire-cli
+verifire init --url <hosted-api-url>
 ```
 
 ## Browse and select products
 
 ```sh
-verification products
-verification versions kyc
-verification install kyc@1.0.0
-verification install kyb@1.0.0
-verification list
-verification remove kyc
+verifire products
+verifire versions kyc
+verifire install kyc@1.0.0
+verifire install kyb@1.0.0
+verifire list
+verifire remove kyc
 ```
 
-A product installation requires an explicit product and version. It records that selection in the current project's `.verificationrc.json`. Multiple products may be selected independently and may use different versions.
+A product installation requires an explicit product and version. It records that selection in the current project's `.verifirerc.json`. Multiple products may be selected independently and may use different versions.
 
 ## Important current limitation
 
