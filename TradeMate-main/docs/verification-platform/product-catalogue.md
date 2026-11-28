@@ -2,18 +2,18 @@
 
 ## Product selection is not a bundle
 
-The platform has one small CLI installer and a catalogue of separately versioned verification products. Developers choose a product and an explicit version. They can install, upgrade (by selecting a newer published version), list and remove each product independently.
+The platform has one small CLI installer and a catalogue of separately versioned verifire products. Developers choose a product and an explicit version. They can install, upgrade (by selecting a newer published version), list and remove each product independently.
 
 ```sh
-verification products
-verification versions kyc
-verification install kyc@1.0.0
-verification install kyb@1.0.0
-verification list
-verification remove kyc
+verifire products
+verifire versions kyc
+verifire install kyc@1.0.0
+verifire install kyb@1.0.0
+verifire list
+verifire remove kyc
 ```
 
-There is deliberately no `verification install all` command. Installing the CLI alone does not install any verification product.
+There is deliberately no `verifire install all` command. Installing the CLI alone does not install any verification product.
 
 ## Catalogue contract
 
@@ -23,7 +23,7 @@ The first catalogue includes KYC, KYB, AML, sanctions, PEP, age, address, biomet
 
 ## Meaning of "install" in this foundation slice
 
-Currently the CLI validates the exact product/version against the local catalogue and writes that selection into the project's `.verificationrc.json`. This is intentionally local metadata only. It does not create a remote tenant entitlement, download a verification engine, enable a provider, or make a live verification request.
+Currently the CLI validates the exact product/version against the local catalogue and writes that selection into the project's `.verifirerc.json`. This is intentionally local metadata only. It does not create a remote tenant entitlement, download a verification engine, enable a provider, or make a live verification request.
 
 The future control plane must separately enforce tenant entitlements and provider/country capabilities on every API request. A local config file is never authorization evidence. Product releases, API versions, provider adapters and country availability have independent compatibility lifecycles.
 
