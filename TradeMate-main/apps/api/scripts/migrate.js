@@ -67,6 +67,7 @@ const MIGRATIONS = [
   '058_persona_verification_agreement_acceptances.sql',
   '059_contract_message_documents.sql',
   '060_persona_webhook_event_documents.sql',
+  '061_p2p_trade_receipt_documents.sql',
 ];
 
 async function main() {
