@@ -138,6 +138,25 @@ test('contract conversation messages link only sender-owned participant-visible 
   assert.match(webSource, /contractAttachmentRemove/);
 });
 
+test('completed P2P trades generate private receipt PDFs for both parties in the same transaction', () => {
+  const manifestSource = readFileSync(join(root, 'scripts', 'migrate.js'), 'utf8');
+  const migrationSource = readFileSync(join(root, 'database', 'migrations', '061_p2p_trade_receipt_documents.sql'), 'utf8');
+  assert.match(manifestSource, /'061_p2p_trade_receipt_documents\.sql'/);
+  assert.match(migrationSource, /PRIMARY KEY \(p2p_trade_id, user_id\)/);
+  assert.match(migrationSource, /document_id UUID NOT NULL UNIQUE/);
+  assert.match(moduleSource, /const buildP2PTradeReceiptPdf/);
+  assert.match(moduleSource, /saveP2PTradeReceiptVaultDocuments/);
+  const p2pController = moduleSource.slice(moduleSource.indexOf("@Controller('p2p')"), moduleSource.indexOf("@Controller('sports')"));
+  assert.match(p2pController, /confirmReceipt/);
+  assert.match(p2pController, /FOR UPDATE OF t/);
+  assert.match(p2pController, /saveP2PTradeReceiptVaultDocuments\(client, receiptTrade\)/);
+  assert.match(p2pController, /'marketplace_transaction'/);
+  assert.match(p2pController, /'p2p_completed_trade_receipt'/);
+  assert.match(p2pController, /payment_reference_included: false/);
+  assert.match(p2pController, /receipt_documents_created: 2/);
+  assert.match(p2pController, /TradeMate does not custody funds or provide escrow/);
+});
+
 test('signed Persona inquiry events generate one private verification evidence PDF per event', () => {
   const manifestSource = readFileSync(join(root, 'scripts', 'migrate.js'), 'utf8');
   const migrationSource = readFileSync(join(root, 'database', 'migrations', '060_persona_webhook_event_documents.sql'), 'utf8');
