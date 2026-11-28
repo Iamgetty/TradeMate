@@ -147,3 +147,21 @@ test('rejects duplicate external references submitted with a different idempoten
     (error) => error instanceof VerificationAcceptanceError && error.code === 'duplicate_reference',
   );
 });
+
+test('rejects future consent timestamps and unsupported callback profiles', async () => {
+  const { persistence } = makePersistence();
+  await assert.rejects(
+    acceptVerificationRequest(persistence, {
+      ...input,
+      request: { ...input.request, consent: { ...input.request.consent, capturedAt: '2026-11-29T00:00:00.000Z' } },
+    }, now),
+    (error) => error instanceof VerificationAcceptanceError && error.code === 'invalid_request',
+  );
+  await assert.rejects(
+    acceptVerificationRequest(persistence, {
+      ...input,
+      request: { ...input.request, callback: { eventProfile: 'unrecognized' } },
+    }, now),
+    (error) => error instanceof VerificationAcceptanceError && error.code === 'invalid_request',
+  );
+});
