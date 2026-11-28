@@ -170,6 +170,43 @@ const saveContractVaultRecord = async (client: PoolClient, contract: Record<stri
 };
 
 
+const buildAccountRegistrationRecordPdf = (user: Record<string, unknown>, registeredAt = new Date()): Buffer => {
+  const rawLines = [
+    'TRADEMATE ACCOUNT REGISTRATION RECORD', '',
+    'Registered at (UTC): ' + registeredAt.toISOString(),
+    'Account reference: ' + String(user.id || ''),
+    'Account holder: ' + String(user.display_name || ''),
+    'Email address: ' + String(user.email || ''),
+    'Initial account status: ' + String(user.status || 'pending email verification'),
+    '', 'REGISTRATION SCOPE',
+    'This record confirms creation of a TradeMate account profile.',
+    'Email ownership had not yet been confirmed when this record was generated.',
+    'It is not proof of identity, legal name, or verification approval.',
+  ];
+  const lines = rawLines.map((line) => line.replace(/[’‘]/g, "'").replace(/[“”]/g, '"').replace(/[—–]/g, '-').replace(/[^\\x20-\\x7E]/g, ''));
+  const escapePdf = (line: string) => line.split('\\\\').join('\\\\\\\\').split('(').join('\\\\(').split(')').join('\\\\)');
+  const commands = ['BT', '/F1 10 Tf', '48 748 Td', '14 TL'];
+  lines.forEach((line, index) => { if (index) commands.push('T*'); commands.push('(' + escapePdf(line) + ') Tj'); });
+  commands.push('ET');
+  const stream = commands.join('\\n');
+  const objects = [
+    '',
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    '<< /Length ' + Buffer.byteLength(stream, 'ascii') + ' >>\\nstream\\n' + stream + '\\nendstream',
+  ];
+  let pdf = '%PDF-1.4\\n';
+  const offsets = [0];
+  for (let id = 1; id < objects.length; id++) { offsets[id] = Buffer.byteLength(pdf, 'ascii'); pdf += id + ' 0 obj\\n' + objects[id] + '\\nendobj\\n'; }
+  const xrefOffset = Buffer.byteLength(pdf, 'ascii');
+  pdf += 'xref\\n0 ' + objects.length + '\\n0000000000 65535 f \\n';
+  for (let id = 1; id < objects.length; id++) pdf += offsets[id].toString().padStart(10, '0') + ' 00000 n \\n';
+  pdf += 'trailer\\n<< /Size ' + objects.length + ' /Root 1 0 R >>\\nstartxref\\n' + xrefOffset + '\\n%%EOF';
+  return Buffer.from(pdf, 'ascii');
+};
+
 const buildEmailVerificationRecordPdf = (user: Record<string, unknown>, verifiedAt = new Date()): Buffer => {
   const rawLines = [
     'TRADEMATE EMAIL VERIFICATION RECORD', '',
@@ -834,7 +871,22 @@ class AuthController {
     try {
       await client.query('BEGIN');
       const code = String(randomInt(0, 1000000)).padStart(6, '0');
-      await client.query('SELECT trademate_private.register_password_account($1, $2, $3, $4)', [email, displayName, hash, tokenDigest(code)]);
+      const registered = await client.query(
+        'SELECT trademate_private.register_password_account($1, $2, $3, $4) AS user_id',
+        [email, displayName, hash, tokenDigest(code)],
+      );
+      const userId = String(registered.rows[0].user_id);
+      const registrationAt = new Date();
+      const registrationPdf = buildAccountRegistrationRecordPdf({
+        id: userId, email, display_name: displayName, status: 'pending email verification',
+      }, registrationAt);
+      const registrationHash = createHash('sha256').update(registrationPdf).digest('hex');
+      await client.query(
+        'INSERT INTO user_documents (owner_user_id, source_type, source_id, document_type, document_status, visibility, file_name, mime_type, file_size, file_sha256, file_data, metadata) VALUES ($1, \'account\', $1, \'other\', \'generated\', \'private\', $2, \'application/pdf\', $3, $4, $5, $6::jsonb)',
+        [userId, 'TradeMate-Account-Registration-' + registrationAt.toISOString().slice(0, 10) + '.pdf',
+          registrationPdf.length, registrationHash, registrationPdf,
+          JSON.stringify({ record_type: 'account_registration_event', account_status: 'pending_email_verification', email_verification_completed: false, recorded_at: registrationAt.toISOString() })],
+      );
       await client.query('COMMIT');
       const delivered = await sendTransactionalEmail(email, 'Verify your TradeMate email', '<p>Your TradeMate verification code is:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">' + code + '</p><p>This code expires in 10 minutes and can only be used once.</p>');
       if (!delivered) throw new HttpException('Your account was created, but the verification email could not be sent. Use Resend to try again.', HttpStatus.SERVICE_UNAVAILABLE);
