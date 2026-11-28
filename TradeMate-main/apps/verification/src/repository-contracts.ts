@@ -100,7 +100,7 @@ export interface IdempotencyRecord extends NewIdempotencyRecord {}
 export interface NewAuditEvent {
   id: string;
   tenantId: string;
-  actorType: 'tenant_admin' | 'api_key' | 'system' | 'provider';
+  actorType: 'platform_admin' | 'tenant_admin' | 'api_key' | 'system' | 'provider';
   actorId: string;
   action: string;
   targetType: string;
