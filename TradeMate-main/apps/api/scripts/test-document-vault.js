@@ -115,7 +115,7 @@ async function main() {
     assert.equal(ownerGet.status, 200, 'document owner must read private metadata');
     const ownerBody = await ownerGet.json();
     assert.equal(ownerBody.document.id, privateId);
-    assert.equal(ownerBody.document.file_data, undefined, 'metadata response must not expose file bytes');
+    assert.ok(!Object.hasOwn(ownerBody.document, 'file_data') || ownerBody.document.file_data == null, 'metadata response must not expose file bytes');
 
     const ownerDownload = await request('owner', '/' + privateId + '/download');
     assert.equal(ownerDownload.status, 200, 'owner must download private document');
