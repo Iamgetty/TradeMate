@@ -179,3 +179,23 @@ No real-user KYC/KYB launch until all applicable gates pass:
 - collecting/storing biometric templates or raw national identity numbers in TradeMate;
 - claiming CAC/NIMC or any government integration before authorization and live technical acceptance;
 - treating marketplace organization moderation as KYB approval.
+
+
+## 11. Staging implementation checkpoint — 28 November 2026
+
+Read-only inspection of AWS staging confirmed:
+- `trademate/staging/api` contains non-empty `PERSONA_API_KEY` and `PERSONA_INQUIRY_TEMPLATE_ID` fields.
+- `trademate/staging/persona-webhook-secret` exists separately and contains a non-empty `PERSONA_WEBHOOK_SECRET` field.
+- The current `.github/workflows/aws-staging-configure-persona.yml` reads only `trademate/staging/api` and passes only the API key and template ID to the runtime helper.
+- The current root-owned runtime helper accepts and writes only the Persona API key and template ID; it does not accept the webhook secret.
+- The active GitHub staging image-publish role and EC2 instance profile were inspected read-only. Their current inline policies grant access to the API secret but not to the separate Persona webhook-secret ARN.
+
+Therefore the existence of the webhook secret in Secrets Manager does **not** establish that the running API process has it. Runtime process state has not yet been inspected. The webhook controller returns service-unavailable when `PERSONA_WEBHOOK_SECRET` is absent.
+
+Required next staging integration work:
+1. Add a narrowly scoped `secretsmanager:GetSecretValue` permission for the exact webhook-secret ARN to the selected staging configuration principal.
+2. Update and securely install the root-owned runtime helper so it validates, writes and verifies `PERSONA_WEBHOOK_SECRET` without printing it.
+3. Update the manual staging configuration workflow to retrieve the separate secret and pass it to that helper.
+4. Execute the configuration workflow only after explicit staging-change approval; verify the active API process and webhook signature path without using real customer identity data.
+
+No AWS IAM policy, EC2 file, running service, database, Cloudflare Worker or production resource was changed during this inspection.
