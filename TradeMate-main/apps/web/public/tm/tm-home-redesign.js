@@ -73,7 +73,7 @@
     'html:not(.tm-desktop) body:not(.tm-desktop) #nav button.on:not(.plus){background:var(--s2)!important;border-radius:24px}',
 
     /* Profile as a bottom sheet (content unchanged, hero centred, settings stays top right) */
-    '#pg{pointer-events:none!important}',
+    '#pg:has(.pgs[data-id="profile"]){pointer-events:none!important}',
     '#pg:has(.pgs[data-id="profile"])::before{content:"";position:fixed;inset:0;z-index:29;background:var(--scrim,#000a);pointer-events:none}',
     PG + '{pointer-events:auto!important;inset:auto 0 0 0!important;margin:0 auto!important;width:min(100%,560px)!important;height:min(88vh,780px)!important;border-radius:32px 32px 0 0!important;border:1px solid var(--line)!important;border-bottom:0!important;z-index:30!important}',
     PG + '::before{content:"";display:block;width:44px;height:5px;border-radius:3px;background:var(--s3);margin:10px auto 0}',
