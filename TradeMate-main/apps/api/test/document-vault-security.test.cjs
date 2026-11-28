@@ -69,6 +69,16 @@ test('new contract proposals generate a private participant-visible vault PDF wi
   assert.match(moduleSource, /signature_status: 'not_signed'/);
 });
 
+test('email verification generates a private vault PDF limited to email-address verification', () => {
+  assert.match(moduleSource, /const buildEmailVerificationRecordPdf =/);
+  assert.match(moduleSource, /TRADEMATE EMAIL VERIFICATION RECORD/);
+  assert.match(moduleSource, /completed TradeMate email verification/);
+  assert.match(moduleSource, /does not verify the account holder identity/);
+  assert.match(moduleSource, /'email_verification', NULL, 'other', 'generated', 'private'/);
+  assert.match(moduleSource, /record_type: 'email_verification_event'/);
+  assert.match(moduleSource, /verification_scope: 'email_address_only'/);
+});
+
 test('organization creation generates an honest registration-event PDF in the organization vault', () => {
   assert.match(moduleSource, /const buildOrganizationRegistrationPdf =/);
   assert.match(moduleSource, /TRADEMATE ORGANIZATION REGISTRATION RECORD/);
