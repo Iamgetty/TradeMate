@@ -77,6 +77,13 @@ test('email verification generates a private vault PDF limited to email-address 
   assert.ok(moduleSource.includes("\\'email_verification\\', NULL, \\'other\\', \\'generated\\', \\'private\\'"));
   assert.match(moduleSource, /record_type: 'email_verification_event'/);
   assert.match(moduleSource, /verification_scope: 'email_address_only'/);
+  const confirmStart = moduleSource.indexOf('async confirmEmailVerification');
+  const confirmEnd = moduleSource.indexOf("@Post('login')", confirmStart);
+  const confirmHandler = moduleSource.slice(confirmStart, confirmEnd);
+  assert.match(confirmHandler, /client\.query\('BEGIN'\)/);
+  assert.match(confirmHandler, /client\.query\('COMMIT'\)/);
+  assert.match(confirmHandler, /client\.query\('ROLLBACK'\)/);
+  assert.match(confirmHandler, /client\.release\(\)/);
 });
 
 test('new account registration generates a private vault record in the same transaction', () => {
