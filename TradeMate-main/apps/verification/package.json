@@ -1,8 +1,8 @@
 {
-  "name": "@metadusk/verification-service",
+  "name": "@metadusk/verifire-service",
   "version": "0.2.0",
   "private": true,
-  "description": "Standalone provider-neutral verification infrastructure service",
+  "description": "VeriFire provider-neutral verification infrastructure service",
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
