@@ -158,7 +158,7 @@ const buildAgreementAcceptancePdf = (agreementKey: string, agreementVersion: str
   pdf += 'trailer\n<< /Size ' + objects.length + ' /Root 1 0 R >>\nstartxref\n' + xrefOffset + '\n%%EOF';
   return Buffer.from(pdf, 'ascii');
 };
-const saveContractVaultRecord = async (client: any, contract: Record<string, any>, recordStatus: string, ownerUserId: string) => {
+const saveContractVaultRecord = async (client: PoolClient, contract: Record<string, unknown>, recordStatus: string, ownerUserId: string) => {
   const pdf = buildContractRecordPdf(contract, recordStatus);
   const safeStatus = recordStatus.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
   const fileName = 'TradeMate-Contract-' + safeStatus + '-' + String(contract.id) + '.pdf';
@@ -170,7 +170,7 @@ const saveContractVaultRecord = async (client: any, contract: Record<string, any
 };
 
 
-const buildContractRecordPdf = (contract: Record<string, string | number | null | undefined>, recordStatus: string, recordedAt = new Date()): Buffer => {
+const buildContractRecordPdf = (contract: Record<string, unknown>, recordStatus: string, recordedAt = new Date()): Buffer => {
   const amount = (Number(contract.amount_minor_units || 0) / 100).toFixed(2);
   const rawLines = [
     'TRADEMATE CONTRACT RECORD', '',
