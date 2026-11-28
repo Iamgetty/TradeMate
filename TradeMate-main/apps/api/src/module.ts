@@ -879,7 +879,7 @@ class PersonaInquiryController {
           `INSERT INTO user_documents
             (owner_user_id, source_type, source_id, document_type, document_status, visibility,
              file_name, mime_type, file_size, file_sha256, file_data, metadata)
-           VALUES ($1, 'account', $2, 'agreement', 'generated', 'private',
+           VALUES ($1, 'account', $2, 'agreement', 'signed', 'private',
                    'TradeMate-Verification-Agreement-v1.1.pdf', 'application/pdf',
                    $3, $4, $5, $6::jsonb)`,
           [userId, acceptance.id, pdf.length, pdfSha256, pdf,
