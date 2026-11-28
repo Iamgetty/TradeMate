@@ -136,11 +136,6 @@ export async function provisionTenant(
       };
     }
 
-    const existingOwner = await tx.tenantAdmins.findByIdentity(input.owner.issuer, input.owner.subject);
-    if (existingOwner) {
-      throw new TenantProvisioningError('The supplied identity is already assigned to a tenant administrator.');
-    }
-
     const tenantId = randomUUID();
     const ownerMembershipId = randomUUID();
     await tx.tenants.create({
