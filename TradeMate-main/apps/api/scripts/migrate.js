@@ -65,6 +65,7 @@ const MIGRATIONS = [
   '056_platform_document_vault.sql',
   '057_user_agreement_acceptances.sql',
   '058_persona_verification_agreement_acceptances.sql',
+  '059_contract_message_documents.sql',
 ];
 
 async function main() {
