@@ -65,7 +65,7 @@ test('Portfolio Documents supports authenticated private PDF, JPG and PNG upload
   const portfolioCss = readFileSync(join(root, '..', 'web', 'public', 'tm', 'runtime-portfolio.css'), 'utf8');
   assert.match(portfolioSource, /pm-upload-trigger/);
   assert.match(portfolioSource, /new FileReader\(\)/);
-  assert.match(portfolioSource, /api\("POST","\\/documents"/);
+  assert.ok(portfolioSource.includes('api("POST","/documents"'));
   assert.match(portfolioSource, /sourceType:"user_upload"/);
   assert.match(portfolioSource, /documentStatus:"received",visibility:"private"/);
   assert.match(portfolioSource, /10\*1024\*1024/);
