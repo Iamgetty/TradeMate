@@ -8,7 +8,7 @@ const moduleSource = readFileSync(join(root, 'src', 'module.ts'), 'utf8');
 const migration = readFileSync(join(root, 'database', 'migrations', '057_user_agreement_acceptances.sql'), 'utf8');
 const manifest = readFileSync(join(root, 'scripts', 'migrate.js'), 'utf8');
 const appSource = readFileSync(join(root, '..', 'web', 'public', 'tm', 'app.js'), 'utf8');
-const agreement = readFileSync(join(root, '..', '..', '..', 'docs', 'legal', 'trademate-platform-user-agreement-v1.md'), 'utf8');
+const agreement = readFileSync(join(root, '..', '..', 'docs', 'legal', 'trademate-platform-user-agreement-v1.md'), 'utf8');
 
 test('agreement acceptance migration is registered and never pre-accepts existing users', () => {
   assert.match(manifest, /'057_user_agreement_acceptances\.sql'/);
