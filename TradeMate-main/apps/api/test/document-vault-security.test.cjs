@@ -70,6 +70,16 @@ test('Portfolio all-documents panel waits for the live vault list before renderi
   const portfolioSource = readFileSync(join(root, '..', 'web', 'public', 'tm', 'app.js'), 'utf8');
   assert.match(portfolioSource, /pmLoadDocs\(\)\.then\(pmAllDocs\)/);
 });
+test('Portfolio document rows expose secure preview controls backed by the preview endpoint', () => {
+  const portfolioSource = readFileSync(join(root, '..', 'web', 'public', 'tm', 'app.js'), 'utf8');
+  const portfolioCss = readFileSync(join(root, '..', 'web', 'public', 'tm', 'runtime-portfolio.css'), 'utf8');
+  assert.match(portfolioSource, /pm-doc-preview/);
+  assert.match(portfolioSource, /\/documents\/.*\/preview/);
+  assert.match(portfolioSource, /URL\.revokeObjectURL/);
+  assert.match(portfolioSource, /pm-inline-preview-body/);
+  assert.match(portfolioCss, /\.pm-inline-preview-body/);
+});
+
 test('Portfolio Documents supports authenticated private PDF, JPG and PNG uploads', () => {
   const portfolioSource = readFileSync(join(root, '..', 'web', 'public', 'tm', 'app.js'), 'utf8');
   const portfolioCss = readFileSync(join(root, '..', 'web', 'public', 'tm', 'runtime-portfolio.css'), 'utf8');
