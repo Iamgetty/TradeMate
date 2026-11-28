@@ -1,7 +1,7 @@
 {
   "name": "@metadusk/verification-cli",
-  "version": "0.1.0",
-  "description": "Terminal installer and developer tooling for the Metadusk Verification Platform",
+  "version": "0.2.0",
+  "description": "Terminal installer and independently versioned product selector for the Metadusk Verification Platform",
   "type": "module",
   "bin": {
     "verification": "./bin/verification.mjs"
@@ -11,7 +11,11 @@
   },
   "files": [
     "bin/",
+    "catalog/",
     "README.md"
   ],
+  "scripts": {
+    "test": "node --test"
+  },
   "license": "UNLICENSED"
-}
+}\n
