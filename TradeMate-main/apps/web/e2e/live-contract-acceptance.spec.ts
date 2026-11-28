@@ -15,7 +15,7 @@ async function waitForAppReady(page: Page) {
   await expect(page.locator('#app .view')).toBeVisible({ timeout: 20_000 });
   // The shell can appear before the app's delegated click handler is installed.
   // Wait for a JS-rendered topbar control before interacting with the app.
-  await expect(page.locator('#app .top button[data-pg="profile"]')).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('#app .view .top button[data-pg="profile"]:visible, #mwbar .tm-av[data-pg="profile"]:visible')).toBeVisible({ timeout: 20_000 });
 }
 
 // Open the Profile feature page from the topbar. Do not retry the click if the
@@ -25,7 +25,7 @@ async function openProfilePage(page: Page) {
   const onPageError = (error: Error) => { pageErrors.push(error.message); };
   page.on('pageerror', onPageError);
   try {
-    await page.locator('#app .top button[data-pg="profile"]').click();
+    await page.locator('#app .view .top button[data-pg="profile"]:visible, #mwbar .tm-av[data-pg="profile"]:visible').click();
     const profilePage = page.locator('#pg .pgs[data-id="profile"]');
     try {
       await expect(profilePage).toBeVisible({ timeout: 8_000 });
@@ -139,12 +139,12 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
     await waitForAppReady(cleanBuyerPage);
     // Continue the assertions using the fresh authenticated page.
     buyer = cleanBuyerPage;
-    await buyer.locator('#app .top button[data-pg="search"]').click();
+    await buyer.locator('#app .top .srch').click();
     await expect(buyer.locator('#pg')).toContainText('Your recent searches will show up here.');
     await expect(buyer.locator('#pg')).not.toContainText('Web design');
     await buyer.goto('/app');
     await waitForAppReady(buyer);
-    await buyer.locator('#app .top button[data-pg="scan"]').click();
+    await buyer.locator('#app .view .top [data-pg="scan"]:visible, #mwbar .hb[data-pg="scan"]:visible').click();
     await expect(buyer.locator('#pg')).toContainText('wallet connection and payment handoff are not available yet.');
     // A new page resets the feature-page overlay stack; route navigation alone does not.
     await buyer.close();
@@ -189,7 +189,7 @@ test('two real browser sessions complete one PostgreSQL-backed contract through 
     const sellerSession = await openAuthenticatedApp(browser, fixture.seller);
     sellerContext = sellerSession.context;
     const seller = sellerSession.page;
-    await seller.locator('#app .top button[data-pg="profile"]').click();
+    await seller.locator('#app .view .top button[data-pg="profile"]:visible, #mwbar .tm-av[data-pg="profile"]:visible').click();
     await seller.locator('[data-act="mode"]').click();
     await openContract(seller, fixture.contractTitle);
     await seller.setViewportSize({ width: 390, height: 844 });
@@ -266,7 +266,7 @@ test('buyer creates a B2B contract proposal from the public listing and both par
     const sellerSession = await openAuthenticatedApp(browser, fixture.seller);
     sellerContext = sellerSession.context;
     const seller = sellerSession.page;
-    await seller.locator('#app .top button[data-pg="profile"]').click();
+    await seller.locator('#app .view .top button[data-pg="profile"]:visible, #mwbar .tm-av[data-pg="profile"]:visible').click();
     await seller.locator('[data-act="mode"]').click();
     await openContract(seller, contractTitle);
     await seller.setViewportSize({ width: 390, height: 844 });
@@ -331,7 +331,7 @@ test('two real browser sessions exchange a PostgreSQL-backed B2B listing enquiry
     const sellerSession = await openAuthenticatedApp(browser, fixture.seller);
     sellerContext = sellerSession.context;
     const seller = sellerSession.page;
-    await seller.locator('#app .top button[data-pg="profile"]').click();
+    await seller.locator('#app .view .top button[data-pg="profile"]:visible, #mwbar .tm-av[data-pg="profile"]:visible').click();
     await seller.locator('[data-act="mode"]').click();
     await seller.locator('#sbar [data-f="More"]').click();
     await seller.getByRole('button', { name: 'Conversations', exact: true }).click();
