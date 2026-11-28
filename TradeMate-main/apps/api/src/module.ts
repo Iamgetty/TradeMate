@@ -935,30 +935,40 @@ class AuthController {
     const email = String(body.email || '').trim().toLowerCase();
     const code = String(body.code || '');
     const sessionToken = randomBytes(32).toString('base64url');
-    const verified = await databasePool.query(
-      'SELECT verified_user_id AS id, verified_email AS email, verified_display_name AS display_name, verified_country_code AS country_code FROM trademate_private.complete_email_verification($1, $2, $3, $4, $5, $6)',
-      [
-        email,
-        tokenDigest(code),
-        tokenDigest(sessionToken),
-        new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000),
-        request.ip || null,
-        request.get('user-agent')?.slice(0, 500) || null,
-      ],
-    );
-    if (!verified.rowCount) {
-      throw new UnauthorizedException('This verification code is invalid or expired. Request a new one.');
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const verified = await client.query(
+        'SELECT verified_user_id AS id, verified_email AS email, verified_display_name AS display_name, verified_country_code AS country_code FROM trademate_private.complete_email_verification($1, $2, $3, $4, $5, $6)',
+        [
+          email,
+          tokenDigest(code),
+          tokenDigest(sessionToken),
+          new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000),
+          request.ip || null,
+          request.get('user-agent')?.slice(0, 500) || null,
+        ],
+      );
+      if (!verified.rowCount) {
+        throw new UnauthorizedException('This verification code is invalid or expired. Request a new one.');
+      }
+      const verifiedUser = verified.rows[0] as Record<string, unknown>;
+      const verifiedAt = new Date();
+      const verificationPdf = buildEmailVerificationRecordPdf(verifiedUser, verifiedAt);
+      const verificationHash = createHash('sha256').update(verificationPdf).digest('hex');
+      await client.query(
+        'INSERT INTO user_documents (owner_user_id, source_type, source_id, document_type, document_status, visibility, file_name, mime_type, file_size, file_sha256, file_data, metadata) VALUES ($1, \'email_verification\', NULL, \'other\', \'generated\', \'private\', $2, \'application/pdf\', $3, $4, $5, $6::jsonb)',
+        [String(verifiedUser.id), 'TradeMate-Email-Verification-' + verifiedAt.toISOString().slice(0, 10) + '.pdf', verificationPdf.length, verificationHash, verificationPdf, JSON.stringify({ record_type: 'email_verification_event', verified_email: String(verifiedUser.email || ''), verified_at: verifiedAt.toISOString(), verification_scope: 'email_address_only' })],
+      );
+      await client.query('COMMIT');
+      response.cookie(SESSION_COOKIE, sessionToken, cookieOptions());
+      return { user: verifiedUser };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
     }
-    const verifiedUser = verified.rows[0] as Record<string, unknown>;
-    const verifiedAt = new Date();
-    const verificationPdf = buildEmailVerificationRecordPdf(verifiedUser, verifiedAt);
-    const verificationHash = createHash('sha256').update(verificationPdf).digest('hex');
-    await databasePool.query(
-      'INSERT INTO user_documents (owner_user_id, source_type, source_id, document_type, document_status, visibility, file_name, mime_type, file_size, file_sha256, file_data, metadata) VALUES ($1, \'email_verification\', NULL, \'other\', \'generated\', \'private\', $2, \'application/pdf\', $3, $4, $5, $6::jsonb)',
-      [String(verifiedUser.id), 'TradeMate-Email-Verification-' + verifiedAt.toISOString().slice(0, 10) + '.pdf', verificationPdf.length, verificationHash, verificationPdf, JSON.stringify({ record_type: 'email_verification_event', verified_email: String(verifiedUser.email || ''), verified_at: verifiedAt.toISOString(), verification_scope: 'email_address_only' })],
-    );
-    response.cookie(SESSION_COOKIE, sessionToken, cookieOptions());
-    return { user: verifiedUser };
   }
 
   @Post('login')
