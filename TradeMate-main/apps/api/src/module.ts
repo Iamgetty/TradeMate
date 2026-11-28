@@ -159,6 +159,81 @@ const buildAgreementAcceptancePdf = (agreementKey: string, agreementVersion: str
   return Buffer.from(pdf, 'ascii');
 };
 
+const buildContractRecordPdf = (contract: Record<string, any>, recordStatus: string, recordedAt = new Date()): Buffer => {
+  const amount = (Number(contract.amount_minor_units || 0) / 100).toFixed(2);
+  const rawLines = [
+    'TRADEMATE CONTRACT RECORD',
+    '',
+    'Record status: ' + recordStatus.toUpperCase(),
+    'Record generated (UTC): ' + recordedAt.toISOString(),
+    'Contract reference: ' + String(contract.id || ''),
+    'Listing reference: ' + String(contract.listing_id || ''),
+    'Title: ' + String(contract.title || ''),
+    'Buyer account: ' + String(contract.buyer_user_id || ''),
+    'Seller organization: ' + String(contract.seller_organization_id || ''),
+    'Proposed amount: ' + amount + ' ' + String(contract.currency_code || ''),
+    'Requested start date: ' + String(contract.requested_start_date || 'Not specified'),
+    'Requested completion date: ' + String(contract.requested_completion_date || 'Not specified'),
+    '',
+    'SCOPE',
+    String(contract.scope || ''),
+    '',
+    'TERMS',
+    String(contract.terms || ''),
+    '',
+    'IMPORTANT STATUS NOTICE',
+    'This generated record reflects the contract proposal status shown above.',
+    'It is not a signed agreement, digital signature, or proof of acceptance.',
+    'Any legally binding execution requirements must be completed separately.',
+  ];
+  const lines: string[] = [];
+  for (const raw of rawLines) {
+    const normalized = raw.replace(/[’‘]/g, "'").replace(/[“”]/g, '"')
+      .replace(/[—–]/g, '-').replace(/…/g, '...')
+      .replace(/[^\\x20-\\x7E]/g, '');
+    if (!normalized) { lines.push(''); continue; }
+    let remaining = normalized;
+    while (remaining.length > 88) {
+      let splitAt = remaining.lastIndexOf(' ', 88);
+      if (splitAt < 35) splitAt = 88;
+      lines.push(remaining.slice(0, splitAt));
+      remaining = remaining.slice(splitAt).trimStart();
+    }
+    lines.push(remaining);
+  }
+  const pages: string[][] = [];
+  for (let i = 0; i < lines.length; i += 52) pages.push(lines.slice(i, i + 52));
+  const objects: string[] = [];
+  objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+  objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
+  const pageRefs: string[] = [];
+  pages.forEach((page, index) => {
+    const pageId = 4 + index * 2, contentId = pageId + 1;
+    pageRefs.push(pageId + ' 0 R');
+    const commands = ['BT', '/F1 9 Tf', '48 748 Td', '13 TL'];
+    page.forEach((line, lineIndex) => {
+      if (lineIndex) commands.push('T*');
+      commands.push('(' + line.replace(/\\\\/g, '\\\\\\').replace(/\\(/g, '\\\\(').replace(/\\)/g, '\\\\)') + ') Tj');
+    });
+    commands.push('ET');
+    const stream = commands.join('\\n');
+    objects[pageId] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ' + contentId + ' 0 R >>';
+    objects[contentId] = '<< /Length ' + Buffer.byteLength(stream, 'ascii') + ' >>\\nstream\\n' + stream + '\\nendstream';
+  });
+  objects[2] = '<< /Type /Pages /Kids [' + pageRefs.join(' ') + '] /Count ' + pageRefs.length + ' >>';
+  let pdf = '%PDF-1.4\\n';
+  const offsets = [0];
+  for (let id = 1; id < objects.length; id++) {
+    offsets[id] = Buffer.byteLength(pdf, 'ascii');
+    pdf += id + ' 0 obj\\n' + objects[id] + '\\nendobj\\n';
+  }
+  const xrefOffset = Buffer.byteLength(pdf, 'ascii');
+  pdf += 'xref\\n0 ' + objects.length + '\\n0000000000 65535 f \\n';
+  for (let id = 1; id < objects.length; id++) pdf += String(offsets[id]).padStart(10, '0') + ' 00000 n \\n';
+  pdf += 'trailer\\n<< /Size ' + objects.length + ' /Root 1 0 R >>\\nstartxref\\n' + xrefOffset + '\\n%%EOF';
+  return Buffer.from(pdf, 'ascii');
+};
+
 const passwordHash = async (password: string) => {
   const salt = randomBytes(16);
   const derived = await deriveScrypt(password, salt, 64, { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
@@ -2680,6 +2755,18 @@ class MarketplaceContractsController {
                    requested_start_date, requested_completion_date, status, created_at`,
         [listingId, buyerId, offer.seller_organization_id, offer.title, scope, terms,
          String(amountMinorUnits), offer.currency_code, startDate, completionDate],
+      );
+      const contractPdf = buildContractRecordPdf(created.rows[0], 'proposal');
+      await client.query(
+        `INSERT INTO user_documents
+          (owner_user_id, source_type, source_id, document_type, document_status,
+           visibility, file_name, mime_type, file_size, file_sha256, file_data, metadata)
+         VALUES ($1,'contract',$2,'contract','generated','contract_participants',
+                 $3,'application/pdf',$4,$5,$6,$7::jsonb)`,
+        [buyerId, created.rows[0].id,
+         'TradeMate-Contract-Proposal-' + created.rows[0].id + '.pdf',
+         contractPdf.length, createHash('sha256').update(contractPdf).digest('hex'),
+         contractPdf, JSON.stringify({ record_type: 'contract_proposal', contract_status: 'proposed', generated_at: new Date().toISOString(), signature_status: 'not_signed' })],
       );
       await client.query(
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_proposed','contract',$3,$4::jsonb)",
