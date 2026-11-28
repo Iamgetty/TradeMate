@@ -1634,6 +1634,9 @@ class UserDocumentsController {
       );
       if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
     }
+    if (['contract','contract_negotiation'].includes(sourceType) && (organizationId || visibility === 'organization')) {
+      throw new BadRequestException('Contract documents must be private or shared only with the contract participants.');
+    }
     if (['contract','contract_negotiation'].includes(sourceType) || visibility === 'contract_participants') {
       if (!sourceId || !['contract','contract_negotiation'].includes(sourceType)) {
         throw new BadRequestException('Contract-visible documents must reference a contract.');
