@@ -33,7 +33,7 @@
       cats: [{ key: 'Finance & Investment', label: 'Finance', div: 'finance_investment' }, { key: 'Institution & Infrastructure', label: 'Institution', div: 'institution_infrastructure' }] },
     { tag: 'ACTIVITY \u00b7 REAL ESTATE & TECHNOLOGY', lead: '', em: '',
       sub: '',
-      cats: [{ key: 'Real Estate', label: 'Real Estate', div: 'real_estate' }, { key: 'Software', label: 'Technology', div: 'software' }] }
+      cats: [{ key: 'Sports', label: 'Sports Transfer', div: 'sports' }, { key: 'Entertainment', label: 'Art', div: 'entertainment' }] }
   ];
   var TTL = 60000;
   var counts = null;        // { division: number } once the listings feed has loaded
