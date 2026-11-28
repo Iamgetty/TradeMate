@@ -1,12 +1,14 @@
 {
   "name": "@metadusk/verification-service",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Standalone provider-neutral verification infrastructure service",
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "start": "node dist/server.js",
+    "test": "npm run build && node --test"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
