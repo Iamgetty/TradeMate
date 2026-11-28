@@ -1506,6 +1506,185 @@ class OrganizationsController {
   }
 }
 
+
+@Controller('documents')
+class UserDocumentsController {
+  private async currentUser(request: Request): Promise<string> {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to access your documents.');
+    const session = await resolvePresentedSessionUser(token);
+    if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    return session.rows[0].id as string;
+  }
+
+  private async accessibleDocument(id: string, userId: string, includeBytes = false) {
+    parseUuidParam(id);
+    const result = await databasePool!.query(
+      `SELECT d.id, d.owner_user_id, d.organization_id, d.source_type, d.source_id,
+              d.document_type, d.document_status, d.visibility, d.file_name,
+              d.mime_type, d.file_size, d.file_sha256, d.metadata, d.created_at,
+              ${includeBytes ? 'd.file_data' : 'NULL::bytea AS file_data'}
+       FROM user_documents d
+       WHERE d.id = $1 AND (
+         d.owner_user_id = $2
+         OR EXISTS (SELECT 1 FROM user_document_access a WHERE a.document_id = d.id AND a.user_id = $2)
+         OR (d.visibility = 'organization' AND EXISTS (
+           SELECT 1 FROM organization_members om
+           WHERE om.organization_id = d.organization_id AND om.user_id = $2
+         ))
+         OR (d.visibility = 'contract_participants' AND d.source_id IS NOT NULL AND EXISTS (
+           SELECT 1 FROM marketplace_contracts c
+           WHERE c.id = d.source_id AND (
+             c.buyer_user_id = $2 OR EXISTS (
+               SELECT 1 FROM organization_members om
+               WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2
+             )
+           )
+         ))
+       )
+       LIMIT 1`,
+      [id, userId],
+    );
+    if (!result.rowCount) throw new NotFoundException('Document not found.');
+    return result.rows[0];
+  }
+
+  @Get()
+  async list(@Req() request: Request) {
+    const userId = await this.currentUser(request);
+    const result = await databasePool!.query(
+      `SELECT d.id, d.owner_user_id, d.organization_id, d.source_type, d.source_id,
+              d.document_type, d.document_status, d.visibility, d.file_name,
+              d.mime_type, d.file_size, d.file_sha256, d.metadata, d.created_at
+       FROM user_documents d
+       WHERE d.owner_user_id = $1
+          OR EXISTS (SELECT 1 FROM user_document_access a WHERE a.document_id = d.id AND a.user_id = $1)
+          OR (d.visibility = 'organization' AND EXISTS (
+            SELECT 1 FROM organization_members om
+            WHERE om.organization_id = d.organization_id AND om.user_id = $1
+          ))
+          OR (d.visibility = 'contract_participants' AND d.source_id IS NOT NULL AND EXISTS (
+            SELECT 1 FROM marketplace_contracts c
+            WHERE c.id = d.source_id AND (
+              c.buyer_user_id = $1 OR EXISTS (
+                SELECT 1 FROM organization_members om
+                WHERE om.organization_id = c.seller_organization_id AND om.user_id = $1
+              )
+            )
+          ))
+       ORDER BY d.created_at DESC LIMIT 200`,
+      [userId],
+    );
+    return { documents: result.rows };
+  }
+
+  @Post()
+  async upload(@Req() request: Request, @Body() body: {
+    fileName?: string; mimeType?: string; dataBase64?: string;
+    sourceType?: string; sourceId?: string; documentType?: string;
+    documentStatus?: string; visibility?: string; organizationId?: string;
+    metadata?: Record<string, unknown>;
+  }) {
+    const userId = await this.currentUser(request);
+    const fileName = typeof body?.fileName === 'string' ? body.fileName.trim() : '';
+    const mimeType = String(body?.mimeType || '').toLowerCase();
+    const suppliedData = String(body?.dataBase64 || '');
+    const dataUrl = /^data:([^;,]+);base64,(.*)$/i.exec(suppliedData);
+    const encoded = dataUrl ? dataUrl[2] : suppliedData;
+    const sourceType = String(body?.sourceType || 'user_upload');
+    const documentType = String(body?.documentType || 'other');
+    const documentStatus = String(body?.documentStatus || 'received');
+    const visibility = String(body?.visibility || 'private');
+    const sourceTypes = ['account','email_verification','identity_verification','persona_agreement','organization_registration','organization_verification','contract','contract_negotiation','marketplace_transaction','user_upload'];
+    const documentTypes = ['agreement','identity','address','organization','contract','statement','receipt','invoice','negotiation','other'];
+    if (!fileName || fileName.length > 180
+      || !['application/pdf','image/jpeg','image/png'].includes(mimeType)
+      || (suppliedData.startsWith('data:') && !dataUrl)
+      || (dataUrl && dataUrl[1].toLowerCase() !== mimeType)
+      || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)
+      || !sourceTypes.includes(sourceType) || !documentTypes.includes(documentType)
+      || !['draft','generated','received','signed','archived'].includes(documentStatus)
+      || !['private','organization','contract_participants'].includes(visibility)) {
+      throw new BadRequestException('Check the document name, type, status and file format.');
+    }
+    const data = Buffer.from(encoded, 'base64');
+    if (!data.length || data.length > 10 * 1024 * 1024 || data.toString('base64') !== encoded
+      || !hasMatchingUploadSignature(mimeType, data)) {
+      throw new BadRequestException('Use a valid PDF, JPG or PNG file no larger than 10 MB.');
+    }
+    const sourceId = body?.sourceId ? String(body.sourceId) : null;
+    const organizationId = body?.organizationId ? String(body.organizationId) : null;
+    if (sourceId) parseUuidParam(sourceId);
+    if (organizationId) parseUuidParam(organizationId);
+    if (visibility === 'organization') {
+      if (!organizationId) throw new BadRequestException('An organization is required for organization-visible documents.');
+      const member = await databasePool!.query(
+        'SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1',
+        [organizationId, userId],
+      );
+      if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
+    }
+    if (visibility === 'contract_participants') {
+      if (!sourceId || !['contract','contract_negotiation'].includes(sourceType)) {
+        throw new BadRequestException('Contract-visible documents must reference a contract.');
+      }
+      const participant = await databasePool!.query(
+        `SELECT 1 FROM marketplace_contracts c
+         WHERE c.id = $1 AND (c.buyer_user_id = $2 OR EXISTS (
+           SELECT 1 FROM organization_members om
+           WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2
+         )) LIMIT 1`,
+        [sourceId, userId],
+      );
+      if (!participant.rowCount) throw new ForbiddenException('Only contract participants can add shared documents.');
+    }
+    const metadata = body?.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata)
+      ? JSON.stringify(body.metadata) : '{}';
+    const result = await databasePool!.query(
+      `INSERT INTO user_documents
+        (owner_user_id, organization_id, source_type, source_id, document_type,
+         document_status, visibility, file_name, mime_type, file_size, file_sha256, file_data, metadata)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb)
+       RETURNING id, owner_user_id, organization_id, source_type, source_id,
+                 document_type, document_status, visibility, file_name,
+                 mime_type, file_size, file_sha256, metadata, created_at`,
+      [userId, organizationId, sourceType, sourceId, documentType, documentStatus,
+       visibility, fileName, mimeType, data.length, createHash('sha256').update(data).digest('hex'), data, metadata],
+    );
+    await databasePool!.query(
+      `INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata)
+       VALUES ($1,$2,'document.uploaded','user_document',$3,$4::jsonb)`,
+      [userId, organizationId, result.rows[0].id, JSON.stringify({ source_type: sourceType, document_type: documentType, visibility, file_size: data.length })],
+    );
+    return { document: result.rows[0] };
+  }
+
+  @Get(':id')
+  async get(@Req() request: Request, @Param('id') id: string) {
+    const userId = await this.currentUser(request);
+    return { document: await this.accessibleDocument(id, userId) };
+  }
+
+  @Get(':id/download')
+  async download(@Req() request: Request, @Param('id') id: string, @Res() response: Response) {
+    const userId = await this.currentUser(request);
+    const document = await this.accessibleDocument(id, userId, true);
+    const safeName = String(document.file_name).replace(/[\\r\\n"]/g, '_');
+    await databasePool!.query(
+      `INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata)
+       VALUES ($1,$2,'document.downloaded','user_document',$3,'{}'::jsonb)`,
+      [userId, document.organization_id, document.id],
+    );
+    response.setHeader('Content-Type', document.mime_type);
+    response.setHeader('Content-Length', String(document.file_size));
+    response.setHeader('Content-Disposition', `attachment; filename="document"; filename*=UTF-8''${encodeURIComponent(safeName)}`);
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Cache-Control', 'private, no-store');
+    return response.status(200).send(document.file_data);
+  }
+}
+
 @Controller('market/listings')
 class PublicListingsController {
   @Post()
@@ -4416,7 +4595,7 @@ class SportsTransferOpportunitiesController {
   }
 }
 
-@Module({ controllers: [SportsTransferOpportunitiesController, SportsTransferMandatesController, SportsTransferOrganizationsController, SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController, PersonaWebhookController, PersonaInquiryController] })
+@Module({ controllers: [SportsTransferOpportunitiesController, SportsTransferMandatesController, SportsTransferOrganizationsController, SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, UserDocumentsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController, PersonaWebhookController, PersonaInquiryController] })
 export class AppModule implements OnModuleDestroy {
   async onModuleDestroy() {
     if (databasePool) await databasePool.end();
