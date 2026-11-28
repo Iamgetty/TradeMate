@@ -2,7 +2,7 @@
 
 **Status:** Initial research baseline — 28 November 2026  
 **Scope:** Nigeria, Kenya, South Africa, Ghana, Egypt, Uganda, Rwanda and Senegal  
-**Decision:** These seven countries are the first commercial-priority markets. This is a market-planning decision, not a claim of live provider access or regulatory approval.
+**Decision:** These eight countries are the first commercial-priority markets. This is a market-planning decision, not a claim of live provider access or regulatory approval.
 
 ## 1. Purpose
 
@@ -20,12 +20,13 @@ Digital-payment adoption is a useful demand signal, but it is not a direct measu
 | South Africa | 81.1% | 67.2% | 31.6% | Mature formal-finance and digital-payment market; not primarily mobile-money-led |
 | Nigeria | 63.3% | 54.5% | 32.8% | Large addressable market with substantial digital-finance growth and identity-fraud needs |
 | Egypt | 43.1% | 36.3% | 15.6% | Lower current penetration; large catch-up opportunity, but more regulatory and execution work |
-| Rwanda | Not directly comparable | Not directly comparable | 77% of adults had a registered mobile wallet in 2024; 86% owned or had used mobile money | Strong recent mobile-money expansion, measured by Rwanda FinScope 2024 |\n| Senegal | Not yet added to this comparable baseline | Not yet added | Not yet added | First-wave market; collect a consistent Findex/official national baseline before ranking |
+| Rwanda | Not directly comparable | Not directly comparable | 77% of adults had a registered mobile wallet in 2024; 86% owned or had used mobile money | Strong recent mobile-money expansion, measured by Rwanda FinScope 2024 |\n| Senegal | 76.5% | 73.5% | 66.9% | Strong mobile-money and digital-payment adoption; promising Francophone West African market |
 
 **Sources and definitions**
 
 - Nigeria, Ghana, Kenya, South Africa and Egypt comparator figures are from 2024 Global Findex results reproduced in SysIN's 2026 Nigeria Financial Inclusion report. Figures are percentages of adults aged 15+; digital payments means making or receiving a digital payment in the past year. [SysIN / Global Findex 2025](https://sysinafrica.com/research/reports/nigeria-financial-inclusion-2026).
 - Uganda's 2024 figures are from Global Findex 2025 indicators reproduced by FinObservatory: 72.8% account ownership, 70.6% digital payments and 67.7% mobile-money accounts. [Uganda financial inclusion data](https://finobservatory.org/inclusion/UGA). World Bank country indicator context: [World Bank Digital Finance — Uganda](https://digitalfinance.worldbank.org/country/uganda).
+- Senegal's figures are from the World Bank Global Findex 2025 dataset (2024 observations): 76.5% account ownership, 73.5% made or received digital payments, and 66.9% had a mobile-money account. See the [World Bank Little Data Book on Financial Inclusion 2025](https://thedocs.worldbank.org/en/doc/be6615202d1f08a25855c8ac2d615122-0050012025/related/Little-Data-Book-2025-Web.pdf) and [World Bank Digital Finance — Senegal](https://digitalfinance.worldbank.org/country/senegal). FinObservatory reproduces the same Findex wave and provides subgroup detail: [Senegal financial inclusion data](https://finobservatory.org/inclusion/SEN).
 - Rwanda's figures are from the official 2024 FinScope survey: 96% overall financial inclusion, 92% formal financial inclusion, 86% of adults owning or having used mobile money, and 77% with a registered mobile wallet in their name (up from 60% in 2020). [National Institute of Statistics of Rwanda — FinScope 2024](https://www.gis.statistics.gov.rw/statistical-publications/business-establishment-finance-trade/finscope-survey-2024) and [Ministry of Finance and Economic Planning summary](https://www.minecofin.gov.rw/news-detail/96-of-rwandans-are-financially-included-finscope-survey-2024).
 
 ## 3. Country-by-country readiness baseline
@@ -114,7 +115,7 @@ The opportunity descriptions are hypotheses to validate with customer discovery.
 
 **Privacy / regulatory starting point:** Review Senegal's Law No. 2008-12 on the protection of personal data and the Commission de Protection des Données Personnelles (CDP), including current implementing requirements, formalities for processing, sensitive/biometric data, controller/processor responsibilities and international transfers. Also assess applicable BCEAO/WAEMU and sector rules for the intended customer and product.
 
-**First research actions:** Obtain written guidance from the CDP on VeriFire's likely controller/processor and cross-border roles; identify the competent national identity authority and private-sector verification onboarding process; map RCCM/business-register verification access; shortlist French-speaking fintech, payment and marketplace design partners; collect comparable 2024 Global Findex indicators and current mobile-money/payment market data.
+**First research actions:** Obtain written guidance from the CDP on VeriFire's likely controller/processor and cross-border roles; identify the competent national identity authority and private-sector verification onboarding process; map RCCM/business-register verification access; shortlist French-speaking fintech, payment and marketplace design partners; use the now-added 2024 Global Findex baseline as the starting point, then validate it with current BCEAO/WAEMU and national market data.
 
 **Current status:** Planned — no approved provider route; legal, institutional-access and French-language operating requirements remain to be validated.
 
@@ -203,6 +204,7 @@ Only then can a restricted pilot be considered. Live requires a separate product
 2. **Kenya and Uganda:** verify government identity-source access and ODPC/NITA-U obligations; prioritize mobile-money and fintech customer interviews.
 3. **Rwanda:** pursue NIDA access and Data Protection Office guidance; its 2024 mobile-money growth makes it a first-wave market, not a later expansion.
 4. **South Africa:** assess Home Affairs and CIPC access, POPIA requirements and enterprise/bank customer demand.
-5. **Egypt:** commission legal and data-transfer diligence early; maintain commercial priority while treating legal/access feasibility as a gating workstream.
+5. **Senegal:** validate CDP requirements, national identity and RCCM access, and French-language buyer demand; map BCEAO/WAEMU requirements for target customers.
+6. **Egypt:** commission legal and data-transfer diligence early; maintain commercial priority while treating legal/access feasibility as a gating workstream.
 
 This document is a research baseline and execution plan, not legal advice, provider endorsement, approval to process personal data, or a declaration of live VeriFire coverage.
