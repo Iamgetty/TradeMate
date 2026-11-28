@@ -25,12 +25,12 @@ const SESSION_DAYS = 7;
 const PLATFORM_AGREEMENT_KEY = 'trademate-platform-user-agreement';
 const PLATFORM_AGREEMENT_VERSION = '1.0';
 const PERSONA_AGREEMENT_KEY = 'trademate-persona-verification-consent';
-const PERSONA_AGREEMENT_VERSION = '1.0';
-const PERSONA_AGREEMENT_CONTENT = `TRADEMATE IDENTITY VERIFICATION CONSENT
+const PERSONA_AGREEMENT_VERSION = '1.1';
+const PERSONA_AGREEMENT_CONTENT = `TRADEMATE IDENTITY VERIFICATION AGREEMENT
 
-Version 1.0 — Effective 28 November 2026
+Version 1.1 — Effective 28 November 2026
 
-When you choose “I agree and continue”, you ask TradeMate to start identity verification using Persona, our identity-verification service provider.
+By typing your full legal name and selecting “Sign agreement & continue”, you sign this TradeMate Verification Agreement and ask TradeMate to start identity verification using Persona, our identity-verification service provider.
 
 WHAT YOU ARE AGREEING TO
 1. TradeMate will create or resume an identity-verification inquiry with Persona and provide the account reference and other information required to initiate that inquiry.
@@ -40,10 +40,10 @@ WHAT YOU ARE AGREEING TO
 5. Verification helps establish identity for platform trust and safety. It is not a guarantee of honesty, authority, financial standing, eligibility or future conduct.
 6. Do not submit another person's identity information unless you are legally authorized to do so.
 
-YOUR CHOICE AND RECORD
-You may decline. If you decline, TradeMate will not start a new Persona inquiry from this request. You can return to this step later. If you accept, TradeMate records the consent version, integrity hash, time, account and relevant technical audit information, and saves a copy of this consent and its acceptance record in your private document vault.
+YOUR CHOICE, SIGNATURE AND RECORD
+You may decline. If you decline, TradeMate will not start a new Persona inquiry from this request. You can return to this step later. To proceed, type your full legal name and select “Sign agreement & continue”. TradeMate records the typed name, agreement version, integrity hash, time, account and relevant technical audit information, and saves a PDF copy of this signed agreement and its signature evidence in your private Portfolio Documents vault.
 
-This consent describes the intended TradeMate integration flow. The precise checks, data categories, processing locations and retention periods depend on Persona's current service terms and the configuration of the verification inquiry. Review Persona's privacy information before proceeding. This text requires legal and privacy review for the jurisdictions in which TradeMate operates and does not replace a privacy notice or independent electronic-signature process.`;
+This agreement describes the intended TradeMate integration flow. The precise checks, data categories, processing locations and retention periods depend on Persona's current service terms and the configuration of the verification inquiry. Review Persona's privacy information before proceeding. The typed-name signature is recorded as electronic-signature evidence with an audit trail; it is not a cryptographic signature or a certificate issued by an independent electronic-signature provider. This text requires legal and privacy review for the jurisdictions in which TradeMate operates and does not replace a privacy notice.`;
 const PLATFORM_AGREEMENT_CONTENT = `TradeMate Platform User Agreement
 
 Version 1.0 — Effective 28 November 2026
@@ -87,7 +87,7 @@ If you do not agree, do not continue using the platform. Sign out and contact Tr
 
 This platform-use agreement is not a substitute for a jurisdiction-specific privacy notice, regulated financial-services disclosure or transaction-specific contract. TradeMate should obtain legal review for the jurisdictions in which it operates before treating this text as its final binding terms.`;
 
-const buildAgreementAcceptancePdf = (agreementKey: string, agreementVersion: string, agreementTitle: string, agreementContent: string, acceptedAt: Date, acceptanceId: string, userId: string, agreementSha256: string, acceptanceMethod = 'Explicit in-app confirmation'): Buffer => {
+const buildAgreementAcceptancePdf = (agreementKey: string, agreementVersion: string, agreementTitle: string, agreementContent: string, acceptedAt: Date, acceptanceId: string, userId: string, agreementSha256: string, acceptanceMethod = 'Explicit in-app confirmation', signatureName: string | null = null): Buffer => {
   const evidence = [
     'ELECTRONIC ACCEPTANCE RECORD',
     '',
@@ -95,12 +95,13 @@ const buildAgreementAcceptancePdf = (agreementKey: string, agreementVersion: str
     'Account ID: ' + userId,
     'Accepted at (UTC): ' + acceptedAt.toISOString(),
     'Acceptance method: ' + acceptanceMethod,
+    ...(signatureName ? ['Electronic signature (typed full legal name): ' + signatureName] : []),
     'Agreement key: ' + agreementKey,
     'Agreement version: ' + agreementVersion,
     'Agreement SHA-256: ' + agreementSha256,
     '',
     'This record documents the account holder\'s explicit in-app acceptance.',
-    'It is an electronic acceptance record, not a cryptographic signature',
+    'It is electronic-signature evidence, not a cryptographic signature',
     'or a certificate issued by an independent electronic-signature provider.',
     '',
     'Agreement title: ' + agreementTitle, '', '--- AGREEMENT TEXT ---',
@@ -842,16 +843,17 @@ class PersonaInquiryController {
     return { required: accepted.rowCount === 0, agreement: {
       key: PERSONA_AGREEMENT_KEY, version: PERSONA_AGREEMENT_VERSION,
       sha256: createHash('sha256').update(PERSONA_AGREEMENT_CONTENT, 'utf8').digest('hex'),
-      title: 'TradeMate Identity Verification Consent', content: PERSONA_AGREEMENT_CONTENT,
+      title: 'TradeMate Verification Agreement', content: PERSONA_AGREEMENT_CONTENT,
     } };
   }
 
   @Post('agreement/accept')
   @HttpCode(200)
-  async acceptAgreement(@Req() request: Request, @Body() body: { version?: string; accepted?: boolean }) {
+  async acceptAgreement(@Req() request: Request, @Body() body: { version?: string; accepted?: boolean; signatureName?: string }) {
     const userId = await this.currentUser(request);
-    if (body?.accepted !== true || body?.version !== PERSONA_AGREEMENT_VERSION) {
-      throw new BadRequestException('Review the identity verification consent and explicitly accept its current version.');
+    const signatureName = typeof body?.signatureName === 'string' ? body.signatureName.trim() : '';
+    if (body?.accepted !== true || body?.version !== PERSONA_AGREEMENT_VERSION || signatureName.length < 2 || signatureName.length > 120 || /[\\u0000-\\u001f\\u007f]/.test(signatureName)) {
+      throw new BadRequestException('Type your full legal name and sign the current TradeMate Verification Agreement to continue.');
     }
     const client = await databasePool!.connect();
     try {
@@ -859,41 +861,43 @@ class PersonaInquiryController {
       const agreementSha256 = createHash('sha256').update(PERSONA_AGREEMENT_CONTENT, 'utf8').digest('hex');
       const result = await client.query(
         `INSERT INTO persona_verification_agreement_acceptances
-          (user_id, agreement_key, agreement_version, agreement_sha256, acceptance_method, ip_address, user_agent)
-         VALUES ($1, $2, $3, $4, 'explicit_in_app', $5, $6)
+          (user_id, agreement_key, agreement_version, agreement_sha256, acceptance_method, ip_address, user_agent, signature_name)
+         VALUES ($1, $2, $3, $4, 'explicit_in_app', $5, $6, $7)
          ON CONFLICT (user_id, agreement_key, agreement_version) DO NOTHING
-         RETURNING id, accepted_at`,
+         RETURNING id, accepted_at, signature_name`,
         [userId, PERSONA_AGREEMENT_KEY, PERSONA_AGREEMENT_VERSION, agreementSha256,
-          request.ip || null, request.get('user-agent')?.slice(0, 500) || null],
+          request.ip || null, request.get('user-agent')?.slice(0, 500) || null, signatureName],
       );
       if (result.rowCount) {
         const acceptance = result.rows[0];
         const pdf = buildAgreementAcceptancePdf(PERSONA_AGREEMENT_KEY, PERSONA_AGREEMENT_VERSION,
-          'TradeMate Identity Verification Consent', PERSONA_AGREEMENT_CONTENT,
-          new Date(acceptance.accepted_at), acceptance.id, userId, agreementSha256);
+          'TradeMate Verification Agreement', PERSONA_AGREEMENT_CONTENT,
+          new Date(acceptance.accepted_at), acceptance.id, userId, agreementSha256,
+          'Typed full legal name + explicit sign action', acceptance.signature_name);
         const pdfSha256 = createHash('sha256').update(pdf).digest('hex');
         await client.query(
           `INSERT INTO user_documents
             (owner_user_id, source_type, source_id, document_type, document_status, visibility,
              file_name, mime_type, file_size, file_sha256, file_data, metadata)
            VALUES ($1, 'account', $2, 'agreement', 'generated', 'private',
-                   'TradeMate-Identity-Verification-Consent-v1.0.pdf', 'application/pdf',
+                   'TradeMate-Verification-Agreement-v1.1.pdf', 'application/pdf',
                    $3, $4, $5, $6::jsonb)`,
           [userId, acceptance.id, pdf.length, pdfSha256, pdf,
             JSON.stringify({ agreement_key: PERSONA_AGREEMENT_KEY, agreement_version: PERSONA_AGREEMENT_VERSION,
               agreement_sha256: agreementSha256, acceptance_id: acceptance.id,
               accepted_at: new Date(acceptance.accepted_at).toISOString(),
-              acceptance_method: 'explicit_in_app', evidence_type: 'electronic_acceptance_record' })],
+              acceptance_method: 'explicit_in_app', signature_name: acceptance.signature_name,
+              signature_method: 'typed_name_and_explicit_sign_action', evidence_type: 'electronic_signature_evidence' })],
         );
         await client.query(
           `INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata)
-           VALUES ($1, 'account.persona_verification_consent_accepted', 'user', $1, $2::jsonb)`,
+           VALUES ($1, 'account.persona_verification_agreement_signed', 'user', $1, $2::jsonb)`,
           [userId, JSON.stringify({ agreement_key: PERSONA_AGREEMENT_KEY, agreement_version: PERSONA_AGREEMENT_VERSION,
             agreement_sha256: agreementSha256, acceptance_id: acceptance.id, vault_pdf_sha256: pdfSha256 })],
         );
       }
       await client.query('COMMIT');
-      return { accepted: true, version: PERSONA_AGREEMENT_VERSION };
+      return { signed: true, version: PERSONA_AGREEMENT_VERSION };
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;
