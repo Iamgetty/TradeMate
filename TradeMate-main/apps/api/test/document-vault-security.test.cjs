@@ -79,6 +79,17 @@ test('email verification generates a private vault PDF limited to email-address 
   assert.match(moduleSource, /verification_scope: 'email_address_only'/);
 });
 
+test('new account registration generates a private vault record in the same transaction', () => {
+  assert.match(moduleSource, /const buildAccountRegistrationRecordPdf =/);
+  assert.match(moduleSource, /TRADEMATE ACCOUNT REGISTRATION RECORD/);
+  assert.match(moduleSource, /Email ownership had not yet been confirmed/);
+  assert.match(moduleSource, /const registered = await client\.query\([\s\S]*register_password_account[\s\S]*AS user_id/);
+  assert.match(moduleSource, /buildAccountRegistrationRecordPdf\(\{[\s\S]*status: 'pending email verification'/);
+  assert.match(moduleSource, /'account', \$1, 'other', 'generated', 'private'/);
+  assert.match(moduleSource, /record_type: 'account_registration_event'/);
+  assert.match(moduleSource, /email_verification_completed: false/);
+});
+
 test('organization creation generates an honest registration-event PDF in the organization vault', () => {
   assert.match(moduleSource, /const buildOrganizationRegistrationPdf =/);
   assert.match(moduleSource, /TRADEMATE ORGANIZATION REGISTRATION RECORD/);
