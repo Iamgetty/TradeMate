@@ -427,7 +427,7 @@
     if (!v.querySelector('.tm-sec-cats')) v.insertBefore(head('tm-sec-cats', 'Top Categories'), sc);
     loadDeals();
     var have = v.querySelector('.tm-deals'), hd = v.querySelector('.tm-sec-deals');
-    if (!hd) { hd = head('tm-sec-deals', 'Deals of the Day', 'Top trending on TradeMate'); sc.after(hd); }
+    if (!hd) { hd = head('tm-sec-deals', 'Deals of the Day'); sc.after(hd); }
     if (!have) { have = el('div', 'tm-deals'); hd.after(have); }
     var real = deals && deals.length;
     var key = real ? deals.map(function (d) { return d.name + '|' + d.price; }).join('~') : 'skeleton';
