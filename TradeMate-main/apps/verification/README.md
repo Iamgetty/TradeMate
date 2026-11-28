@@ -2,6 +2,14 @@
 
 Standalone, provider-neutral service boundary. It does not depend on TradeMate sessions, users, organizations or database tables.
 
+## Product boundary: headless API only
+
+VeriFire has no customer-facing UX. It does not host dashboards, login screens, verification forms, consent screens, onboarding flows, widgets or end-user portals.
+
+Every installer/integrator must build, test and prepare its own customer-facing interface before integrating VeriFire. The integrator owns the forms, consent collection, document/biometric capture experience, progress and error states, branding, accessibility and presentation of results.
+
+The integrator's frontend must call its own backend; that backend calls VeriFire server-to-server. Never expose a VeriFire API key or other server secret in browser/mobile code. The integrator must collect the required end-user consent and submit only the data needed for the requested check. VeriFire returns API results and events; the integrator controls how they are presented.
+
 ## Local development
 
 Requires Node.js 24 or later.
