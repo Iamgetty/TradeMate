@@ -310,3 +310,76 @@ Kind regards,
 | Product readiness | Installer-owned consent UI and backend-to-backend integration; no VeriFire-hosted customer UI | Open |
 
 **No outreach has been sent.** These drafts are prepared for review and must be completed with the actual applicant entity, legal status and Nigerian/Ghanaian presence details before sending.
+
+
+## Rwanda — National Identification Agency (NIDA) / Single Digital Identity (SDID)
+
+### Verified public position
+
+NIDA's nationwide identity-detail verification and photography exercise concluded on 4 October 2026. NIDA reported 13,725,589 people photographed and described the objective as consolidating records into a unified digital identity profile. This confirms an active national identity modernization programme, not commercial API availability.
+
+RISA's 2026 procurement for biometric verification endpoint technologies is a concrete SDID ecosystem signal. It is a multi-supplier, multi-user framework for NIDA and other specifically authorized government institutions. The published procurement portal records an extension of the bid-submission deadline to 13 May 2026; that primary procurement window has passed. The documents do not establish an open commercial API or automatic private-sector eligibility.
+
+The consolidated procurement clarifications state that SDID Core is the master demographic/credential repository and identify AMBAS/ABIS, IDAM, Irembo, audit ingestion and Rwanda NPKI as related components. Interoperability is expected through REST/JSON, TLS 1.3 with mutual TLS, OAuth 2.0 and OIDC/SAML as applicable. Detailed API specifications and sandbox credentials are provided to awarded suppliers at Call-off Contract stage. For the framework, personal data, biometrics, logs and analytics must be hosted in Rwanda; cross-border transmission or mirroring requires explicit written NIDA approval and NDPO compliance. A DPA with NIDA is required at Call-off stage, and NDPO registration applies as required.
+
+Official references:
+- [NIDA — digital ID verification exercise completed 4 October 2026](https://www.nida.gov.rw/news-details/abarenga-miliyoni-13-nibo-bamaze-gufotorerwa-e-ndangamuntu-mu-gihe-cyumwaka)
+- [RISA — biometric verification endpoint procurement](https://www.risa.gov.rw/publications/tenders)
+- [RISA — consolidated bidder clarification responses](https://www.risa.gov.rw/fileadmin/user_upload/RISA/Publications/Tenders/Consolidated_Bidder_Clarification_Responses_for_biometric_verification_endpoint_technologies.pdf)
+- NIDA: info@nida.gov.rw; call centre 3500.
+- RISA procurement: rdapprocurement@risa.gov.rw.
+
+### Privacy and data-residency requirements
+
+Law No. 058/2021 applies to entities established in Rwanda and to foreign entities processing personal data of people located in Rwanda. The DPO FAQ says controllers and processors intending to process personal data must register; biometric data is sensitive personal data and a DPO must be designated.
+
+Articles 48–50 govern international transfer and storage. Transfers require an applicable legal ground; supervisory authorization supported by safeguards is one route, with other limited statutory grounds. Article 49 requires a written allocation of roles and responsibilities for authorized access or transfers. Personal data must be stored in Rwanda unless a valid supervisory-authority authorization/certificate permits storage outside Rwanda. Article 52 limits retention to the purpose period unless a listed ground justifies longer retention, followed by secure destruction.
+
+Official references:
+- [DPO — institutional FAQ](https://dpo.gov.rw/faqs)
+- [DPO — Articles 48–52](https://dpo.gov.rw/dpp-law/sharing-transferstorage-and-retention-of-personal-data)
+- [DPO — scope and definitions](https://dpo.gov.rw/dpp-law/general-provisions)
+
+### Questions for NIDA / RISA
+
+1. Is SDID currently accepting non-government institutional participants, or is access limited to NIDA and specifically authorized public institutions?
+2. Is there a separate statutory or contractual route for a regulated private-sector institution to request identity verification against SDID/NPR?
+3. Can a Rwandan institution be the direct applicant and contracting party while VeriFire is its named processor/subprocessor, and what written NIDA approval is required?
+4. Must the technology provider be locally established, NDPO-registered or provide Rwanda-based hosting? What applies to a foreign processor?
+5. Does the multi-user framework permit private-sector customers to use awarded suppliers, or only the authorized government institutions named by NIDA/RISA?
+6. Has the primary procurement framework been awarded, and are later call-offs or a new onboarding window expected?
+7. What are the current SDID Core/AMBAS API onboarding, mTLS/OAuth/OIDC, audit and sandbox procedures?
+8. Which methods are permitted (1:1 identity-bound verification, face/fingerprint/iris, signed QR), and is 1:N limited to defined deduplication/government use cases?
+9. Which minimum attributes/outcomes may be returned, and can raw biometric templates and full demographic records remain undisclosed?
+10. What lawful basis and consent evidence are required per query, and can an institution collect that evidence in its own interface?
+11. Must query payloads, results, biometrics, logs, backups, telemetry and support access remain in Rwanda? What approvals are required for remote support or cross-border access?
+12. What DPA, retention/deletion, audit, incident, pricing, rate-limit, SLA and continuity terms apply?
+
+### Draft enquiry (not sent)
+
+**To:** info@nida.gov.rw; rdapprocurement@risa.gov.rw  
+**Subject:** Institutional enquiry — SDID identity-verification access and authorized technology-provider model
+
+Dear NIDA / RISA Team,
+
+We are conducting an initial institutional-access assessment for Metadusk VeriFire, a headless, server-to-server verification platform. We have reviewed NIDA's public digital identity programme information and RISA's 2026 procurement and consolidated clarifications for biometric verification endpoint technologies supporting the Single Digital Identity ecosystem.
+
+Before considering any application or technical work, please clarify:
+- whether SDID/National Population Register verification is available to private-sector institutions and the applicable eligibility/contracting route;
+- whether a Rwandan institution may be the direct applicant and contracting party while VeriFire operates as its expressly authorized processor/subprocessor;
+- local establishment, NDPO registration and NIDA/NCSA requirements for a foreign technology provider;
+- whether the 2026 framework is restricted to NIDA and authorized government institutions and whether a later onboarding route is planned;
+- current API, authentication, sandbox and certification requirements;
+- supported verification methods, permissible result fields, consent evidence and biometric restrictions;
+- Rwanda hosting, cross-border access, retention/deletion, audit and incident obligations; and
+- fees, rate limits, service levels and onboarding timelines.
+
+We will not request credentials, submit live identity data or initiate production access during this assessment. Please direct us to the responsible institutional-access and data-protection teams and advise which formal application materials are required.
+
+Kind regards,
+[Authorized representative]
+[Legal entity]
+[Applicant institution, if different]
+[Business address]
+[Business email and telephone]
+
