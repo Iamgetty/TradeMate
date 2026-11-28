@@ -216,6 +216,76 @@ const buildPersonaVerificationEventPdf = (event: {
   return Buffer.from(pdf, 'ascii');
 };
 
+const savePersonaVerificationEventEvidence = async (inquiryId: string): Promise<void> => {
+  if (!databasePool) return;
+  const client = await databasePool.connect();
+  try {
+    await client.query('BEGIN');
+    const mapping = await client.query(
+      'SELECT user_id FROM persona_user_inquiries WHERE inquiry_id = $1 FOR UPDATE',
+      [inquiryId],
+    );
+    if (!mapping.rowCount) { await client.query('COMMIT'); return; }
+    const userId = String(mapping.rows[0].user_id);
+    const events = await client.query(
+      `SELECT e.event_id, e.event_name, e.inquiry_id, e.inquiry_status,
+              e.event_created_at, e.received_at, e.payload_sha256
+       FROM persona_webhook_events e
+       LEFT JOIN persona_webhook_event_documents d ON d.event_id = e.event_id
+       WHERE e.inquiry_id = $1 AND d.event_id IS NULL
+       ORDER BY e.event_created_at ASC NULLS LAST, e.received_at ASC
+       LIMIT 50`,
+      [inquiryId],
+    );
+    for (const event of events.rows) {
+      const receivedAt = event.received_at instanceof Date ? event.received_at : new Date(event.received_at);
+      const eventCreatedAt = event.event_created_at
+        ? (event.event_created_at instanceof Date ? event.event_created_at : new Date(event.event_created_at))
+        : null;
+      const pdf = buildPersonaVerificationEventPdf({
+        eventId: String(event.event_id), eventName: String(event.event_name),
+        inquiryId: String(event.inquiry_id), inquiryStatus: event.inquiry_status ? String(event.inquiry_status) : null,
+        eventCreatedAt, receivedAt, userId, payloadSha256: String(event.payload_sha256),
+      });
+      const fileName = 'TradeMate-Persona-Verification-' + String(event.event_id) + '.pdf';
+      const digest = createHash('sha256').update(pdf).digest('hex');
+      const document = await client.query(
+        `INSERT INTO user_documents
+          (owner_user_id, source_type, source_id, document_type, document_status, visibility,
+           file_name, mime_type, file_size, file_sha256, file_data, metadata)
+         VALUES ($1,'identity_verification',$1,'identity','generated','private',$2,
+                 'application/pdf',$3,$4,$5,$6::jsonb)
+         RETURNING id`,
+        [userId, fileName, pdf.length, digest, pdf, JSON.stringify({
+          record_type: 'persona_verification_event', persona_event_id: event.event_id,
+          persona_event_name: event.event_name, persona_inquiry_id: event.inquiry_id,
+          inquiry_status: event.inquiry_status, event_created_at: event.event_created_at,
+          received_at: event.received_at, payload_sha256: event.payload_sha256,
+          raw_identity_images_included: false,
+        })],
+      );
+      await client.query(
+        'INSERT INTO persona_webhook_event_documents (event_id, user_id, document_id) VALUES ($1,$2,$3)',
+        [event.event_id, userId, document.rows[0].id],
+      );
+      await client.query(
+        `INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata)
+         VALUES ($1,'persona.verification_event_recorded','user_document',$2,$3::jsonb)`,
+        [userId, document.rows[0].id, JSON.stringify({
+          persona_event_id: event.event_id, event_name: event.event_name,
+          inquiry_id: event.inquiry_id, status: event.inquiry_status,
+        })],
+      );
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 const buildAccountRegistrationRecordPdf = (user: Record<string, unknown>, registeredAt = new Date()): Buffer => {
   const rawLines = [
     'TRADEMATE ACCOUNT REGISTRATION RECORD', '',
