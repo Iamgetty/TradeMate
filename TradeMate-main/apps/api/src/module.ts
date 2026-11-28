@@ -67,6 +67,77 @@ If you do not agree, do not continue using the platform. Sign out and contact Tr
 
 This platform-use agreement is not a substitute for a jurisdiction-specific privacy notice, regulated financial-services disclosure or transaction-specific contract. TradeMate should obtain legal review for the jurisdictions in which it operates before treating this text as its final binding terms.`;
 
+const buildAgreementAcceptancePdf = (acceptedAt: Date, acceptanceId: string, userId: string, agreementSha256: string): Buffer => {
+  const evidence = [
+    'ELECTRONIC ACCEPTANCE RECORD',
+    '',
+    'Acceptance ID: ' + acceptanceId,
+    'Account ID: ' + userId,
+    'Accepted at (UTC): ' + acceptedAt.toISOString(),
+    'Acceptance method: Explicit in-app confirmation',
+    'Agreement key: ' + PLATFORM_AGREEMENT_KEY,
+    'Agreement version: ' + PLATFORM_AGREEMENT_VERSION,
+    'Agreement SHA-256: ' + agreementSha256,
+    '',
+    'This record documents the account holder\'s explicit in-app acceptance.',
+    'It is an electronic acceptance record, not a cryptographic signature',
+    'or a certificate issued by an independent electronic-signature provider.',
+    '',
+    '--- AGREEMENT TEXT ---',
+    '',
+    ...PLATFORM_AGREEMENT_CONTENT.split(/\\r?\\n/),
+  ];
+  const ascii = (value: string) => value
+    .replace(/[’‘]/g, "'").replace(/[“”]/g, '"')
+    .replace(/[—–]/g, '-').replace(/…/g, '...')
+    .replace(/[^\\x20-\\x7E]/g, '');
+  const lines: string[] = [];
+  for (const raw of evidence) {
+    const line = ascii(raw);
+    if (!line) { lines.push(''); continue; }
+    let remaining = line;
+    while (remaining.length > 92) {
+      let splitAt = remaining.lastIndexOf(' ', 92);
+      if (splitAt < 40) splitAt = 92;
+      lines.push(remaining.slice(0, splitAt));
+      remaining = remaining.slice(splitAt).trimStart();
+    }
+    lines.push(remaining);
+  }
+  const pageLines: string[][] = [];
+  for (let index = 0; index < lines.length; index += 52) pageLines.push(lines.slice(index, index + 52));
+  const objects: string[] = [];
+  objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+  objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
+  const pageRefs: string[] = [];
+  pageLines.forEach((page, index) => {
+    const pageId = 4 + index * 2;
+    const contentId = pageId + 1;
+    pageRefs.push(pageId + ' 0 R');
+    const commands = ['BT', '/F1 9 Tf', '48 748 Td', '13 TL'];
+    page.forEach((line, lineIndex) => {
+      if (lineIndex) commands.push('T*');
+      commands.push('(' + line.replace(/\\\\/g, '\\\\\\\\').replace(/\\(/g, '\\\\(').replace(/\\)/g, '\\\\)') + ') Tj');
+    });
+    commands.push('ET');
+    const stream = commands.join('\\n');
+    objects[pageId] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ' + contentId + ' 0 R >>';
+    objects[contentId] = '<< /Length ' + Buffer.byteLength(stream, 'ascii') + ' >>\\nstream\\n' + stream + '\\nendstream';
+  });
+  objects[2] = '<< /Type /Pages /Kids [' + pageRefs.join(' ') + '] /Count ' + pageRefs.length + ' >>';
+  let pdf = '%PDF-1.4\\n';
+  const offsets = [0];
+  for (let id = 1; id < objects.length; id++) {
+    offsets[id] = Buffer.byteLength(pdf, 'ascii');
+    pdf += id + ' 0 obj\\n' + objects[id] + '\\nendobj\\n';
+  }
+  const xrefOffset = Buffer.byteLength(pdf, 'ascii');
+  pdf += 'xref\\n0 ' + objects.length + '\\n0000000000 65535 f \\n';
+  for (let id = 1; id < objects.length; id++) pdf += String(offsets[id]).padStart(10, '0') + ' 00000 n \\n';
+  pdf += 'trailer\\n<< /Size ' + objects.length + ' /Root 1 0 R >>\\nstartxref\\n' + xrefOffset + '\\n%%EOF';
+  return Buffer.from(pdf, 'ascii');
+};
+
 const passwordHash = async (password: string) => {
   const salt = randomBytes(16);
   const derived = await deriveScrypt(password, salt, 64, { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
@@ -678,15 +749,31 @@ class AuthController {
           (user_id, agreement_key, agreement_version, agreement_sha256, acceptance_method, ip_address, user_agent)
          VALUES ($1, $2, $3, $4, 'explicit_in_app', $5, $6)
          ON CONFLICT (user_id, agreement_key, agreement_version) DO NOTHING
-         RETURNING id`,
+         RETURNING id, accepted_at`,
         [userId, PLATFORM_AGREEMENT_KEY, PLATFORM_AGREEMENT_VERSION, agreementSha256,
          request.ip || null, request.get('user-agent')?.slice(0, 500) || null],
       );
       if (accepted.rowCount) {
+        const acceptance = accepted.rows[0];
+        const pdf = buildAgreementAcceptancePdf(new Date(acceptance.accepted_at), acceptance.id, userId, agreementSha256);
+        const pdfSha256 = createHash('sha256').update(pdf).digest('hex');
+        await client.query(
+          `INSERT INTO user_documents
+            (owner_user_id, source_type, source_id, document_type, document_status, visibility,
+             file_name, mime_type, file_size, file_sha256, file_data, metadata)
+           VALUES ($1, 'account', $2, 'agreement', 'generated', 'private',
+                   'TradeMate-Platform-User-Agreement-v1.0.pdf', 'application/pdf',
+                   $3, $4, $5, $6::jsonb)`,
+          [userId, acceptance.id, pdf.length, pdfSha256, pdf,
+           JSON.stringify({ agreement_key: PLATFORM_AGREEMENT_KEY, agreement_version: PLATFORM_AGREEMENT_VERSION,
+             agreement_sha256: agreementSha256, acceptance_id: acceptance.id, accepted_at: new Date(acceptance.accepted_at).toISOString(),
+             acceptance_method: 'explicit_in_app', evidence_type: 'electronic_acceptance_record' })],
+        );
         await client.query(
           `INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata)
            VALUES ($1, 'account.platform_agreement_accepted', 'user', $1, $2::jsonb)`,
-          [userId, JSON.stringify({ agreement_key: PLATFORM_AGREEMENT_KEY, agreement_version: PLATFORM_AGREEMENT_VERSION, agreement_sha256: agreementSha256 })],
+          [userId, JSON.stringify({ agreement_key: PLATFORM_AGREEMENT_KEY, agreement_version: PLATFORM_AGREEMENT_VERSION,
+            agreement_sha256: agreementSha256, acceptance_id: acceptance.id, vault_pdf_sha256: pdfSha256 })],
         );
       }
       await client.query('COMMIT');
