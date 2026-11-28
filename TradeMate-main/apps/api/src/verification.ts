@@ -57,7 +57,7 @@ const requirePool = () => {
   return pool;
 };
 
-const emitUserEvent = (userId: string, event: Record<string, unknown>) => {
+export const publishVerificationEvent = (userId: string, event: Record<string, unknown>) => {
   const message = JSON.stringify({ type: 'verification.event', data: event });
   for (const client of sockets) {
     if (client.userId !== userId || client.socket.readyState !== WebSocket.OPEN) continue;
@@ -169,7 +169,7 @@ export class VerificationController {
     }
 
     const client = await db.connect();
-    let caseRow: Record<string, unknown>;
+    let caseRow: Record<string, unknown> = {};
     let reused = false;
     try {
       await client.query('BEGIN');
@@ -195,7 +195,11 @@ export class VerificationController {
            FROM public.verification_cases WHERE created_by_user_id = $1 AND idempotency_key = $2`,
           [userId, idempotencyKey],
         );
+        if (!existing.rowCount) throw new HttpException('Idempotency key could not be resolved.', HttpStatus.CONFLICT);
         caseRow = existing.rows[0];
+        const sameRequest = caseRow.case_type === caseType && caseRow.country_code === countryCode &&
+          caseRow.subject_organization_id === organizationId;
+        if (!sameRequest) throw new HttpException('Idempotency key was already used for a different verification request.', HttpStatus.CONFLICT);
         reused = true;
       } else if (!inserted.rowCount) {
         throw new HttpException('Unable to create verification case.', HttpStatus.CONFLICT);
@@ -220,7 +224,7 @@ export class VerificationController {
     } finally {
       client.release();
     }
-    emitUserEvent(userId, { event: 'verification.case_created', case: caseRow });
+    if (!reused) publishVerificationEvent(userId, { event: 'verification.case_created', case: caseRow });
     return { case: caseRow, checks: CASE_CHECKS[caseType], reused };
   }
 }
@@ -264,10 +268,7 @@ export function attachVerificationSocket(server: Server) {
           }));
           client.on('close', () => sockets.delete(record));
           client.on('error', () => sockets.delete(record));
-          client.on('message', (raw) => {
-            // This socket is server-push only. Client messages are ignored.
-            if (raw.length > 1024) client.close(1009, 'Message too large.');
-          });
+          client.on('message', () => client.close(1008, 'Verification socket is server-push only.'));
         });
       } catch {
         socket.write('HTTP/1.1 401 Unauthorized\\r\\nConnection: close\\r\\n\\r\\n');
