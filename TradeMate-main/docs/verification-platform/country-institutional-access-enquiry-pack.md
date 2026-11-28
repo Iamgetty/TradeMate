@@ -572,7 +572,7 @@ Sources:
 - [MCIT — Egyptian FinTech Landscape 2024, PDPL summary](https://mcit.gov.eg/Upcont/Documents/Reports%20and%20Documents_1332025000_Egyptian_FinTech_Landscape_2024_13032025.pdf)
 - [MCIT — PDPC international regulatory engagement, 24 November 2026](https://mcit.gov.eg/en/Media_Center/Latest_News/News/121665)
 - [Baker McKenzie — PDPL update, 7 October 2026](https://www.bakermckenzie.com/en/insight/publications/2026/10/egypt-personal-data-protection-law-update)
-- [Law No. 151 of 2020 and Executive Regulations English translation (secondary source)](https://eg.andersen.com/wp-content/uploads/2026/02/Law-No.-151-of-2020.pdf)
+- [Law No. 151 of 2020 and Executive Regulations English translation (secondary source)](https://shehatalaw.com/wp-content/uploads/2026/01/Shehata-Partners-Publications-Data-Protection-Executive-Regulations-English.pdf)
 - [PDPC portal](https://portal.pdpc.gov.eg/) (portal endpoint did not load during this research; verify availability directly)
 
 ### Questions for CBE — Digital Financial Identity
