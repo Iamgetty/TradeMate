@@ -3261,13 +3261,13 @@ class MarketplaceContractsController {
       );
       if (current.rows[0].is_buyer) {
         await client.query(
-          "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', 'New contract message', 'The buyer sent a new message on a contract.', 'conversation' FROM organization_members om WHERE om.organization_id = $1 AND om.user_id <> $2 AND om.member_role IN ('owner','admin')",
-          [current.rows[0].seller_organization_id, userId],
+          "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', 'New contract message', $3, 'conversation' FROM organization_members om WHERE om.organization_id = $1 AND om.user_id <> $2 AND om.member_role IN ('owner','admin')",
+          [current.rows[0].seller_organization_id, userId, attachmentDocumentIds.length ? 'The buyer sent a contract message with ' + attachmentDocumentIds.length + ' file attachment(s).' : 'The buyer sent a new message on a contract.'],
         );
       } else {
         await client.query(
-          "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'Contracts', 'New contract message', 'The seller sent a new message on a contract.', 'conversation')",
-          [current.rows[0].buyer_user_id],
+          "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'Contracts', 'New contract message', $2, 'conversation')",
+          [current.rows[0].buyer_user_id, attachmentDocumentIds.length ? 'The seller sent a contract message with ' + attachmentDocumentIds.length + ' file attachment(s).' : 'The seller sent a new message on a contract.'],
         );
       }
       await client.query('COMMIT');
