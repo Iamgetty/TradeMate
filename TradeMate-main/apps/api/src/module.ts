@@ -162,8 +162,7 @@ const buildAgreementAcceptancePdf = (agreementKey: string, agreementVersion: str
 const buildContractRecordPdf = (contract: Record<string, any>, recordStatus: string, recordedAt = new Date()): Buffer => {
   const amount = (Number(contract.amount_minor_units || 0) / 100).toFixed(2);
   const rawLines = [
-    'TRADEMATE CONTRACT RECORD',
-    '',
+    'TRADEMATE CONTRACT RECORD', '',
     'Record status: ' + recordStatus.toUpperCase(),
     'Record generated (UTC): ' + recordedAt.toISOString(),
     'Contract reference: ' + String(contract.id || ''),
@@ -174,14 +173,8 @@ const buildContractRecordPdf = (contract: Record<string, any>, recordStatus: str
     'Proposed amount: ' + amount + ' ' + String(contract.currency_code || ''),
     'Requested start date: ' + String(contract.requested_start_date || 'Not specified'),
     'Requested completion date: ' + String(contract.requested_completion_date || 'Not specified'),
-    '',
-    'SCOPE',
-    String(contract.scope || ''),
-    '',
-    'TERMS',
-    String(contract.terms || ''),
-    '',
-    'IMPORTANT STATUS NOTICE',
+    '', 'SCOPE', String(contract.scope || ''), '', 'TERMS', String(contract.terms || ''),
+    '', 'IMPORTANT STATUS NOTICE',
     'This generated record reflects the contract proposal status shown above.',
     'It is not a signed agreement, digital signature, or proof of acceptance.',
     'Any legally binding execution requirements must be completed separately.',
@@ -190,7 +183,7 @@ const buildContractRecordPdf = (contract: Record<string, any>, recordStatus: str
   for (const raw of rawLines) {
     const normalized = raw.replace(/[’‘]/g, "'").replace(/[“”]/g, '"')
       .replace(/[—–]/g, '-').replace(/…/g, '...')
-      .replace(/[^\\x20-\\x7E]/g, '');
+      .replace(/[^\x20-\x7E]/g, '');
     if (!normalized) { lines.push(''); continue; }
     let remaining = normalized;
     while (remaining.length > 88) {
@@ -213,24 +206,24 @@ const buildContractRecordPdf = (contract: Record<string, any>, recordStatus: str
     const commands = ['BT', '/F1 9 Tf', '48 748 Td', '13 TL'];
     page.forEach((line, lineIndex) => {
       if (lineIndex) commands.push('T*');
-      commands.push('(' + line.replace(/\\\\/g, '\\\\\\').replace(/\\(/g, '\\\\(').replace(/\\)/g, '\\\\)') + ') Tj');
+      commands.push('(' + line.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)') + ') Tj');
     });
     commands.push('ET');
-    const stream = commands.join('\\n');
+    const stream = commands.join('\n');
     objects[pageId] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ' + contentId + ' 0 R >>';
-    objects[contentId] = '<< /Length ' + Buffer.byteLength(stream, 'ascii') + ' >>\\nstream\\n' + stream + '\\nendstream';
+    objects[contentId] = '<< /Length ' + Buffer.byteLength(stream, 'ascii') + ' >>\nstream\n' + stream + '\nendstream';
   });
   objects[2] = '<< /Type /Pages /Kids [' + pageRefs.join(' ') + '] /Count ' + pageRefs.length + ' >>';
-  let pdf = '%PDF-1.4\\n';
+  let pdf = '%PDF-1.4\n';
   const offsets = [0];
   for (let id = 1; id < objects.length; id++) {
     offsets[id] = Buffer.byteLength(pdf, 'ascii');
-    pdf += id + ' 0 obj\\n' + objects[id] + '\\nendobj\\n';
+    pdf += id + ' 0 obj\n' + objects[id] + '\nendobj\n';
   }
   const xrefOffset = Buffer.byteLength(pdf, 'ascii');
-  pdf += 'xref\\n0 ' + objects.length + '\\n0000000000 65535 f \\n';
-  for (let id = 1; id < objects.length; id++) pdf += String(offsets[id]).padStart(10, '0') + ' 00000 n \\n';
-  pdf += 'trailer\\n<< /Size ' + objects.length + ' /Root 1 0 R >>\\nstartxref\\n' + xrefOffset + '\\n%%EOF';
+  pdf += 'xref\n0 ' + objects.length + '\n0000000000 65535 f \n';
+  for (let id = 1; id < objects.length; id++) pdf += String(offsets[id]).padStart(10, '0') + ' 00000 n \n';
+  pdf += 'trailer\n<< /Size ' + objects.length + ' /Root 1 0 R >>\nstartxref\n' + xrefOffset + '\n%%EOF';
   return Buffer.from(pdf, 'ascii');
 };
 
