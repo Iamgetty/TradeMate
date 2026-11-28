@@ -852,7 +852,7 @@ class PersonaInquiryController {
   async acceptAgreement(@Req() request: Request, @Body() body: { version?: string; accepted?: boolean; signatureName?: string }) {
     const userId = await this.currentUser(request);
     const signatureName = typeof body?.signatureName === 'string' ? body.signatureName.trim() : '';
-    if (body?.accepted !== true || body?.version !== PERSONA_AGREEMENT_VERSION || signatureName.length < 2 || signatureName.length > 120 || /[\\u0000-\\u001f\\u007f]/.test(signatureName)) {
+    if (body?.accepted !== true || body?.version !== PERSONA_AGREEMENT_VERSION || signatureName.length < 2 || signatureName.length > 120 || /[\x00-\x1F\x7F]/.test(signatureName)) {
       throw new BadRequestException('Type your full legal name and sign the current TradeMate Verification Agreement to continue.');
     }
     const client = await databasePool!.connect();
