@@ -30,6 +30,13 @@ test('public document upload cannot manufacture signed or trusted workflow recor
   assert.match(controller, /\['draft','received'\]/);
   assert.doesNotMatch(controller, /document_status\s*:\s*['"]signed['"]/);
   assert.match(controller, /hasMatchingUploadSignature/);
+  const uploadStart = controller.indexOf('async upload');
+  const uploadEnd = controller.indexOf("@Get(':id')", uploadStart);
+  const uploadHandler = controller.slice(uploadStart, uploadEnd);
+  assert.match(uploadHandler, /client\.query\('BEGIN'\)/);
+  assert.match(uploadHandler, /client\.query\('COMMIT'\)/);
+  assert.match(uploadHandler, /client\.query\('ROLLBACK'\)/);
+  assert.match(uploadHandler, /document\.uploaded/);
 });
 
 test('organization verification vault access requires current owner or admin membership', () => {
