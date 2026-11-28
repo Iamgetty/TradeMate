@@ -19,8 +19,8 @@
 
   // key = the app's category key (what [data-mm] expects); div = API division.
   var SLIDES = [
-    { tag: 'TRENDING \u00b7 SERVICES & B2B', lead: 'Hire and ', em: 'get hired',
-      sub: 'Skilled pros, suppliers and business partners.',
+    { tag: 'FEATURED', lead: '', em: '',
+      sub: '',
       cats: [{ key: 'Services', label: 'Services', div: 'services' }, { key: 'B2B', label: 'B2B', div: 'b2b' }] },
     { tag: 'ACTIVITY \u00b7 REAL ESTATE & TECHNOLOGY', lead: 'Homes, land and ', em: 'software',
       sub: 'Property listings, apps and licences.',
@@ -31,9 +31,9 @@
     { tag: 'PROMOTION \u00b7 FINANCE & INSTITUTION', lead: 'Zero contract ', em: 'fees',
       sub: 'Publish your first offer free this month.',
       cats: [{ key: 'Finance & Investment', label: 'Finance', div: 'finance_investment' }, { key: 'Institution & Infrastructure', label: 'Institution', div: 'institution_infrastructure' }] },
-    { tag: 'ACTIVITY \u00b7 SPORTS TRANSFER & ART', lead: 'Transfers and ', em: 'talent',
-      sub: 'Signings, loans, music, film and art.',
-      cats: [{ key: 'Sports', label: 'Sports Transfer', div: 'sports' }, { key: 'Entertainment', label: 'Art', div: 'entertainment' }] }
+    { tag: 'ACTIVITY \u00b7 REAL ESTATE & TECHNOLOGY', lead: '', em: '',
+      sub: '',
+      cats: [{ key: 'Real Estate', label: 'Real Estate', div: 'real_estate' }, { key: 'Software', label: 'Technology', div: 'software' }] }
   ];
   var TTL = 60000;
   var counts = null;        // { division: number } once the listings feed has loaded
@@ -117,24 +117,10 @@
       slide.setAttribute('data-mm', s.cats[0].key); // tapping the card opens the first category
       slide.setAttribute('aria-label', (i + 1) + ' of ' + SLIDES.length);
       var copy = el('div', 'tbn-copy');
+      // Keep the original boxed .tbn-tag typography and styling; the title is
+      // the only visible writing on each slide.
       copy.appendChild(el('span', 'tbn-tag', s.tag));
-      var h2 = el('h2');
-      h2.appendChild(document.createTextNode(s.lead));
-      h2.appendChild(el('em', null, s.em));
-      copy.appendChild(h2);
-      copy.appendChild(el('p', null, s.sub));
-      var list = el('div', 'tbn-list');
-      s.cats.forEach(function (c) {
-        var chip = el('button', 'tbn-chip');
-        chip.type = 'button';
-        chip.setAttribute('data-mm', c.key);
-        chip.setAttribute('data-div', c.div);
-        chip.appendChild(el('b', null, c.label));
-        chip.appendChild(el('small'));
-        list.appendChild(chip);
-      });
       slide.appendChild(copy);
-      slide.appendChild(list);
       track.appendChild(slide);
     });
     root.appendChild(track);
