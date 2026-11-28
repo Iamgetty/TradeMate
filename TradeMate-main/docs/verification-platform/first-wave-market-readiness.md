@@ -1,7 +1,7 @@
 # VeriFire first-wave commercial market readiness
 
 **Status:** Initial research baseline — 28 November 2026  
-**Scope:** Nigeria, Kenya, South Africa, Ghana, Egypt, Uganda and Rwanda  
+**Scope:** Nigeria, Kenya, South Africa, Ghana, Egypt, Uganda, Rwanda and Senegal  
 **Decision:** These seven countries are the first commercial-priority markets. This is a market-planning decision, not a claim of live provider access or regulatory approval.
 
 ## 1. Purpose
@@ -20,7 +20,7 @@ Digital-payment adoption is a useful demand signal, but it is not a direct measu
 | South Africa | 81.1% | 67.2% | 31.6% | Mature formal-finance and digital-payment market; not primarily mobile-money-led |
 | Nigeria | 63.3% | 54.5% | 32.8% | Large addressable market with substantial digital-finance growth and identity-fraud needs |
 | Egypt | 43.1% | 36.3% | 15.6% | Lower current penetration; large catch-up opportunity, but more regulatory and execution work |
-| Rwanda | Not directly comparable | Not directly comparable | 77% of adults had a registered mobile wallet in 2024; 86% owned or had used mobile money | Strong recent mobile-money expansion, measured by Rwanda FinScope 2024 |
+| Rwanda | Not directly comparable | Not directly comparable | 77% of adults had a registered mobile wallet in 2024; 86% owned or had used mobile money | Strong recent mobile-money expansion, measured by Rwanda FinScope 2024 |\n| Senegal | Not yet added to this comparable baseline | Not yet added | Not yet added | First-wave market; collect a consistent Findex/official national baseline before ranking |
 
 **Sources and definitions**
 
@@ -106,6 +106,18 @@ The opportunity descriptions are hypotheses to validate with customer discovery.
 
 **Current status:** Planned — no approved provider route.
 
+### Senegal — first commercial priority
+
+**Why it matters:** Senegal adds a Francophone West African market to the first commercial wave and creates a route to validate VeriFire's product, language and support model beyond Anglophone markets. Digital financial services, mobile money and regional payment interoperability are promising demand areas, but customer demand and adoption levels must be quantified with current, comparable country data before setting revenue assumptions.
+
+**Identity / verification landscape:** The national identity and civil-registration ecosystem, including the national identity card and civil-status records, may provide potential verification anchors. The responsible authorities' institutional access rules, legal purposes, technical interfaces, fees and eligibility for private-sector access must be confirmed. Do not assume a public API or third-party access.
+
+**Privacy / regulatory starting point:** Review Senegal's Law No. 2008-12 on the protection of personal data and the Commission de Protection des Données Personnelles (CDP), including current implementing requirements, formalities for processing, sensitive/biometric data, controller/processor responsibilities and international transfers. Also assess applicable BCEAO/WAEMU and sector rules for the intended customer and product.
+
+**First research actions:** Obtain written guidance from the CDP on VeriFire's likely controller/processor and cross-border roles; identify the competent national identity authority and private-sector verification onboarding process; map RCCM/business-register verification access; shortlist French-speaking fintech, payment and marketplace design partners; collect comparable 2024 Global Findex indicators and current mobile-money/payment market data.
+
+**Current status:** Planned — no approved provider route; legal, institutional-access and French-language operating requirements remain to be validated.
+
 ### Rwanda — first commercial priority
 
 **Why it matters:** Official FinScope 2024 data reports 96% financial inclusion, 92% formal financial inclusion, 86% of adults owning or having used mobile money, and registered mobile wallets rising from 60% in 2020 to 77% in 2024. This is strong evidence of expanding digital-finance usage and supports prioritizing Rwanda commercially.
@@ -122,7 +134,7 @@ The opportunity descriptions are hypotheses to validate with customer discovery.
 
 | VeriFire product area | Initial commercial hypothesis | Key caution |
 |---|---|---|
-| Person KYC / identity verification | Core demand across all seven markets | Country-specific source access and lawful purpose required |
+| Person KYC / identity verification | Core demand across all eight markets | Country-specific source access and lawful purpose required |
 | KYB / business verification | Fintechs, lenders, marketplaces, payment providers and suppliers | Confirm company-registry access and beneficial-ownership data quality |
 | Phone verification | Account opening, account recovery and fraud controls | SIM ownership data access is restricted; do not infer identity from phone possession |
 | Fraud-risk signals | Synthetic identity, account takeover and onboarding abuse | Signals need provenance, accuracy, explainability and human-review paths |
@@ -175,7 +187,7 @@ Only then can a restricted pilot be considered. Live requires a separate product
 
 | Decision / input | Current position |
 |---|---|
-| First commercial countries | Nigeria, Kenya, South Africa, Ghana, Egypt, Uganda, Rwanda |
+| First commercial countries | Nigeria, Kenya, South Africa, Ghana, Egypt, Uganda, Rwanda, Senegal |
 | Technical African reference registry | Existing 54-country foundation; registry is not a live-coverage promise |
 | Provider selection | Not selected |
 | Government-source access | Not approved or contracted |
