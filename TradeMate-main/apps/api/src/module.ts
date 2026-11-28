@@ -158,6 +158,17 @@ const buildAgreementAcceptancePdf = (agreementKey: string, agreementVersion: str
   pdf += 'trailer\n<< /Size ' + objects.length + ' /Root 1 0 R >>\nstartxref\n' + xrefOffset + '\n%%EOF';
   return Buffer.from(pdf, 'ascii');
 };
+const saveContractVaultRecord = async (client: any, contract: Record<string, any>, recordStatus: string, ownerUserId: string) => {
+  const pdf = buildContractRecordPdf(contract, recordStatus);
+  const safeStatus = recordStatus.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
+  const fileName = 'TradeMate-Contract-' + safeStatus + '-' + String(contract.id) + '.pdf';
+  const hash = createHash('sha256').update(pdf).digest('hex');
+  await client.query(
+    'INSERT INTO user_documents (owner_user_id, source_type, source_id, document_type, document_status, visibility, file_name, mime_type, file_size, file_sha256, file_data, metadata) VALUES ($1,\'contract\',$2,\'contract\',\'generated\',\'contract_participants\',$3,\'application/pdf\',$4,$5,$6,$7::jsonb)',
+    [ownerUserId, contract.id, fileName, pdf.length, hash, pdf, JSON.stringify({ record_type: 'contract_status_record', contract_status: String(contract.status || recordStatus), generated_at: new Date().toISOString(), signature_status: 'not_signed' })],
+  );
+};
+
 
 const buildContractRecordPdf = (contract: Record<string, string | number | null | undefined>, recordStatus: string, recordedAt = new Date()): Buffer => {
   const amount = (Number(contract.amount_minor_units || 0) / 100).toFixed(2);
@@ -2849,6 +2860,8 @@ class MarketplaceContractsController {
          RETURNING id, status, accepted_by_user_id, accepted_at, updated_at`,
         [id, status, userId],
       );
+      const contractRecord = await client.query('SELECT * FROM marketplace_contracts WHERE id = $1', [id]);
+      await saveContractVaultRecord(client, { ...contractRecord.rows[0], status }, status, current.rows[0].buyer_user_id);
       await client.query(
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,$3,'contract',$4,$5::jsonb)",
         [userId, current.rows[0].seller_organization_id, status === 'accepted' ? 'marketplace.contract_accepted' : 'marketplace.contract_rejected', id, JSON.stringify({ status })],
@@ -2885,6 +2898,8 @@ class MarketplaceContractsController {
         "UPDATE marketplace_contracts SET status = 'cancelled', updated_at = now() WHERE id = $1 RETURNING id, status, updated_at",
         [id],
       );
+      const contractRecord = await client.query('SELECT * FROM marketplace_contracts WHERE id = $1', [id]);
+      await saveContractVaultRecord(client, { ...contractRecord.rows[0], status: 'cancelled' }, 'cancelled', current.rows[0].buyer_user_id);
       await client.query(
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_cancelled','contract',$3,'{}'::jsonb)",
         [userId, current.rows[0].seller_organization_id, id],
@@ -2939,6 +2954,8 @@ class MarketplaceContractsController {
          RETURNING id, status, buyer_confirmed_at, seller_confirmed_at, completed_at, updated_at`,
         [id, isBuyer, sellerActor, completed],
       );
+      const contractRecord = await client.query('SELECT * FROM marketplace_contracts WHERE id = $1', [id]);
+      await saveContractVaultRecord(client, { ...contractRecord.rows[0], ...updated.rows[0] }, completed ? 'completed' : 'fulfilment-confirmed', contract.buyer_user_id);
       await client.query(
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_fulfilment_confirmed','contract',$3,$4::jsonb)",
         [userId, contract.seller_organization_id, id, JSON.stringify({ completed })],
