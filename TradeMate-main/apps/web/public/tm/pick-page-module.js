@@ -31,7 +31,7 @@
 /* Home redesign loader: loads the home-redesign patch after the other runtime patches. */
 (function () {
   var s = document.createElement('script');
-  s.src = '/tm/tm-home-redesign.js?v=1';
+  s.src = '/tm/tm-home-redesign.js?v=2';
   s.async = false;
   document.body.appendChild(s);
 })();
