@@ -1536,7 +1536,10 @@ class UserDocumentsController {
               ${includeBytes ? 'd.file_data' : 'NULL::bytea AS file_data'}
        FROM user_documents d
        WHERE d.id = $1 AND (
-         d.owner_user_id = $2
+         (d.owner_user_id = $2 AND (d.source_type <> 'organization_verification' OR EXISTS (
+           SELECT 1 FROM organization_members om
+           WHERE om.organization_id = d.organization_id AND om.user_id = $2 AND om.member_role IN ('owner','admin')
+         )))
          OR EXISTS (SELECT 1 FROM user_document_access a WHERE a.document_id = d.id AND a.user_id = $2)
          OR (d.visibility = 'organization' AND EXISTS (
            SELECT 1 FROM organization_members om
@@ -1567,7 +1570,10 @@ class UserDocumentsController {
               d.document_type, d.document_status, d.visibility, d.file_name,
               d.mime_type, d.file_size, d.file_sha256, d.metadata, d.created_at
        FROM user_documents d
-       WHERE d.owner_user_id = $1
+       WHERE (d.owner_user_id = $1 AND (d.source_type <> 'organization_verification' OR EXISTS (
+            SELECT 1 FROM organization_members om
+            WHERE om.organization_id = d.organization_id AND om.user_id = $1 AND om.member_role IN ('owner','admin')
+          )))
           OR EXISTS (SELECT 1 FROM user_document_access a WHERE a.document_id = d.id AND a.user_id = $1)
           OR (d.visibility = 'organization' AND EXISTS (
             SELECT 1 FROM organization_members om
