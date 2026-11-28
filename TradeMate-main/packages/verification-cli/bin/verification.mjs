@@ -6,8 +6,8 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const VERSION = '0.2.0';
-const CONFIG_FILE = '.verificationrc.json';
-const DEFAULT_SERVICE_URL = 'https://api.verification.metadusk.com';
+const CONFIG_FILE = '.verifirerc.json';
+const DEFAULT_SERVICE_URL = null;
 const CATALOG_PATH = new URL('../catalog/products.json', import.meta.url);
 
 async function catalog() {
@@ -15,16 +15,16 @@ async function catalog() {
 }
 
 function help() {
-  process.stdout.write(`Verification CLI v${VERSION}
+  process.stdout.write(`VeriFire CLI v${VERSION}
 
 Usage:
-  verification init [--url <service-url>]
-  verification products
-  verification versions <product>
-  verification install <product>@<version>
-  verification list
-  verification remove <product>
-  verification doctor
+  verifire init [--url <service-url>]
+  verifire products
+  verifire versions <product>
+  verifire install <product>@<version>
+  verifire list
+  verifire remove <product>
+  verifire doctor
   verification --version
   verification --help
 
@@ -50,7 +50,7 @@ async function readConfig() {
     value.products ??= {};
     return value;
   } catch (error) {
-    if (error.code === 'ENOENT') throw new Error(`No valid ${CONFIG_FILE} found. Run "verification init" first.`);
+    if (error.code === 'ENOENT') throw new Error(`No valid ${CONFIG_FILE} found. Run "verifire init" first.`);
     throw error;
   }
 }
@@ -78,7 +78,9 @@ async function writeConfig(config, { createOnly = false } = {}) {
 async function init(args) {
   const index = args.indexOf('--url');
   if (index >= 0 && !args[index + 1]) throw new Error('--url requires a value.');
-  const serviceUrl = normalizeServiceUrl(index >= 0 ? args[index + 1] : DEFAULT_SERVICE_URL);
+  const suppliedUrl = index >= 0 ? args[index + 1] : DEFAULT_SERVICE_URL;
+  if (!suppliedUrl) throw new Error('Specify the hosted VeriFire API URL with --url.');
+  const serviceUrl = normalizeServiceUrl(suppliedUrl);
   await writeConfig({ version: 1, serviceUrl, products: {} }, { createOnly: true });
   process.stdout.write(`Initialized ${CONFIG_FILE}\nService: ${serviceUrl}\nNo API key or identity data was written.\n`);
 }
@@ -91,20 +93,20 @@ async function products() {
 async function versions(productId) {
   const data = await catalog();
   const product = data.products.find((item) => item.id === productId);
-  if (!product) throw new Error(`Unknown product "${productId}". Run "verification products".`);
+  if (!product) throw new Error(`Unknown product "${productId}". Run "verifire products".`);
   process.stdout.write(`${product.id} — ${product.name}\n`);
   for (const release of product.versions) process.stdout.write(`  ${release.version}  ${release.status}\n`);
 }
 
 async function install(spec) {
   const match = /^([a-z][a-z0-9-]*)@([0-9]+\.[0-9]+\.[0-9]+)$/.exec(spec ?? '');
-  if (!match) throw new Error('Use an explicit product version, for example: verification install kyc@1.0.0');
+  if (!match) throw new Error('Use an explicit product version, for example: verifire install kyc@1.0.0');
   const [, productId, version] = match;
   const data = await catalog();
   const product = data.products.find((item) => item.id === productId);
-  if (!product) throw new Error(`Unknown product "${productId}". Run "verification products".`);
+  if (!product) throw new Error(`Unknown product "${productId}". Run "verifire products".`);
   const release = product.versions.find((item) => item.version === version);
-  if (!release) throw new Error(`Version ${version} is not published for ${productId}. Run "verification versions ${productId}".`);
+  if (!release) throw new Error(`Version ${version} is not published for ${productId}. Run "verifire versions ${productId}".`);
   if (release.status !== 'catalogue') throw new Error(`Version ${version} is not installable: ${release.status}.`);
   const config = await readConfig();
   config.products[productId] = { version, installedAt: new Date().toISOString(), status: 'selected' };
@@ -115,7 +117,7 @@ async function install(spec) {
 async function listInstalled() {
   const config = await readConfig();
   const entries = Object.entries(config.products);
-  if (!entries.length) return process.stdout.write('No products selected. Run "verification products" to browse.\n');
+  if (!entries.length) return process.stdout.write('No products selected. Run "verifire products" to browse.\n');
   for (const [id, item] of entries) process.stdout.write(`${id}@${item.version}  ${item.status}\n`);
 }
 
@@ -155,7 +157,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   try {
     await run();
   } catch (error) {
-    process.stderr.write(`verification: ${error.message}\n`);
+    process.stderr.write(`verifire: ${error.message}\n`);
     process.exitCode = 1;
   }
 }
