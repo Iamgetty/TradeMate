@@ -950,6 +950,8 @@ class AuthController {
         ],
       );
       if (!verified.rowCount) {
+        // The function records failed attempts; commit that counter before rejecting the request.
+        await client.query('COMMIT');
         throw new UnauthorizedException('This verification code is invalid or expired. Request a new one.');
       }
       const verifiedUser = verified.rows[0] as Record<string, unknown>;
