@@ -110,7 +110,7 @@
     H + '>.home-market-shortcuts .mk-card{min-height:82px!important;padding:10px 6px!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:2px!important;background:transparent!important;border:0!important;box-shadow:none!important}',
     H + '>.home-market-shortcuts .mk-ico{width:46px!important;height:46px!important;border-radius:15px!important;background:var(--s2)!important;color:var(--am)!important;display:grid!important;place-items:center!important;border:0!important;box-shadow:none!important;margin:0!important}',
     H + '>.home-market-shortcuts .mk-ico svg{width:23px!important;height:23px!important}',
-    H + '>.home-market-shortcuts .mk-name{font-size:12px!important;font-weight:600!important;line-height:1.15!important;text-align:center!important;white-space:normal!important;color:var(--txt)!important}'
+    H + '>.home-market-shortcuts .mk-name{font-size:12px!important;font-weight:600!important;line-height:1.15!important;text-align:center!important;white-space:normal!important;color:var(--txt)!important}',
 
     /* ---------- Deals of the Day (+ loading skeleton) ---------- */
     '.tm-deals{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding:0 20px 2px}',
