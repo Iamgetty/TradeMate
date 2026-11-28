@@ -22,6 +22,544 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const SESSION_COOKIE = 'trademate_session';
 const SESSION_DAYS = 7;
+const PLATFORM_AGREEMENT_KEY = 'trademate-platform-user-agreement';
+const PLATFORM_AGREEMENT_VERSION = '1.0';
+const PERSONA_AGREEMENT_KEY = 'trademate-persona-verification-consent';
+const PERSONA_AGREEMENT_VERSION = '1.0';
+const PERSONA_AGREEMENT_CONTENT = `TRADEMATE IDENTITY VERIFICATION CONSENT
+
+Version 1.0 — Effective 28 November 2026
+
+When you choose “I agree and continue”, you ask TradeMate to start identity verification using Persona, our identity-verification service provider.
+
+WHAT YOU ARE AGREEING TO
+1. TradeMate will create or resume an identity-verification inquiry with Persona and provide the account reference and other information required to initiate that inquiry.
+2. You will be directed to Persona's hosted verification experience. Information you submit there, which may include identity-document images, a photograph or selfie, and information extracted from those materials, is collected by Persona for the checks configured for this inquiry.
+3. Persona processes information under its own terms and privacy documentation. Review Persona's current privacy information before submitting documents: https://withpersona.com/legal/privacy-policy
+4. TradeMate receives inquiry status and verification outcomes through the integration. TradeMate does not receive or store your raw identity-document images through this inquiry-status integration.
+5. Verification helps establish identity for platform trust and safety. It is not a guarantee of honesty, authority, financial standing, eligibility or future conduct.
+6. Do not submit another person's identity information unless you are legally authorized to do so.
+
+YOUR CHOICE AND RECORD
+You may decline. If you decline, TradeMate will not start a new Persona inquiry from this request. You can return to this step later. If you accept, TradeMate records the consent version, integrity hash, time, account and relevant technical audit information, and saves a copy of this consent and its acceptance record in your private document vault.
+
+This consent describes the intended TradeMate integration flow. The precise checks, data categories, processing locations and retention periods depend on Persona's current service terms and the configuration of the verification inquiry. Review Persona's privacy information before proceeding. This text requires legal and privacy review for the jurisdictions in which TradeMate operates and does not replace a privacy notice or independent electronic-signature process.`;
+const PLATFORM_AGREEMENT_CONTENT = `TradeMate Platform User Agreement
+
+Version 1.0 — Effective 28 November 2026
+
+WELCOME TO TRADEMATE
+TradeMate exists to make serious business and marketplace relationships clearer, more transparent and more trustworthy. It brings people, businesses and organizations together to discover opportunities, communicate, negotiate and build relationships with greater confidence.
+
+By selecting “I agree and continue”, you confirm that you have read and accept this Agreement. Your acceptance is recorded against your account, together with the version of this Agreement and the time of acceptance.
+
+1. YOUR ACCOUNT AND INFORMATION
+Provide information that is accurate, current and not misleading. Keep your sign-in credentials private, use your account responsibly and tell us promptly if you believe someone else has accessed it. Do not impersonate another person, create deceptive accounts or use another person's identity or documents without proper authority.
+
+2. HONEST AND RESPONSIBLE USE
+Use TradeMate for lawful, genuine business and marketplace activity. Do not use the platform to deceive, defraud, harass, threaten, manipulate, facilitate unlawful activity or misrepresent a person, organization, product, service, opportunity or transaction. Do not upload false, misleading, stolen or unlawfully obtained documents. You must have the right and authority to share information and documents you submit.
+
+3. IDENTITY, ORGANIZATIONS AND VERIFICATION
+TradeMate may ask you or an organization you represent to complete identity, business or other verification checks. Provide truthful information and cooperate with reasonable requests. Verification is an identity and risk-checking process; it does not guarantee a person's honesty, financial position, professional ability, ownership claims or future conduct, and it does not replace your own due diligence. Do not claim to represent an organization unless you are authorized to do so.
+
+4. MARKETPLACE ACTIVITY, NEGOTIATIONS AND CONTRACTS
+Review the details of an opportunity, offer, negotiation or transaction before acting. Understand the parties, scope, price, currency, timing, obligations, delivery terms and relevant conditions. TradeMate provides tools to help parties discover one another, communicate and manage commercial workflows. Unless a specific service clearly says otherwise, TradeMate is not a party to agreements between users and does not guarantee another user will perform, pay, deliver or meet a stated qualification. A message, draft, uploaded file, proposal or in-platform status is not a completed or legally signed contract unless the relevant parties complete the applicable agreement and signature process. Do not describe a document as signed, approved, official or complete when it is not. Obtain independent legal, financial, tax, regulatory or professional advice where appropriate.
+
+5. DOCUMENTS, PRIVACY AND PERMISSIONS
+Documents and information you submit may be stored and made available through your TradeMate document area. Access is controlled according to the document's purpose and permissions associated with your account, organization or transaction. Do not access, disclose, copy or use another person's or organization's private information without permission. You authorize TradeMate to process information and documents as reasonably necessary to provide, secure, support and improve the platform, comply with legal obligations and address abuse or disputes, subject to applicable privacy requirements and TradeMate's privacy notice. Share another person's personal information only when you have a lawful basis and authority.
+
+6. PLATFORM INTEGRITY AND SECURITY
+Do not probe, disrupt, overload, reverse engineer or bypass platform security or access controls. Do not introduce malicious code, scrape private information, interfere with another user's access or misuse platform features. TradeMate may investigate suspicious activity, restrict access or preserve relevant records where reasonably necessary to protect users, the platform or transaction integrity, or to comply with law.
+
+7. AVAILABILITY AND CHANGES
+We work to keep TradeMate reliable and secure, but uninterrupted availability cannot be guaranteed. Features may change, be suspended or withdrawn for maintenance, security, legal or operational reasons. We may update this Agreement. When a material update requires renewed acceptance, we will present the updated version and record your decision. Earlier acceptance does not count as acceptance of a later version.
+
+8. SUSPENSION AND ACCOUNT CLOSURE
+We may limit or suspend access where we reasonably believe an account is compromised, these rules have been breached, activity presents a risk to users or the platform, or law requires it. Where appropriate, we will explain the action and any available review process. You may stop using TradeMate and request account closure through the available account process. Certain records may need to be retained for security, audit, dispute-resolution or legal reasons.
+
+9. NO BLANKET GUARANTEE
+TradeMate provides tools and information to support better business interactions. We do not promise that every user, listing, opportunity, document, statement or transaction is accurate, suitable or risk-free. Verify important claims and make decisions using your own judgment. Nothing in this Agreement excludes or limits a right or liability that cannot lawfully be excluded or limited under applicable law.
+
+10. YOUR ACCEPTANCE
+By selecting “I agree and continue”, you confirm that you have read and understood this Agreement; information and documents you provide will be truthful and shared with proper authority; you will use TradeMate lawfully, respectfully and in good faith; you understand verification is not a guarantee and you must assess counterparties and transactions for yourself; and you consent to TradeMate recording your acceptance electronically, including this Agreement version, its integrity hash, the time of acceptance and relevant technical audit information.
+
+If you do not agree, do not continue using the platform. Sign out and contact TradeMate support if you need help.
+
+This platform-use agreement is not a substitute for a jurisdiction-specific privacy notice, regulated financial-services disclosure or transaction-specific contract. TradeMate should obtain legal review for the jurisdictions in which it operates before treating this text as its final binding terms.`;
+
+const buildAgreementAcceptancePdf = (agreementKey: string, agreementVersion: string, agreementTitle: string, agreementContent: string, acceptedAt: Date, acceptanceId: string, userId: string, agreementSha256: string, acceptanceMethod = 'Explicit in-app confirmation'): Buffer => {
+  const evidence = [
+    'ELECTRONIC ACCEPTANCE RECORD',
+    '',
+    'Acceptance ID: ' + acceptanceId,
+    'Account ID: ' + userId,
+    'Accepted at (UTC): ' + acceptedAt.toISOString(),
+    'Acceptance method: ' + acceptanceMethod,
+    'Agreement key: ' + agreementKey,
+    'Agreement version: ' + agreementVersion,
+    'Agreement SHA-256: ' + agreementSha256,
+    '',
+    'This record documents the account holder\'s explicit in-app acceptance.',
+    'It is an electronic acceptance record, not a cryptographic signature',
+    'or a certificate issued by an independent electronic-signature provider.',
+    '',
+    'Agreement title: ' + agreementTitle, '', '--- AGREEMENT TEXT ---',
+    '',
+    ...agreementContent.split(/\r?\n/),
+  ];
+  const ascii = (value: string) => value
+    .replace(/[’‘]/g, "'").replace(/[“”]/g, '"')
+    .replace(/[—–]/g, '-').replace(/…/g, '...')
+    .replace(/[^\x20-\x7E]/g, '');
+  const lines: string[] = [];
+  for (const raw of evidence) {
+    const line = ascii(raw);
+    if (!line) { lines.push(''); continue; }
+    let remaining = line;
+    while (remaining.length > 92) {
+      let splitAt = remaining.lastIndexOf(' ', 92);
+      if (splitAt < 40) splitAt = 92;
+      lines.push(remaining.slice(0, splitAt));
+      remaining = remaining.slice(splitAt).trimStart();
+    }
+    lines.push(remaining);
+  }
+  const pageLines: string[][] = [];
+  for (let index = 0; index < lines.length; index += 52) pageLines.push(lines.slice(index, index + 52));
+  const objects: string[] = [];
+  objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+  objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
+  const pageRefs: string[] = [];
+  pageLines.forEach((page, index) => {
+    const pageId = 4 + index * 2;
+    const contentId = pageId + 1;
+    pageRefs.push(pageId + ' 0 R');
+    const commands = ['BT', '/F1 9 Tf', '48 748 Td', '13 TL'];
+    page.forEach((line, lineIndex) => {
+      if (lineIndex) commands.push('T*');
+      const escaped = line.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+      commands.push('(' + escaped + ') Tj');
+    });
+    commands.push('ET');
+    const stream = commands.join('\n');
+    objects[pageId] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ' + contentId + ' 0 R >>';
+    objects[contentId] = '<< /Length ' + Buffer.byteLength(stream, 'ascii') + ' >>\nstream\n' + stream + '\nendstream';
+  });
+  objects[2] = '<< /Type /Pages /Kids [' + pageRefs.join(' ') + '] /Count ' + pageRefs.length + ' >>';
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  for (let id = 1; id < objects.length; id++) {
+    offsets[id] = Buffer.byteLength(pdf, 'ascii');
+    pdf += id + ' 0 obj\n' + objects[id] + '\nendobj\n';
+  }
+  const xrefOffset = Buffer.byteLength(pdf, 'ascii');
+  pdf += 'xref\n0 ' + objects.length + '\n0000000000 65535 f \n';
+  for (let id = 1; id < objects.length; id++) pdf += String(offsets[id]).padStart(10, '0') + ' 00000 n \n';
+  pdf += 'trailer\n<< /Size ' + objects.length + ' /Root 1 0 R >>\nstartxref\n' + xrefOffset + '\n%%EOF';
+  return Buffer.from(pdf, 'ascii');
+};
+const saveContractVaultRecord = async (client: PoolClient, contract: Record<string, unknown>, recordStatus: string, ownerUserId: string) => {
+  const pdf = buildContractRecordPdf(contract, recordStatus);
+  const safeStatus = recordStatus.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
+  const fileName = 'TradeMate-Contract-' + safeStatus + '-' + String(contract.id) + '.pdf';
+  const hash = createHash('sha256').update(pdf).digest('hex');
+  await client.query(
+    'INSERT INTO user_documents (owner_user_id, source_type, source_id, document_type, document_status, visibility, file_name, mime_type, file_size, file_sha256, file_data, metadata) VALUES ($1,\'contract\',$2,\'contract\',\'generated\',\'contract_participants\',$3,\'application/pdf\',$4,$5,$6,$7::jsonb)',
+    [ownerUserId, contract.id, fileName, pdf.length, hash, pdf, JSON.stringify({ record_type: 'contract_status_record', contract_status: String(contract.status || recordStatus), generated_at: new Date().toISOString(), signature_status: 'not_signed' })],
+  );
+};
+
+
+const buildPersonaVerificationEventPdf = (event: {
+  eventId: string; eventName: string; inquiryId: string; inquiryStatus: string | null;
+  eventCreatedAt: Date | null; receivedAt: Date; userId: string; payloadSha256: string;
+}): Buffer => {
+  const lines = [
+    'TRADEMATE IDENTITY VERIFICATION EVENT RECORD', '',
+    'Account reference: ' + event.userId,
+    'Persona inquiry reference: ' + event.inquiryId,
+    'Persona event reference: ' + event.eventId,
+    'Event: ' + event.eventName,
+    'Inquiry status reported: ' + (event.inquiryStatus || 'Not supplied'),
+    'Event time (UTC): ' + (event.eventCreatedAt?.toISOString() || 'Not supplied'),
+    'Received by TradeMate (UTC): ' + event.receivedAt.toISOString(),
+    'Webhook payload SHA-256: ' + event.payloadSha256,
+    '',
+    'RECORD SCOPE AND LIMITATIONS',
+    'This record documents a signed Persona webhook event received by TradeMate.',
+    'It is not an identity document, proof of identity, or a guarantee of identity.',
+    'It does not represent a legal determination or approval beyond the event shown.',
+    'TradeMate does not copy raw identity images or biometric source files into this record.',
+  ].map((line) => line.replace(/[’‘]/g, "'").replace(/[“”]/g, '"').replace(/[—–]/g, '-').replace(/[^\x20-\x7E]/g, ''));
+  const escapePdf = (line: string) => line.split('\\').join('\\\\').split('(').join('\\(').split(')').join('\\)');
+  const commands = ['BT', '/F1 10 Tf', '48 748 Td', '14 TL'];
+  lines.forEach((line, index) => { if (index) commands.push('T*'); commands.push('(' + escapePdf(line) + ') Tj'); });
+  commands.push('ET');
+  const stream = commands.join('\n');
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    '<< /Length ' + Buffer.byteLength(stream, 'ascii') + ' >>\nstream\n' + stream + '\nendstream',
+  ];
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(Buffer.byteLength(pdf, 'ascii'));
+    pdf += (index + 1) + ' 0 obj\n' + object + '\nendobj\n';
+  });
+  const xrefOffset = Buffer.byteLength(pdf, 'ascii');
+  pdf += 'xref\n0 6\n0000000000 65535 f \n';
+  for (let index = 1; index <= 5; index++) pdf += String(offsets[index]).padStart(10, '0') + ' 00000 n \n';
+  pdf += 'trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n' + xrefOffset + '\n%%EOF';
+  return Buffer.from(pdf, 'ascii');
+};
+
+const savePersonaVerificationEventEvidence = async (inquiryId: string): Promise<void> => {
+  if (!databasePool) return;
+  const client = await databasePool.connect();
+  try {
+    await client.query('BEGIN');
+    const mapping = await client.query(
+      'SELECT user_id FROM persona_user_inquiries WHERE inquiry_id = $1 FOR UPDATE',
+      [inquiryId],
+    );
+    if (!mapping.rowCount) { await client.query('COMMIT'); return; }
+    const userId = String(mapping.rows[0].user_id);
+    const events = await client.query(
+      `SELECT e.event_id, e.event_name, e.inquiry_id, e.inquiry_status,
+              e.event_created_at, e.received_at, e.payload_sha256
+       FROM persona_webhook_events e
+       LEFT JOIN persona_webhook_event_documents d ON d.event_id = e.event_id
+       WHERE e.inquiry_id = $1 AND d.event_id IS NULL
+       ORDER BY e.event_created_at ASC NULLS LAST, e.received_at ASC
+       LIMIT 50`,
+      [inquiryId],
+    );
+    for (const event of events.rows) {
+      const receivedAt = event.received_at instanceof Date ? event.received_at : new Date(event.received_at);
+      const eventCreatedAt = event.event_created_at
+        ? (event.event_created_at instanceof Date ? event.event_created_at : new Date(event.event_created_at))
+        : null;
+      const pdf = buildPersonaVerificationEventPdf({
+        eventId: String(event.event_id), eventName: String(event.event_name),
+        inquiryId: String(event.inquiry_id), inquiryStatus: event.inquiry_status ? String(event.inquiry_status) : null,
+        eventCreatedAt, receivedAt, userId, payloadSha256: String(event.payload_sha256),
+      });
+      const fileName = 'TradeMate-Persona-Verification-' + String(event.event_id) + '.pdf';
+      const digest = createHash('sha256').update(pdf).digest('hex');
+      const document = await client.query(
+        `INSERT INTO user_documents
+          (owner_user_id, source_type, source_id, document_type, document_status, visibility,
+           file_name, mime_type, file_size, file_sha256, file_data, metadata)
+         VALUES ($1,'identity_verification',$1,'identity','generated','private',$2,
+                 'application/pdf',$3,$4,$5,$6::jsonb)
+         RETURNING id`,
+        [userId, fileName, pdf.length, digest, pdf, JSON.stringify({
+          record_type: 'persona_verification_event', persona_event_id: event.event_id,
+          persona_event_name: event.event_name, persona_inquiry_id: event.inquiry_id,
+          inquiry_status: event.inquiry_status, event_created_at: event.event_created_at,
+          received_at: event.received_at, payload_sha256: event.payload_sha256,
+          raw_identity_images_included: false,
+        })],
+      );
+      await client.query(
+        'INSERT INTO persona_webhook_event_documents (event_id, user_id, document_id) VALUES ($1,$2,$3)',
+        [event.event_id, userId, document.rows[0].id],
+      );
+      await client.query(
+        `INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata)
+         VALUES ($1,'persona.verification_event_recorded','user_document',$2,$3::jsonb)`,
+        [userId, document.rows[0].id, JSON.stringify({
+          persona_event_id: event.event_id, event_name: event.event_name,
+          inquiry_id: event.inquiry_id, status: event.inquiry_status,
+        })],
+      );
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+const buildAccountRegistrationRecordPdf = (user: Record<string, unknown>, registeredAt = new Date()): Buffer => {
+  const rawLines = [
+    'TRADEMATE ACCOUNT REGISTRATION RECORD', '',
+    'Registered at (UTC): ' + registeredAt.toISOString(),
+    'Account reference: ' + String(user.id || ''),
+    'Account holder: ' + String(user.display_name || ''),
+    'Email address: ' + String(user.email || ''),
+    'Initial account status: ' + String(user.status || 'pending email verification'),
+    '', 'REGISTRATION SCOPE',
+    'This record confirms creation of a TradeMate account profile.',
+    'Email ownership had not yet been confirmed when this record was generated.',
+    'It is not proof of identity, legal name, or verification approval.',
+  ];
+  const lines = rawLines.map((line) => line.replace(/[^\x20-\x7E]/g, ''));
+  const escapePdf = (line: string) => line.split('\\').join('\\\\').split('(').join('\\(').split(')').join('\\)');
+  const commands = ['BT', '/F1 10 Tf', '48 748 Td', '14 TL'];
+  lines.forEach((line, index) => { if (index) commands.push('T*'); commands.push('(' + escapePdf(line) + ') Tj'); });
+  commands.push('ET');
+  const stream = commands.join('\n');
+  const objects = [
+    '',
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    '<< /Length ' + Buffer.byteLength(stream, 'ascii') + ' >>\nstream\n' + stream + '\nendstream',
+  ];
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  for (let id = 1; id < objects.length; id++) { offsets[id] = Buffer.byteLength(pdf, 'ascii'); pdf += id + ' 0 obj\n' + objects[id] + '\nendobj\n'; }
+  const xrefOffset = Buffer.byteLength(pdf, 'ascii');
+  pdf += 'xref\n0 ' + objects.length + '\n0000000000 65535 f \n';
+  for (let id = 1; id < objects.length; id++) pdf += offsets[id].toString().padStart(10, '0') + ' 00000 n \n';
+  pdf += 'trailer\n<< /Size ' + objects.length + ' /Root 1 0 R >>\nstartxref\n' + xrefOffset + '\n%%EOF';
+  return Buffer.from(pdf, 'ascii');
+};
+
+const buildEmailVerificationRecordPdf = (user: Record<string, unknown>, verifiedAt = new Date()): Buffer => {
+  const rawLines = [
+    'TRADEMATE EMAIL VERIFICATION RECORD', '',
+    'Verified at (UTC): ' + verifiedAt.toISOString(),
+    'Account reference: ' + String(user.id || ''),
+    'Verified email: ' + String(user.email || ''),
+    'Account display name: ' + String(user.display_name || ''),
+    'Country code: ' + String(user.country_code || ''),
+    '', 'VERIFICATION SCOPE',
+    'This record confirms that the account email address completed TradeMate email verification.',
+    'It does not verify the account holder identity, organization status, or legal authority.',
+  ];
+  const lines = rawLines.map((line) => line.replace(/[^\x20-\x7E]/g, ''));
+  const escapePdf = (line: string) => line.split('\\').join('\\\\').split('(').join('\\(').split(')').join('\\)');
+  const commands = ['BT', '/F1 10 Tf', '48 748 Td', '14 TL'];
+  lines.forEach((line, index) => { if (index) commands.push('T*'); commands.push('(' + escapePdf(line) + ') Tj'); });
+  commands.push('ET');
+  const stream = commands.join('\n');
+  const objects = [
+    '',
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    '<< /Length ' + Buffer.byteLength(stream, 'ascii') + ' >>\nstream\n' + stream + '\nendstream',
+  ];
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  for (let id = 1; id < objects.length; id++) { offsets[id] = Buffer.byteLength(pdf, 'ascii'); pdf += id + ' 0 obj\n' + objects[id] + '\nendobj\n'; }
+  const xrefOffset = Buffer.byteLength(pdf, 'ascii');
+  pdf += 'xref\n0 ' + objects.length + '\n0000000000 65535 f \n';
+  for (let id = 1; id < objects.length; id++) pdf += offsets[id].toString().padStart(10, '0') + ' 00000 n \n';
+  pdf += 'trailer\n<< /Size ' + objects.length + ' /Root 1 0 R >>\nstartxref\n' + xrefOffset + '\n%%EOF';
+  return Buffer.from(pdf, 'ascii');
+};
+
+const buildOrganizationRegistrationPdf = (organization: Record<string, unknown>, ownerUserId: string, recordedAt = new Date()): Buffer => {
+  const rawLines = [
+    'TRADEMATE ORGANIZATION REGISTRATION RECORD', '',
+    'Record generated (UTC): ' + recordedAt.toISOString(),
+    'Organization reference: ' + String(organization.id || ''),
+    'Organization name: ' + String(organization.name || ''),
+    'Organization type: ' + String(organization.organization_type || ''),
+    'Country code: ' + String(organization.country_code || ''),
+    'Default currency: ' + String(organization.default_currency || ''),
+    'Initial platform status: ' + String(organization.status || 'pending'),
+    'Registered by account: ' + ownerUserId,
+    '', 'IMPORTANT STATUS NOTICE',
+    'This record confirms that an organization profile was created on TradeMate.',
+    'It is not a certificate of incorporation, proof of registration with a government authority,',
+    'verification approval, or a signed legal agreement.',
+  ];
+  const lines = rawLines.map((line) => line.replace(/[^\x20-\x7E]/g, ''));
+  const escapePdf = (line: string) => line.split('\\').join('\\\\').split('(').join('\\(').split(')').join('\\)');
+  const commands = ['BT', '/F1 10 Tf', '48 748 Td', '14 TL'];
+  lines.forEach((line, index) => { if (index) commands.push('T*'); commands.push('(' + escapePdf(line) + ') Tj'); });
+  commands.push('ET');
+  const stream = commands.join('\n');
+  const objects = [
+    '',
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    '<< /Length ' + Buffer.byteLength(stream, 'ascii') + ' >>\nstream\n' + stream + '\nendstream',
+  ];
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  for (let id = 1; id < objects.length; id++) { offsets[id] = Buffer.byteLength(pdf, 'ascii'); pdf += id + ' 0 obj\n' + objects[id] + '\nendobj\n'; }
+  const xrefOffset = Buffer.byteLength(pdf, 'ascii');
+  pdf += 'xref\n0 ' + objects.length + '\n0000000000 65535 f \n';
+  for (let id = 1; id < objects.length; id++) pdf += offsets[id].toString().padStart(10, '0') + ' 00000 n \n';
+  pdf += 'trailer\n<< /Size ' + objects.length + ' /Root 1 0 R >>\nstartxref\n' + xrefOffset + '\n%%EOF';
+  return Buffer.from(pdf, 'ascii');
+};
+
+const buildP2PTradeReceiptPdf = (trade: Record<string, unknown>, generatedAt = new Date()): Buffer => {
+  const rawLines = [
+    'TRADEMATE P2P TRANSACTION RECEIPT', '',
+    'Receipt generated (UTC): ' + generatedAt.toISOString(),
+    'Transaction reference: ' + String(trade.id || ''),
+    'Status: COMPLETED — both parties recorded completion',
+    'Completed at (UTC): ' + String(trade.completed_at || generatedAt.toISOString()),
+    'Buyer marked payment sent (UTC): ' + String(trade.buyer_payment_sent_at || 'Not recorded'),
+    'Seller confirmed receipt (UTC): ' + String(trade.seller_payment_confirmed_at || trade.completed_at || generatedAt.toISOString()),
+    'Buyer account: ' + String(trade.buyer_user_id || ''),
+    'Buyer name: ' + String(trade.buyer_name || 'Not available'),
+    'Seller account: ' + String(trade.seller_user_id || ''),
+    'Seller name: ' + String(trade.seller_name || 'Not available'),
+    'Asset: ' + String(trade.asset_code || ''),
+    'Fiat currency: ' + String(trade.fiat_code || ''),
+    'Price per asset: ' + String(trade.price || ''),
+    'Quantity: ' + String(trade.quantity || ''),
+    'Fiat total: ' + String(trade.fiat_total || '') + ' ' + String(trade.fiat_code || ''),
+    'Order reference: ' + String(trade.order_id || ''),
+    '',
+    'RECEIPT SCOPE',
+    'This receipt records the transaction details and completion status stored in TradeMate.',
+    'TradeMate does not custody funds or provide escrow. This document is not proof of a bank transfer,',
+    'payment receipt from a financial institution, guarantee, or independent verification of funds.',
+  ];
+  const ascii = (value: string) => value.replace(/[’‘]/g, "'").replace(/[“”]/g, '"')
+    .replace(/[—–]/g, '-').replace(/…/g, '...').replace(/[^\x20-\x7E]/g, '');
+  const lines: string[] = [];
+  for (const raw of rawLines) {
+    const line = ascii(raw);
+    if (!line) { lines.push(''); continue; }
+    let remaining = line;
+    while (remaining.length > 92) {
+      let splitAt = remaining.lastIndexOf(' ', 92);
+      if (splitAt < 40) splitAt = 92;
+      lines.push(remaining.slice(0, splitAt));
+      remaining = remaining.slice(splitAt).trimStart();
+    }
+    lines.push(remaining);
+  }
+  const pageLines: string[][] = [];
+  for (let index = 0; index < lines.length; index += 52) pageLines.push(lines.slice(index, index + 52));
+  const objects: string[] = [];
+  objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+  objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
+  const pageRefs: string[] = [];
+  pageLines.forEach((page, index) => {
+    const pageId = 4 + index * 2, contentId = pageId + 1;
+    pageRefs.push(pageId + ' 0 R');
+    const commands = ['BT', '/F1 9 Tf', '48 748 Td', '13 TL'];
+    page.forEach((line, lineIndex) => {
+      if (lineIndex) commands.push('T*');
+      commands.push('(' + line.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)') + ') Tj');
+    });
+    commands.push('ET');
+    const stream = commands.join('\n');
+    objects[pageId] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ' + contentId + ' 0 R >>';
+    objects[contentId] = '<< /Length ' + Buffer.byteLength(stream, 'ascii') + ' >>\nstream\n' + stream + '\nendstream';
+  });
+  objects[2] = '<< /Type /Pages /Kids [' + pageRefs.join(' ') + '] /Count ' + pageRefs.length + ' >>';
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  for (let id = 1; id < objects.length; id++) {
+    offsets[id] = Buffer.byteLength(pdf, 'ascii');
+    pdf += id + ' 0 obj\n' + objects[id] + '\nendobj\n';
+  }
+  const xrefOffset = Buffer.byteLength(pdf, 'ascii');
+  pdf += 'xref\n0 ' + objects.length + '\n0000000000 65535 f \n';
+  for (let id = 1; id < objects.length; id++) pdf += String(offsets[id]).padStart(10, '0') + ' 00000 n \n';
+  pdf += 'trailer\n<< /Size ' + objects.length + ' /Root 1 0 R >>\nstartxref\n' + xrefOffset + '\n%%EOF';
+  return Buffer.from(pdf, 'ascii');
+};
+const saveP2PTradeReceiptVaultDocuments = async (client: PoolClient, trade: Record<string, unknown>) => {
+  const generatedAt = new Date();
+  for (const ownerUserId of [String(trade.buyer_user_id), String(trade.seller_user_id)]) {
+    const existing = await client.query(
+      'SELECT document_id FROM p2p_trade_receipt_documents WHERE p2p_trade_id = $1 AND user_id = $2',
+      [trade.id, ownerUserId],
+    );
+    if (existing.rowCount) continue;
+    const pdf = buildP2PTradeReceiptPdf(trade, generatedAt);
+    const hash = createHash('sha256').update(pdf).digest('hex');
+    const fileName = 'TradeMate-P2P-Receipt-' + String(trade.id) + '.pdf';
+    const document = await client.query(
+      "INSERT INTO user_documents (owner_user_id, source_type, source_id, document_type, document_status, visibility, file_name, mime_type, file_size, file_sha256, file_data, metadata) VALUES ($1,'marketplace_transaction',$2,'receipt','generated','private',$3,'application/pdf',$4,$5,$6,$7::jsonb) RETURNING id",
+      [ownerUserId, trade.id, fileName, pdf.length, hash, pdf, JSON.stringify({ record_type: 'p2p_completed_trade_receipt', transaction_reference: String(trade.id), completed_at: trade.completed_at, generated_at: generatedAt.toISOString(), payment_reference_included: false })],
+    );
+    await client.query(
+      'INSERT INTO p2p_trade_receipt_documents (p2p_trade_id, user_id, document_id) VALUES ($1,$2,$3)',
+      [trade.id, ownerUserId, document.rows[0].id],
+    );
+  }
+};
+const buildContractRecordPdf = (contract: Record<string, unknown>, recordStatus: string, recordedAt = new Date()): Buffer => {
+  const amount = (Number(contract.amount_minor_units || 0) / 100).toFixed(2);
+  const rawLines = [
+    'TRADEMATE CONTRACT RECORD', '',
+    'Record status: ' + recordStatus.toUpperCase(),
+    'Record generated (UTC): ' + recordedAt.toISOString(),
+    'Contract reference: ' + String(contract.id || ''),
+    'Listing reference: ' + String(contract.listing_id || ''),
+    'Title: ' + String(contract.title || ''),
+    'Buyer account: ' + String(contract.buyer_user_id || ''),
+    'Seller organization: ' + String(contract.seller_organization_id || ''),
+    'Proposed amount: ' + amount + ' ' + String(contract.currency_code || ''),
+    'Requested start date: ' + String(contract.requested_start_date || 'Not specified'),
+    'Requested completion date: ' + String(contract.requested_completion_date || 'Not specified'),
+    '', 'SCOPE', String(contract.scope || ''), '', 'TERMS', String(contract.terms || ''),
+    '', 'IMPORTANT STATUS NOTICE',
+    'This generated record reflects the contract proposal status shown above.',
+    'It is not a signed agreement, digital signature, or proof of acceptance.',
+    'Any legally binding execution requirements must be completed separately.',
+  ];
+  const lines: string[] = [];
+  for (const raw of rawLines) {
+    const normalized = raw.replace(/[’‘]/g, "'").replace(/[“”]/g, '"')
+      .replace(/[—–]/g, '-').replace(/…/g, '...')
+      .replace(/[^\x20-\x7E]/g, '');
+    if (!normalized) { lines.push(''); continue; }
+    let remaining = normalized;
+    while (remaining.length > 88) {
+      let splitAt = remaining.lastIndexOf(' ', 88);
+      if (splitAt < 35) splitAt = 88;
+      lines.push(remaining.slice(0, splitAt));
+      remaining = remaining.slice(splitAt).trimStart();
+    }
+    lines.push(remaining);
+  }
+  const pages: string[][] = [];
+  for (let i = 0; i < lines.length; i += 52) pages.push(lines.slice(i, i + 52));
+  const objects: string[] = [];
+  objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+  objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
+  const pageRefs: string[] = [];
+  pages.forEach((page, index) => {
+    const pageId = 4 + index * 2, contentId = pageId + 1;
+    pageRefs.push(pageId + ' 0 R');
+    const commands = ['BT', '/F1 9 Tf', '48 748 Td', '13 TL'];
+    page.forEach((line, lineIndex) => {
+      if (lineIndex) commands.push('T*');
+      commands.push('(' + line.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)') + ') Tj');
+    });
+    commands.push('ET');
+    const stream = commands.join('\n');
+    objects[pageId] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ' + contentId + ' 0 R >>';
+    objects[contentId] = '<< /Length ' + Buffer.byteLength(stream, 'ascii') + ' >>\nstream\n' + stream + '\nendstream';
+  });
+  objects[2] = '<< /Type /Pages /Kids [' + pageRefs.join(' ') + '] /Count ' + pageRefs.length + ' >>';
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  for (let id = 1; id < objects.length; id++) {
+    offsets[id] = Buffer.byteLength(pdf, 'ascii');
+    pdf += id + ' 0 obj\n' + objects[id] + '\nendobj\n';
+  }
+  const xrefOffset = Buffer.byteLength(pdf, 'ascii');
+  pdf += 'xref\n0 ' + objects.length + '\n0000000000 65535 f \n';
+  for (let id = 1; id < objects.length; id++) pdf += String(offsets[id]).padStart(10, '0') + ' 00000 n \n';
+  pdf += 'trailer\n<< /Size ' + objects.length + ' /Root 1 0 R >>\nstartxref\n' + xrefOffset + '\n%%EOF';
+  return Buffer.from(pdf, 'ascii');
+};
+
 const passwordHash = async (password: string) => {
   const salt = randomBytes(16);
   const derived = await deriveScrypt(password, salt, 64, { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
@@ -260,6 +798,7 @@ class PersonaWebhookController {
        approved_at = CASE WHEN $1 = 'approved' THEN COALESCE(approved_at, now()) ELSE approved_at END
        WHERE inquiry_id = $2 AND (status <> 'approved' OR $1 = 'approved')`,
       [statusByEvent[eventName], inquiryId]);
+    await savePersonaVerificationEventEvidence(inquiryId);
     return { received: true, duplicate: inserted.rowCount === 0 };
   }
 }
@@ -293,6 +832,74 @@ class PersonaInquiryController {
     return session.rows[0].id as string;
   }
 
+  @Get('agreement')
+  async agreement(@Req() request: Request) {
+    const userId = await this.currentUser(request);
+    const accepted = await databasePool!.query(
+      'SELECT 1 FROM persona_verification_agreement_acceptances WHERE user_id = $1 AND agreement_key = $2 AND agreement_version = $3 AND agreement_sha256 = $4 LIMIT 1',
+      [userId, PERSONA_AGREEMENT_KEY, PERSONA_AGREEMENT_VERSION, createHash('sha256').update(PERSONA_AGREEMENT_CONTENT, 'utf8').digest('hex')],
+    );
+    return { required: accepted.rowCount === 0, agreement: {
+      key: PERSONA_AGREEMENT_KEY, version: PERSONA_AGREEMENT_VERSION,
+      sha256: createHash('sha256').update(PERSONA_AGREEMENT_CONTENT, 'utf8').digest('hex'),
+      title: 'TradeMate Identity Verification Consent', content: PERSONA_AGREEMENT_CONTENT,
+    } };
+  }
+
+  @Post('agreement/accept')
+  @HttpCode(200)
+  async acceptAgreement(@Req() request: Request, @Body() body: { version?: string; accepted?: boolean }) {
+    const userId = await this.currentUser(request);
+    if (body?.accepted !== true || body?.version !== PERSONA_AGREEMENT_VERSION) {
+      throw new BadRequestException('Review the identity verification consent and explicitly accept its current version.');
+    }
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const agreementSha256 = createHash('sha256').update(PERSONA_AGREEMENT_CONTENT, 'utf8').digest('hex');
+      const result = await client.query(
+        `INSERT INTO persona_verification_agreement_acceptances
+          (user_id, agreement_key, agreement_version, agreement_sha256, acceptance_method, ip_address, user_agent)
+         VALUES ($1, $2, $3, $4, 'explicit_in_app', $5, $6)
+         ON CONFLICT (user_id, agreement_key, agreement_version) DO NOTHING
+         RETURNING id, accepted_at`,
+        [userId, PERSONA_AGREEMENT_KEY, PERSONA_AGREEMENT_VERSION, agreementSha256,
+          request.ip || null, request.get('user-agent')?.slice(0, 500) || null],
+      );
+      if (result.rowCount) {
+        const acceptance = result.rows[0];
+        const pdf = buildAgreementAcceptancePdf(PERSONA_AGREEMENT_KEY, PERSONA_AGREEMENT_VERSION,
+          'TradeMate Identity Verification Consent', PERSONA_AGREEMENT_CONTENT,
+          new Date(acceptance.accepted_at), acceptance.id, userId, agreementSha256);
+        const pdfSha256 = createHash('sha256').update(pdf).digest('hex');
+        await client.query(
+          `INSERT INTO user_documents
+            (owner_user_id, source_type, source_id, document_type, document_status, visibility,
+             file_name, mime_type, file_size, file_sha256, file_data, metadata)
+           VALUES ($1, 'account', $2, 'agreement', 'generated', 'private',
+                   'TradeMate-Identity-Verification-Consent-v1.0.pdf', 'application/pdf',
+                   $3, $4, $5, $6::jsonb)`,
+          [userId, acceptance.id, pdf.length, pdfSha256, pdf,
+            JSON.stringify({ agreement_key: PERSONA_AGREEMENT_KEY, agreement_version: PERSONA_AGREEMENT_VERSION,
+              agreement_sha256: agreementSha256, acceptance_id: acceptance.id,
+              accepted_at: new Date(acceptance.accepted_at).toISOString(),
+              acceptance_method: 'explicit_in_app', evidence_type: 'electronic_acceptance_record' })],
+        );
+        await client.query(
+          `INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata)
+           VALUES ($1, 'account.persona_verification_consent_accepted', 'user', $1, $2::jsonb)`,
+          [userId, JSON.stringify({ agreement_key: PERSONA_AGREEMENT_KEY, agreement_version: PERSONA_AGREEMENT_VERSION,
+            agreement_sha256: agreementSha256, acceptance_id: acceptance.id, vault_pdf_sha256: pdfSha256 })],
+        );
+      }
+      await client.query('COMMIT');
+      return { accepted: true, version: PERSONA_AGREEMENT_VERSION };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
+  }
+
   @Get('status')
   async status(@Req() request: Request) {
     const userId = await this.currentUser(request);
@@ -311,6 +918,11 @@ class PersonaInquiryController {
     let upstreamErrorCount = 0;
     try {
     const userId = await this.currentUser(request);
+    const consent = await databasePool!.query(
+      'SELECT 1 FROM persona_verification_agreement_acceptances WHERE user_id = $1 AND agreement_key = $2 AND agreement_version = $3 AND agreement_sha256 = $4 LIMIT 1',
+      [userId, PERSONA_AGREEMENT_KEY, PERSONA_AGREEMENT_VERSION, createHash('sha256').update(PERSONA_AGREEMENT_CONTENT, 'utf8').digest('hex')],
+    );
+    if (!consent.rowCount) throw new HttpException('Review and accept the identity verification consent before starting Persona verification.', HttpStatus.PRECONDITION_REQUIRED);
     const apiKey = process.env.PERSONA_API_KEY || '';
     const templateId = process.env.PERSONA_INQUIRY_TEMPLATE_ID || '';
     if (!apiKey || !/^itmpl_[A-Za-z0-9]+$/.test(templateId)) {
@@ -368,12 +980,9 @@ class PersonaInquiryController {
       });
       upstreamStatus = created.status;
       if (!created.ok) {
-        // Capture only Persona's structured, non-secret error fields. Never log
-        // the raw response because upstream payloads may contain user data.
+        // Never log raw upstream response fields; they may contain user data.
         const errorPayload: unknown = await created.json().catch(() => null);
         const errors = isRecord(errorPayload) && Array.isArray(errorPayload.errors) ? errorPayload.errors : [];
-        // Log only the number of structured errors. Upstream titles, codes and
-        // details are not trusted to be free of user-provided or personal data.
         upstreamErrorCount = errors.length;
         throw new HttpException('Persona could not start verification. Please try again later.', created.status === 401 || created.status === 403 ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.BAD_GATEWAY);
       }
@@ -434,6 +1043,7 @@ class PersonaInquiryController {
          WHERE inquiry.inquiry_id = $1
            AND (inquiry.status <> 'approved' OR event.event_name = 'inquiry.approved')`,
         [inquiryId]);
+      await savePersonaVerificationEventEvidence(inquiryId);
     }
     return { inquiryId, url: hostedUrl, status: 'pending' };
     } catch (error) {
@@ -480,7 +1090,22 @@ class AuthController {
     try {
       await client.query('BEGIN');
       const code = String(randomInt(0, 1000000)).padStart(6, '0');
-      await client.query('SELECT trademate_private.register_password_account($1, $2, $3, $4)', [email, displayName, hash, tokenDigest(code)]);
+      const registered = await client.query(
+        'SELECT trademate_private.register_password_account($1, $2, $3, $4) AS user_id',
+        [email, displayName, hash, tokenDigest(code)],
+      );
+      const userId = String(registered.rows[0].user_id);
+      const registrationAt = new Date();
+      const registrationPdf = buildAccountRegistrationRecordPdf({
+        id: userId, email, display_name: displayName, status: 'pending email verification',
+      }, registrationAt);
+      const registrationHash = createHash('sha256').update(registrationPdf).digest('hex');
+      await client.query(
+        'INSERT INTO user_documents (owner_user_id, source_type, source_id, document_type, document_status, visibility, file_name, mime_type, file_size, file_sha256, file_data, metadata) VALUES ($1, \'account\', $1, \'other\', \'generated\', \'private\', $2, \'application/pdf\', $3, $4, $5, $6::jsonb)',
+        [userId, 'TradeMate-Account-Registration-' + registrationAt.toISOString().slice(0, 10) + '.pdf',
+          registrationPdf.length, registrationHash, registrationPdf,
+          JSON.stringify({ record_type: 'account_registration_event', account_status: 'pending_email_verification', email_verification_completed: false, recorded_at: registrationAt.toISOString() })],
+      );
       await client.query('COMMIT');
       const delivered = await sendTransactionalEmail(email, 'Verify your TradeMate email', '<p>Your TradeMate verification code is:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">' + code + '</p><p>This code expires in 10 minutes and can only be used once.</p>');
       if (!delivered) throw new HttpException('Your account was created, but the verification email could not be sent. Use Resend to try again.', HttpStatus.SERVICE_UNAVAILABLE);
@@ -529,22 +1154,42 @@ class AuthController {
     const email = String(body.email || '').trim().toLowerCase();
     const code = String(body.code || '');
     const sessionToken = randomBytes(32).toString('base64url');
-    const verified = await databasePool.query(
-      'SELECT verified_user_id AS id, verified_email AS email, verified_display_name AS display_name, verified_country_code AS country_code FROM trademate_private.complete_email_verification($1, $2, $3, $4, $5, $6)',
-      [
-        email,
-        tokenDigest(code),
-        tokenDigest(sessionToken),
-        new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000),
-        request.ip || null,
-        request.get('user-agent')?.slice(0, 500) || null,
-      ],
-    );
-    if (!verified.rowCount) {
-      throw new UnauthorizedException('This verification code is invalid or expired. Request a new one.');
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const verified = await client.query(
+        'SELECT verified_user_id AS id, verified_email AS email, verified_display_name AS display_name, verified_country_code AS country_code FROM trademate_private.complete_email_verification($1, $2, $3, $4, $5, $6)',
+        [
+          email,
+          tokenDigest(code),
+          tokenDigest(sessionToken),
+          new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000),
+          request.ip || null,
+          request.get('user-agent')?.slice(0, 500) || null,
+        ],
+      );
+      if (!verified.rowCount) {
+        // The function records failed attempts; commit that counter before rejecting the request.
+        await client.query('COMMIT');
+        throw new UnauthorizedException('This verification code is invalid or expired. Request a new one.');
+      }
+      const verifiedUser = verified.rows[0] as Record<string, unknown>;
+      const verifiedAt = new Date();
+      const verificationPdf = buildEmailVerificationRecordPdf(verifiedUser, verifiedAt);
+      const verificationHash = createHash('sha256').update(verificationPdf).digest('hex');
+      await client.query(
+        'INSERT INTO user_documents (owner_user_id, source_type, source_id, document_type, document_status, visibility, file_name, mime_type, file_size, file_sha256, file_data, metadata) VALUES ($1, \'email_verification\', NULL, \'other\', \'generated\', \'private\', $2, \'application/pdf\', $3, $4, $5, $6::jsonb)',
+        [String(verifiedUser.id), 'TradeMate-Email-Verification-' + verifiedAt.toISOString().slice(0, 10) + '.pdf', verificationPdf.length, verificationHash, verificationPdf, JSON.stringify({ record_type: 'email_verification_event', verified_email: String(verifiedUser.email || ''), verified_at: verifiedAt.toISOString(), verification_scope: 'email_address_only' })],
+      );
+      await client.query('COMMIT');
+      response.cookie(SESSION_COOKIE, sessionToken, cookieOptions());
+      return { user: verifiedUser };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
     }
-    response.cookie(SESSION_COOKIE, sessionToken, cookieOptions());
-    return { user: verified.rows[0] };
   }
 
   @Post('login')
@@ -604,6 +1249,81 @@ class AuthController {
     await notifySuccessfulSignIn(user.email);
     response.cookie(SESSION_COOKIE, token, cookieOptions());
     return { user: { id: user.id, email: user.email, display_name: user.display_name, country_code: user.country_code } };
+  }
+
+  @Get('agreement/status')
+  async agreementStatus(@Req() request: Request) {
+    if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in.');
+    const session = await resolvePresentedSessionUser(token);
+    if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    const accepted = await databasePool.query(
+      'SELECT 1 FROM user_agreement_acceptances WHERE user_id = $1 AND agreement_key = $2 AND agreement_version = $3 LIMIT 1',
+      [session.rows[0].id, PLATFORM_AGREEMENT_KEY, PLATFORM_AGREEMENT_VERSION],
+    );
+    return {
+      required: accepted.rowCount === 0,
+      agreement: { key: PLATFORM_AGREEMENT_KEY, version: PLATFORM_AGREEMENT_VERSION, sha256: createHash('sha256').update(PLATFORM_AGREEMENT_CONTENT, 'utf8').digest('hex'), title: 'TradeMate Platform User Agreement', content: PLATFORM_AGREEMENT_CONTENT },
+    };
+  }
+
+  @Post('agreement/accept')
+  @HttpCode(200)
+  async acceptAgreement(@Req() request: Request, @Body() body: { version?: string; accepted?: boolean }) {
+    if (!databasePool) throw new UnauthorizedException('Authentication is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in.');
+    const session = await resolvePresentedSessionUser(token);
+    if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    if (body?.accepted !== true || body?.version !== PLATFORM_AGREEMENT_VERSION) {
+      throw new BadRequestException('Review the current agreement and explicitly accept its version to continue.');
+    }
+    const userId = session.rows[0].id as string;
+    const client = await databasePool.connect();
+    try {
+      await client.query('BEGIN');
+      const agreementSha256 = createHash('sha256').update(PLATFORM_AGREEMENT_CONTENT, 'utf8').digest('hex');
+      const accepted = await client.query(
+        `INSERT INTO user_agreement_acceptances
+          (user_id, agreement_key, agreement_version, agreement_sha256, acceptance_method, ip_address, user_agent)
+         VALUES ($1, $2, $3, $4, 'explicit_in_app', $5, $6)
+         ON CONFLICT (user_id, agreement_key, agreement_version) DO NOTHING
+         RETURNING id, accepted_at`,
+        [userId, PLATFORM_AGREEMENT_KEY, PLATFORM_AGREEMENT_VERSION, agreementSha256,
+         request.ip || null, request.get('user-agent')?.slice(0, 500) || null],
+      );
+      if (accepted.rowCount) {
+        const acceptance = accepted.rows[0];
+        const pdf = buildAgreementAcceptancePdf(PLATFORM_AGREEMENT_KEY, PLATFORM_AGREEMENT_VERSION, 'TradeMate Platform User Agreement', PLATFORM_AGREEMENT_CONTENT, new Date(acceptance.accepted_at), acceptance.id, userId, agreementSha256);
+        const pdfSha256 = createHash('sha256').update(pdf).digest('hex');
+        await client.query(
+          `INSERT INTO user_documents
+            (owner_user_id, source_type, source_id, document_type, document_status, visibility,
+             file_name, mime_type, file_size, file_sha256, file_data, metadata)
+           VALUES ($1, 'account', $2, 'agreement', 'generated', 'private',
+                   'TradeMate-Platform-User-Agreement-v1.0.pdf', 'application/pdf',
+                   $3, $4, $5, $6::jsonb)`,
+          [userId, acceptance.id, pdf.length, pdfSha256, pdf,
+           JSON.stringify({ agreement_key: PLATFORM_AGREEMENT_KEY, agreement_version: PLATFORM_AGREEMENT_VERSION,
+             agreement_sha256: agreementSha256, acceptance_id: acceptance.id, accepted_at: new Date(acceptance.accepted_at).toISOString(),
+             acceptance_method: 'explicit_in_app', evidence_type: 'electronic_acceptance_record' })],
+        );
+        await client.query(
+          `INSERT INTO audit_events (actor_user_id, event_type, entity_type, entity_id, metadata)
+           VALUES ($1, 'account.platform_agreement_accepted', 'user', $1, $2::jsonb)`,
+          [userId, JSON.stringify({ agreement_key: PLATFORM_AGREEMENT_KEY, agreement_version: PLATFORM_AGREEMENT_VERSION,
+            agreement_sha256: agreementSha256, acceptance_id: acceptance.id, vault_pdf_sha256: pdfSha256 })],
+        );
+      }
+      await client.query('COMMIT');
+      return { accepted: true, version: PLATFORM_AGREEMENT_VERSION };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Get('me')
@@ -1389,6 +2109,13 @@ class OrganizationsController {
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1, $2, 'organization.created', 'organization', $2, $3::jsonb)",
         [userId, organization.id, JSON.stringify({ organization_type: organizationType, country_code: countryCode, default_currency: defaultCurrency })],
       );
+      const registrationPdf = buildOrganizationRegistrationPdf(organization, userId);
+      await client.query(
+        "INSERT INTO user_documents (owner_user_id, organization_id, source_type, source_id, document_type, document_status, visibility, file_name, mime_type, file_size, file_sha256, file_data, metadata) VALUES ($1,$2,'organization_registration',$2,'organization','generated','organization',$3,'application/pdf',$4,$5,$6,$7::jsonb)",
+        [userId, organization.id, 'TradeMate-Organization-Registration-' + String(organization.id) + '.pdf',
+          registrationPdf.length, createHash('sha256').update(registrationPdf).digest('hex'), registrationPdf,
+          JSON.stringify({ record_type: 'organization_registration_event', organization_status: organization.status, generated_at: new Date().toISOString(), legal_registration_certificate: false })],
+      );
       await client.query('COMMIT');
       return { organization: { ...organization, member_role: 'owner' } };
     } catch (error) {
@@ -1486,6 +2213,15 @@ class OrganizationsController {
           "INSERT INTO organization_documents (organization_id, uploaded_by_user_id, file_name, mime_type, file_size, file_data) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, file_name, mime_type, file_size, review_status, created_at",
           [id, userId, fileName, mimeType, data.length, data],
         );
+        await client.query(
+          `INSERT INTO user_documents
+            (owner_user_id, organization_id, source_type, source_id, document_type,
+             document_status, visibility, file_name, mime_type, file_size, file_sha256, file_data, metadata)
+           VALUES ($1,$2,'organization_verification',$3,'organization','received','organization',$4,$5,$6,$7,$8,$9::jsonb)`,
+          [userId, id, result.rows[0].id, fileName, mimeType, data.length,
+           createHash('sha256').update(data).digest('hex'), data,
+           JSON.stringify({ legacy_organization_document_id: result.rows[0].id, review_status: result.rows[0].review_status })],
+        );
         saved.push(result.rows[0]);
       }
       await client.query(
@@ -1514,6 +2250,226 @@ class OrganizationsController {
       [id],
     );
     return { documents: result.rows };
+  }
+}
+
+
+@Controller('documents')
+class UserDocumentsController {
+  private async currentUser(request: Request): Promise<string> {
+    if (!databasePool) throw new UnauthorizedException('TradeMate is temporarily unavailable.');
+    const token = sessionTokenFrom(request);
+    if (!token) throw new UnauthorizedException('Please sign in to access your documents.');
+    const session = await resolvePresentedSessionUser(token);
+    if (!session.rowCount) throw new UnauthorizedException('Your session has expired. Please sign in again.');
+    return session.rows[0].id as string;
+  }
+
+  private async accessibleDocument(id: string, userId: string, includeBytes = false) {
+    parseUuidParam(id);
+    const result = await databasePool!.query(
+      `SELECT d.id, d.owner_user_id, d.organization_id, d.source_type, d.source_id,
+              d.document_type, d.document_status, d.visibility, d.file_name,
+              d.mime_type, d.file_size, d.file_sha256, d.metadata, d.created_at,
+              ${includeBytes ? 'd.file_data' : 'NULL::bytea AS file_data'}
+       FROM user_documents d
+       WHERE d.id = $1 AND (
+         (d.owner_user_id = $2 AND (d.source_type <> 'organization_verification' OR EXISTS (
+           SELECT 1 FROM organization_members om
+           WHERE om.organization_id = d.organization_id AND om.user_id = $2 AND om.member_role IN ('owner','admin')
+         )))
+         OR EXISTS (SELECT 1 FROM user_document_access a WHERE a.document_id = d.id AND a.user_id = $2)
+         OR (d.visibility = 'organization' AND EXISTS (
+           SELECT 1 FROM organization_members om
+           WHERE om.organization_id = d.organization_id AND om.user_id = $2 AND (d.source_type <> 'organization_verification' OR om.member_role IN ('owner','admin'))
+         ))
+         OR (d.visibility = 'contract_participants' AND d.source_id IS NOT NULL AND EXISTS (
+           SELECT 1 FROM marketplace_contracts c
+           WHERE c.id = d.source_id AND (
+             c.buyer_user_id = $2 OR EXISTS (
+               SELECT 1 FROM organization_members om
+               WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2
+             )
+           )
+         ))
+       )
+       LIMIT 1`,
+      [id, userId],
+    );
+    if (!result.rowCount) throw new NotFoundException('Document not found.');
+    return result.rows[0];
+  }
+
+  @Get()
+  async list(@Req() request: Request) {
+    const userId = await this.currentUser(request);
+    const result = await databasePool!.query(
+      `SELECT d.id, d.owner_user_id, d.organization_id, d.source_type, d.source_id,
+              d.document_type, d.document_status, d.visibility, d.file_name,
+              d.mime_type, d.file_size, d.file_sha256, d.metadata, d.created_at
+       FROM user_documents d
+       WHERE (d.owner_user_id = $1 AND (d.source_type <> 'organization_verification' OR EXISTS (
+            SELECT 1 FROM organization_members om
+            WHERE om.organization_id = d.organization_id AND om.user_id = $1 AND om.member_role IN ('owner','admin')
+          )))
+          OR EXISTS (SELECT 1 FROM user_document_access a WHERE a.document_id = d.id AND a.user_id = $1)
+          OR (d.visibility = 'organization' AND EXISTS (
+            SELECT 1 FROM organization_members om
+            WHERE om.organization_id = d.organization_id AND om.user_id = $1 AND (d.source_type <> 'organization_verification' OR om.member_role IN ('owner','admin'))
+          ))
+          OR (d.visibility = 'contract_participants' AND d.source_id IS NOT NULL AND EXISTS (
+            SELECT 1 FROM marketplace_contracts c
+            WHERE c.id = d.source_id AND (
+              c.buyer_user_id = $1 OR EXISTS (
+                SELECT 1 FROM organization_members om
+                WHERE om.organization_id = c.seller_organization_id AND om.user_id = $1
+              )
+            )
+          ))
+       ORDER BY d.created_at DESC LIMIT 200`,
+      [userId],
+    );
+    return { documents: result.rows };
+  }
+
+  @Post()
+  async upload(@Req() request: Request, @Body() body: {
+    fileName?: string; mimeType?: string; dataBase64?: string;
+    sourceType?: string; sourceId?: string; documentType?: string;
+    documentStatus?: string; visibility?: string; organizationId?: string;
+    metadata?: Record<string, unknown>;
+  }) {
+    const userId = await this.currentUser(request);
+    const fileName = typeof body?.fileName === 'string' ? body.fileName.trim() : '';
+    const mimeType = String(body?.mimeType || '').toLowerCase();
+    const suppliedData = String(body?.dataBase64 || '');
+    const dataUrl = /^data:([^;,]+);base64,(.*)$/i.exec(suppliedData);
+    const encoded = dataUrl ? dataUrl[2] : suppliedData;
+    const sourceType = String(body?.sourceType || 'user_upload');
+    const documentType = String(body?.documentType || 'other');
+    const documentStatus = String(body?.documentStatus || 'received');
+    const visibility = String(body?.visibility || 'private');
+    const sourceTypes = ['contract','contract_negotiation','user_upload'];
+    const documentTypes = ['agreement','identity','address','organization','contract','statement','receipt','invoice','negotiation','other'];
+    if (!fileName || fileName.length > 180
+      || !['application/pdf','image/jpeg','image/png'].includes(mimeType)
+      || (suppliedData.startsWith('data:') && !dataUrl)
+      || (dataUrl && dataUrl[1].toLowerCase() !== mimeType)
+      || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)
+      || !sourceTypes.includes(sourceType) || !documentTypes.includes(documentType)
+      || !['draft','received'].includes(documentStatus)
+      || !['private','organization','contract_participants'].includes(visibility)) {
+      throw new BadRequestException('Check the document name, type, status and file format.');
+    }
+    const data = Buffer.from(encoded, 'base64');
+    if (!data.length || data.length > 10 * 1024 * 1024 || data.toString('base64') !== encoded
+      || !hasMatchingUploadSignature(mimeType, data)) {
+      throw new BadRequestException('Use a valid PDF, JPG or PNG file no larger than 10 MB.');
+    }
+    const sourceId = body?.sourceId ? String(body.sourceId) : null;
+    const organizationId = body?.organizationId ? String(body.organizationId) : null;
+    if (sourceId) parseUuidParam(sourceId);
+    if (organizationId) parseUuidParam(organizationId);
+    if (visibility === 'organization') {
+      if (!organizationId) throw new BadRequestException('An organization is required for organization-visible documents.');
+      const member = await databasePool!.query(
+        'SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1',
+        [organizationId, userId],
+      );
+      if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
+    }
+    if (['contract','contract_negotiation'].includes(sourceType) && (organizationId || visibility === 'organization')) {
+      throw new BadRequestException('Contract documents must be private or shared only with the contract participants.');
+    }
+    if (['contract','contract_negotiation'].includes(sourceType) || visibility === 'contract_participants') {
+      if (!sourceId || !['contract','contract_negotiation'].includes(sourceType)) {
+        throw new BadRequestException('Contract-visible documents must reference a contract.');
+      }
+      const participant = await databasePool!.query(
+        `SELECT 1 FROM marketplace_contracts c
+         WHERE c.id = $1 AND (c.buyer_user_id = $2 OR EXISTS (
+           SELECT 1 FROM organization_members om
+           WHERE om.organization_id = c.seller_organization_id AND om.user_id = $2
+         )) LIMIT 1`,
+        [sourceId, userId],
+      );
+      if (!participant.rowCount) throw new ForbiddenException('Only contract participants can add shared documents.');
+    }
+    const metadata = body?.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata)
+      ? JSON.stringify(body.metadata) : '{}';
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        `INSERT INTO user_documents
+          (owner_user_id, organization_id, source_type, source_id, document_type,
+           document_status, visibility, file_name, mime_type, file_size, file_sha256, file_data, metadata)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb)
+         RETURNING id, owner_user_id, organization_id, source_type, source_id,
+                   document_type, document_status, visibility, file_name,
+                   mime_type, file_size, file_sha256, metadata, created_at`,
+        [userId, organizationId, sourceType, sourceId, documentType, documentStatus,
+         visibility, fileName, mimeType, data.length, createHash('sha256').update(data).digest('hex'), data, metadata],
+      );
+      await client.query(
+        `INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata)
+         VALUES ($1,$2,'document.uploaded','user_document',$3,$4::jsonb)`,
+        [userId, organizationId, result.rows[0].id, JSON.stringify({ source_type: sourceType, document_type: documentType, visibility, file_size: data.length })],
+      );
+      await client.query('COMMIT');
+      return { document: result.rows[0] };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  @Get(':id')
+  async get(@Req() request: Request, @Param('id') id: string) {
+    const userId = await this.currentUser(request);
+    return { document: await this.accessibleDocument(id, userId) };
+  }
+
+  @Get(':id/download')
+  async download(@Req() request: Request, @Param('id') id: string, @Res() response: Response) {
+    const userId = await this.currentUser(request);
+    const document = await this.accessibleDocument(id, userId, true);
+    const safeName = String(document.file_name).replace(/[\\r\\n"]/g, '_');
+    await databasePool!.query(
+      `INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata)
+       VALUES ($1,$2,'document.downloaded','user_document',$3,'{}'::jsonb)`,
+      [userId, document.organization_id, document.id],
+    );
+    response.setHeader('Content-Type', document.mime_type);
+    response.setHeader('Content-Length', String(document.file_size));
+    response.setHeader('Content-Disposition', `attachment; filename="document"; filename*=UTF-8''${encodeURIComponent(safeName)}`);
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Cache-Control', 'private, no-store');
+    return response.status(200).send(document.file_data);
+  }
+
+  @Get(':id/preview')
+  async preview(@Req() request: Request, @Param('id') id: string, @Res() response: Response) {
+    const userId = await this.currentUser(request);
+    const document = await this.accessibleDocument(id, userId, true);
+    if (!['application/pdf', 'image/jpeg', 'image/png'].includes(String(document.mime_type))) {
+      throw new BadRequestException('This document type cannot be previewed.');
+    }
+    const safeName = String(document.file_name).replace(/[\\r\\n"]/g, '_');
+    await databasePool!.query(
+      `INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata)
+       VALUES ($1,$2,'document.previewed','user_document',$3,'{}'::jsonb)`,
+      [userId, document.organization_id, document.id],
+    );
+    response.setHeader('Content-Type', document.mime_type);
+    response.setHeader('Content-Length', String(document.file_size));
+    response.setHeader('Content-Disposition', `inline; filename="document"; filename*=UTF-8''${encodeURIComponent(safeName)}`);
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' blob: data:; style-src 'unsafe-inline'; sandbox");
+    response.setHeader('Cache-Control', 'private, no-store');
+    return response.status(200).send(document.file_data);
   }
 }
 
@@ -2210,6 +3166,18 @@ class MarketplaceContractsController {
         [listingId, buyerId, offer.seller_organization_id, offer.title, scope, terms,
          String(amountMinorUnits), offer.currency_code, startDate, completionDate],
       );
+      const contractPdf = buildContractRecordPdf(created.rows[0], 'proposal');
+      await client.query(
+        `INSERT INTO user_documents
+          (owner_user_id, source_type, source_id, document_type, document_status,
+           visibility, file_name, mime_type, file_size, file_sha256, file_data, metadata)
+         VALUES ($1,'contract',$2,'contract','generated','contract_participants',
+                 $3,'application/pdf',$4,$5,$6,$7::jsonb)`,
+        [buyerId, created.rows[0].id,
+         'TradeMate-Contract-Proposal-' + created.rows[0].id + '.pdf',
+         contractPdf.length, createHash('sha256').update(contractPdf).digest('hex'),
+         contractPdf, JSON.stringify({ record_type: 'contract_proposal', contract_status: 'proposed', generated_at: new Date().toISOString(), signature_status: 'not_signed' })],
+      );
       await client.query(
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_proposed','contract',$3,$4::jsonb)",
         [buyerId, offer.seller_organization_id, created.rows[0].id, JSON.stringify({ listing_id: listingId, listing_type: offer.listing_type })],
@@ -2298,6 +3266,8 @@ class MarketplaceContractsController {
          RETURNING id, status, accepted_by_user_id, accepted_at, updated_at`,
         [id, status, userId],
       );
+      const contractRecord = await client.query('SELECT * FROM marketplace_contracts WHERE id = $1', [id]);
+      await saveContractVaultRecord(client, { ...contractRecord.rows[0], status }, status, current.rows[0].buyer_user_id);
       await client.query(
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,$3,'contract',$4,$5::jsonb)",
         [userId, current.rows[0].seller_organization_id, status === 'accepted' ? 'marketplace.contract_accepted' : 'marketplace.contract_rejected', id, JSON.stringify({ status })],
@@ -2334,6 +3304,8 @@ class MarketplaceContractsController {
         "UPDATE marketplace_contracts SET status = 'cancelled', updated_at = now() WHERE id = $1 RETURNING id, status, updated_at",
         [id],
       );
+      const contractRecord = await client.query('SELECT * FROM marketplace_contracts WHERE id = $1', [id]);
+      await saveContractVaultRecord(client, { ...contractRecord.rows[0], status: 'cancelled' }, 'cancelled', current.rows[0].buyer_user_id);
       await client.query(
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_cancelled','contract',$3,'{}'::jsonb)",
         [userId, current.rows[0].seller_organization_id, id],
@@ -2388,6 +3360,8 @@ class MarketplaceContractsController {
          RETURNING id, status, buyer_confirmed_at, seller_confirmed_at, completed_at, updated_at`,
         [id, isBuyer, sellerActor, completed],
       );
+      const contractRecord = await client.query('SELECT * FROM marketplace_contracts WHERE id = $1', [id]);
+      await saveContractVaultRecord(client, { ...contractRecord.rows[0], ...updated.rows[0] }, completed ? 'completed' : 'fulfilment-confirmed', contract.buyer_user_id);
       await client.query(
         "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_fulfilment_confirmed','contract',$3,$4::jsonb)",
         [userId, contract.seller_organization_id, id, JSON.stringify({ completed })],
@@ -2420,7 +3394,18 @@ class MarketplaceContractsController {
     const contract = await this.authorizedContract(id, userId);
     const result = await databasePool!.query(
       `SELECT m.id, m.contract_id, m.sender_user_id, u.display_name AS sender_name,
-              m.message, m.created_at
+              m.message, m.created_at,
+              COALESCE((
+                SELECT jsonb_agg(jsonb_build_object(
+                  'id', d.id, 'file_name', d.file_name, 'mime_type', d.mime_type,
+                  'file_size', d.file_size, 'created_at', d.created_at
+                ) ORDER BY d.created_at, d.id)
+                FROM marketplace_contract_message_documents md
+                JOIN user_documents d ON d.id = md.document_id
+                WHERE md.contract_message_id = m.id AND md.contract_id = m.contract_id
+                  AND d.source_type = 'contract_negotiation' AND d.source_id = m.contract_id
+                  AND d.visibility = 'contract_participants'
+              ), '[]'::jsonb) AS attachments
        FROM marketplace_contract_messages m
        JOIN users u ON u.id = m.sender_user_id
        WHERE m.contract_id = $1
@@ -2432,13 +3417,20 @@ class MarketplaceContractsController {
   }
 
   @Post(':id/messages')
-  async reply(@Param('id') id: string, @Req() request: Request, @Body() body: { message?: string }) {
+  async reply(@Param('id') id: string, @Req() request: Request, @Body() body: { message?: string; attachmentDocumentIds?: string[] }) {
     parseUuidParam(id);
     parseBody(contractMessageBodySchema, body);
     const userId = await this.authenticatedUser(request);
     const message = typeof body?.message === 'string' ? body.message.trim() : '';
     if (message.length < 1 || message.length > 2000) {
       throw new BadRequestException('Your message must be between 1 and 2,000 characters.');
+    }
+    const attachmentDocumentIds = Array.isArray(body?.attachmentDocumentIds) ? body.attachmentDocumentIds : [];
+    if (attachmentDocumentIds.length > 10
+      || attachmentDocumentIds.some((value) => typeof value !== 'string'
+        || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value))
+      || new Set(attachmentDocumentIds).size !== attachmentDocumentIds.length) {
+      throw new BadRequestException('Choose up to 10 valid, distinct contract documents.');
     }
     const client = await databasePool!.connect();
     try {
@@ -2457,28 +3449,51 @@ class MarketplaceContractsController {
       if (!['proposed', 'accepted'].includes(current.rows[0].status)) {
         throw new ConflictException('This contract is closed for new messages.');
       }
+      if (attachmentDocumentIds.length) {
+        const ownedDocuments = await client.query(
+          `SELECT id FROM user_documents
+           WHERE id = ANY($1::uuid[]) AND owner_user_id = $2 AND source_type = 'contract_negotiation'
+             AND source_id = $3 AND visibility = 'contract_participants'
+           FOR SHARE`,
+          [attachmentDocumentIds, userId, id],
+        );
+        if (ownedDocuments.rowCount !== attachmentDocumentIds.length) {
+          throw new ForbiddenException('Only your own files uploaded to this contract can be attached to a message.');
+        }
+      }
       const inserted = await client.query(
         'INSERT INTO marketplace_contract_messages (contract_id, sender_user_id, message) VALUES ($1,$2,$3) RETURNING id, contract_id, sender_user_id, message, created_at',
         [id, userId, message],
       );
+      if (attachmentDocumentIds.length) {
+        await client.query(
+          `INSERT INTO marketplace_contract_message_documents
+            (contract_message_id, document_id, contract_id, attached_by_user_id)
+           SELECT $1, d.id, $2, $3 FROM user_documents d
+           WHERE d.id = ANY($4::uuid[]) AND d.owner_user_id = $3
+             AND d.source_type = 'contract_negotiation' AND d.source_id = $2
+             AND d.visibility = 'contract_participants'`,
+          [inserted.rows[0].id, id, userId, attachmentDocumentIds],
+        );
+      }
       await client.query(
-        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_message_sent','contract',$3,'{}'::jsonb)",
-        [userId, current.rows[0].seller_organization_id, id],
+        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_message_sent','contract',$3,$4::jsonb)",
+        [userId, current.rows[0].seller_organization_id, id, JSON.stringify({ attachment_count: attachmentDocumentIds.length })],
       );
       if (current.rows[0].is_buyer) {
         await client.query(
-          "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', 'New contract message', 'The buyer sent a new message on a contract.', 'conversation' FROM organization_members om WHERE om.organization_id = $1 AND om.user_id <> $2 AND om.member_role IN ('owner','admin')",
-          [current.rows[0].seller_organization_id, userId],
+          "INSERT INTO user_notifications (user_id, category, title, body, icon) SELECT om.user_id, 'Contracts', 'New contract message', $3, 'conversation' FROM organization_members om WHERE om.organization_id = $1 AND om.user_id <> $2 AND om.member_role IN ('owner','admin')",
+          [current.rows[0].seller_organization_id, userId, attachmentDocumentIds.length ? 'The buyer sent a contract message with ' + attachmentDocumentIds.length + ' file attachment(s).' : 'The buyer sent a new message on a contract.'],
         );
       } else {
         await client.query(
-          "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'Contracts', 'New contract message', 'The seller sent a new message on a contract.', 'conversation')",
-          [current.rows[0].buyer_user_id],
+          "INSERT INTO user_notifications (user_id, category, title, body, icon) VALUES ($1, 'Contracts', 'New contract message', $2, 'conversation')",
+          [current.rows[0].buyer_user_id, attachmentDocumentIds.length ? 'The seller sent a contract message with ' + attachmentDocumentIds.length + ' file attachment(s).' : 'The seller sent a new message on a contract.'],
         );
       }
       await client.query('COMMIT');
       const sender = await databasePool!.query('SELECT display_name FROM users WHERE id = $1 LIMIT 1', [userId]);
-      return { data: { ...inserted.rows[0], sender_name: sender.rows[0]?.display_name ?? 'TradeMate user' }, message: 'Contract message sent.' };
+      return { data: { ...inserted.rows[0], sender_name: sender.rows[0]?.display_name ?? 'TradeMate user', attachments: attachmentDocumentIds }, message: 'Contract message sent.' };
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;
@@ -2758,11 +3773,24 @@ class P2PMarketController {
     const client = await databasePool!.connect();
     try {
       await client.query('BEGIN');
+      const locked = await client.query(
+        `SELECT t.id, t.order_id, t.buyer_user_id, t.seller_user_id, t.asset_code, t.fiat_code,
+                t.price::text, t.quantity::text, t.fiat_total::text, t.buyer_payment_sent_at, t.seller_payment_confirmed_at, t.completed_at,
+                b.display_name AS buyer_name, s.display_name AS seller_name
+         FROM p2p_trades t JOIN users b ON b.id = t.buyer_user_id JOIN users s ON s.id = t.seller_user_id
+         WHERE t.id = $1 AND t.seller_user_id = $2 AND t.status = 'pending'
+           AND t.buyer_payment_sent_at IS NOT NULL AND t.seller_payment_confirmed_at IS NULL
+         FOR UPDATE OF t`,
+        [id, userId],
+      );
+      if (!locked.rowCount) throw new ConflictException('Buyer must first mark payment sent; order must still be pending.');
       const result = await client.query("UPDATE p2p_trades SET seller_payment_confirmed_at=now(),status='completed',completed_at=now(),updated_at=now() WHERE id=$1 AND seller_user_id=$2 AND status='pending' AND buyer_payment_sent_at IS NOT NULL AND seller_payment_confirmed_at IS NULL RETURNING id,status,completed_at",[id,userId]);
-      if (!result.rowCount) throw new ConflictException('Buyer must first mark payment sent; order must still be pending.');
-      await this.writeP2PAudit(client, userId, 'p2p.trade_completed', 'p2p_trade', id);
+      if (!result.rowCount) throw new ConflictException('Trade state changed; refresh and try again.');
+      const receiptTrade = { ...locked.rows[0], completed_at: result.rows[0].completed_at };
+      await saveP2PTradeReceiptVaultDocuments(client, receiptTrade);
+      await this.writeP2PAudit(client, userId, 'p2p.trade_completed', 'p2p_trade', id, { receipt_documents_created: 2 });
       await client.query('COMMIT');
-      return { order: result.rows[0] };
+      return { order: result.rows[0], receipt: { document_type: 'receipt', visibility: 'private', saved_to_both_portfolios: true } };
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;
@@ -4427,7 +5455,7 @@ class SportsTransferOpportunitiesController {
   }
 }
 
-@Module({ controllers: [SportsTransferOpportunitiesController, SportsTransferMandatesController, SportsTransferOrganizationsController, SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController, PersonaWebhookController, PersonaInquiryController] })
+@Module({ controllers: [SportsTransferOpportunitiesController, SportsTransferMandatesController, SportsTransferOrganizationsController, SportsTransferIdentityController, PublicProfilesController, PublicMarketQuotesController, CommunityFeedController, HealthController, AuthController, PreferencesController, NotificationsController, SupportController, OrganizationsController, UserDocumentsController, PublicListingsController, MarketplaceTradesController, P2PMarketController, EnquiriesController, MarketplaceContractsController, ModerationController, PersonaWebhookController, PersonaInquiryController] })
 export class AppModule implements OnModuleDestroy {
   async onModuleDestroy() {
     if (databasePool) await databasePool.end();

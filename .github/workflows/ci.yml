@@ -14,9 +14,11 @@ on:
       - feat/sports-transfer-representative-mandates
       - feat/sports-transfer-opportunity-drafts
       - feat/sports-transfer-external-player-discovery-foundation
+      - feat/platform-document-vault
   pull_request:
     branches:
       - main
+      - redesign/persona-verification-ui
 
 permissions:
   contents: read
