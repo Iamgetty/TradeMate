@@ -62,4 +62,9 @@ test('new contract proposals generate a private participant-visible vault PDF wi
   assert.match(moduleSource, /'contract','contract','generated'/);
   assert.match(moduleSource, /signature_status: 'not_signed'/);
   assert.match(moduleSource, /TradeMate-Contract-Proposal-/);
+  assert.match(moduleSource, /const saveContractVaultRecord =/);
+  assert.match(moduleSource, /saveContractVaultRecord\(client, \{ \.\.\.contractRecord\.rows\[0\], status \}, status, current\.rows\[0\]\.buyer_user_id\)/);
+  assert.match(moduleSource, /saveContractVaultRecord\(client, \{ \.\.\.contractRecord\.rows\[0\], status: 'cancelled' \}, 'cancelled', current\.rows\[0\]\.buyer_user_id\)/);
+  assert.match(moduleSource, /completed \? 'completed' : 'fulfilment-confirmed'/);
+  assert.match(moduleSource, /signature_status: 'not_signed'/);
 });
