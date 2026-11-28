@@ -434,8 +434,8 @@ class PersonaInquiryController {
   async agreement(@Req() request: Request) {
     const userId = await this.currentUser(request);
     const accepted = await databasePool!.query(
-      'SELECT 1 FROM persona_verification_agreement_acceptances WHERE user_id = $1 AND agreement_key = $2 AND agreement_version = $3 LIMIT 1',
-      [userId, PERSONA_AGREEMENT_KEY, PERSONA_AGREEMENT_VERSION],
+      'SELECT 1 FROM persona_verification_agreement_acceptances WHERE user_id = $1 AND agreement_key = $2 AND agreement_version = $3 AND agreement_sha256 = $4 LIMIT 1',
+      [userId, PERSONA_AGREEMENT_KEY, PERSONA_AGREEMENT_VERSION, createHash('sha256').update(PERSONA_AGREEMENT_CONTENT, 'utf8').digest('hex')],
     );
     return { required: accepted.rowCount === 0, agreement: {
       key: PERSONA_AGREEMENT_KEY, version: PERSONA_AGREEMENT_VERSION,
@@ -516,8 +516,8 @@ class PersonaInquiryController {
     try {
     const userId = await this.currentUser(request);
     const consent = await databasePool!.query(
-      'SELECT 1 FROM persona_verification_agreement_acceptances WHERE user_id = $1 AND agreement_key = $2 AND agreement_version = $3 LIMIT 1',
-      [userId, PERSONA_AGREEMENT_KEY, PERSONA_AGREEMENT_VERSION],
+      'SELECT 1 FROM persona_verification_agreement_acceptances WHERE user_id = $1 AND agreement_key = $2 AND agreement_version = $3 AND agreement_sha256 = $4 LIMIT 1',
+      [userId, PERSONA_AGREEMENT_KEY, PERSONA_AGREEMENT_VERSION, createHash('sha256').update(PERSONA_AGREEMENT_CONTENT, 'utf8').digest('hex')],
     );
     if (!consent.rowCount) throw new HttpException('Review and accept the identity verification consent before starting Persona verification.', HttpStatus.PRECONDITION_REQUIRED);
     const apiKey = process.env.PERSONA_API_KEY || '';
