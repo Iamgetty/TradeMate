@@ -209,8 +209,40 @@ export interface ProviderExecutionRepository {
   findForVerification(tenantId: string, verificationId: string): Promise<NewProviderExecution[]>;
 }
 
+export interface OutboxRecord extends NewOutboxEvent {
+  status: 'pending' | 'processing' | 'delivered' | 'dead_letter';
+  attempts: number;
+  availableAt: string;
+  leaseToken: string | null;
+  leaseUntil: string | null;
+  lastErrorCode: string | null;
+  deliveredAt: string | null;
+  updatedAt: string;
+}
+
 export interface OutboxRepository {
   append(event: NewOutboxEvent): Promise<void>;
+  /**
+   * Atomically claim due pending events and expired processing leases.
+   * Implementations must increment attempts and issue a fresh unpredictable
+   * leaseToken for every claimed row (e.g. SELECT FOR UPDATE SKIP LOCKED).
+   */
+  claimDue(input: {
+    workerId: string;
+    now: string;
+    leaseUntil: string;
+    limit: number;
+  }): Promise<OutboxRecord[]>;
+  /** Lease-token fencing prevents a stale worker acknowledging a reclaimed event. */
+  markDelivered(eventId: string, leaseToken: string, deliveredAt: string): Promise<boolean>;
+  reschedule(input: {
+    eventId: string;
+    leaseToken: string;
+    availableAt: string;
+    updatedAt: string;
+    errorCode: string;
+    deadLetter: boolean;
+  }): Promise<boolean>;
 }
 
 /**
