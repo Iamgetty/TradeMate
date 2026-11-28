@@ -169,7 +169,7 @@ export class VerificationController {
     }
 
     const client = await db.connect();
-    let caseRow: Record<string, unknown> = {};
+    let caseRow: Record<string, unknown>;
     let reused = false;
     try {
       await client.query('BEGIN');
