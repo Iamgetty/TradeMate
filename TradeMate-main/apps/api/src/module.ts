@@ -1634,7 +1634,7 @@ class UserDocumentsController {
       );
       if (!member.rowCount) throw new ForbiddenException('You do not have access to this organization.');
     }
-    if (visibility === 'contract_participants') {
+    if (['contract','contract_negotiation'].includes(sourceType) || visibility === 'contract_participants') {
       if (!sourceId || !['contract','contract_negotiation'].includes(sourceType)) {
         throw new BadRequestException('Contract-visible documents must reference a contract.');
       }
