@@ -54,6 +54,7 @@
 
     /* top row: when #mwbar carries the actions the row keeps only the search field */
     H + '>.top{display:block!important;padding:0 20px!important;margin:0!important;border:0!important;background:none!important}',
+    H + '>.dk-head{padding-bottom:4px!important}',
     H + '>.top[data-tm-bar]>:not(.srch){display:none!important}',
     H + '>.top:not([data-tm-bar]){display:grid!important;grid-template-columns:1fr auto;grid-template-areas:"br su" "se se";align-items:center;column-gap:8px;padding:16px 20px 0!important}',
     H + '>.top .avb{display:none!important}',
@@ -64,7 +65,7 @@
     H + '>.top:not([data-tm-bar]) .ib[data-pg="support"]{grid-area:su}',
     H + '>.top .tm-brand{display:none}',
     H + '>.top:not([data-tm-bar]) .tm-brand{display:flex}',
-    H + '>.top .srch{grid-area:se;position:relative!important;z-index:5!important;isolation:isolate;display:flex!important;align-items:center;gap:10px;width:100%!important;max-width:100%!important;height:38px!important;margin:30px 0 0!important;padding:0!important;background:none!important;border:0!important;box-shadow:none!important;overflow:visible!important;transform:translateZ(0)}',
+    H + '>.top .srch{grid-area:se;position:relative!important;z-index:5!important;isolation:isolate;display:flex!important;align-items:center;gap:10px;width:100%!important;max-width:100%!important;height:38px!important;margin:0!important;padding:0!important;background:none!important;border:0!important;box-shadow:none!important;overflow:visible!important;transform:translateZ(0)}',
     H + '>.top .srch .tm-sf{flex:1;min-width:0;height:38px;display:flex;align-items:center;gap:8px;padding:0 12px;border:1px solid var(--line);border-radius:12px;color:var(--mut);font-size:13px;overflow:hidden;text-align:left}',
     H + '>.top .srch .tm-sf svg{width:18px;height:18px;flex:none}',
     H + '>.top .srch .tm-go{flex:none;width:38px;height:38px;border-radius:12px;background:var(--am);color:var(--ongrad,#1b1006);display:grid;place-items:center}',
