@@ -318,7 +318,7 @@ var s = document.createElement("style");
           var data = {};
           try { data = JSON.parse(text); } catch (_) {}
           if (!response.ok || !data.url) {
-            throw new Error(data.message || ('Verification failed (HTTP ' + response.status + '): ' + text.slice(0, 120)));
+            throw new Error('Verification could not be started (HTTP ' + response.status + '). Please try again or contact support.');
           }
           return data;
         });
