@@ -82,6 +82,8 @@ test('email verification generates a private vault PDF limited to email-address 
   const confirmHandler = moduleSource.slice(confirmStart, confirmEnd);
   assert.match(confirmHandler, /client\.query\('BEGIN'\)/);
   assert.match(confirmHandler, /client\.query\('COMMIT'\)/);
+  assert.match(confirmHandler, /failed attempts; commit that counter before rejecting/);
+  assert.match(confirmHandler, /if \(!verified\.rowCount\) \{[\s\S]*?await client\.query\('COMMIT'\);/);
   assert.match(confirmHandler, /client\.query\('ROLLBACK'\)/);
   assert.match(confirmHandler, /client\.release\(\)/);
 });
