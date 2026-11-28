@@ -124,3 +124,25 @@ Do not assume one pan-African privacy or identity law. Requirements must be revi
 This is an architecture requirement and implementation plan. The current VeriFire PR does **not** yet contain a live country registry, country-specific document rules, national identity integrations, provider contracts, or live verification routes. No African country should currently be advertised as production-supported on the basis of this document.
 
 The existing persistence-neutral repository contracts and API-key lifecycle services are foundations only. Country policy, coverage records, provider routing and production persistence remain future implementation work.
+
+
+## Implemented registry foundation
+
+The service now has a typed, versioned country/product coverage registry contract and a fail-closed resolver in `apps/verification/src/country-coverage.ts`.
+
+- Uses ISO 3166-1 alpha-2 codes and includes a 54-country African-state reference list. This is a technical starting point, not a legal definition of every territory or jurisdiction.
+- Records coverage per country and product, including subject type, assurance level, policy version, effective date and review date.
+- A `live` record is rejected unless legal, provider-contract, security, operations, and privacy/cross-border-transfer approvals are all true and at least one approved adapter is named.
+- Routing selects only an enabled adapter explicitly allowlisted for that country, product and assurance level.
+- Planned, not-assessed, suspended, degraded, future-effective, mismatched and unapproved routes fail closed.
+- The registry stores adapter identifiers and capability metadata only. It has no fields for provider usernames, passwords, API secrets, identity documents, biometric templates or raw identity numbers.
+
+## Credential and evidence boundary
+
+VeriFire must not collect or persist end-user passwords, national-ID portal credentials, or provider account login credentials. Provider authentication material belongs in an independently approved provider-side secret custody arrangement and is not part of the coverage registry or operational records. This code does not select or provision a vault.
+
+A future evidence flow, if legally and contractually necessary, must be separately designed around purpose limitation, secure transfer, minimal processing, short retention and verifiable deletion. It must not turn the platform into a document or credential repository.
+
+## Current implementation status
+
+The registry and routing foundation is implemented and covered by unit tests. It is not yet connected to a production registry store or HTTP verification endpoint. No country/product route is currently declared live, and no provider integration is implied. Each route requires evidence for all approval gates before it can be enabled.
