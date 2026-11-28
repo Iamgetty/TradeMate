@@ -1,10 +1,10 @@
 {
-  "name": "@metadusk/verification-cli",
+  "name": "@metadusk/verifire-cli",
   "version": "0.2.0",
   "description": "Terminal installer and independently versioned product selector for the Metadusk Verification Platform",
   "type": "module",
   "bin": {
-    "verification": "./bin/verification.mjs"
+    "verifire": "./bin/verification.mjs"
   },
   "engines": {
     "node": ">=20"
