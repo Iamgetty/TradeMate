@@ -146,7 +146,7 @@ test('completed P2P trades generate private receipt PDFs for both parties in the
   assert.ok(migrationSource.includes('document_id UUID NOT NULL UNIQUE'));
   assert.ok(migrationSource.includes('REVOKE ALL ON TABLE public.p2p_trade_receipt_documents FROM PUBLIC'));
   const receiptPdfBuilder = moduleSource.slice(moduleSource.indexOf('const buildP2PTradeReceiptPdf'), moduleSource.indexOf('const saveP2PTradeReceiptVaultDocuments'));
-  for (const field of ['TRADEMATE P2P TRANSACTION RECEIPT', 'Transaction reference:', 'Buyer account:', 'Seller account:', 'Fiat total:', 'not proof of a bank transfer']) {
+  for (const field of ['TRADEMATE P2P TRANSACTION RECEIPT', 'Transaction reference:', 'Buyer account:', 'Seller account:', 'Fiat total:', 'Buyer marked payment sent (UTC):', 'Seller confirmed receipt (UTC):', 'not proof of a bank transfer']) {
     assert.ok(receiptPdfBuilder.includes(field), `receipt PDF missing ${field}`);
   }
 
@@ -164,6 +164,7 @@ test('completed P2P trades generate private receipt PDFs for both parties in the
   const p2pController = moduleSource.slice(moduleSource.indexOf("@Controller('p2p')"), moduleSource.indexOf("@Controller('profiles')"));
   assert.ok(p2pController.includes('confirmReceipt'));
   assert.ok(p2pController.includes('FOR UPDATE OF t'));
+  assert.ok(p2pController.includes('t.buyer_payment_sent_at, t.seller_payment_confirmed_at, t.completed_at'));
   assert.ok(p2pController.includes('saveP2PTradeReceiptVaultDocuments(client, receiptTrade)'));
   assert.ok(p2pController.includes('receipt_documents_created: 2'));
   const confirmHandler = p2pController.slice(p2pController.indexOf('async confirmReceipt'), p2pController.indexOf("@Post('orders/:id/cancel')"));
