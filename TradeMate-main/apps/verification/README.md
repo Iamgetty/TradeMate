@@ -1,4 +1,4 @@
-# Verification Service
+# VeriFire Service
 
 Standalone, provider-neutral service boundary. It does not depend on TradeMate sessions, users, organizations or database tables.
 
