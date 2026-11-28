@@ -39,6 +39,11 @@
     H + '{display:flex!important;flex-direction:column;padding-bottom:calc(120px + env(safe-area-inset-bottom,0px))!important}',
     H + '>*{order:30}',
     H + '>.top{order:0}',
+    H + '>.dk-head{order:-1!important}',
+    H + ' .tbn-tag,' + H + ' .tbn p,' + H + ' .tbn-list,' + H + ' .tbn-chip{display:none!important}',
+    H + ' .tbn-s{display:flex!important;flex-direction:column!important;justify-content:space-between!important;gap:18px!important}',
+    H + ' .tbn-copy{max-width:100%!important;width:100%!important}',
+    H + ' .tbn-cta{align-self:flex-start!important;min-width:104px!important}',
     H + '>.tbn,' + H + '>.home-promo-tbn,' + H + '>.banner{order:1}',
     H + '>.sc-promo{order:2}',
     H + '>.tm-sec-cats{order:3}',
@@ -50,17 +55,16 @@
     /* top row: when #mwbar carries the actions the row keeps only the search field */
     H + '>.top{display:block!important;padding:0 20px!important;margin:0!important;border:0!important;background:none!important}',
     H + '>.top[data-tm-bar]>:not(.srch){display:none!important}',
-    H + '>.top:not([data-tm-bar]){display:grid!important;grid-template-columns:auto 1fr auto auto auto;grid-template-areas:"av br sc su bl" "se se se se se";align-items:center;column-gap:8px;padding:16px 20px 0!important}',
-    H + '>.top:not([data-tm-bar]) .avb{grid-area:av}',
+    H + '>.top:not([data-tm-bar]){display:grid!important;grid-template-columns:1fr auto;grid-template-areas:"br su" "se se";align-items:center;column-gap:8px;padding:16px 20px 0!important}',
+    H + '>.top .avb{display:none!important}',
     H + '>.top:not([data-tm-bar]) .tm-brand{grid-area:br;display:flex;align-items:center;gap:8px;min-width:0}',
     H + '>.top:not([data-tm-bar]) .tm-brand img{width:26px;height:26px;border-radius:8px}',
     H + '>.top:not([data-tm-bar]) .tm-brand b{font:800 16px "Bricolage Grotesque","Hanken Grotesk",sans-serif;color:var(--txt)}',
-    H + '>.top:not([data-tm-bar]) .ib[data-pg="scan"]{grid-area:sc}',
+    H + '>.top .ib[data-pg="scan"],'+H+' .top .ib[data-pg="notif"]{display:none!important}',
     H + '>.top:not([data-tm-bar]) .ib[data-pg="support"]{grid-area:su}',
-    H + '>.top:not([data-tm-bar]) .ib[data-pg="notif"]{grid-area:bl}',
     H + '>.top .tm-brand{display:none}',
     H + '>.top:not([data-tm-bar]) .tm-brand{display:flex}',
-    H + '>.top .srch{grid-area:se;display:flex!important;align-items:center;gap:10px;width:100%!important;height:38px!important;margin:30px 0 0!important;padding:0!important;background:none!important;border:0!important;box-shadow:none!important}',
+    H + '>.top .srch{grid-area:se;position:relative!important;z-index:5!important;isolation:isolate;display:flex!important;align-items:center;gap:10px;width:100%!important;max-width:100%!important;height:38px!important;margin:30px 0 0!important;padding:0!important;background:none!important;border:0!important;box-shadow:none!important;overflow:visible!important;transform:translateZ(0)}',
     H + '>.top .srch .tm-sf{flex:1;min-width:0;height:38px;display:flex;align-items:center;gap:8px;padding:0 12px;border:1px solid var(--line);border-radius:12px;color:var(--mut);font-size:13px;overflow:hidden;text-align:left}',
     H + '>.top .srch .tm-sf svg{width:18px;height:18px;flex:none}',
     H + '>.top .srch .tm-go{flex:none;width:38px;height:38px;border-radius:12px;background:var(--am);color:var(--ongrad,#1b1006);display:grid;place-items:center}',
@@ -69,12 +73,13 @@
     /* ---------- Slide banner (same slides, v10 look) ---------- */
     H + '>.tbn,' + H + '>.home-promo-tbn{position:relative;margin:38px 20px 0!important}',
     H + ' .tbn-track{border:1px solid var(--line)!important;border-radius:24px!important;background:var(--s1)!important;box-shadow:none!important}',
-    H + ' .tbn-s{position:relative;display:block!important;grid-template-columns:none!important;padding:18px!important;min-height:168px!important;background:none!important;overflow:hidden}',
+    H + ' .tbn-s{position:relative;display:block!important;grid-template-columns:none!important;padding:20px 18px 48px!important;min-height:236px!important;height:auto!important;background:none!important;overflow:hidden}',
     H + ' .tbn-s:after{content:none!important}',
     H + ' .tbn-tag{font:500 9px "DM Mono",monospace!important;letter-spacing:.16em;padding:4px 8px!important;border-radius:6px!important;background:var(--bg)!important;border:0!important;color:var(--am)!important}',
-    H + ' .tbn h2{margin:12px 0 0!important;max-width:190px;font:800 22px/1.15 "Bricolage Grotesque","Hanken Grotesk",sans-serif!important;letter-spacing:-.015em}',
+    H + ' .tbn-copy{position:relative;z-index:2;max-width:calc(100% - 96px)!important}',
+    H + ' .tbn h2{margin:12px 0 0!important;max-width:100%!important;font:800 22px/1.2 "Bricolage Grotesque","Hanken Grotesk",sans-serif!important;letter-spacing:-.015em;overflow-wrap:anywhere}',
     H + ' .tbn h2 em{color:var(--am)}',
-    H + ' .tbn p{margin:5px 0 0!important;max-width:200px;font-size:13px!important;color:var(--mut)}',
+    H + ' .tbn p{margin:7px 0 0!important;max-width:100%!important;font-size:13px!important;line-height:1.45!important;color:var(--mut)}',
     H + ' .tbn-list{position:absolute;left:18px;bottom:30px;display:flex;gap:10px;overflow:visible!important}',
     H + ' .tbn-chip{height:28px;padding:0 11px!important;border-radius:10px!important;background:var(--bg)!important;border:1px solid var(--line)!important;font-size:11px!important;font-weight:700;gap:6px}',
     H + ' .tbn-chip small{font-size:9.5px;font-weight:600;color:var(--up)}',
@@ -102,10 +107,10 @@
     /* ---------- Top Categories ---------- */
     H + '>.home-market-shortcuts{display:flex!important;grid-template-columns:none!important;gap:10px!important;overflow-x:auto;scrollbar-width:none;margin:0!important;padding:0 20px 2px!important}',
     H + '>.home-market-shortcuts::-webkit-scrollbar{display:none}',
-    H + '>.home-market-shortcuts .mk-card{flex:none!important;width:60px!important;min-width:0!important;height:auto!important;min-height:0!important;padding:0!important;display:flex!important;flex-direction:column!important;align-items:center!important;gap:7px!important;background:none!important;border:0!important;box-shadow:none!important}',
-    H + '>.home-market-shortcuts .mk-ico{width:54px!important;height:54px!important;border-radius:50%!important;background:var(--s2)!important;color:var(--am)!important;display:grid!important;place-items:center!important;border:0!important;box-shadow:none!important}',
-    H + '>.home-market-shortcuts .mk-ico svg{width:22px!important;height:22px!important}',
-    H + '>.home-market-shortcuts .mk-name{font-size:11px!important;font-weight:600!important;line-height:1.15!important;text-align:center!important;white-space:normal!important;color:var(--txt)!important}',
+    H + '>.home-market-shortcuts .mk-card{flex:none!important;width:116px!important;min-width:116px!important;min-height:116px!important;height:auto!important;padding:16px!important;display:flex!important;flex-direction:column!important;align-items:flex-start!important;justify-content:space-between!important;gap:4px!important;text-align:left!important;border-radius:18px!important;background:var(--s1)!important;border:1px solid var(--line)!important;box-shadow:none!important}',
+    H + '>.home-market-shortcuts .mk-ico{width:42px!important;height:42px!important;border-radius:12px!important;margin:0!important;background:var(--s2)!important;color:var(--am)!important;display:grid!important;place-items:center!important;border:0!important;box-shadow:none!important}',
+    H + '>.home-market-shortcuts .mk-ico svg{width:21px!important;height:21px!important}',
+    H + '>.home-market-shortcuts .mk-name{font:800 17px/1.15 "Bricolage Grotesque",sans-serif!important;letter-spacing:-.01em!important;text-align:left!important;white-space:normal!important;color:var(--txt)!important}',
 
     /* ---------- Deals of the Day (+ loading skeleton) ---------- */
     '.tm-deals{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding:0 20px 2px}',
@@ -325,7 +330,7 @@
     }
     var Lg = bar.querySelector('.tm-hb-l'), Rg = bar.querySelector('.tm-hb-r');
     var sig = '';
-    var src = top ? [].slice.call(top.querySelectorAll('.avb,.ib[data-pg="scan"],.ib[data-pg="support"],.ib[data-pg="notif"]')) : [];
+    var src = top ? [].slice.call(top.querySelectorAll('.avb, .ib[data-pg="support"]')) : [];
     src.forEach(function (b) { sig += b.outerHTML; });
     if (Rg.getAttribute('data-sig') === sig) return true;
     Rg.setAttribute('data-sig', sig);
@@ -361,8 +366,10 @@
     var nav = document.getElementById('nav');
     if (!nav) return;
     [].forEach.call(nav.querySelectorAll('button'), function (b) {
-      if (b.querySelector('.tm-nl')) return;
       var l = b.dataset.tab || (b.dataset.pg === 'scout' ? 'Scout' : '') || b.getAttribute('aria-label') || '';
+      [].forEach.call([].slice.call(b.childNodes), function (n) {
+        if (n.nodeType === 3 || (n.nodeType === 1 && !n.matches('svg'))) n.remove();
+      });
       if (l) b.appendChild(el('span', 'tm-nl', l));
     });
   }
@@ -406,7 +413,7 @@
     if (!v.querySelector('.tm-sec-cats')) v.insertBefore(head('tm-sec-cats', 'Top Categories'), sc);
     loadDeals();
     var have = v.querySelector('.tm-deals'), hd = v.querySelector('.tm-sec-deals');
-    if (!hd) { hd = head('tm-sec-deals', 'Deals of the Day', 'Top trending on TradeMate'); sc.after(hd); }
+    if (!hd) { hd = head('tm-sec-deals', 'Deals of the Day'); sc.after(hd); }
     if (!have) { have = el('div', 'tm-deals'); hd.after(have); }
     var real = deals && deals.length;
     var key = real ? deals.map(function (d) { return d.name + '|' + d.price; }).join('~') : 'skeleton';
