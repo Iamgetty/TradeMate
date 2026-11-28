@@ -308,7 +308,7 @@ class PersonaInquiryController {
   async createInquiry(@Req() request: Request) {
     let diagnosticStage = 'session';
     let upstreamStatus: number | null = null;
-    let upstreamError: string | null = null;
+    let upstreamErrorCount = 0;
     try {
     const userId = await this.currentUser(request);
     const apiKey = process.env.PERSONA_API_KEY || '';
@@ -372,13 +372,9 @@ class PersonaInquiryController {
         // the raw response because upstream payloads may contain user data.
         const errorPayload: unknown = await created.json().catch(() => null);
         const errors = isRecord(errorPayload) && Array.isArray(errorPayload.errors) ? errorPayload.errors : [];
-        upstreamError = errors.slice(0, 3).map((item) => {
-          if (!isRecord(item)) return '';
-          const code = typeof item.code === 'string' || typeof item.code === 'number' ? String(item.code) : '';
-          const title = typeof item.title === 'string' ? item.title : '';
-          const details = typeof item.details === 'string' ? item.details : '';
-          return [code, title, details].filter(Boolean).join(': ').slice(0, 220);
-        }).filter(Boolean).join(' | ').slice(0, 500) || 'Persona returned a non-JSON error response';
+        // Log only the number of structured errors. Upstream titles, codes and
+        // details are not trusted to be free of user-provided or personal data.
+        upstreamErrorCount = errors.length;
         throw new HttpException('Persona could not start verification. Please try again later.', created.status === 401 || created.status === 403 ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.BAD_GATEWAY);
       }
       const payload: unknown = await created.json();
@@ -449,7 +445,7 @@ class PersonaInquiryController {
         stage: diagnosticStage,
         status,
         upstreamStatus,
-        upstreamError,
+        upstreamErrorCount,
         reason: String(reason).slice(0, 160),
       });
       throw error;
