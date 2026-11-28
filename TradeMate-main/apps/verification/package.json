@@ -1,0 +1,20 @@
+{
+  "name": "@metadusk/verifire-service",
+  "version": "0.2.0",
+  "private": true,
+  "description": "VeriFire provider-neutral verification infrastructure service",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "start": "node dist/server.js",
+    "test": "npm run build && node --test"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

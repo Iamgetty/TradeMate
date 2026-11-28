@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "description": "Initial product catalogue. Entries are selectable CLI catalogue releases, not claims of live provider coverage or hosted entitlement.",
+  "products": [
+    {
+      "id": "kyc",
+      "name": "Know Your Customer",
+      "description": "Individual identity verification",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "status": "catalogue"
+        }
+      ]
+    },
+    {
+      "id": "kyb",
+      "name": "Know Your Business",
+      "description": "Business identity and registration verification",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "status": "catalogue"
+        }
+      ]
+    },
+    {
+      "id": "aml",
+      "name": "Anti-Money Laundering Screening",
+      "description": "Risk and AML screening",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "status": "catalogue"
+        }
+      ]
+    },
+    {
+      "id": "sanctions",
+      "name": "Sanctions Screening",
+      "description": "Sanctions list screening",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "status": "catalogue"
+        }
+      ]
+    },
+    {
+      "id": "pep",
+      "name": "Politically Exposed Person Screening",
+      "description": "PEP screening",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "status": "catalogue"
+        }
+      ]
+    },
+    {
+      "id": "age-verification",
+      "name": "Age Verification",
+      "description": "Age and age-threshold checks",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "status": "catalogue"
+        }
+      ]
+    },
+    {
+      "id": "address-verification",
+      "name": "Address Verification",
+      "description": "Residential or business address checks",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "status": "catalogue"
+        }
+      ]
+    },
+    {
+      "id": "biometric",
+      "name": "Biometric Verification",
+      "description": "Face match and liveness checks",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "status": "catalogue"
+        }
+      ]
+    },
+    {
+      "id": "fraud",
+      "name": "Fraud Risk",
+      "description": "Identity and application fraud signals",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "status": "catalogue"
+        }
+      ]
+    },
+    {
+      "id": "transaction-monitoring",
+      "name": "Transaction Monitoring",
+      "description": "Transaction risk monitoring",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "status": "catalogue"
+        }
+      ]
+    },
+    {
+      "id": "travel-rule",
+      "name": "Travel Rule",
+      "description": "Regulated virtual-asset transfer compliance workflows",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "status": "catalogue"
+        }
+      ]
+    },
+    {
+      "id": "phone-verification",
+      "name": "Phone Verification",
+      "description": "Phone ownership and risk checks",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "status": "catalogue"
+        }
+      ]
+    },
+    {
+      "id": "email-verification",
+      "name": "Email Verification",
+      "description": "Email ownership and risk checks",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "status": "catalogue"
+        }
+      ]
+    }
+  ]
+}

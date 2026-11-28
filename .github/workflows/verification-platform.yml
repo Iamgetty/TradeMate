@@ -1,0 +1,56 @@
+name: Verification platform validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'TradeMate-main/apps/verification/**'
+      - 'TradeMate-main/packages/verification-cli/**'
+      - 'TradeMate-main/docs/verification-platform/**'
+      - '.github/workflows/verification-platform.yml'
+  push:
+    branches: [feat/standalone-verification-platform]
+    paths:
+      - 'TradeMate-main/apps/verification/**'
+      - 'TradeMate-main/packages/verification-cli/**'
+      - 'TradeMate-main/docs/verification-platform/**'
+      - '.github/workflows/verification-platform.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verification-platform-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verification-service:
+    name: Verification service typecheck and tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.22.1
+      - name: Install service dependencies
+        working-directory: TradeMate-main/apps/verification
+        run: npm install --no-audit --no-fund
+      - name: Typecheck and run service tests
+        working-directory: TradeMate-main/apps/verification
+        run: npm test
+
+  verification-cli:
+    name: Verification CLI tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.22.1
+      - name: Run CLI tests
+        working-directory: TradeMate-main/packages/verification-cli
+        run: npm test
