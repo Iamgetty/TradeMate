@@ -694,7 +694,7 @@ test('notification action marks the item read and opens its internal conversatio
   });
 
   await login(page, 'buyer@example.test');
-  await page.locator('#app button[data-pg="notif"]').first().click();
+  await page.locator('#mwbar .hb[data-pg="notif"]').first().click();
   await expect(page.locator('#pg .nf-card')).toHaveCount(1);
   await page.locator('#pg .nf-card').click();
 
