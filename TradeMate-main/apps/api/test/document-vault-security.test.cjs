@@ -59,7 +59,7 @@ test('new contract proposals generate a private participant-visible vault PDF wi
   assert.match(moduleSource, /It is not a signed agreement, digital signature, or proof of acceptance/);
   assert.match(moduleSource, /const contractPdf = buildContractRecordPdf\(created\.rows\[0\], 'proposal'\)/);
   assert.match(moduleSource, /'contract_participants'/);
-  assert.match(moduleSource, /'contract','contract','generated'/);
+  assert.match(moduleSource, /INSERT INTO user_documents \(owner_user_id, source_type, source_id, document_type, document_status, visibility/);
   assert.match(moduleSource, /signature_status: 'not_signed'/);
   assert.match(moduleSource, /TradeMate-Contract-Proposal-/);
   assert.match(moduleSource, /const saveContractVaultRecord =/);
