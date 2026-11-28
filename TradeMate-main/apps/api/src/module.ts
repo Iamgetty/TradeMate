@@ -1605,7 +1605,7 @@ class UserDocumentsController {
     const documentType = String(body?.documentType || 'other');
     const documentStatus = String(body?.documentStatus || 'received');
     const visibility = String(body?.visibility || 'private');
-    const sourceTypes = ['account','email_verification','identity_verification','persona_agreement','organization_registration','organization_verification','contract','contract_negotiation','marketplace_transaction','user_upload'];
+    const sourceTypes = ['contract','contract_negotiation','user_upload'];
     const documentTypes = ['agreement','identity','address','organization','contract','statement','receipt','invoice','negotiation','other'];
     if (!fileName || fileName.length > 180
       || !['application/pdf','image/jpeg','image/png'].includes(mimeType)
@@ -1613,7 +1613,7 @@ class UserDocumentsController {
       || (dataUrl && dataUrl[1].toLowerCase() !== mimeType)
       || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)
       || !sourceTypes.includes(sourceType) || !documentTypes.includes(documentType)
-      || !['draft','generated','received','signed','archived'].includes(documentStatus)
+      || !['draft','received'].includes(documentStatus)
       || !['private','organization','contract_participants'].includes(visibility)) {
       throw new BadRequestException('Check the document name, type, status and file format.');
     }
