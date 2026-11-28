@@ -138,6 +138,23 @@ test('contract conversation messages link only sender-owned participant-visible 
   assert.match(webSource, /contractAttachmentRemove/);
 });
 
+test('signed Persona inquiry events generate one private verification evidence PDF per event', () => {
+  const manifestSource = readFileSync(join(root, 'scripts', 'migrate.js'), 'utf8');
+  const migrationSource = readFileSync(join(root, 'database', 'migrations', '060_persona_webhook_event_documents.sql'), 'utf8');
+  assert.match(manifestSource, /'060_persona_webhook_event_documents\.sql'/);
+  assert.match(migrationSource, /event_id TEXT PRIMARY KEY REFERENCES public\.persona_webhook_events\(event_id\)/);
+  assert.match(migrationSource, /document_id UUID NOT NULL UNIQUE REFERENCES public\.user_documents\(id\)/);
+  assert.match(moduleSource, /const buildPersonaVerificationEventPdf =/);
+  assert.match(moduleSource, /TRADEMATE IDENTITY VERIFICATION EVENT RECORD/);
+  assert.match(moduleSource, /source_type, source_id, document_type, document_status, visibility/);
+  assert.match(moduleSource, /'identity_verification',\$1,'identity','generated','private'/);
+  assert.match(moduleSource, /raw_identity_images_included: false/);
+  assert.match(moduleSource, /persona\.verification_event_recorded/);
+  assert.match(moduleSource, /await savePersonaVerificationEventEvidence\(inquiryId\)/);
+  assert.match(moduleSource, /LEFT JOIN persona_webhook_event_documents/);
+  assert.match(moduleSource, /ON CONFLICT \(event_id\) DO NOTHING/);
+});
+
 test('new contract proposals generate a private participant-visible vault PDF without claiming signature', () => {
   assert.match(moduleSource, /const buildContractRecordPdf =/);
   assert.match(moduleSource, /TRADEMATE CONTRACT RECORD/);
