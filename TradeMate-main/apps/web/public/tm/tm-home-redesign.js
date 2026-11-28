@@ -107,8 +107,9 @@
 
     /* ---------- Top Categories ---------- */
     H + '>.tm-sec-cats{display:flex!important}',
-    H + '>.home-market-shortcuts{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px 10px!important;padding:0 16px 14px!important}',
-    H + '>.home-market-shortcuts .mk-card{min-height:82px!important;padding:10px 6px!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:2px!important;background:transparent!important;border:0!important;box-shadow:none!important}',
+    H + '>.home-market-shortcuts{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;gap:12px!important;overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:none!important;-webkit-overflow-scrolling:touch;padding:0 16px 14px!important}',
+    H + '>.home-market-shortcuts::-webkit-scrollbar{display:none!important}',
+    H + '>.home-market-shortcuts .mk-card{flex:0 0 82px!important;width:82px!important;min-width:82px!important;min-height:82px!important;padding:10px 6px!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:2px!important;background:transparent!important;border:0!important;box-shadow:none!important}',
     H + '>.home-market-shortcuts .mk-ico{width:46px!important;height:46px!important;border-radius:15px!important;background:var(--s2)!important;color:var(--am)!important;display:grid!important;place-items:center!important;border:0!important;box-shadow:none!important;margin:0!important}',
     H + '>.home-market-shortcuts .mk-ico svg{width:23px!important;height:23px!important}',
     H + '>.home-market-shortcuts .mk-name{font-size:12px!important;font-weight:600!important;line-height:1.15!important;text-align:center!important;white-space:normal!important;color:var(--txt)!important}',
