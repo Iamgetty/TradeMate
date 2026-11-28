@@ -98,7 +98,7 @@ test('same provisioning request key and parameters return the original tenant', 
 test('reusing a provisioning request key with changed parameters fails closed', async () => {
   const persistence = fakePersistence();
   await provisionTenant(persistence, admin, input, NOW);
-  const changed = { ...input, products: [{ productId: 'kyc', expiresAt: null }] };
+  const changed = { ...input, products: [{ productId: 'kyc', startsAt: '2026-11-28T12:00:00.000Z', expiresAt: null }] };
   await assert.rejects(() => provisionTenant(persistence, admin, changed, NOW), TenantProvisioningError);
   assert.equal(persistence.state.tenants.size, 1);
 });
@@ -115,7 +115,7 @@ test('the same external identity may own more than one tenant', async () => {
 test('invalid issuer, duplicate products and invalid entitlement windows are rejected before persistence', async () => {
   const persistence = fakePersistence();
   await assert.rejects(() => provisionTenant(persistence, admin, { ...input, owner: { ...input.owner, issuer: 'http://identity.example.test' } }, NOW), TenantProvisioningError);
-  await assert.rejects(() => provisionTenant(persistence, admin, { ...input, products: [{ productId: 'kyc', expiresAt: null }, { productId: 'kyc', expiresAt: null }] }, NOW), TenantProvisioningError);
+  await assert.rejects(() => provisionTenant(persistence, admin, { ...input, products: [{ productId: 'kyc', startsAt: '2026-11-28T12:00:00.000Z', expiresAt: null }, { productId: 'kyc', startsAt: '2026-11-28T12:00:00.000Z', expiresAt: null }] }, NOW), TenantProvisioningError);
   await assert.rejects(() => provisionTenant(persistence, admin, { ...input, products: [{ productId: 'kyc', startsAt: '2026-11-28T13:00:00.000Z', expiresAt: null }] }, NOW), TenantProvisioningError);
   assert.equal(persistence.state.transactions, 0);
 });
