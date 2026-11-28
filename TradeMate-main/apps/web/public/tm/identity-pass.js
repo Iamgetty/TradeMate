@@ -361,8 +361,76 @@ var s = document.createElement("style");
     title.style.cssText = 'font:800 22px inherit;margin:0';
     header.appendChild(eyebrow); header.appendChild(title);
     var body = document.createElement('div');
-    body.style.cssText = 'padding:18px 22px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.65 inherit;color:var(--txt,#fff)';
-    body.textContent = agreement.content || '';
+    body.className = 'tm-consent-body';
+    body.style.cssText = 'padding:22px 24px 26px;overflow:auto;min-height:0;color:var(--txt,#fff);font:400 14px/1.65 inherit';
+    var rawLines = String(agreement.content || '').split(/\\r?\\n/);
+    // The document title is already prominent in the dialog header; do not repeat it.
+    if (rawLines.length && /^TRADEMATE IDENTITY VERIFICATION AGREEMENT$/i.test(rawLines[0].trim())) rawLines.shift();
+    var currentList = null, currentItem = null, sectionCount = 0;
+    function addConsentParagraph(text, className) {
+      var p = document.createElement('p');
+      p.className = className || 'tm-consent-paragraph';
+      var urlPattern = /(https:\\/\\/withpersona\\.com\\/legal\\/privacy-policy)/g;
+      var parts = text.split(urlPattern);
+      parts.forEach(function (part) {
+        if (!part) return;
+        if (urlPattern.test(part)) {
+          var link = document.createElement('a');
+          link.href = 'https://withpersona.com/legal/privacy-policy';
+          link.target = '_blank'; link.rel = 'noopener noreferrer';
+          link.textContent = part;
+          p.appendChild(link);
+          urlPattern.lastIndex = 0;
+        } else {
+          p.appendChild(document.createTextNode(part));
+        }
+      });
+      body.appendChild(p);
+      return p;
+    }
+    function flushList() { currentList = null; currentItem = null; }
+    function addClause(line) {
+      if (!currentList) {
+        currentList = document.createElement('ol');
+        currentList.className = 'tm-consent-list';
+        body.appendChild(currentList);
+      }
+      var match = line.match(/^\\d+\\.\\s*(.*)$/);
+      currentItem = document.createElement('li');
+      currentItem.textContent = match ? match[1] : line;
+      currentList.appendChild(currentItem);
+    }
+    rawLines.forEach(function (raw) {
+      var line = raw.trim();
+      if (!line) { flushList(); return; }
+      if (/^Version\\s/i.test(line)) {
+        flushList();
+        var meta = document.createElement('div');
+        meta.className = 'tm-consent-version';
+        meta.textContent = line;
+        body.appendChild(meta);
+        return;
+      }
+      if (/^(WHAT YOU ARE AGREEING TO|YOUR CHOICE, SIGNATURE AND RECORD)$/i.test(line)) {
+        flushList();
+        sectionCount++;
+        var h = document.createElement('h3');
+        h.className = 'tm-consent-section-title';
+        h.textContent = line === 'WHAT YOU ARE AGREEING TO' ? 'What you are agreeing to' : 'Your choice, signature and record';
+        body.appendChild(h);
+        return;
+      }
+      if (/^\\d+\\.\\s/.test(line)) { addClause(line); return; }
+      if (currentItem) {
+        currentItem.appendChild(document.createTextNode(' ' + line));
+        return;
+      }
+      flushList();
+      addConsentParagraph(line, sectionCount ? 'tm-consent-paragraph' : 'tm-consent-intro');
+    });
+    var consentStyle = document.createElement('style');
+    consentStyle.textContent = '.tm-consent-body a{color:var(--am,#ffc24d);text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere}.tm-consent-version{display:inline-flex;align-items:center;margin:0 0 22px;padding:7px 11px;border:1px solid var(--line,#394052);border-radius:999px;background:var(--s2,#202638);color:var(--mut,#aab1c2);font:600 11px/1.3 inherit}.tm-consent-intro{margin:0 0 24px;font-size:15px;line-height:1.65;color:var(--txt,#fff)}.tm-consent-section-title{margin:26px 0 12px;padding-bottom:9px;border-bottom:1px solid var(--line,#394052);font:800 14px/1.35 inherit;letter-spacing:.055em;text-transform:uppercase;color:var(--am,#ffc24d)}.tm-consent-paragraph{margin:0 0 14px;color:var(--txt,#fff);line-height:1.65}.tm-consent-list{display:grid;gap:12px;margin:0 0 22px;padding:0;list-style:none;counter-reset:consent}.tm-consent-list li{position:relative;margin:0;padding:0 0 0 42px;line-height:1.65;color:var(--txt,#fff);counter-increment:consent}.tm-consent-list li:before{content:counter(consent,decimal-leading-zero);position:absolute;left:0;top:1px;display:grid;place-items:center;width:28px;height:28px;border:1px solid color-mix(in srgb,var(--am,#ffc24d) 35%,var(--line,#394052));border-radius:9px;background:color-mix(in srgb,var(--am,#ffc24d) 9%,var(--s2,#202638));color:var(--am,#ffc24d);font:700 10px/1 inherit}@media(max-width:560px){.tm-consent-body{padding:18px 18px 22px!important;font-size:13.5px!important}.tm-consent-intro{font-size:14px}.tm-consent-section-title{margin-top:22px}}';
+    body.appendChild(consentStyle);
     var signatureWrap = document.createElement('label');
     signatureWrap.style.cssText = 'display:grid;gap:7px;padding:0 22px 18px;font-size:12px;font-weight:700;color:var(--txt,#fff)';
     signatureWrap.textContent = 'Type your full legal name to sign';
