@@ -180,7 +180,7 @@ const buildEmailVerificationRecordPdf = (user: Record<string, unknown>, verified
     'Country code: ' + String(user.country_code || ''),
     '', 'VERIFICATION SCOPE',
     'This record confirms that the account email address completed TradeMate email verification.',
-    'It does not verify the account holder identity, user status, or legal authority.',
+    'It does not verify the account holder identity, organization status, or legal authority.',
   ];
   const lines = rawLines.map((line) => line.replace(/[^\x20-\x7E]/g, ''));
   const escapePdf = (line: string) => line.split('\\').join('\\\\').split('(').join('\\(').split(')').join('\\)');
