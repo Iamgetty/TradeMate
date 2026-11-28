@@ -2724,7 +2724,7 @@ class EnquiriesController {
   }
 
   @Post(':id/messages')
-  async reply(@Param('id') id: string, @Req() request: Request, @Body() body: { message?: string }) {
+  async reply(@Param('id') id: string, @Req() request: Request, @Body() body: { message?: string; attachmentDocumentIds?: string[] }) {
     parseUuidParam(id);
     parseBody(enquiryReplyBodySchema, body);
     const userId = await this.authenticatedUser(request);
@@ -3175,7 +3175,16 @@ class MarketplaceContractsController {
     const contract = await this.authorizedContract(id, userId);
     const result = await databasePool!.query(
       `SELECT m.id, m.contract_id, m.sender_user_id, u.display_name AS sender_name,
-              m.message, m.created_at
+              m.message, m.created_at,
+              COALESCE((
+                SELECT jsonb_agg(jsonb_build_object(
+                  'id', d.id, 'file_name', d.file_name, 'mime_type', d.mime_type,
+                  'file_size', d.file_size, 'created_at', d.created_at
+                ) ORDER BY d.created_at, d.id)
+                FROM marketplace_contract_message_documents md
+                JOIN user_documents d ON d.id = md.document_id
+                WHERE md.contract_message_id = m.id AND md.contract_id = m.contract_id
+              ), '[]'::jsonb) AS attachments
        FROM marketplace_contract_messages m
        JOIN users u ON u.id = m.sender_user_id
        WHERE m.contract_id = $1
@@ -3195,6 +3204,13 @@ class MarketplaceContractsController {
     if (message.length < 1 || message.length > 2000) {
       throw new BadRequestException('Your message must be between 1 and 2,000 characters.');
     }
+    const attachmentDocumentIds = Array.isArray(body?.attachmentDocumentIds) ? body.attachmentDocumentIds : [];
+    if (attachmentDocumentIds.length > 10
+      || attachmentDocumentIds.some((value) => typeof value !== 'string'
+        || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value))
+      || new Set(attachmentDocumentIds).size !== attachmentDocumentIds.length) {
+      throw new BadRequestException('Choose up to 10 valid, distinct contract documents.');
+    }
     const client = await databasePool!.connect();
     try {
       await client.query('BEGIN');
@@ -3212,13 +3228,36 @@ class MarketplaceContractsController {
       if (!['proposed', 'accepted'].includes(current.rows[0].status)) {
         throw new ConflictException('This contract is closed for new messages.');
       }
+      if (attachmentDocumentIds.length) {
+        const ownedDocuments = await client.query(
+          `SELECT id FROM user_documents
+           WHERE id = ANY($1::uuid[]) AND owner_user_id = $2 AND source_type = 'contract_negotiation'
+             AND source_id = $3 AND visibility = 'contract_participants'
+           FOR SHARE`,
+          [attachmentDocumentIds, userId, id],
+        );
+        if (ownedDocuments.rowCount !== attachmentDocumentIds.length) {
+          throw new ForbiddenException('Only your own files uploaded to this contract can be attached to a message.');
+        }
+      }
       const inserted = await client.query(
         'INSERT INTO marketplace_contract_messages (contract_id, sender_user_id, message) VALUES ($1,$2,$3) RETURNING id, contract_id, sender_user_id, message, created_at',
         [id, userId, message],
       );
+      if (attachmentDocumentIds.length) {
+        await client.query(
+          `INSERT INTO marketplace_contract_message_documents
+            (contract_message_id, document_id, contract_id, attached_by_user_id)
+           SELECT $1, d.id, $2, $3 FROM user_documents d
+           WHERE d.id = ANY($4::uuid[]) AND d.owner_user_id = $3
+             AND d.source_type = 'contract_negotiation' AND d.source_id = $2
+             AND d.visibility = 'contract_participants'`,
+          [inserted.rows[0].id, id, userId, attachmentDocumentIds],
+        );
+      }
       await client.query(
-        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_message_sent','contract',$3,'{}'::jsonb)",
-        [userId, current.rows[0].seller_organization_id, id],
+        "INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata) VALUES ($1,$2,'marketplace.contract_message_sent','contract',$3,$4::jsonb)",
+        [userId, current.rows[0].seller_organization_id, id, JSON.stringify({ attachment_count: attachmentDocumentIds.length })],
       );
       if (current.rows[0].is_buyer) {
         await client.query(
@@ -3233,7 +3272,7 @@ class MarketplaceContractsController {
       }
       await client.query('COMMIT');
       const sender = await databasePool!.query('SELECT display_name FROM users WHERE id = $1 LIMIT 1', [userId]);
-      return { data: { ...inserted.rows[0], sender_name: sender.rows[0]?.display_name ?? 'TradeMate user' }, message: 'Contract message sent.' };
+      return { data: { ...inserted.rows[0], sender_name: sender.rows[0]?.display_name ?? 'TradeMate user', attachments: attachmentDocumentIds }, message: 'Contract message sent.' };
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;
