@@ -64,8 +64,8 @@ test('Persona verification consent is versioned, saved privately, and required b
   assert.match(moduleSource, /account\\.persona_verification_consent_accepted/);
   assert.match(moduleSource, /TradeMate-Identity-Verification-Consent-v1\\.0\\.pdf/);
   assert.match(moduleSource, /PERSONA_AGREEMENT_CONTENT/);
-  assert.match(identityPass, /\\/api\\/integrations\\/persona\\/agreement/);
-  assert.match(identityPass, /\\/api\\/integrations\\/persona\\/agreement\\/accept/);
+  assert.ok(identityPass.includes('/api/integrations/persona/agreement'));
+  assert.ok(identityPass.includes('/api/integrations/persona/agreement/accept'));
   assert.match(identityPass, /I agree and continue/);
   assert.match(identityPass, /Not now/);
 });
