@@ -1,8 +1,9 @@
-/* TradeMate home redesign (layout + Light theme palette).
+/* TradeMate home redesign (layout + Light and Purple theme palettes).
  * - Home order: header, search, slide banner, quick market overview, Top Categories, Deals of the Day, Favorites.
  * - Floating pill bottom bar (same five buttons), Profile as a bottom sheet with a centred hero.
- * - Light theme only: white background with purple accents. Dark and Purple themes keep their own colours:
- *   every colour below comes from the theme variables (var(--am), var(--s1) ...), nothing is hard-coded for them.
+ * - Light theme: pure white background with an indigo accent. Purple theme: graphite base with a violet accent.
+ * - Dark theme is NOT touched: nothing below sets any colour for html[data-theme="dark"]; every layout colour
+ *   comes from the theme variables (var(--am), var(--s1) ...).
  * - "Deals of the Day" is read from the same backend call the app already uses: GET /api/market/listings.
  * Runs as a DOM/CSS patch so app.js does not need to change. */
 (function () {
@@ -13,10 +14,14 @@
   var H = 'html body #app .view:has(.home-market-shortcuts)';
   var PG = 'html body #pg .pgs[data-id="profile"]';
   var css = [
-    /* ---------- Light theme: white + purple (vars only; blue rules are re-tinted by retintLight) ---------- */
-    'html[data-theme="light"]{--bg:#FFFFFF;--s1:#F5F3FF;--s2:#EDE9FE;--s3:#E4DFFB;--line:#E4DFFB;--txt:#1E1B3A;--txt2:#3A3566;--text:#1E1B3A;--mut:#5B5780;--dis:#9A95BD;--am:#6C4DFF;--co:#5B3DF0;--in:#6C4DFF;--grad:#6C4DFF;--grad2:#6C4DFF;--navbg:#FFFFFF;--navsolid:#FFFFFF;--sbbg:#FFFFFF;--card:#FFFFFF;--ongrad:#FFFFFF;--glow:#6C4DFF33}',
+    /* ---------- Light theme: pure white + indigo (vars only; blue rules are re-tinted by retintLight) ---------- */
+    'html[data-theme="light"]{--bg:#FFFFFF;--s1:#F8FAFC;--s2:#EEF2FF;--s3:#E2E8F0;--line:#E2E8F0;--txt:#0F172A;--txt2:#334155;--text:#0F172A;--mut:#586579;--dis:#94A3B8;--am:#4F46E5;--co:#4338CA;--in:#4F46E5;--grad:#4F46E5;--grad2:#4F46E5;--navbg:#FFFFFF;--navsolid:#FFFFFF;--sbbg:#FFFFFF;--card:#FFFFFF;--ongrad:#FFFFFF;--glow:#4F46E533;--scrim:#94A3B8}',
     'html[data-theme="light"],html[data-theme="light"] body{background:#FFFFFF}',
-    'html[data-theme="light"] body .tabs button.on:not(#tm-x){color:#5B3DF0!important}',
+    'html[data-theme="light"] body .tabs button.on:not(#tm-x){color:#4338CA!important}',
+
+    /* ---------- Purple theme: graphite base + violet accent ---------- */
+    'html[data-theme="purple"]{--bg:#0F0E15;--s1:#17161F;--s2:#232131;--s3:#2E2C3C;--line:#2E2C3C;--txt:#F3F2F8;--txt2:#D9D6E6;--text:#F3F2F8;--mut:#A8A5B8;--dis:#6F6C80;--am:#A495F8;--co:#8F7EF0;--in:#A495F8;--grad:#A495F8;--grad2:#A495F8;--navbg:#0F0E15;--navsolid:#0F0E15;--sbbg:#0F0E15;--card:#17161F;--ongrad:#14111F;--glow:#A495F833;--scrim:#050409}',
+    'html[data-theme="purple"],html[data-theme="purple"] body{background:#0F0E15}',
 
     /* ---------- Home: order and spacing ---------- */
     H + '{display:flex!important;flex-direction:column;padding-bottom:calc(112px + env(safe-area-inset-bottom,0px))!important}',
@@ -40,7 +45,7 @@
     H + '>.top .ib[data-pg="support"]{grid-area:su}',
     H + '>.top .ib[data-pg="notif"]{grid-area:bl}',
     H + '>.top .ib{width:44px!important;height:44px!important;border-radius:50%!important;background:var(--s2)!important;display:grid;place-items:center;position:relative}',
-    H + '>.top .srch{grid-area:se;display:flex!important;align-items:center;gap:10px;width:100%!important;height:48px!important;border-radius:14px!important;background:var(--s1)!important;border:1px solid var(--line)!important;padding:0 4px 0 14px!important}',
+    H + '>.top .srch{grid-area:se;display:flex!important;align-items:center;gap:10px;width:100%!important;height:48px!important;border-radius:14px!important;background:transparent!important;border:1px solid var(--line)!important;padding:0 4px 0 14px!important}',
     H + '>.top .srch .tm-go{margin-left:auto;flex:none;width:40px;height:40px;border-radius:12px;background:var(--am);color:var(--ongrad,#1b1006);display:grid;place-items:center}',
     H + '>.top .srch .tm-go svg{width:20px;height:20px;color:inherit!important;stroke:currentColor}',
 
@@ -89,9 +94,9 @@
   style.textContent = css;
   document.head.appendChild(style);
 
-  /* ---------- Light theme: re-tint the app's hard-coded blue rules to the purple accent ---------- */
-  var MAP = [[/#2563eb/gi, '#6C4DFF'], [/#1d4ed8/gi, '#5B3DF0'], [/#eff6ff/gi, '#EDE9FE'], [/#dbeafe/gi, '#DDD6FE'],
-    [/#3b82f6/gi, '#6C4DFF'], [/#f5f5f5/gi, '#F5F3FF'], [/rgba\(\s*37\s*,\s*99\s*,\s*235\s*,/gi, 'rgba(108,77,255,']];
+  /* ---------- Light theme: re-tint the app's hard-coded blue rules to the indigo accent ---------- */
+  var MAP = [[/#2563eb/gi, '#4F46E5'], [/#1d4ed8/gi, '#4338CA'], [/#eff6ff/gi, '#EEF2FF'], [/#dbeafe/gi, '#E0E7FF'],
+    [/#3b82f6/gi, '#4F46E5'], [/#f5f5f5/gi, '#F8FAFC'], [/rgba\(\s*37\s*,\s*99\s*,\s*235\s*,/gi, 'rgba(79,70,229,']];
   var BLUE = /#2563eb|#1d4ed8|#eff6ff|#dbeafe|#3b82f6|rgba\(\s*37\s*,\s*99\s*,\s*235/i;
   var tintEl = document.createElement('style');
   tintEl.id = 'tm-light-purple';
