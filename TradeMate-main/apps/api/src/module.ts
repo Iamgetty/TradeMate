@@ -2230,6 +2230,28 @@ class UserDocumentsController {
     response.setHeader('Cache-Control', 'private, no-store');
     return response.status(200).send(document.file_data);
   }
+
+  @Get(':id/preview')
+  async preview(@Req() request: Request, @Param('id') id: string, @Res() response: Response) {
+    const userId = await this.currentUser(request);
+    const document = await this.accessibleDocument(id, userId, true);
+    if (!['application/pdf', 'image/jpeg', 'image/png'].includes(String(document.mime_type))) {
+      throw new BadRequestException('This document type cannot be previewed.');
+    }
+    const safeName = String(document.file_name).replace(/[\\r\\n"]/g, '_');
+    await databasePool!.query(
+      `INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata)
+       VALUES ($1,$2,'document.previewed','user_document',$3,'{}'::jsonb)`,
+      [userId, document.organization_id, document.id],
+    );
+    response.setHeader('Content-Type', document.mime_type);
+    response.setHeader('Content-Length', String(document.file_size));
+    response.setHeader('Content-Disposition', `inline; filename="document"; filename*=UTF-8''${encodeURIComponent(safeName)}`);
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' blob: data:; style-src 'unsafe-inline'; sandbox");
+    response.setHeader('Cache-Control', 'private, no-store');
+    return response.status(200).send(document.file_data);
+  }
 }
 
 @Controller('market/listings')
