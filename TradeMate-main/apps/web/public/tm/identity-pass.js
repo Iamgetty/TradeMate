@@ -175,7 +175,14 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
 .idp-vprivacy{justify-content:flex-start;padding:12px 14px;border:1px solid var(--line);border-radius:15px;background:color-mix(in srgb,var(--s2) 72%,transparent);font-size:11.5px}
 .idp-vprivacy small{font-size:10.5px}
 @media(max-width:560px){.idp-verify{padding:17px;border-radius:22px}.idp-vtop{align-items:flex-start;flex-wrap:wrap}.idp-vheading{padding-top:2px}.idp-vstatus{margin-left:62px;margin-top:-4px}.idp-vsteps{gap:7px;margin:18px 0}.idp-vstep-icon{width:40px;height:40px;border-radius:13px}.idp-vstep b{font-size:11.5px}.idp-vstep small{font-size:10px;max-width:12ch}.idp-vconnector{flex-basis:4%;margin-top:19px}}
-@media(max-width:380px){.idp-vsteps{flex-direction:column;gap:9px}.idp-vstep{flex-direction:row;align-items:center;text-align:left;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:14px;background:var(--s2)}.idp-vstep-icon{flex:none}.idp-vstep b{min-width:110px}.idp-vstep small{max-width:none;flex:1}.idp-vconnector{display:none}}
+@media(max-width:560px){.idp-vstatus{margin:0;white-space:normal;justify-self:start}.idp-vsteps{align-items:center}}
+@media(max-width:380px){.idp-verify{padding:16px;border-radius:20px}.idp-vtop{display:grid;grid-template-columns:40px minmax(0,1fr);gap:10px;align-items:start}.idp-vbadge{grid-column:1;grid-row:1;width:40px;height:40px;border-radius:12px}.idp-vheading{grid-column:2;grid-row:1;min-width:0}.idp-vheading h3{font-size:20px}.idp-vstatus{grid-column:2;grid-row:2;margin-top:2px;justify-self:start}.idp-vsteps{display:grid;grid-template-columns:1fr;gap:8px;margin:18px 0}.idp-vstep{display:grid;grid-template-columns:36px minmax(0,1fr);grid-template-rows:auto auto;align-items:center;column-gap:10px;row-gap:2px;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--s2)}.idp-vstep-icon{grid-column:1;grid-row:1 / span 2;width:36px;height:36px;border-radius:11px}.idp-vstep b{grid-column:2;grid-row:1;min-width:0;font-size:12px}.idp-vstep small{grid-column:2;grid-row:2;max-width:none;font-size:10.5px}.idp-vconnector{display:none}}
+/* Calm, editorial finish: lower decoration and improve ultra-small layout. */
+.idp-verify{background:var(--s1);box-shadow:0 8px 24px rgba(0,0,0,.09);border-color:color-mix(in srgb,var(--am) 18%,var(--line))}
+.idp-verify:before{right:-80px;top:-100px;width:190px;height:190px;opacity:.45}
+.idp-vstatus{box-shadow:none}
+.idp-verify .idp-cta{box-shadow:0 4px 12px color-mix(in srgb,var(--am) 12%,transparent)}
+.idp-vstep-icon{box-shadow:none}
 
 `;
 
