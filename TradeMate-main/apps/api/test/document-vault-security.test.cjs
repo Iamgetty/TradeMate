@@ -146,7 +146,7 @@ test('completed P2P trades generate private receipt PDFs for both parties in the
   assert.match(migrationSource, /document_id UUID NOT NULL UNIQUE/);
   assert.match(moduleSource, /const buildP2PTradeReceiptPdf/);
   assert.match(moduleSource, /saveP2PTradeReceiptVaultDocuments/);
-  const p2pController = moduleSource.slice(moduleSource.indexOf("@Controller('p2p')"), moduleSource.indexOf("@Controller('documents')"));
+  const p2pController = moduleSource.slice(moduleSource.indexOf("@Controller('p2p')"), moduleSource.indexOf("@Controller('profiles')"));
   assert.match(p2pController, /confirmReceipt/);
   assert.match(p2pController, /FOR UPDATE OF t/);
   assert.match(p2pController, /saveP2PTradeReceiptVaultDocuments\(client, receiptTrade\)/);
