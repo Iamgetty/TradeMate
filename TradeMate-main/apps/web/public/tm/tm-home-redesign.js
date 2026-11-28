@@ -57,7 +57,6 @@
     H + '>.top:not([data-tm-bar]) .tm-brand b{font:800 16px "Bricolage Grotesque","Hanken Grotesk",sans-serif;color:var(--txt)}',
     H + '>.top .ib[data-pg="scan"],'+H+' .top .ib[data-pg="notif"]{display:none!important}',
     H + '>.top:not([data-tm-bar]) .ib[data-pg="support"]{grid-area:su}',
-    H + '>.top:not([data-tm-bar]) .ib[data-pg="support"]{grid-area:su}',
     H + '>.top .tm-brand{display:none}',
     H + '>.top:not([data-tm-bar]) .tm-brand{display:flex}',
     H + '>.top .srch{grid-area:se;display:flex!important;align-items:center;gap:10px;width:100%!important;height:38px!important;margin:30px 0 0!important;padding:0!important;background:none!important;border:0!important;box-shadow:none!important}',
@@ -75,7 +74,7 @@
     H + ' .tbn-copy{position:relative;z-index:2;max-width:calc(100% - 96px)!important}',
     H + ' .tbn h2{margin:12px 0 0!important;max-width:100%!important;font:800 22px/1.2 "Bricolage Grotesque","Hanken Grotesk",sans-serif!important;letter-spacing:-.015em;overflow-wrap:anywhere}',
     H + ' .tbn h2 em{color:var(--am)}',
-    H + ' .tbn p{margin:7px 0 0!important;max-width:100%!important;font-size:13px!important;line-height:1.45!important;color:var(--mut)}'
+    H + ' .tbn p{margin:7px 0 0!important;max-width:100%!important;font-size:13px!important;line-height:1.45!important;color:var(--mut)}',
     H + ' .tbn-list{position:absolute;left:18px;bottom:30px;display:flex;gap:10px;overflow:visible!important}',
     H + ' .tbn-chip{height:28px;padding:0 11px!important;border-radius:10px!important;background:var(--bg)!important;border:1px solid var(--line)!important;font-size:11px!important;font-weight:700;gap:6px}',
     H + ' .tbn-chip small{font-size:9.5px;font-weight:600;color:var(--up)}',
