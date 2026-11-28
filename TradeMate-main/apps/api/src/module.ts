@@ -406,6 +406,8 @@ const buildP2PTradeReceiptPdf = (trade: Record<string, unknown>, generatedAt = n
     'Transaction reference: ' + String(trade.id || ''),
     'Status: COMPLETED — both parties recorded completion',
     'Completed at (UTC): ' + String(trade.completed_at || generatedAt.toISOString()),
+    'Buyer marked payment sent (UTC): ' + String(trade.buyer_payment_sent_at || 'Not recorded'),
+    'Seller confirmed receipt (UTC): ' + String(trade.seller_payment_confirmed_at || trade.completed_at || generatedAt.toISOString()),
     'Buyer account: ' + String(trade.buyer_user_id || ''),
     'Buyer name: ' + String(trade.buyer_name || 'Not available'),
     'Seller account: ' + String(trade.seller_user_id || ''),
@@ -3765,7 +3767,7 @@ class P2PMarketController {
       await client.query('BEGIN');
       const locked = await client.query(
         `SELECT t.id, t.order_id, t.buyer_user_id, t.seller_user_id, t.asset_code, t.fiat_code,
-                t.price::text, t.quantity::text, t.fiat_total::text, t.completed_at,
+                t.price::text, t.quantity::text, t.fiat_total::text, t.buyer_payment_sent_at, t.seller_payment_confirmed_at, t.completed_at,
                 b.display_name AS buyer_name, s.display_name AS seller_name
          FROM p2p_trades t JOIN users b ON b.id = t.buyer_user_id JOIN users s ON s.id = t.seller_user_id
          WHERE t.id = $1 AND t.seller_user_id = $2 AND t.status = 'pending'
