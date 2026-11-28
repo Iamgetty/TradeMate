@@ -62,6 +62,14 @@ The default design is data minimization: retain opaque references, normalized ou
 
 Tenant closure must stop new work and trigger an approved lifecycle workflow. It must not silently erase legally required audit records or leave provider-side evidence unmanaged.
 
+## Foundation now implemented in code
+
+The VeriFire service now defines persistence-neutral repository contracts for tenants, API keys, entitlements, verification requests, idempotency, audit events, provider executions and outbox events in `apps/verification/src/repository-contracts.ts`. A `VeriFirePersistence.withTransaction` boundary requires adapters to provide atomic transactions; tenant-scoped methods explicitly receive tenant identifiers. No database adapter or in-memory production fallback is included.
+
+The API-key lifecycle domain service in `apps/verification/src/key-lifecycle.ts` creates a high-entropy key, persists only its verifier, and appends its audit event in one transaction. Revocation and its audit event are also atomic. Plaintext is returned once to the caller and is never written by the service to persistence. The caller must supply an already authenticated tenant-administrator context; tenant-admin authentication and provisioning endpoints are not implemented.
+
+Authorization also exposes exact-scope enforcement, and tests cover key expiry, entitlement effective windows, scope denial, key creation, and revocation. These are domain primitives, not yet connected to the HTTP server or a production persistence adapter.
+
 ## Decisions still required before implementation
 
 1. Select the persistence engine and hosting boundary after reviewing the current AWS and Cloudflare architecture, operational ownership, data-residency needs, backup/restore and recovery objectives.
