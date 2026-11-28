@@ -123,7 +123,7 @@ test('contract conversation messages link only sender-owned participant-visible 
   const contractController = moduleSource.slice(moduleSource.indexOf("@Controller('market/contracts')"), moduleSource.indexOf("@Controller('market/trades')"));
   assert.match(manifestSource, /'059_contract_message_documents\.sql'/);
   assert.match(migrationSource, /marketplace_contract_message_documents/);
-  assert.match(migrationSource, /REFERENCES public\.marketplace_contract_messages\(id\)/);
+  assert.match(migrationSource, /REFERENCES public\.marketplace_contract_messages\(id, contract_id\)/);
   assert.match(migrationSource, /REFERENCES public\.user_documents\(id\)/);
   assert.match(contractController, /attachmentDocumentIds/);
   assert.match(validationSource, /attachmentDocumentIds: z\.array\(z\.string\(\)\.uuid\(\)\)\.max\(10\)\.optional\(\)/);
