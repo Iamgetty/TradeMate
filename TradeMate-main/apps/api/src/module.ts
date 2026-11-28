@@ -669,7 +669,7 @@ class AuthController {
       throw new BadRequestException('Review the current agreement and explicitly accept its version to continue.');
     }
     const userId = session.rows[0].id as string;
-    await databasePool.query(
+    const accepted = await databasePool.query(
       `INSERT INTO user_agreement_acceptances
         (user_id, agreement_key, agreement_version, agreement_sha256, acceptance_method, ip_address, user_agent)
        VALUES ($1, $2, $3, $4, 'explicit_in_app', $5, $6)
