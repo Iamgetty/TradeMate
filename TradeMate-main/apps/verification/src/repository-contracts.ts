@@ -133,10 +133,47 @@ export interface NewOutboxEvent {
   createdAt: string;
 }
 
+export type TenantAdminRole = 'owner' | 'admin';
+export type TenantAdminMembershipStatus = 'active' | 'suspended';
+
+export interface TenantAdminMembershipRecord {
+  id: string;
+  tenantId: string;
+  identityIssuer: string;
+  identitySubject: string;
+  role: TenantAdminRole;
+  status: TenantAdminMembershipStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewTenantAdminMembership extends TenantAdminMembershipRecord {}
+
+export interface PlatformProvisioningRecord {
+  requestKeyHash: string;
+  requestFingerprint: string;
+  tenantId: string;
+  ownerMembershipId: string;
+  productIds: readonly string[];
+  createdAt: string;
+}
+
 export interface TenantRepository {
   findById(id: string): Promise<TenantRecordWithTimestamps | null>;
   create(record: NewTenant): Promise<TenantRecordWithTimestamps>;
   updateStatus(id: string, status: TenantStatus, updatedAt: string): Promise<void>;
+}
+
+export interface TenantAdminMembershipRepository {
+  findByIdentity(identityIssuer: string, identitySubject: string): Promise<TenantAdminMembershipRecord | null>;
+  findById(tenantId: string, membershipId: string): Promise<TenantAdminMembershipRecord | null>;
+  create(record: NewTenantAdminMembership): Promise<TenantAdminMembershipRecord>;
+  updateStatus(tenantId: string, membershipId: string, status: TenantAdminMembershipStatus, updatedAt: string): Promise<boolean>;
+}
+
+export interface PlatformProvisioningRepository {
+  findByRequestKeyHash(requestKeyHash: string): Promise<PlatformProvisioningRecord | null>;
+  create(record: PlatformProvisioningRecord): Promise<PlatformProvisioningRecord>;
 }
 
 export interface ApiKeyRepository {
@@ -183,6 +220,8 @@ export interface OutboxRepository {
  */
 export interface VeriFireTransaction {
   tenants: TenantRepository;
+  tenantAdmins: TenantAdminMembershipRepository;
+  platformProvisioning: PlatformProvisioningRepository;
   apiKeys: ApiKeyRepository;
   entitlements: EntitlementRepository;
   verifications: VerificationRepository;
