@@ -56,6 +56,16 @@ test('vault downloads are authenticated and audited', () => {
   assert.match(moduleSource, /document\.downloaded/);
 });
 
+test('document previews are authenticated, access-controlled, no-store and audited', () => {
+  assert.match(moduleSource, /@Get\(':id\/preview'\)/);
+  assert.match(moduleSource, /accessibleDocument\(id, userId, true\)/);
+  assert.match(moduleSource, /document\.previewed/);
+  assert.match(moduleSource, /This document type cannot be previewed/);
+  assert.match(moduleSource, /Content-Disposition', `inline;/);
+  assert.match(moduleSource, /Content-Security-Policy/);
+  assert.match(moduleSource, /Cache-Control', 'private, no-store'/);
+});
+
 test('Portfolio all-documents panel waits for the live vault list before rendering', () => {
   const portfolioSource = readFileSync(join(root, '..', 'web', 'public', 'tm', 'app.js'), 'utf8');
   assert.match(portfolioSource, /pmLoadDocs\(\)\.then\(pmAllDocs\)/);
