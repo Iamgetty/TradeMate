@@ -344,7 +344,7 @@
     }
     var Lg = bar.querySelector('.tm-hb-l'), Rg = bar.querySelector('.tm-hb-r');
     var sig = '';
-    var src = top ? [].slice.call(top.querySelectorAll('.ib[data-pg="support"]')) : [];
+    var src = top ? [].slice.call(top.querySelectorAll('.avb, .ib[data-pg="support"]')) : [];
     src.forEach(function (b) { sig += b.outerHTML; });
     if (Rg.getAttribute('data-sig') === sig) return true;
     Rg.setAttribute('data-sig', sig);
