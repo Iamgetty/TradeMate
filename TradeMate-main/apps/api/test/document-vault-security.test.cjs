@@ -104,6 +104,17 @@ test('contract conversations share negotiation attachments only with contract pa
   assert.match(contractCss, /\.ct-files/);
 });
 
+test('contract negotiation file sharing is restricted to live contract participants', () => {
+  const portfolioSource = readFileSync(join(root, '..', 'web', 'public', 'tm', 'app.js'), 'utf8');
+  assert.match(portfolioSource, /function contractDocumentsPanel/);
+  assert.match(portfolioSource, /contractAttachmentPick/);
+  assert.match(portfolioSource, /sourceType:"contract_negotiation"/);
+  assert.match(portfolioSource, /documentType:"negotiation"/);
+  assert.match(portfolioSource, /visibility:"contract_participants"/);
+  assert.match(portfolioSource, /loadContractDocuments\(contract,!0\)/);
+  assert.match(moduleSource, /Only contract participants can add shared documents/);
+});
+
 test('new contract proposals generate a private participant-visible vault PDF without claiming signature', () => {
   assert.match(moduleSource, /const buildContractRecordPdf =/);
   assert.match(moduleSource, /TRADEMATE CONTRACT RECORD/);
