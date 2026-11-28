@@ -165,7 +165,7 @@ export interface TenantRepository {
 }
 
 export interface TenantAdminMembershipRepository {
-  findByIdentity(identityIssuer: string, identitySubject: string): Promise<TenantAdminMembershipRecord | null>;
+  findByIdentity(tenantId: string, identityIssuer: string, identitySubject: string): Promise<TenantAdminMembershipRecord | null>;
   findById(tenantId: string, membershipId: string): Promise<TenantAdminMembershipRecord | null>;
   create(record: NewTenantAdminMembership): Promise<TenantAdminMembershipRecord>;
   updateStatus(tenantId: string, membershipId: string, status: TenantAdminMembershipStatus, updatedAt: string): Promise<boolean>;
