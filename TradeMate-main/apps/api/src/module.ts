@@ -2724,7 +2724,7 @@ class EnquiriesController {
   }
 
   @Post(':id/messages')
-  async reply(@Param('id') id: string, @Req() request: Request, @Body() body: { message?: string; attachmentDocumentIds?: string[] }) {
+  async reply(@Param('id') id: string, @Req() request: Request, @Body() body: { message?: string }) {
     parseUuidParam(id);
     parseBody(enquiryReplyBodySchema, body);
     const userId = await this.authenticatedUser(request);
@@ -3196,7 +3196,7 @@ class MarketplaceContractsController {
   }
 
   @Post(':id/messages')
-  async reply(@Param('id') id: string, @Req() request: Request, @Body() body: { message?: string }) {
+  async reply(@Param('id') id: string, @Req() request: Request, @Body() body: { message?: string; attachmentDocumentIds?: string[] }) {
     parseUuidParam(id);
     parseBody(contractMessageBodySchema, body);
     const userId = await this.authenticatedUser(request);
