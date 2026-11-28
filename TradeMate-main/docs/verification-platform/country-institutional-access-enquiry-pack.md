@@ -512,3 +512,172 @@ Kind regards,
 ### Decision
 
 South Africa is the strongest first-wave market so far for documented institutional access breadth: DHA publicly confirms a private-sector NPR verification service, and CIPC publicly exposes commercial Companies and beneficial-ownership API products. However, there is no confirmed VeriFire contract, foreign-processor approval, customer-led delegation permission, API sandbox credential or current tariff quote. Keep both routes at institutional diligence only. No outreach has been sent, no provider selected, no credentials requested and no country route enabled.
+
+
+## Egypt — CBE, MCIT / Ministry of Interior, FRA, Digital Egypt and PDPC
+
+### Verified institutional access findings
+
+**1. Central Bank of Egypt — Digital Financial Identity (DFI) platform**
+
+CBE issued regulations in August 2026 governing the Digital Financial Identity platform for identifying bank customers and verifying identities electronically (eKYC). CBE's official summary says the framework covers all Egyptian banks, licensed entities eligible to join the approved DFI platform, CBE-authorized banking agents and other parties involved in DFI services. Functions include electronic customer identification and identity verification/updates, electronic authentication of banking transactions and payment instructions, customer consent and digital-identity sharing.
+
+This is the most direct formal institutional eKYC route found for Egypt's financial sector. However, eligibility is restricted to banks and licensed entities approved for the platform. The published summary does not establish that an independent foreign verification vendor can join directly, nor does it specify whether an approved customer may appoint a foreign processor/subprocessor. Obtain the complete regulations, technical standards and CBE confirmation before designing a connector.
+
+Official references:
+- [CBE — Digital Financial Identity](https://www.cbe.org.eg/en/payment-systems-and-services/digital-financial-identity)
+- [CBE — DFI/eKYC regulations announcement, 24 August 2026](https://www.cbe.org.eg/en/news-publications/news/2026/08/24/09/40/ekyc-2026)
+- [CBE — circulars listing, including 23 August 2026 DFI rules](https://www.cbe.org.eg/en/laws-regulations/regulations/circulars)
+
+**2. Ministry of Communications / Ministry of Interior — biometric verification pilot**
+
+MCIT announced on 26 August 2026 that it had established, in cooperation with the Ministry of Interior, the regulatory framework, infrastructure and integration platform for biometric verification and e-signature services. The platform is coordinated with the Civil Status Sector at the Ministry of Interior. NTRA, ITIDA, CyShield and licensed e-signature companies are involved. The initial pilot allows licensed telecom operators to offer identity-verification and e-signature services through their smartphone apps; operators are rolling out progressively as they become technically ready.
+
+This establishes a current national digital-identity integration programme, but the published announcement does not provide a public API, vendor application route, or general private-sector entitlement to query Civil Status records. The pilot's initial access is described as a licensed-telecom-operator model. Any role for VeriFire would need written confirmation from MCIT, Ministry of Interior/Civil Status Sector and NTRA, and may require an eligible local licensee to sponsor the arrangement.
+
+Official reference:
+- [MCIT — Egypt launches biometric verification and e-signature system, 26 August 2026](https://mcit.gov.eg/en/Media_Center/Latest_News/News/117426)
+
+**3. Financial Regulatory Authority — non-bank finance verification requirements**
+
+FRA's 25 August 2026 statement says entities under FRA supervision operating through fintech, including fintech outsourcing service providers, must verify national-ID authenticity, confirm mobile-line ownership and screen clients against AML/asset-freeze watchlists. Consumer-finance and MSME-finance firms, associations and institutions must issue OTPs to verified phone numbers at contract execution and again at fund disbursement, retaining proof. FRA refers to Resolution No. 186 of 2024 as amended, most recently by Resolution No. 133 of 2026. Its statement says the remaining institutions' OTP compliance grace period ends the following January.
+
+This creates a strong compliance need for verifiable identity, phone-ownership and watchlist workflows. It does not itself grant access to national ID records or authorize VeriFire as a regulated provider. Obtain the underlying resolutions and confirm whether a foreign outsourced platform needs FRA notification/approval, local contracting, cybersecurity assessment or other conditions.
+
+Official reference:
+- [FRA — strict customer identity and data verification standards, 25 August 2026](https://fra.gov.eg/en/fra_news/%D8%AF-%D8%A5%D8%B3%D9%84%D8%A7%D9%85-%D8%B9%D8%B2%D8%A7%D9%85-%D8%B1%D8%A6%D9%8A%D8%B3-%D8%A7%D9%84%D9%87%D9%8A%D8%A6%D8%A9-%D8%A7%D9%84%D8%B9%D8%A7%D9%85%D8%A9-%D9%84%D9%84%D8%B1%D9%82%D8%A7%D8%A8-2/)
+
+**4. Digital Egypt — commercial-registry services**
+
+MCIT announced that nine commercial-registry services became available exclusively through the Digital Egypt platform from 1 January 2026. The services include inquiries about and verification of commercial registration, updates, extracts and certificates. This is an official digital registry channel, but the announcement does not establish a public API or a commercial redistribution licence. Do not scrape or resell records without confirming the terms and an authorized technical route.
+
+Official reference:
+- [MCIT — nine commercial-registry services through Digital Egypt, 1 January 2026](https://mcit.gov.eg/en/Media_Center/Press_Room/Press_Releases/98927)
+
+### PDPL / PDPC compliance gate — current as of 28 November 2026
+
+Egypt's Personal Data Protection Law No. 151 of 2020 is supplemented by Executive Regulations issued under Ministerial Decree No. 816 of 2025. The one-year transitional compliance period has ended (sources describe the operative date as 1 November 2026). The Personal Data Protection Center (PDPC) is now an active regulator: MCIT reported PDPC international regulatory engagement on 24 November 2026. The PDPC electronic portal for licences, permits and accreditations was reported launched in October 2026.
+
+The MCIT's official Egyptian FinTech Landscape 2024 report describes the PDPL framework as requiring licensing/permits and security accreditation for data processing, sensitive data and cross-border transfers; it also describes DPO registration and a local representative for foreign controllers. Later legal updates report that foreign controllers/processors can use the PDPC portal through an authorized local representative who authenticates with Digital Egypt credentials. Verify the current portal workflow and exact licence categories directly with PDPC before relying on that route.
+
+For VeriFire, treat the following as mandatory diligence gates, not optional future clean-up:
+- Determine the controller, processor and any subprocessor roles for each customer flow. Verify whether VeriFire itself needs a controller/processor licence or permit and whether local representative appointment is required.
+- Confirm the PDPC licence/permit required for sensitive identity/biometric data and whether explicit consent is sufficient for the intended processing or additional authorization is mandatory.
+- Obtain a destination-specific cross-border transfer licence/permit where required before sending Egyptian personal data to any foreign environment. Secondary analysis of Article 15 of the Executive Regulations describes licensing and destination assessment, with narrow exceptions that should not be assumed to remove the need for safeguards or PDPC review.
+- Confirm any Egypt-local storage, access, support, backup, log and onward-transfer requirements. Do not assume offshore-only storage is permissible.
+- Confirm DPO appointment/registration, records of processing, notices, data-subject rights, retention/deletion and breach notification obligations under the Law and Regulations.
+- Confirm whether foreign processors must appoint a local representative and whether that representative can submit applications on their behalf.
+
+Sources:
+- [MCIT — Egyptian FinTech Landscape 2024, PDPL summary](https://mcit.gov.eg/Upcont/Documents/Reports%20and%20Documents_1332025000_Egyptian_FinTech_Landscape_2024_13032025.pdf)
+- [MCIT — PDPC international regulatory engagement, 24 November 2026](https://mcit.gov.eg/en/Media_Center/Latest_News/News/121665)
+- [Baker McKenzie — PDPL update, 7 October 2026](https://www.bakermckenzie.com/en/insight/publications/2026/10/egypt-personal-data-protection-law-update)
+- [Law No. 151 of 2020 and Executive Regulations English translation (secondary source)](https://eg.andersen.com/wp-content/uploads/2026/02/Law-No.-151-of-2020.pdf)
+- [PDPC portal](https://portal.pdpc.gov.eg/) (portal endpoint did not load during this research; verify availability directly)
+
+### Questions for CBE — Digital Financial Identity
+
+1. Which classes of non-bank licensed entities are currently eligible to join the approved DFI platform, and what licence types qualify?
+2. Can an eligible Egyptian bank or licensed entity appoint a foreign verification platform as a named technology supplier, processor or subprocessor? What prior CBE/platform approval is required?
+3. Can a technology supplier participate across multiple approved customers, or must each bank/customer obtain separate approval and establish its own integration?
+4. What are the platform operator, governance, onboarding, technical certification and participant approval processes?
+5. Please provide the full DFI rules, API specifications, interface standards, authentication, encryption, network connectivity, sandbox and test-data process.
+6. Which national-ID fields, biometric methods and identity results may be used or disclosed? Can the platform return a minimal verification result without disclosing raw biometric templates or full registry data?
+7. What consent and customer-authentication evidence must be captured, and can an institution collect this within its own customer interface?
+8. What local hosting, data residency, cybersecurity, audit, retention, deletion, incident notification and outsourcing requirements apply?
+9. What fees, transaction limits, rate limits, SLA, support and service-continuity arrangements apply?
+
+### Questions for MCIT / Ministry of Interior / NTRA — biometric identity platform
+
+1. Is the August 2026 biometric verification/e-signature pilot currently limited to licensed mobile-network operators, or are other regulated institutions and technology providers being onboarded?
+2. Which authority owns the Civil Status Sector integration platform and accepts institutional/vendor applications?
+3. Can an eligible Egyptian telecom operator, bank or other licensed institution sponsor a foreign technical processor such as VeriFire? What written approval and contractual structure are required?
+4. Does the system support identity-bound 1:1 verification only, or any other biometric matching mode? Which methods (face, fingerprint, liveness) are approved for each participant class?
+5. What data fields and response semantics are exposed, and can the result be limited to match/no-match or another minimal assertion?
+6. What are the technical specifications, security certification, sandbox, onboarding, consent, pricing, SLA and production acceptance requirements?
+7. Are there local establishment, local hosting, local key custody, NTRA licence or Egyptian cybersecurity accreditation requirements for a technology provider?
+8. What are the retention/deletion, audit, cross-border transfer, remote-support and incident-notification requirements?
+
+### Questions for FRA — fintech outsourcing / non-bank finance
+
+1. Please provide the current consolidated text of Resolution No. 186 of 2024 and amendments, including Resolution No. 133 of 2026, and confirm the exact effective dates and scope.
+2. Which obligations apply directly to fintech outsourcing service providers, and which remain the regulated customer's responsibility?
+3. Does an offshore verification platform serving an FRA-regulated customer require prior approval, notification, registration, local representation or a local contract?
+4. Which identity-verification, mobile-line ownership and AML/watchlist sources are acceptable, and what evidence must the institution retain?
+5. What standards apply to OTP delivery and evidence at contract signing and disbursement, and may the institution use an external provider?
+6. What are the outsourcing, audit, cybersecurity, incident, data residency, subcontractor and cross-border data requirements?
+
+### Questions for PDPC / Egyptian counsel
+
+1. Which controller/processor licence or permit category applies to Metadusk VeriFire if it processes Egyptian identity data solely on documented customer instructions?
+2. Must VeriFire appoint a local representative, and can the representative authenticate on Digital Egypt and submit all PDPC applications for a foreign legal entity?
+3. Which separate authorization/licence is required for biometric or other sensitive personal data processing, and is explicit consent also required?
+4. What cross-border transfer licence/permit applies to each destination and data category? Does the PDPC require destination-specific safeguards, local storage or prior approval for remote access/support?
+5. Are any exceptions to the transfer-licence requirement available to a processor acting for an Egyptian bank or regulated customer, and what conditions must be documented?
+6. What are the DPO appointment/registration, processing-register, privacy notice, consent, DPIA/impact assessment, data-subject request, retention/deletion and breach notification requirements?
+7. What are the current licence/permit fees, renewal periods, processing timelines, audit rights and sanctions for non-compliance?
+8. Is the PDPC portal fully operational for foreign applicants now that the grace period has ended, and what authenticated application documents are required?
+
+### Draft CBE enquiry (not sent)
+
+**To:** Central Bank of Egypt — Digital Financial Identity / eKYC platform team (via official CBE contact channel)  
+**Subject:** Institutional participation enquiry — Digital Financial Identity platform and authorized technology-provider model
+
+Dear Central Bank of Egypt Team,
+
+We are assessing the Digital Financial Identity platform established under the CBE's August 2026 eKYC regulations for a potential institutional integration with Metadusk VeriFire, a headless, server-to-server verification platform.
+
+Please clarify the eligibility and onboarding route for licensed entities, whether an eligible Egyptian bank or licensed institution may appoint VeriFire as its expressly authorized foreign technology supplier/processor, and whether a separate approval is required for each customer integration. We would also appreciate the current platform rules, technical specifications, sandbox and certification process, permitted identity/biometric methods and result fields, consent requirements, local hosting and cybersecurity controls, outsourcing and cross-border requirements, fees and service levels.
+
+We will not request credentials, submit live identity data or initiate production access during this assessment. Please direct us to the team responsible for DFI participant onboarding and advise the formal application materials.
+
+Kind regards,
+[Authorized representative]
+[Legal entity]
+[Potential Egyptian applicant/customer, if different]
+[Business address]
+[Business email and telephone]
+
+### Draft MCIT / Ministry of Interior enquiry (not sent)
+
+**To:** MCIT / Ministry of Interior Civil Status Sector / NTRA — via official institutional contact channels  
+**Subject:** Institutional enquiry — biometric verification integration platform and authorized technical-provider participation
+
+Dear Team,
+
+We are assessing Egypt's biometric verification and e-signature integration platform announced in August 2026, including the pilot for licensed telecom operators and its coordination with the Civil Status Sector.
+
+Please clarify whether participation is currently limited to licensed telecom operators, whether additional regulated institutions or technology providers may apply, and whether an eligible Egyptian institution may sponsor Metadusk VeriFire as an expressly authorized foreign processor/technical supplier. Please also provide the responsible contracting authority, eligibility criteria, application and approval process, API/interface specifications, sandbox, permitted verification methods and fields, local hosting and security requirements, consent and retention rules, cross-border restrictions, fees and SLA.
+
+We will not request credentials or process live identity data during this assessment. Please advise the formal institutional enquiry route and required documents.
+
+Kind regards,
+[Authorized representative]
+[Legal entity]
+[Potential Egyptian applicant/customer, if different]
+[Business address]
+[Business email and telephone]
+
+### Draft FRA enquiry (not sent)
+
+**To:** Financial Regulatory Authority — fintech / non-bank financial activities supervision (via official FRA contact channel)  
+**Subject:** Regulatory clarification — outsourced identity verification services under FRA customer-data verification rules
+
+Dear FRA Team,
+
+We are assessing how Metadusk VeriFire, a headless verification platform, could support an FRA-regulated Egyptian institution with national-ID authenticity checks, mobile-line ownership verification, AML/watchlist screening and auditable OTP evidence.
+
+Please identify the applicable current consolidated rules, including Resolution No. 186 of 2024 and Resolution No. 133 of 2026, and clarify the obligations applying to the regulated institution versus its fintech outsourcing service provider. In particular, please advise whether a foreign verification platform requires prior approval, notification, local representation or local contracting; which source providers and verification methods are acceptable; and what outsourcing, cybersecurity, audit, data-residency, cross-border and incident requirements apply.
+
+We will not access live identity data or provide regulated services during this assessment. Please direct us to the responsible supervisory team and the formal process for obtaining a written interpretation.
+
+Kind regards,
+[Authorized representative]
+[Legal entity]
+[Potential Egyptian customer, if different]
+[Business address]
+[Business email and telephone]
+
+### Decision
+
+Egypt is a high-potential regulated market, but the compliance burden is now immediate rather than prospective. The strongest near-term customer-led route appears to be an eligible CBE DFI participant or FRA-regulated institution sponsoring a clearly authorized technology provider; neither delegation nor foreign-processor eligibility is confirmed. The national biometric pilot is initially telecom-operator-led, while Digital Egypt's commercial-registry verification service has no public commercial API entitlement established by the source reviewed. PDPC licensing, local representation and cross-border permits must be resolved before any Egyptian personal data enters VeriFire. No outreach has been sent, no provider selected, no credentials requested, no integration built and no country route enabled.
