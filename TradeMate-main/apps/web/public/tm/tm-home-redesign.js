@@ -11,7 +11,9 @@
 
   var H = 'html body #app .view:has(.home-market-shortcuts)';
   var PG = 'html body #pg .pgs[data-id="profile"]';
-  var BAR = 'html body #mwbar:has(.tm-hb-l)';
+  /* The restructured #mwbar header is mobile-only: desktop.css hides .mw-bar and the desktop
+   * header keeps its own .top buttons, so this must never out-specify that rule on desktop. */
+  var BAR = 'html:not(.tm-desktop) body #mwbar:has(.tm-hb-l)';
   var css = [
     /* ---------- Palettes (v10). Dark is intentionally not listed. ---------- */
     'html[data-theme="light"]{--bg:#FFFFFF;--s1:#F8FAFC;--s2:#EEF2FF;--s3:#E2E8F0;--line:#E2E8F0;--txt:#0F172A;--txt2:#334155;--text:#0F172A;--mut:#586579;--dis:#94A3B8;--am:#4F46E5;--co:#4F46E5;--in:#4F46E5;--grad:#4F46E5;--grad2:#4F46E5;--navbg:#FFFFFF;--navsolid:#FFFFFF;--sbbg:#FFFFFF;--card:#FFFFFF;--ongrad:#FFFFFF;--scrim:#94A3B8;--up:#047857;--glow:#4F46E533}',
@@ -316,8 +318,10 @@
     return out;
   }
 
-  /* header: the existing #mwbar becomes menu | logo + name | actions */
+  /* header: the existing #mwbar becomes menu | logo + name | actions (mobile only) */
   function syncBar(top) {
+    /* Desktop keeps its own header: desktop.css hides .mw-bar and the real .top buttons stay in use. */
+    if (document.documentElement.classList.contains('tm-desktop')) return false;
     var bar = document.getElementById('mwbar');
     if (!bar) return false;
     if (!bar.querySelector('.tm-hb-l')) {
