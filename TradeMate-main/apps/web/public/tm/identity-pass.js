@@ -69,9 +69,7 @@
 .idp-rc{display:flex;gap:8px;flex-wrap:wrap}
 .idp-chip{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--s2);color:var(--txt);font:600 13px 'Hanken Grotesk',sans-serif;cursor:pointer}
 .idp-chip svg{color:var(--am)}
-.idp-all{text-align:center;margin-top:16px}
-.idp-allbtn,.idp-donebtn.btn.wide{display:inline-flex;align-items:center;justify-content:center;width:auto;height:42px;padding:0 30px;border-radius:999px;font:700 14px 'Hanken Grotesk',sans-serif;cursor:pointer}
-.idp-allbtn{border:1.5px solid var(--am);background:none;color:var(--am)}
+.idp-donebtn.btn.wide{display:inline-flex;align-items:center;justify-content:center;width:auto;height:42px;padding:0 30px;border-radius:999px;font:700 14px 'Hanken Grotesk',sans-serif;cursor:pointer}
 .pfoot.idp-strip{margin:0 16px calc(10px + env(safe-area-inset-bottom,0px));padding:0;height:46px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--s1);box-shadow:0 10px 30px rgba(0,0,0,.28)}
 .idp-sz{flex:1 1 0;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 12px;color:var(--txt);font:700 13px 'Hanken Grotesk',sans-serif;cursor:pointer;min-width:0}
 .idp-sz:first-child{flex:1.5;justify-content:flex-start}
@@ -97,6 +95,11 @@
 .idp-ucl{display:grid;gap:12px;align-content:start}
 .idp-list .lr .lic{background:var(--s2)!important;border:1px solid var(--line)!important;box-shadow:none!important}
 .idp-ucr .uc-tabs{margin:0 0 12px;padding-left:0;padding-right:0}
+.idp-ucr .uc-tabs button:first-child{justify-items:start;padding-left:18px}
+.idp-ucr .uc-tabs button:last-child{justify-items:end;padding-right:18px}
+.uc-hd{background:var(--bg)!important}
+.uc-hd .bk2{margin-right:auto}
+.uc-hd .rts{margin-left:auto}
 .uc-hd:has(+ .uc-tabs button[data-arg="My info"].on) h2{display:none}
 .idp-list{background:var(--s1);border:1px solid var(--line);border-radius:22px;overflow:hidden}
 .idp-list .lr{border-bottom:1px solid var(--line);padding:0 14px;min-height:56px}
@@ -135,7 +138,6 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
 .idp-vheading{min-width:0;flex:1}
 .idp-veyebrow{font:700 10px 'DM Mono',monospace;letter-spacing:.15em;color:var(--am);margin:0 0 5px}
 .idp-vheading h3{font:800 19px 'Bricolage Grotesque','Hanken Grotesk',sans-serif;margin:0;color:var(--txt)}
-.idp-vheading p{font-size:13px;color:var(--mut);line-height:1.45;margin:5px 0 0}
 .idp-vstatus{font:700 11px 'Hanken Grotesk',sans-serif;border-radius:999px;padding:7px 10px;white-space:nowrap;background:color-mix(in srgb,var(--am) 13%,var(--s2));color:var(--am);border:1px solid color-mix(in srgb,var(--am) 24%,var(--line))}
 .idp-vstatus.success{color:var(--up);background:color-mix(in srgb,var(--up) 12%,var(--s2));border-color:color-mix(in srgb,var(--up) 28%,var(--line))}
 .idp-vstatus.warning{color:var(--dn);background:color-mix(in srgb,var(--dn) 10%,var(--s2));border-color:color-mix(in srgb,var(--dn) 28%,var(--line))}
@@ -143,8 +145,6 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
 .idp-vstep{display:flex;flex:1;min-width:0;flex-direction:column;gap:5px;align-items:center;text-align:center}
 .idp-vstep-icon{width:38px;height:38px;border:1px solid var(--line);border-radius:50%;display:grid;place-items:center;color:var(--am);background:var(--s1)}
 .idp-vstep-icon svg{width:18px;height:18px}
-.idp-vstep b{font-size:12px;color:var(--txt)}
-.idp-vstep small{font-size:10.5px;line-height:1.35;color:var(--mut)}
 .idp-vconnector{height:1px;flex:0 0 9%;margin-top:19px;background:linear-gradient(90deg,var(--line),color-mix(in srgb,var(--am) 50%,var(--line)))}
 .idp-vfoot{display:grid;gap:12px}
 .idp-verify .idp-cta{min-height:48px;display:flex;align-items:center;justify-content:center;gap:10px}
@@ -152,7 +152,7 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
 .idp-vprivacy{display:flex;justify-content:center;align-items:center;gap:8px;text-align:left;color:var(--mut);font-size:11px;line-height:1.45}
 .idp-vprivacy svg{color:var(--am);flex:none}
 .idp-vprivacy small{font-size:10px;color:var(--mut)}
-@media(max-width:420px){.idp-verify{padding:15px;border-radius:18px}.idp-vstatus{font-size:10px;padding:6px 8px}.idp-vstep-icon{width:34px;height:34px}.idp-vconnector{margin-top:17px;flex-basis:5%}.idp-vstep small{font-size:10px}}
+@media(max-width:420px){.idp-verify{padding:15px;border-radius:18px}.idp-vstatus{font-size:10px;padding:6px 8px}.idp-vstep-icon{width:34px;height:34px}.idp-vconnector{margin-top:17px;flex-basis:5%}}
 /* Persona verification: restrained hierarchy, crisp spacing, dependable mobile layout. */
 .idp-verify{border-radius:24px;padding:20px;background:var(--s1);border-color:color-mix(in srgb,var(--am) 20%,var(--line));box-shadow:0 8px 24px rgba(0,0,0,.09)}
 .idp-verify:before{right:-80px;top:-100px;width:190px;height:190px;opacity:.35}
@@ -161,22 +161,18 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
 .idp-vheading{padding-top:1px}
 .idp-veyebrow{font-size:10px;letter-spacing:.13em}
 .idp-vheading h3{font-size:21px;letter-spacing:-.02em}
-.idp-vheading p{font-size:13px;line-height:1.5;max-width:40ch}
 .idp-vstatus{padding:7px 10px;font-size:11px;box-shadow:none;white-space:nowrap}
 .idp-vsteps{gap:8px;margin:20px 0}
-.idp-vstep{gap:6px}
 .idp-vstep-icon{width:42px;height:42px;border-radius:13px;background:var(--s2);border-color:var(--line);box-shadow:none}
 .idp-vstep-icon svg{width:19px;height:19px}
-.idp-vstep b{font-size:12px;letter-spacing:-.01em}
-.idp-vstep small{font-size:10.5px;max-width:16ch;line-height:1.45}
 .idp-vconnector{height:1px;flex-basis:7%;margin-top:20px;opacity:.65}
 .idp-vfoot{gap:12px}
 .idp-verify .idp-cta{min-height:52px;border-radius:15px;font-size:15px;box-shadow:0 4px 12px color-mix(in srgb,var(--am) 12%,transparent);transition:transform .15s ease,filter .15s ease}
 .idp-verify .idp-cta:not(:disabled):active{transform:translateY(1px);filter:saturate(.94)}
 .idp-vprivacy{justify-content:flex-start;padding:11px 13px;border:1px solid var(--line);border-radius:14px;background:var(--s2);font-size:11px}
 .idp-vprivacy small{font-size:10px}
-@media(max-width:560px){.idp-verify{padding:17px;border-radius:21px}.idp-vtop{flex-wrap:wrap}.idp-vstatus{margin:0;white-space:normal;justify-self:start}.idp-vsteps{gap:7px;margin:18px 0}.idp-vstep-icon{width:38px;height:38px;border-radius:12px}.idp-vstep b{font-size:11.5px}.idp-vstep small{font-size:10px;max-width:12ch}.idp-vconnector{flex-basis:4%;margin-top:18px}}
-@media(max-width:380px){.idp-verify{padding:15px;border-radius:19px}.idp-vtop{display:grid;grid-template-columns:40px minmax(0,1fr);gap:10px;align-items:start}.idp-vbadge{grid-column:1;grid-row:1;width:40px;height:40px;border-radius:12px}.idp-vheading{grid-column:2;grid-row:1;min-width:0}.idp-vheading h3{font-size:20px}.idp-vstatus{grid-column:2;grid-row:2;margin-top:2px;justify-self:start}.idp-vsteps{display:grid;grid-template-columns:1fr;gap:8px;margin:17px 0}.idp-vstep{display:grid;grid-template-columns:36px minmax(0,1fr);grid-template-rows:auto auto;align-items:center;column-gap:10px;row-gap:2px;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:13px;background:var(--s2)}.idp-vstep-icon{grid-column:1;grid-row:1 / span 2;width:36px;height:36px;border-radius:11px}.idp-vstep b{grid-column:2;grid-row:1;min-width:0;font-size:12px}.idp-vstep small{grid-column:2;grid-row:2;max-width:none;font-size:10.5px}.idp-vconnector{display:none}}
+@media(max-width:560px){.idp-verify{padding:17px;border-radius:21px}.idp-vtop{flex-wrap:wrap}.idp-vstatus{margin:0;white-space:normal;justify-self:start}.idp-vsteps{gap:7px;margin:18px 0}.idp-vstep-icon{width:38px;height:38px;border-radius:12px}.idp-vconnector{flex-basis:4%;margin-top:18px}}
+@media(max-width:380px){.idp-verify{padding:15px;border-radius:19px}.idp-vtop{display:grid;grid-template-columns:40px minmax(0,1fr);gap:10px;align-items:start}.idp-vbadge{grid-column:1;grid-row:1;width:40px;height:40px;border-radius:12px}.idp-vheading{grid-column:2;grid-row:1;min-width:0}.idp-vheading h3{font-size:20px}.idp-vstatus{grid-column:2;grid-row:2;margin-top:2px;justify-self:start}.idp-vsteps{margin:17px 0}}
 
 `;
 
@@ -206,7 +202,7 @@ var s = document.createElement("style");
     return '<div class="idp-c3' + (flipped ? " flip" : "") + '"><div class="idp-ci">' +
       '<div class="idp-cf"><div class="idp-top"><span class="idp-cm">TradeMate · Identity pass</span>' + flip("Flip ") + "</div>" +
       '<div class="idp-id"><button class="idp-pav" data-pg="avatar" aria-label="Change profile picture">' + avHTML(76, 22) + '</button><div style="min-width:0"><h1 class="idp-nm">' + esc(t.nick) + '</h1><button class="idp-gl" data-act="copy" data-arg="' + t.uid + '" aria-label="Copy UID" style="height:30px">UID ' + t.uid + ic("copy", "width:14px;height:14px") + "</button></div></div>" +
-      '<div class="idp-bt"><span class="idp-ok' + (verified ? "" : " pending") + '" data-pg="kycinfo">' + PT_SHIELD_G + (verified ? "Verified" : "Not verified") + "</span></div></div>" +
+      '<div class="idp-bt"><span class="idp-ok' + (verified ? "" : " pending") + '" data-pg="kycinfo">' + (verified ? "Verified" : "Not verified") + "</span></div></div>" +
       '<div class="idp-cb"><div class="idp-top"><span class="idp-cm">Shortcuts</span>' + flip("Flip ") + '</div><div class="idp-sqs">' +
       SH.map(function (x) { return '<button class="idp-sq" data-f="' + x[0] + '">' + ic(x[3]) + "<span>" + x[1] + "<small>" + x[2] + "</small></span></button>"; }).join("") +
       "</div></div></div></div>";
@@ -217,13 +213,13 @@ var s = document.createElement("style");
     var active = ["pending","in_progress","submitted","review"].indexOf(status.status) >= 0;
     var failed = ["failed","rejected","needs_retry","action_required"].indexOf(status.status) >= 0;
     var label = verified || status.verified ? "Verified" : active ? "In review" : failed ? "Action required" : "Not verified";
-    var intro = verified || status.verified ? "Your identity is confirmed. You're all set." : active ? "Your submission is being reviewed. We'll update your status here." : failed ? "A little more information is needed to complete verification." : "A secure, guided process to help build trust on TradeMate.";
     var cta = verified || status.verified
       ? '<button class="idp-cta idp-verified" type="button" disabled>' + ic("check") + ' Identity verified</button>'
       : '<button class="idp-cta" type="button" data-persona-start>' + (active ? "Check verification status" : failed ? "Retry verification" : "Start verification") + ic("right", "width:18px;height:18px") + '</button>';
-    var steps = [["person","Personal details","Confirm your basic information"],["id","Identity document","Scan a valid government ID"],["cam","Selfie check","Match your face to your ID"]];
-    return '<section class="idp-verify"><div class="idp-vtop"><div class="idp-vbadge">' + PT_SHIELD + '</div><div class="idp-vheading"><div class="idp-veyebrow">ACCOUNT TRUST</div><h3>Identity verification</h3><p>' + intro + '</p></div><span class="idp-vstatus' + (verified || status.verified ? " success" : failed ? " warning" : active ? " progress" : "") + '">' + label + '</span></div>' +
-      '<div class="idp-vsteps">' + steps.map(function(x,i){return '<div class="idp-vstep"><span class="idp-vstep-icon">' + ic(x[0]) + '</span><b>' + x[1] + '</b><small>' + x[2] + '</small></div>'+(i<2?'<span class="idp-vconnector"></span>':'');}).join("") + '</div>' +
+    // Icon-only steps: the labels stay available to screen readers but are not drawn.
+    var steps = [["person", "Personal details"], ["id", "Identity document"], ["cam", "Selfie check"]];
+    return '<section class="idp-verify"><div class="idp-vtop"><div class="idp-vbadge">' + PT_SHIELD + '</div><div class="idp-vheading"><div class="idp-veyebrow">ACCOUNT TRUST</div><h3>Identity verification</h3></div><span class="idp-vstatus' + (verified || status.verified ? " success" : failed ? " warning" : active ? " progress" : "") + '">' + label + '</span></div>' +
+      '<div class="idp-vsteps">' + steps.map(function(x,i){return '<div class="idp-vstep"><span class="idp-vstep-icon" role="img" aria-label="' + x[1] + '">' + ic(x[0]) + '</span></div>'+(i<2?'<span class="idp-vconnector"></span>':'');}).join("") + '</div>' +
       '<div class="idp-vfoot">' + cta + '<div class="idp-vprivacy">' + ic("lock", "width:15px;height:15px") + '<span>Secure verification powered by Persona<br><small>Your details are handled securely and used for verification.</small></span></div></div></section>';
   }
   function strip(e) {
@@ -237,7 +233,7 @@ var s = document.createElement("style");
       return '<button class="idp-chip" data-f="' + x + '" style="--h:' + HUE[x] + '">' + ic(f[1], "width:16px;height:16px") + x + "</button>";
     }).join("");
     return '<header class="ph"><button class="bk2" data-back aria-label="Back">' + ic("left") + '</button><span style="flex:1"></span><div class="rts"><button class="rt" data-pg="support" aria-label="Support">' + ic("headset") + '</button><button class="rt" data-act="uc" data-arg="My info" aria-label="User Center">' + ic("settings") + "</button></div></header>" +
-      '<div class="pbody"><div class="idp-cq"><div class="idp-grid"><div class="idp-l" style="display:grid;gap:14px;align-content:start">' + pass() + verify() + '</div><div class="idp-r"><div class="sec" style="padding-left:2px">RECENTLY USED</div><div class="idp-rc">' + chips + '</div><div class="idp-all"><button class="idp-allbtn" data-f="More">All Services</button></div></div></div></div></div>' + strip(e);
+      '<div class="pbody"><div class="idp-cq"><div class="idp-grid"><div class="idp-l" style="display:grid;gap:14px;align-content:start">' + pass() + verify() + '</div><div class="idp-r"><div class="sec" style="padding-left:2px">RECENTLY USED</div><div class="idp-rc">' + chips + '</div></div></div></div></div>' + strip(e);
   };
 
   // Security level comes from the account's real setup: password (always), authenticator 2FA, verified identity.
