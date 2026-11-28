@@ -156,6 +156,146 @@ Kind regards,
 [Business address / Ghana presence details]  
 [Business email and telephone]
 
+
+
+## Kenya — National Registration Bureau (NRB) / Health ID
+
+### Verified public position
+
+Kenya's official eCitizen Health ID service describes biometric eKYC using face or fingerprint capture, liveness checks and matching against the National Registration Bureau's national biometrics database. Its published FAQ says the service can be used by government agencies, financial institutions, healthcare providers and private companies, and describes authorized entities receiving identity data. This is a concrete government-described institutional service, but the public pages do not disclose the onboarding criteria, API contract, pricing, contracting party, processor delegation model or technical access procedure. Do not infer that any private company is automatically authorized.
+
+Official references:
+- [eCitizen Health ID](https://ekyc.ecitizen.go.ke/)
+- [Health ID help and support](https://ekyc.ecitizen.go.ke/help-and-support) — support@ecitizen.go.ke; +254 207 903 260
+- [National Registration Bureau on eCitizen](https://nrb.ecitizen.go.ke/)
+
+### Material privacy and biometric requirements
+
+The ODPC's official FAQ says controllers and processors handling Kenyan data subjects' personal data must register even when not established in Kenya. It identifies biometric data as sensitive personal data. The ODPC's 2025 Biometric Data Guidance further states:
+- All entities processing biometric data must register with the ODPC as controllers and/or processors.
+- Biometric processing requires a lawful basis and additional sensitive-data conditions, transparent notices, purpose limitation and minimization.
+- A DPIA is required before high-risk biometric processing; the guidance says it must be conducted and submitted at least 60 days before biometric processing begins.
+- At least one full, up-to-date serving copy of biometric data must be stored in a data centre located in Kenya.
+- Biometric data breaches must be reported to the ODPC within 72 hours and affected data subjects without undue delay.
+
+These requirements are significant architecture gates. A generic offshore-only biometric storage design is not acceptable without a Kenya-specific compliant arrangement and legal review.
+
+Official references:
+- [ODPC FAQ — controller/processor registration and territorial scope](https://odpc.go.ke/faqs/)
+- [ODPC Guidance Notes on Biometric Data (2025)](https://www.odpc.go.ke/wp-content/uploads/2025/11/ODPC-%E2%80%93-Guidance-Note-on-Biometric-Data.pdf)
+- [ODPC Guidance Notes for Cross-border Data Transfers (2026)](https://odpc.go.ke/wp-content/uploads/2026/09/ODPC-%E2%80%93-Guidance-Notes-for-Cross-border-Data-Transfers.pdf)
+
+### Questions for NRB / eCitizen Health ID
+
+1. Is Health ID currently open to new private-sector institutional integrations, and which legal entity/agency is the contracting authority?
+2. What types of private companies and regulated institutions qualify as authorized entities? Are foreign companies eligible?
+3. Can a Kenyan customer be the applicant and contract holder while a foreign technology platform operates the integration as its expressly authorized processor/subprocessor?
+4. Does NRB/eCitizen require the technology processor itself to be incorporated, registered or physically present in Kenya?
+5. What are the formal onboarding stages, application documents, approvals, fees and expected timelines?
+6. Please provide the current API/SDK specifications, endpoints, authentication and signing requirements, supported biometric modalities, liveness rules, device requirements and error catalogue.
+7. Is a sandbox with synthetic identities available? What is the certification and production acceptance process?
+8. Which attributes and verification outcomes may be returned, and can the customer select a minimum attribute set per lawful purpose?
+9. Are biometric samples or templates exposed to the customer or technology processor, or does NRB return only a match result and approved attributes?
+10. What Kenya data-centre/localization model is required for biometric data, and does the service retain a serving copy on behalf of the institution?
+11. What are the controller/processor roles, consent evidence requirements, audit rights, retention/deletion rules and cross-border processing restrictions?
+12. What are the transaction charges, rate limits, availability SLA, support arrangements and breach-notification requirements?
+
+### Draft enquiry
+
+**To:** support@ecitizen.go.ke  
+**Subject:** Institutional integration enquiry — Health ID biometric eKYC and authorized technology-provider model
+
+Dear eCitizen / Health ID Support Team,
+
+We are assessing the official Health ID service for a potential institutional integration with Metadusk VeriFire, a headless, server-to-server verification platform. We understand from the public Health ID materials that authorized entities may use biometric eKYC with liveness and matching against NRB records.
+
+Before any technical or commercial commitment, please direct us to the responsible NRB/Health ID institutional onboarding team and clarify:
+- eligibility and application requirements for private-sector and foreign institutions;
+- whether a Kenyan customer can be the direct applicant and contracting party while VeriFire operates as an expressly authorized processor/subprocessor;
+- required local establishment, registration and approval status for the applicant and technology provider;
+- current API/SDK documentation, sandbox, certification and production access procedure;
+- biometric modalities, consent evidence, permitted attributes, and whether raw samples/templates are disclosed;
+- Kenya biometric data-localization, DPIA, retention/deletion, audit and cross-border requirements; and
+- pricing, rate limits, SLA, support and incident-notification terms.
+
+We will not request or process live identity data during this assessment. Please advise the formal institutional enquiry route and documentation required.
+
+Kind regards,
+[Authorized representative]
+[Legal entity]
+[Business address]
+[Business email and telephone]
+
+## Uganda — National Identification and Registration Authority (NIRA)
+
+### Verified public position
+
+Uganda's Registration of Persons Act 2015 provides that access to the National Identification Register by non-government persons is governed by regulations. The Registration of Persons (Access and Use of Information) Regulations, 2015 require a non-government applicant to apply to NIRA in Form 1. The application must identify the person whose information is sought, the applicant's address, the applicant's capacity where acting for another person and the purpose. An individual-record request must be accompanied by the data subject's consent in the prescribed Form 2. NIRA may refuse access where privacy, state security or other grounds warrant refusal; fees apply.
+
+Separately, NIRA published a PKI-secured-services initiative seeking vetted, registered third-party providers to support:
+- e-consent for eKYC, where a citizen can consent to a third party's request for information in the National Identification Register through a fingerprint-matched, secure PKI workflow; and
+- point-of-service verification of digitally signed documents generated from the NIRA portal.
+
+The published initiative requests proposals describing workflows and PKI infrastructure. It is not proof that a general-purpose commercial API is available, that a current procurement/onboarding window is open, or that VeriFire has been selected/approved. It is, however, a promising institutional engagement path because it explicitly contemplates third-party eKYC providers and citizen-mediated consent.
+
+Official references:
+- [Registration of Persons (Access and Use of Information) Regulations, 2015](https://www.nira.go.ug/media/2022/08/Access-and-Use-of-Information.pdf)
+- [NIRA PKI-secured services initiative](https://www.nira.go.ug/media/2024/02/Provision-of-PKI-Secured-Services.pdf)
+- [Registration of Persons Act 2015](https://www.nira.go.ug/publications/registration-of-person-act-2015-2)
+- NIRA contact: info@nira.go.ug; +256 312 119 600 / +256 312 119 631 / +256 312 119 639.
+
+### Privacy and cross-border requirements
+
+Uganda's Data Protection and Privacy Regulations, 2021, regulation 30, restrict processing or storage outside Uganda unless the organisation demonstrates adequate protection in the destination country or obtains the data subject's consent; further onward transfer requires express consent. The current PDPO portal says organisations collecting personal data must register as a controller, processor or collector and obtain a certificate before processing. The 2025 Google decision is also relevant to offshore providers: Ugandan obligations can apply regardless of where an organisation is based. Obtain Uganda counsel's confirmation of the current statutory text and the application of the regulations to the proposed data flow before selecting hosting regions.
+
+Official references:
+- [Uganda Data Protection and Privacy Regulations, 2021](https://pdpo.go.ug/media/2022/03/Data_Protection_and_Privacy_Regulations-2021.pdf)
+- [Personal Data Protection Office (PDPO)](https://pdpo.go.ug/)
+- [PDPO registration guidance and resources](https://pdpo.go.ug/knowledge-center/resources)
+- [PDPO decision: Ssekamwa Frank & others v Google LLC](https://pdpo.go.ug/media/2025/07/Ssekamwa-Frank-3-Ors-vs-Google-LLC-PDPO-Decision-18th-July-2024.pdf)
+
+### Questions for NIRA
+
+1. Is the 2024 PKI-secured-services initiative still active, and is NIRA onboarding additional third-party providers for e-consent/eKYC?
+2. Is there a separate route for an institution to apply under the 2015 Access and Use Regulations without becoming a PKI service provider?
+3. Can a foreign technology provider apply directly, or must an eligible Ugandan institution be the applicant and contracting party?
+4. Can a Ugandan customer appoint VeriFire as a named processor/subprocessor to operate the integration, and what written NIRA approval is required?
+5. What are the current application forms, eligibility criteria, supporting documents, fees and approval stages for commercial use?
+6. What lawful purposes and sectors are eligible, and are there restrictions on lending, fintech, telecoms, marketplaces or fraud prevention?
+7. What consent form and proof are required for each request? Can the customer's own interface collect consent and pass verifiable evidence to NIRA?
+8. What fields and verification methods are available, and are biometric templates/samples ever disclosed to third parties?
+9. Please provide current API specifications, endpoints, authentication, PKI/certificate profiles, signing and verification requirements, sandbox and test process.
+10. What hosting, encryption, key custody, local presence, audit, retention/deletion and incident-response controls are mandatory?
+11. What restrictions apply to processing or storing NIRA data outside Uganda, and what evidence does PDPO/NIRA require for the proposed architecture?
+12. What are the transaction fees, minimum commitments, rate limits, SLA, support and service continuity arrangements?
+
+### Draft enquiry
+
+**To:** info@nira.go.ug  
+**Subject:** Institutional enquiry — NIR eKYC access, PKI e-consent initiative and authorized technology-provider model
+
+Dear NIRA Team,
+
+We are assessing a privacy-preserving institutional integration with the National Identification Register for Metadusk VeriFire, a headless verification platform. We reviewed the Registration of Persons (Access and Use of Information) Regulations, 2015 and NIRA's published PKI-secured-services initiative describing citizen e-consent for eKYC and point-of-service verification of digitally signed documents.
+
+Please advise:
+- whether NIRA is currently onboarding third-party providers under the PKI-secured-services initiative;
+- whether there is a separate institutional access route under the 2015 Regulations for an eligible Ugandan customer;
+- whether a Ugandan institution may be the applicant and contracting party while VeriFire is an expressly authorized processor/subprocessor;
+- the applicable eligibility, consent, purpose, application, fee and approval requirements;
+- current technical specifications, PKI/certificate requirements, sandbox and production certification;
+- permitted data fields, biometric handling, retention/deletion, audit and security obligations; and
+- Uganda data-protection, local hosting and cross-border processing requirements for the proposed arrangement.
+
+We will not request or process live NIR records during this assessment. Please direct us to the responsible institutional-access or technical team and the current formal application materials.
+
+Kind regards,
+[Authorized representative]
+[Legal entity]
+[Business address]
+[Business email and telephone]
+
+
 ## Decision gates before any integration
 
 | Gate | Evidence required | Current status |
