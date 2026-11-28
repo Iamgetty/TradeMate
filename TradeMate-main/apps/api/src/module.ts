@@ -159,7 +159,7 @@ const buildAgreementAcceptancePdf = (agreementKey: string, agreementVersion: str
   return Buffer.from(pdf, 'ascii');
 };
 
-const buildContractRecordPdf = (contract: Record<string, any>, recordStatus: string, recordedAt = new Date()): Buffer => {
+const buildContractRecordPdf = (contract: Record<string, string | number | null | undefined>, recordStatus: string, recordedAt = new Date()): Buffer => {
   const amount = (Number(contract.amount_minor_units || 0) / 100).toFixed(2);
   const rawLines = [
     'TRADEMATE CONTRACT RECORD', '',
