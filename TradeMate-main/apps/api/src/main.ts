@@ -4,6 +4,7 @@ import { AppModule } from './module';
 import { attachMarketFeed } from './market-feed';
 import { attachMarketHighlights } from './market-highlights';
 import { attachMarketActivity } from './market-activity';
+import { attachVerificationSocket } from './verification';
 import { validateEnvironment } from './environment';
 import { databaseRequestContextMiddleware } from './database-context';
 import { createApiJsonBodyParser } from './request-body-parser';
@@ -17,6 +18,7 @@ async function bootstrap() {
   app.use(databaseRequestContextMiddleware);
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
   attachMarketFeed(app.getHttpServer());
+  attachVerificationSocket(app.getHttpServer());
   app.setGlobalPrefix('api');
 
   // Keep the deployed TradeMate web origin allowed even if a Render env
