@@ -383,3 +383,132 @@ Kind regards,
 [Business address]
 [Business email and telephone]
 
+
+
+## South Africa — Department of Home Affairs (DHA), CIPC and Information Regulator
+
+### Verified institutional access findings
+
+**1. Home Affairs National Population Register / Online Verification Service (OVS)**
+
+The Department of Home Affairs announced that its upgraded NPR verification service launched on 1 July 2025 for government users and private-sector clients. The Department said three major private-sector users had transitioned at launch. Its published tariff at that time was R10 per real-time verification and R1 per off-peak batch transaction, effective 1 July 2025. Treat these as historical published tariffs and request the current fee schedule before commercial modelling.
+
+DHA's March 2025 statement described the service as enabling public and private organisations, including financial-sector businesses, to verify client identities against the National Population Register using biometric features such as fingerprints and facial recognition. The 2025 launch statement says registered users can check identities and other biographical information. It does not publish a complete public API specification, a general eligibility checklist, a self-service sandbox or a foreign-processor delegation policy.
+
+**2. DHA Digital Partnership Model**
+
+DHA's 9 March 2026 announcement says participating banks connect directly to Home Affairs systems through a secure API-based Digital Gateway for Smart ID services. Capitec and Standard Bank branches were live at launch, and FNB was in final testing; rollout was phased. This is a specific bank/Home Affairs partnership, not evidence that VeriFire or all private companies can use the same gateway. Ask whether a separate technology-provider partnership route exists.
+
+**3. Companies and beneficial ownership — CIPC APIVerse**
+
+CIPC's developer portal lists a commercial read-only Companies API for searching and retrieving company data. All APIs use an OAuth 2.0 Authorisation API, which must be subscribed to before other API products. The portal offers self-service app creation, testing and usage monitoring. A beneficial-ownership API is listed as a subscription product; several other products (including filing, disqualified-director, XBRL, documents and streaming) were labelled coming soon on the page reviewed. Obtain current field-level docs, pricing, production approval and reuse rights. Do not represent the portal's product listing as confirmation of a specific beneficial-owner dataset's completeness or unrestricted access.
+
+Official references:
+- [DHA — upgraded NPR verification service launch and 2025 tariff notice](https://www.gov.za/news/media-statements/home-affairs-launch-world-class-new-identity-verification-service-and-cost)
+- [DHA — system upgrade announcement, 24 March 2025](https://www.gov.za/news/media-statements/home-affairs-upgrades-critical-digital-verification-system-24-mar-2025)
+- [DHA — Digital Partnership Model, 9 March 2026](https://www.gov.za/news/media-statements/home-affairs-first-bank-branches-go-live-under-new-digital-partnership-model)
+- [CIPC APIVerse developer portal](https://developer.cipc.co.za/)
+- [CIPC API documentation](https://developer.cipc.co.za/static/docs)
+- [CIPC API catalogue](https://developer.cipc.co.za/apis)
+
+### POPIA / FICA compliance gates
+
+The Protection of Personal Information Act 4 of 2013 (POPIA) applies to the proposed South African data flows. This summary is an issue list for counsel, not a legal opinion:
+
+- **Biometrics:** Section 26 classifies biometric information as special personal information. Section 27 sets out general authorizations/exceptions, including data-subject consent and certain legal grounds; category-specific provisions and any Information Regulator authorization may also matter. Do not assume that biometric processing is automatically lawful merely because a customer asks for it.
+- **Operator / sub-operator:** Sections 20–21 require processing on behalf of a responsible party to be authorized and confidential, and require a written contract ensuring the operator maintains section 19 security safeguards. The operator must notify the responsible party immediately on reasonable grounds to believe personal information was accessed/acquired by an unauthorized person.
+- **Security compromise:** Section 22 requires the responsible party to notify the Regulator and affected data subjects as soon as reasonably possible after discovery, subject to statutory conditions.
+- **Retention:** Section 14 limits retention to what is necessary unless a listed ground permits longer retention, and requires deletion/destruction or de-identification when retention is no longer authorized. FIC Guidance Note 7B (3 August 2026) says accountable institutions must keep CDD records, including copies of or references to identity-verification information. That is the institution's statutory duty; the platform should support evidence references and customer-controlled retention rather than defaulting to raw document/biometric retention.
+- **Cross-border:** Section 72 permits transfers to a foreign recipient only under a specified condition, such as adequate protection under law/binding corporate rules/agreement, consent, or the defined contractual/benefit grounds. Map onward transfers and subprocessors; do not rely on a generic claim that the destination is adequate.
+- **Prior authorisation:** Section 57 is triggered by specific patterns, including certain use/linking of unique identifiers for a different purpose, processing criminal-behaviour information on behalf of third parties, credit reporting, and certain transfers of special/children's information to a country without adequate protection. Biometric processing by itself is not listed as an automatic section 57 trigger, but sections 26–27 still govern it. The Regulator's eServices portal describes the prior-authorisation process.
+- **Information Officer:** POPIA section 55(2) requires the responsible party's Information Officer to be registered with the Regulator before taking up the statutory duties. The Regulator's eServices portal supports registration.
+
+Official references:
+- [POPIA — official Act text](https://www.justice.gov.za/legislation/acts/2013-004.pdf)
+- [Information Regulator — prior authorisation portal](https://eservices.inforegulator.org.za/priorauthorisation/default.aspx)
+- [Information Regulator — eServices](https://eservices.inforegulator.org.za/)
+- [FIC Guidance Note 7B, 3 August 2026](https://www.fic.gov.za/wp-content/uploads/2026/08/Guidance-Note-7B-%E2%80%93-Implementation-of-various-aspects-of-the-FIC-Act.pdf)
+
+### Questions for DHA — OVS / NPR verification
+
+1. Is the upgraded OVS currently onboarding new private-sector customers, and what categories of legal entities qualify?
+2. Must the applicant be a South African-incorporated entity, locally registered foreign company, FIC accountable institution, or another regulated entity? Can a foreign platform apply directly?
+3. Can a South African customer be the OVS contracting party while Metadusk VeriFire is its expressly named operator/technical processor or sub-operator? Is prior written DHA approval required for that delegation?
+4. Does DHA permit a technology provider to serve multiple customer institutions through a single approved connection, or must each customer contract and connect independently?
+5. What is the current application, due-diligence, security assessment and contracting process, and what evidence of lawful purpose/consent is required?
+6. Please provide current OVS API/interface specifications, authentication, encryption, network connectivity, certificate/key custody, test environment and certification procedure.
+7. Which verification methods are available to private-sector clients (demographic, fingerprint, facial, liveness), and which are limited to specific customer classes or use cases?
+8. What minimum input attributes and result fields are permitted? Can the service return a minimal match/no-match or approved verification result without exposing source-register data or biometric templates?
+9. What are the current real-time and batch tariffs, volume tiers, minimum commitments, rate limits, batch windows, SLA, support and outage/fallback terms?
+10. What audit logs, transaction-level consent evidence, record retention, deletion and data-subject rights requirements apply to DHA, customer and operator records?
+11. Are there restrictions on hosting, remote administration, support access or onward processing outside South Africa? Does DHA require local data residency or local personnel?
+12. What is the distinction between OVS verification access and the bank-specific Digital Gateway under the Digital Partnership Model? Is there a formal technology-partner route for non-bank providers?
+
+### Questions for CIPC — Companies / beneficial ownership APIs
+
+1. Can a foreign software provider subscribe to the Companies API and beneficial-ownership API directly, or must the subscriber be a South African entity?
+2. What are the current product subscription, identity/business verification, pricing, billing and production approval requirements?
+3. Please provide current schemas, fields, search limits, pagination, freshness/update cadence, error handling, sandbox/test data and OAuth 2.0 credential lifecycle.
+4. What beneficial-ownership fields are available, what are the access conditions, and are there distinctions between public and restricted information?
+5. May a subscriber use the API to provide verification results to its business customers as a paid service? Are caching, redistribution, resale, sub-licensing or retention restricted?
+6. Can VeriFire act as an authorized operator for a customer's CIPC subscription, or must each customer subscribe and hold its own credentials?
+7. What are the audit, security, rate-limit, service-level, change-notice and termination requirements?
+
+### Questions for the Information Regulator / counsel
+
+1. For VeriFire's proposed model, which entity is the responsible party and which is operator/sub-operator for identity verification, biometrics, AML screening and KYB enrichment?
+2. Which section 27 authorization applies to each biometric workflow, and does any category-specific provision or section 27(2) authorization need to be obtained?
+3. Does a proposed use of SA ID numbers/unique identifiers across multiple independent customer datasets trigger section 57(1)(a) prior authorisation? Does any sanctions/PEP/fraud/criminal-risk product process criminal-behaviour information on behalf of third parties under section 57(1)(b)?
+4. Does any proposed transfer of biometric or other special personal information from South Africa to the platform's foreign environment trigger section 57(1)(d), and is the destination considered adequate under section 72?
+5. What contract terms, sub-operator approvals, transfer instruments, Information Officer registration and breach-response commitments should be documented before a pilot?
+6. Are there sector-specific FICA or other regulatory requirements for a verification technology provider serving banks, fintechs, insurers, lenders or other accountable institutions?
+
+### Draft DHA enquiry (not sent)
+
+**To:** Department of Home Affairs — Online Verification Service / National Population Register institutional onboarding team (please route to the responsible team through the official DHA contact channel)  
+**Subject:** Institutional access enquiry — NPR Online Verification Service and authorized technology-provider model
+
+Dear Department of Home Affairs Team,
+
+We are assessing the Department's upgraded National Population Register Online Verification Service for a potential institutional integration with Metadusk VeriFire, a headless, server-to-server verification platform.
+
+The Department's public announcements confirm that the upgraded OVS supports government and private-sector users and that the 2025 Digital Partnership Model provides participating banks with secure API-based integration. We would appreciate referral to the team responsible for new private-sector OVS onboarding and clarification of:
+- eligibility and application requirements for a new private-sector applicant;
+- whether a South African customer may contract directly with DHA while VeriFire is its expressly authorized operator/technical processor;
+- whether one approved technical connection may serve multiple customers or each customer requires a separate contract and connection;
+- current API/interface documentation, security assessment, sandbox and certification;
+- permitted methods, data fields and minimum-result options;
+- current tariffs, rate limits, SLA and support;
+- audit, consent evidence, retention/deletion and breach obligations; and
+- local hosting, remote support and cross-border processing restrictions.
+
+We will not request credentials, submit live identity data or initiate production access during this assessment. Please advise the formal institutional enquiry route and required application documents.
+
+Kind regards,
+[Authorized representative]
+[Legal entity]
+[South African applicant/customer, if different]
+[Business address]
+[Business email and telephone]
+
+### Draft CIPC enquiry (not sent)
+
+**To:** CIPC APIVerse support — via [official developer portal](https://developer.cipc.co.za/)  
+**Subject:** Commercial API subscription and authorized operator enquiry — Companies and beneficial ownership data
+
+Dear CIPC APIVerse Team,
+
+We are evaluating CIPC's Companies API and beneficial-ownership API for Metadusk VeriFire, a headless business-verification platform.
+
+Please confirm foreign-provider eligibility, subscription and production approval requirements, current pricing, available company and beneficial-ownership fields, API documentation and test facilities. We would also appreciate clarification on whether VeriFire may provide API-derived verification results to customer institutions as a paid service, and whether a customer may hold its own CIPC subscription while VeriFire operates as its expressly authorized operator. Please specify any restrictions on caching, retention, redistribution, resale, sub-licensing, audit, rate limits and onward disclosure.
+
+We will not access or redistribute production data until the applicable licence and customer authorization are confirmed.
+
+Kind regards,
+[Authorized representative]
+[Legal entity]
+[Business email and telephone]
+
+### Decision
+
+South Africa is the strongest first-wave market so far for documented institutional access breadth: DHA publicly confirms a private-sector NPR verification service, and CIPC publicly exposes commercial Companies and beneficial-ownership API products. However, there is no confirmed VeriFire contract, foreign-processor approval, customer-led delegation permission, API sandbox credential or current tariff quote. Keep both routes at institutional diligence only. No outreach has been sent, no provider selected, no credentials requested and no country route enabled.
