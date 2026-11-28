@@ -3763,11 +3763,24 @@ class P2PMarketController {
     const client = await databasePool!.connect();
     try {
       await client.query('BEGIN');
+      const locked = await client.query(
+        `SELECT t.id, t.order_id, t.buyer_user_id, t.seller_user_id, t.asset_code, t.fiat_code,
+                t.price::text, t.quantity::text, t.fiat_total::text, t.completed_at,
+                b.display_name AS buyer_name, s.display_name AS seller_name
+         FROM p2p_trades t JOIN users b ON b.id = t.buyer_user_id JOIN users s ON s.id = t.seller_user_id
+         WHERE t.id = $1 AND t.seller_user_id = $2 AND t.status = 'pending'
+           AND t.buyer_payment_sent_at IS NOT NULL AND t.seller_payment_confirmed_at IS NULL
+         FOR UPDATE OF t`,
+        [id, userId],
+      );
+      if (!locked.rowCount) throw new ConflictException('Buyer must first mark payment sent; order must still be pending.');
       const result = await client.query("UPDATE p2p_trades SET seller_payment_confirmed_at=now(),status='completed',completed_at=now(),updated_at=now() WHERE id=$1 AND seller_user_id=$2 AND status='pending' AND buyer_payment_sent_at IS NOT NULL AND seller_payment_confirmed_at IS NULL RETURNING id,status,completed_at",[id,userId]);
-      if (!result.rowCount) throw new ConflictException('Buyer must first mark payment sent; order must still be pending.');
-      await this.writeP2PAudit(client, userId, 'p2p.trade_completed', 'p2p_trade', id);
+      if (!result.rowCount) throw new ConflictException('Trade state changed; refresh and try again.');
+      const receiptTrade = { ...locked.rows[0], completed_at: result.rows[0].completed_at };
+      await saveP2PTradeReceiptVaultDocuments(client, receiptTrade);
+      await this.writeP2PAudit(client, userId, 'p2p.trade_completed', 'p2p_trade', id, { receipt_documents_created: 2 });
       await client.query('COMMIT');
-      return { order: result.rows[0] };
+      return { order: result.rows[0], receipt: { document_type: 'receipt', visibility: 'private', saved_to_both_portfolios: true } };
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;
