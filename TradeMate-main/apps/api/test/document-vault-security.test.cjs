@@ -141,39 +141,35 @@ test('contract conversation messages link only sender-owned participant-visible 
 test('completed P2P trades generate private receipt PDFs for both parties in the same transaction', () => {
   const manifestSource = readFileSync(join(root, 'scripts', 'migrate.js'), 'utf8');
   const migrationSource = readFileSync(join(root, 'database', 'migrations', '061_p2p_trade_receipt_documents.sql'), 'utf8');
-  assert.match(manifestSource, /'061_p2p_trade_receipt_documents\\.sql'/);
-  assert.match(migrationSource, /PRIMARY KEY \\(p2p_trade_id, user_id\\)/);
-  assert.match(migrationSource, /document_id UUID NOT NULL UNIQUE/);
-  assert.match(migrationSource, /REVOKE ALL ON TABLE public\\.p2p_trade_receipt_documents FROM PUBLIC/);
-  assert.match(moduleSource, /const buildP2PTradeReceiptPdf/);
+  assert.ok(manifestSource.includes("'061_p2p_trade_receipt_documents.sql'"));
+  assert.ok(migrationSource.includes('PRIMARY KEY (p2p_trade_id, user_id)'));
+  assert.ok(migrationSource.includes('document_id UUID NOT NULL UNIQUE'));
+  assert.ok(migrationSource.includes('REVOKE ALL ON TABLE public.p2p_trade_receipt_documents FROM PUBLIC'));
   const receiptPdfBuilder = moduleSource.slice(moduleSource.indexOf('const buildP2PTradeReceiptPdf'), moduleSource.indexOf('const saveP2PTradeReceiptVaultDocuments'));
-  assert.match(receiptPdfBuilder, /TRADEMATE P2P TRANSACTION RECEIPT/);
-  assert.match(receiptPdfBuilder, /Transaction reference:/);
-  assert.match(receiptPdfBuilder, /Buyer account:/);
-  assert.match(receiptPdfBuilder, /Seller account:/);
-  assert.match(receiptPdfBuilder, /Fiat total:/);
-  assert.match(receiptPdfBuilder, /not proof of a bank transfer/);
-  assert.match(receiptPdfBuilder, /createHash/);
+  for (const field of ['TRADEMATE P2P TRANSACTION RECEIPT', 'Transaction reference:', 'Buyer account:', 'Seller account:', 'Fiat total:', 'not proof of a bank transfer']) {
+    assert.ok(receiptPdfBuilder.includes(field), `receipt PDF missing ${field}`);
+  }
+  assert.ok(receiptPdfBuilder.includes('createHash'));
   const receiptSaver = moduleSource.slice(moduleSource.indexOf('const saveP2PTradeReceiptVaultDocuments'), moduleSource.indexOf('const buildContractRecordPdf'));
-  assert.match(receiptSaver, /for \\(const ownerUserId of \\[String\\(trade\\.buyer_user_id\\), String\\(trade\\.seller_user_id\\)\\])/);
-  assert.match(receiptSaver, /SELECT document_id FROM p2p_trade_receipt_documents WHERE p2p_trade_id = \\$1 AND user_id = \\$2/);
-  assert.match(receiptSaver, /if \\(existing\\.rowCount\\) continue/);
-  assert.match(receiptSaver, /'marketplace_transaction'/);
-  assert.match(receiptSaver, /'receipt','generated','private'/);
-  assert.match(receiptSaver, /file_sha256, file_data, metadata/);
-  assert.match(receiptSaver, /INSERT INTO p2p_trade_receipt_documents/);
+  for (const field of [
+    'for (const ownerUserId of [String(trade.buyer_user_id), String(trade.seller_user_id)]',
+    'SELECT document_id FROM p2p_trade_receipt_documents WHERE p2p_trade_id = $1 AND user_id = $2',
+    'if (existing.rowCount) continue',
+    "'marketplace_transaction'",
+    "'receipt','generated','private'",
+    'file_sha256, file_data, metadata',
+    'INSERT INTO p2p_trade_receipt_documents',
+  ]) assert.ok(receiptSaver.includes(field), `receipt vault save missing ${field}`);
   const p2pController = moduleSource.slice(moduleSource.indexOf("@Controller('p2p')"), moduleSource.indexOf("@Controller('profiles')"));
-  assert.match(p2pController, /confirmReceipt/);
-  assert.match(p2pController, /FOR UPDATE OF t/);
-  assert.match(p2pController, /saveP2PTradeReceiptVaultDocuments\\(client, receiptTrade\\)/);
-  assert.match(p2pController, /receipt_documents_created: 2/);
+  assert.ok(p2pController.includes('confirmReceipt'));
+  assert.ok(p2pController.includes('FOR UPDATE OF t'));
+  assert.ok(p2pController.includes('saveP2PTradeReceiptVaultDocuments(client, receiptTrade)'));
+  assert.ok(p2pController.includes('receipt_documents_created: 2'));
   const confirmHandler = p2pController.slice(p2pController.indexOf('async confirmReceipt'), p2pController.indexOf("@Post('orders/:id/cancel')"));
-  assert.match(confirmHandler, /client\\.query\\('BEGIN'\\)/);
-  assert.match(confirmHandler, /client\\.query\\('COMMIT'\\)/);
-  assert.match(confirmHandler, /client\\.query\\('ROLLBACK'\\)/);
-  assert.match(moduleSource, /'p2p_completed_trade_receipt'/);
-  assert.match(moduleSource, /payment_reference_included: false/);
-  assert.match(moduleSource, /TradeMate does not custody funds or provide escrow/);
+  for (const field of ["client.query('BEGIN')", "client.query('COMMIT')", "client.query('ROLLBACK')"]) assert.ok(confirmHandler.includes(field));
+  assert.ok(moduleSource.includes("'p2p_completed_trade_receipt'"));
+  assert.ok(moduleSource.includes('payment_reference_included: false'));
+  assert.ok(moduleSource.includes('TradeMate does not custody funds or provide escrow'));
 });
 test('signed Persona inquiry events generate one private verification evidence PDF per event', () => {
   const manifestSource = readFileSync(join(root, 'scripts', 'migrate.js'), 'utf8');
