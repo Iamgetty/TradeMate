@@ -131,7 +131,7 @@ test('contract conversation messages link only sender-owned participant-visible 
   assert.match(contractController, /source_id = \$3 AND visibility = 'contract_participants'/);
   assert.match(contractController, /Only your own files uploaded to this contract can be attached/);
   assert.match(contractController, /marketplace_contract_message_documents/);
-  assert.match(contractController, /'attachments',/);
+  assert.match(contractController, /AS attachments/);
   assert.match(webSource, /attachmentDocumentIds:ids/);
   assert.match(webSource, /t\.attachments\|\|\[\]/);
   assert.match(webSource, /ct-msg-files/);
