@@ -74,7 +74,7 @@ test('email verification generates a private vault PDF limited to email-address 
   assert.match(moduleSource, /TRADEMATE EMAIL VERIFICATION RECORD/);
   assert.match(moduleSource, /completed TradeMate email verification/);
   assert.match(moduleSource, /does not verify the account holder identity/);
-  assert.match(moduleSource, /'email_verification', NULL, 'other', 'generated', 'private'/);
+  assert.ok(moduleSource.includes("\\'email_verification\\', NULL, \\'other\\', \\'generated\\', \\'private\\'"));
   assert.match(moduleSource, /record_type: 'email_verification_event'/);
   assert.match(moduleSource, /verification_scope: 'email_address_only'/);
 });
