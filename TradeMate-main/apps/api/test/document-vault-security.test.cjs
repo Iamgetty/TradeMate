@@ -48,3 +48,8 @@ test('vault downloads are authenticated and audited', () => {
   assert.match(moduleSource, /accessibleDocument\(id, userId, true\)/);
   assert.match(moduleSource, /document\.downloaded/);
 });
+
+test('Portfolio all-documents panel waits for the live vault list before rendering', () => {
+  const portfolioSource = readFileSync(join(root, '..', '..', 'web', 'public', 'tm', 'app.js'), 'utf8');
+  assert.match(portfolioSource, /pmLoadDocs\(\)\.then\(pmAllDocs\)/);
+});
