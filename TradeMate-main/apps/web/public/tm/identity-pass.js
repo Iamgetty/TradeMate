@@ -338,10 +338,19 @@ var s = document.createElement("style");
     var body = document.createElement('div');
     body.style.cssText = 'padding:18px 22px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.65 inherit;color:var(--txt,#fff)';
     body.textContent = agreement.content || '';
+    var signatureWrap = document.createElement('label');
+    signatureWrap.style.cssText = 'display:grid;gap:7px;padding:0 22px 18px;font-size:12px;font-weight:700;color:var(--txt,#fff)';
+    signatureWrap.textContent = 'Type your full legal name to sign';
+    var signatureInput = document.createElement('input');
+    signatureInput.type = 'text'; signatureInput.name = 'signatureName'; signatureInput.autocomplete = 'name';
+    signatureInput.maxLength = 120; signatureInput.required = true; signatureInput.placeholder = 'Full legal name';
+    signatureInput.setAttribute('aria-label', 'Full legal name for electronic signature');
+    signatureInput.style.cssText = 'width:100%;box-sizing:border-box;min-height:48px;padding:0 14px;border:1px solid var(--line,#394052);border-radius:12px;background:var(--s2,#202638);color:var(--txt,#fff);font:600 14px inherit';
+    signatureWrap.appendChild(signatureInput);
     var footer = document.createElement('div');
     footer.style.cssText = 'padding:16px 22px;border-top:1px solid var(--line,#394052);display:grid;gap:12px';
     var note = document.createElement('p');
-    note.textContent = 'Your acceptance will be recorded and a copy saved in your private Documents vault. This is electronic consent, not a cryptographic e-signature.';
+    note.textContent = 'Your typed signature and the signed agreement will be recorded and saved in Portfolio → Documents. This is electronic-signature evidence, not a cryptographic signature.';
     note.style.cssText = 'font-size:11px;line-height:1.45;color:var(--mut,#aab1c2);margin:0';
     var actions = document.createElement('div');
     actions.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap';
@@ -349,13 +358,16 @@ var s = document.createElement("style");
     decline.type = 'button'; decline.textContent = 'Not now';
     decline.style.cssText = 'min-height:44px;padding:0 18px;border:1px solid var(--line,#394052);border-radius:12px;background:transparent;color:inherit;font-weight:700;cursor:pointer';
     var accept = document.createElement('button');
-    accept.type = 'button'; accept.textContent = 'I agree and continue';
+    accept.type = 'button'; accept.textContent = 'Sign agreement & continue';
     accept.style.cssText = 'min-height:44px;padding:0 18px;border:0;border-radius:12px;background:var(--am,#ffc24d);color:#17130a;font-weight:800;cursor:pointer';
     decline.addEventListener('click', function () { overlay.remove(); onDecline(); });
     accept.addEventListener('click', function () {
-      accept.disabled = true; decline.disabled = true; accept.textContent = 'Saving consent…';
-      onAccept().then(function () { overlay.remove(); }).catch(function (error) {
-        accept.disabled = false; decline.disabled = false; accept.textContent = 'I agree and continue';
+      var signatureName = signatureInput.value.trim();
+      if (signatureName.length < 2) { signatureInput.focus(); signatureInput.setCustomValidity('Enter your full legal name to sign.'); signatureInput.reportValidity(); return; }
+      signatureInput.setCustomValidity('');
+      accept.disabled = true; decline.disabled = true; signatureInput.disabled = true; accept.textContent = 'Saving signed agreement…';
+      onAccept(signatureName).then(function () { overlay.remove(); }).catch(function (error) {
+        accept.disabled = false; decline.disabled = false; signatureInput.disabled = false; accept.textContent = 'Sign agreement & continue';
         var alert = footer.querySelector('[role="alert"]');
         if (!alert) { alert = document.createElement('p'); alert.setAttribute('role', 'alert'); alert.style.cssText = 'color:var(--dn,#e66);font-size:12px;margin:0'; footer.insertBefore(alert, actions); }
         alert.textContent = error && error.message ? error.message : 'Could not save your consent. Please try again.';
@@ -363,9 +375,9 @@ var s = document.createElement("style");
     });
     actions.appendChild(decline); actions.appendChild(accept);
     footer.appendChild(note); footer.appendChild(actions);
-    panel.appendChild(header); panel.appendChild(body); panel.appendChild(footer); overlay.appendChild(panel);
+    panel.appendChild(header); panel.appendChild(body); panel.appendChild(signatureWrap); panel.appendChild(footer); overlay.appendChild(panel);
     document.body.appendChild(overlay);
-    accept.focus();
+    signatureInput.focus();
   }
   function openPersonaInquiry(button) {
     button.disabled = true; button.textContent = 'Connecting to Persona…';
@@ -398,10 +410,10 @@ var s = document.createElement("style");
       .then(function (data) {
         if (!data.required) { openPersonaInquiry(button); return; }
         button.disabled = false; button.textContent = 'Start verification';
-        showPersonaConsent(data.agreement || {}, function () {
+        showPersonaConsent(data.agreement || {}, function (signatureName) {
           return personaRequest('/api/integrations/persona/agreement/accept', {
             method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ accepted: true, version: data.agreement && data.agreement.version })
+            body: JSON.stringify({ accepted: true, version: data.agreement && data.agreement.version, signatureName: signatureName })
           }).then(function () { openPersonaInquiry(button); });
         }, function () {});
       })
