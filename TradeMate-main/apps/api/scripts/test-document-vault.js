@@ -16,7 +16,7 @@ async function main() {
   try {
     const suffix = randomUUID();
     const actors = {};
-    for (const role of ['owner', 'admin', 'member', 'outsider']) {
+    for (const role of ['owner', 'admin', 'member', 'outsider', 'stranger']) {
       const user = await pool.query(
         "INSERT INTO users (email, display_name, status) VALUES ($1,$2,'active') RETURNING id",
         [role + '-' + suffix + '@example.invalid', 'Vault test ' + role],
@@ -105,6 +105,8 @@ async function main() {
       'seller organization admin must access contract participant documents');
     assert.equal((await request('admin', '/' + contractDocumentId + '/download')).status, 200,
       'seller participant must download contract participant document');
+    assert.equal((await request('stranger', '/' + contractDocumentId)).status, 404,
+      'a user outside both contract parties must not read the document');
     const outsiderContractList = await request('owner', '');
     assert.ok((await outsiderContractList.json()).documents.some((document) => document.id === contractDocumentId),
       'contract participants must see the contract document in list results');
