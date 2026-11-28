@@ -170,6 +170,42 @@ const saveContractVaultRecord = async (client: PoolClient, contract: Record<stri
 };
 
 
+const buildEmailVerificationRecordPdf = (user: Record<string, unknown>, verifiedAt = new Date()): Buffer => {
+  const rawLines = [
+    'TRADEMATE EMAIL VERIFICATION RECORD', '',
+    'Verified at (UTC): ' + verifiedAt.toISOString(),
+    'Account reference: ' + String(user.id || ''),
+    'Verified email: ' + String(user.email || ''),
+    'Account display name: ' + String(user.display_name || ''),
+    'Country code: ' + String(user.country_code || ''),
+    '', 'VERIFICATION SCOPE',
+    'This record confirms that the account email address completed TradeMate email verification.',
+    'It does not verify the account holder identity, organization status, or legal authority.',
+  ];
+  const lines = rawLines.map((line) => line.replace(/[^\\x20-\\x7E]/g, ''));
+  const escapePdf = (line: string) => line.split('\\\\').join('\\\\\\\\').split('(').join('\\\\(').split(')').join('\\\\)');
+  const commands = ['BT', '/F1 10 Tf', '48 748 Td', '14 TL'];
+  lines.forEach((line, index) => { if (index) commands.push('T*'); commands.push('(' + escapePdf(line) + ') Tj'); });
+  commands.push('ET');
+  const stream = commands.join('\\n');
+  const objects = [
+    '',
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    '<< /Length ' + Buffer.byteLength(stream, 'ascii') + ' >>\\nstream\\n' + stream + '\\nendstream',
+  ];
+  let pdf = '%PDF-1.4\\n';
+  const offsets = [0];
+  for (let id = 1; id < objects.length; id++) { offsets[id] = Buffer.byteLength(pdf, 'ascii'); pdf += id + ' 0 obj\\n' + objects[id] + '\\nendobj\\n'; }
+  const xrefOffset = Buffer.byteLength(pdf, 'ascii');
+  pdf += 'xref\\n0 ' + objects.length + '\\n0000000000 65535 f \\n';
+  for (let id = 1; id < objects.length; id++) pdf += offsets[id].toString().padStart(10, '0') + ' 00000 n \\n';
+  pdf += 'trailer\\n<< /Size ' + objects.length + ' /Root 1 0 R >>\\nstartxref\\n' + xrefOffset + '\\n%%EOF';
+  return Buffer.from(pdf, 'ascii');
+};
+
 const buildOrganizationRegistrationPdf = (organization: Record<string, unknown>, ownerUserId: string, recordedAt = new Date()): Buffer => {
   const rawLines = [
     'TRADEMATE ORGANIZATION REGISTRATION RECORD', '',
@@ -861,8 +897,16 @@ class AuthController {
     if (!verified.rowCount) {
       throw new UnauthorizedException('This verification code is invalid or expired. Request a new one.');
     }
+    const verifiedUser = verified.rows[0] as Record<string, unknown>;
+    const verifiedAt = new Date();
+    const verificationPdf = buildEmailVerificationRecordPdf(verifiedUser, verifiedAt);
+    const verificationHash = createHash('sha256').update(verificationPdf).digest('hex');
+    await databasePool.query(
+      'INSERT INTO user_documents (owner_user_id, source_type, source_id, document_type, document_status, visibility, file_name, mime_type, file_size, file_sha256, file_data, metadata) VALUES ($1, \'email_verification\', NULL, \'other\', \'generated\', \'private\', $2, \'application/pdf\', $3, $4, $5, $6::jsonb)',
+      [String(verifiedUser.id), 'TradeMate-Email-Verification-' + verifiedAt.toISOString().slice(0, 10) + '.pdf', verificationPdf.length, verificationHash, verificationPdf, JSON.stringify({ record_type: 'email_verification_event', verified_email: String(verifiedUser.email || ''), verified_at: verifiedAt.toISOString(), verification_scope: 'email_address_only' })],
+    );
     response.cookie(SESSION_COOKIE, sessionToken, cookieOptions());
-    return { user: verified.rows[0] };
+    return { user: verifiedUser };
   }
 
   @Post('login')
