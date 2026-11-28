@@ -2178,23 +2178,33 @@ class UserDocumentsController {
     }
     const metadata = body?.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata)
       ? JSON.stringify(body.metadata) : '{}';
-    const result = await databasePool!.query(
-      `INSERT INTO user_documents
-        (owner_user_id, organization_id, source_type, source_id, document_type,
-         document_status, visibility, file_name, mime_type, file_size, file_sha256, file_data, metadata)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb)
-       RETURNING id, owner_user_id, organization_id, source_type, source_id,
-                 document_type, document_status, visibility, file_name,
-                 mime_type, file_size, file_sha256, metadata, created_at`,
-      [userId, organizationId, sourceType, sourceId, documentType, documentStatus,
-       visibility, fileName, mimeType, data.length, createHash('sha256').update(data).digest('hex'), data, metadata],
-    );
-    await databasePool!.query(
-      `INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata)
-       VALUES ($1,$2,'document.uploaded','user_document',$3,$4::jsonb)`,
-      [userId, organizationId, result.rows[0].id, JSON.stringify({ source_type: sourceType, document_type: documentType, visibility, file_size: data.length })],
-    );
-    return { document: result.rows[0] };
+    const client = await databasePool!.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        `INSERT INTO user_documents
+          (owner_user_id, organization_id, source_type, source_id, document_type,
+           document_status, visibility, file_name, mime_type, file_size, file_sha256, file_data, metadata)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb)
+         RETURNING id, owner_user_id, organization_id, source_type, source_id,
+                   document_type, document_status, visibility, file_name,
+                   mime_type, file_size, file_sha256, metadata, created_at`,
+        [userId, organizationId, sourceType, sourceId, documentType, documentStatus,
+         visibility, fileName, mimeType, data.length, createHash('sha256').update(data).digest('hex'), data, metadata],
+      );
+      await client.query(
+        `INSERT INTO audit_events (actor_user_id, organization_id, event_type, entity_type, entity_id, metadata)
+         VALUES ($1,$2,'document.uploaded','user_document',$3,$4::jsonb)`,
+        [userId, organizationId, result.rows[0].id, JSON.stringify({ source_type: sourceType, document_type: documentType, visibility, file_size: data.length })],
+      );
+      await client.query('COMMIT');
+      return { document: result.rows[0] };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   @Get(':id')
