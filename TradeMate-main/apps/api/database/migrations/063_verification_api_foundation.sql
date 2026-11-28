@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS public.verification_events (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   case_id UUID NOT NULL REFERENCES public.verification_cases(id) ON DELETE CASCADE,
   actor_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
-  event_type TEXT NOT NULL CHECK (event_type ~ '^verification\\.[a-z_]+$'),
+  event_type TEXT NOT NULL CHECK (event_type ~ '^verification\.[a-z_]+$'),
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb
     CHECK (jsonb_typeof(metadata) = 'object'),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
