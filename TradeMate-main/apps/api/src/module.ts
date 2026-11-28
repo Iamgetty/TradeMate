@@ -1475,6 +1475,15 @@ class OrganizationsController {
           "INSERT INTO organization_documents (organization_id, uploaded_by_user_id, file_name, mime_type, file_size, file_data) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, file_name, mime_type, file_size, review_status, created_at",
           [id, userId, fileName, mimeType, data.length, data],
         );
+        await client.query(
+          `INSERT INTO user_documents
+            (owner_user_id, organization_id, source_type, source_id, document_type,
+             document_status, visibility, file_name, mime_type, file_size, file_sha256, file_data, metadata)
+           VALUES ($1,$2,'organization_verification',$3,'organization','received','organization',$4,$5,$6,$7,$8,$9::jsonb)`,
+          [userId, id, result.rows[0].id, fileName, mimeType, data.length,
+           createHash('sha256').update(data).digest('hex'), data,
+           JSON.stringify({ legacy_organization_document_id: result.rows[0].id, review_status: result.rows[0].review_status })],
+        );
         saved.push(result.rows[0]);
       }
       await client.query(
