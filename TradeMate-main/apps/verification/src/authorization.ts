@@ -44,6 +44,12 @@ export class AuthorizationError extends Error {
   }
 }
 
+export function requireScope(context: AuthorizedTenantContext, requiredScope: string): void {
+  if (!/^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$/.test(requiredScope) || !context.scopes.includes(requiredScope)) {
+    throw new AuthorizationError();
+  }
+}
+
 const KEY_PREFIX_LENGTH = 17;
 const PRODUCT_ID_PATTERN = /^[a-z][a-z0-9-]{1,63}$/;
 
