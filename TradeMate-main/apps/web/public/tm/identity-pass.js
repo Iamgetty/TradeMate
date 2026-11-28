@@ -153,6 +153,31 @@ html[data-theme="purple"] .idp-cf:before,html[data-theme="purple"] .idp-cb:befor
 .idp-vprivacy svg{color:var(--am);flex:none}
 .idp-vprivacy small{font-size:10px;color:var(--mut)}
 @media(max-width:420px){.idp-verify{padding:15px;border-radius:18px}.idp-vstatus{font-size:10px;padding:6px 8px}.idp-vstep-icon{width:34px;height:34px}.idp-vconnector{margin-top:17px;flex-basis:5%}.idp-vstep small{font-size:10px}}
+/* Persona verification: restrained hierarchy, crisp spacing, dependable mobile layout. */
+.idp-verify{border-radius:24px;padding:20px;background:var(--s1);border-color:color-mix(in srgb,var(--am) 20%,var(--line));box-shadow:0 8px 24px rgba(0,0,0,.09)}
+.idp-verify:before{right:-80px;top:-100px;width:190px;height:190px;opacity:.35}
+.idp-vtop{gap:12px;align-items:flex-start}
+.idp-vbadge{width:46px;height:46px;border-radius:14px;background:color-mix(in srgb,var(--am) 12%,var(--s2));box-shadow:none}
+.idp-vheading{padding-top:1px}
+.idp-veyebrow{font-size:10px;letter-spacing:.13em}
+.idp-vheading h3{font-size:21px;letter-spacing:-.02em}
+.idp-vheading p{font-size:13px;line-height:1.5;max-width:40ch}
+.idp-vstatus{padding:7px 10px;font-size:11px;box-shadow:none;white-space:nowrap}
+.idp-vsteps{gap:8px;margin:20px 0}
+.idp-vstep{gap:6px}
+.idp-vstep-icon{width:42px;height:42px;border-radius:13px;background:var(--s2);border-color:var(--line);box-shadow:none}
+.idp-vstep-icon svg{width:19px;height:19px}
+.idp-vstep b{font-size:12px;letter-spacing:-.01em}
+.idp-vstep small{font-size:10.5px;max-width:16ch;line-height:1.45}
+.idp-vconnector{height:1px;flex-basis:7%;margin-top:20px;opacity:.65}
+.idp-vfoot{gap:12px}
+.idp-verify .idp-cta{min-height:52px;border-radius:15px;font-size:15px;box-shadow:0 4px 12px color-mix(in srgb,var(--am) 12%,transparent);transition:transform .15s ease,filter .15s ease}
+.idp-verify .idp-cta:not(:disabled):active{transform:translateY(1px);filter:saturate(.94)}
+.idp-vprivacy{justify-content:flex-start;padding:11px 13px;border:1px solid var(--line);border-radius:14px;background:var(--s2);font-size:11px}
+.idp-vprivacy small{font-size:10px}
+@media(max-width:560px){.idp-verify{padding:17px;border-radius:21px}.idp-vtop{flex-wrap:wrap}.idp-vstatus{margin:0;white-space:normal;justify-self:start}.idp-vsteps{gap:7px;margin:18px 0}.idp-vstep-icon{width:38px;height:38px;border-radius:12px}.idp-vstep b{font-size:11.5px}.idp-vstep small{font-size:10px;max-width:12ch}.idp-vconnector{flex-basis:4%;margin-top:18px}}
+@media(max-width:380px){.idp-verify{padding:15px;border-radius:19px}.idp-vtop{display:grid;grid-template-columns:40px minmax(0,1fr);gap:10px;align-items:start}.idp-vbadge{grid-column:1;grid-row:1;width:40px;height:40px;border-radius:12px}.idp-vheading{grid-column:2;grid-row:1;min-width:0}.idp-vheading h3{font-size:20px}.idp-vstatus{grid-column:2;grid-row:2;margin-top:2px;justify-self:start}.idp-vsteps{display:grid;grid-template-columns:1fr;gap:8px;margin:17px 0}.idp-vstep{display:grid;grid-template-columns:36px minmax(0,1fr);grid-template-rows:auto auto;align-items:center;column-gap:10px;row-gap:2px;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:13px;background:var(--s2)}.idp-vstep-icon{grid-column:1;grid-row:1 / span 2;width:36px;height:36px;border-radius:11px}.idp-vstep b{grid-column:2;grid-row:1;min-width:0;font-size:12px}.idp-vstep small{grid-column:2;grid-row:2;max-width:none;font-size:10.5px}.idp-vconnector{display:none}}
+
 `;
 
 var s = document.createElement("style");
@@ -336,8 +361,76 @@ var s = document.createElement("style");
     title.style.cssText = 'font:800 22px inherit;margin:0';
     header.appendChild(eyebrow); header.appendChild(title);
     var body = document.createElement('div');
-    body.style.cssText = 'padding:18px 22px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.65 inherit;color:var(--txt,#fff)';
-    body.textContent = agreement.content || '';
+    body.className = 'tm-consent-body';
+    body.style.cssText = 'padding:22px 24px 26px;overflow:auto;min-height:0;color:var(--txt,#fff);font-family:inherit;font-size:14px;line-height:1.65;font-weight:400';
+    var rawLines = String(agreement.content || '').split(/\r?\n/);
+    // The document title is already prominent in the dialog header; do not repeat it.
+    if (rawLines.length && /^TRADEMATE IDENTITY VERIFICATION AGREEMENT$/i.test(rawLines[0].trim())) rawLines.shift();
+    var currentList = null, currentItem = null, sectionCount = 0;
+    function addConsentParagraph(text, className) {
+      var p = document.createElement('p');
+      p.className = className || 'tm-consent-paragraph';
+      var urlPattern = new RegExp('https://withpersona[.]com/legal/privacy-policy', 'g');
+      var parts = text.split(urlPattern);
+      parts.forEach(function (part) {
+        if (!part) return;
+        if (part === 'https://withpersona.com/legal/privacy-policy') {
+          var link = document.createElement('a');
+          link.href = 'https://withpersona.com/legal/privacy-policy';
+          link.target = '_blank'; link.rel = 'noopener noreferrer';
+          link.textContent = part;
+          p.appendChild(link);
+          urlPattern.lastIndex = 0;
+        } else {
+          p.appendChild(document.createTextNode(part));
+        }
+      });
+      body.appendChild(p);
+      return p;
+    }
+    function flushList() { currentList = null; currentItem = null; }
+    function addClause(line) {
+      if (!currentList) {
+        currentList = document.createElement('ol');
+        currentList.className = 'tm-consent-list';
+        body.appendChild(currentList);
+      }
+      var match = line.match(/^\d+\.\s*(.*)$/);
+      currentItem = document.createElement('li');
+      currentItem.textContent = match ? match[1] : line;
+      currentList.appendChild(currentItem);
+    }
+    rawLines.forEach(function (raw) {
+      var line = raw.trim();
+      if (!line) { flushList(); return; }
+      if (/^Version\s/i.test(line)) {
+        flushList();
+        var meta = document.createElement('div');
+        meta.className = 'tm-consent-version';
+        meta.textContent = line;
+        body.appendChild(meta);
+        return;
+      }
+      if (/^(WHAT YOU ARE AGREEING TO|YOUR CHOICE, SIGNATURE AND RECORD)$/i.test(line)) {
+        flushList();
+        sectionCount++;
+        var h = document.createElement('h3');
+        h.className = 'tm-consent-section-title';
+        h.textContent = line === 'WHAT YOU ARE AGREEING TO' ? 'What you are agreeing to' : 'Your choice, signature and record';
+        body.appendChild(h);
+        return;
+      }
+      if (/^\d+\.\s/.test(line)) { addClause(line); return; }
+      if (currentItem) {
+        currentItem.appendChild(document.createTextNode(' ' + line));
+        return;
+      }
+      flushList();
+      addConsentParagraph(line, sectionCount ? 'tm-consent-paragraph' : 'tm-consent-intro');
+    });
+    var consentStyle = document.createElement('style');
+    consentStyle.textContent = '.tm-consent-body a{color:var(--am,#ffc24d);text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere}.tm-consent-version{display:inline-flex;align-items:center;margin:0 0 22px;padding:7px 11px;border:1px solid var(--line,#394052);border-radius:999px;background:var(--s2,#202638);color:var(--mut,#aab1c2);font:600 11px/1.3 inherit}.tm-consent-intro{margin:0 0 24px;font-size:15px;line-height:1.65;color:var(--txt,#fff)}.tm-consent-section-title{margin:26px 0 12px;padding-bottom:9px;border-bottom:1px solid var(--line,#394052);font:800 14px/1.35 inherit;letter-spacing:.055em;text-transform:uppercase;color:var(--am,#ffc24d)}.tm-consent-paragraph{margin:0 0 14px;color:var(--txt,#fff);line-height:1.65}.tm-consent-list{display:grid;gap:12px;margin:0 0 22px;padding:0;list-style:none;counter-reset:consent}.tm-consent-list li{position:relative;margin:0;padding:0 0 0 42px;line-height:1.65;color:var(--txt,#fff);counter-increment:consent}.tm-consent-list li:before{content:counter(consent,decimal-leading-zero);position:absolute;left:0;top:1px;display:grid;place-items:center;width:28px;height:28px;border:1px solid color-mix(in srgb,var(--am,#ffc24d) 35%,var(--line,#394052));border-radius:9px;background:color-mix(in srgb,var(--am,#ffc24d) 9%,var(--s2,#202638));color:var(--am,#ffc24d);font:700 10px/1 inherit}@media(max-width:560px){.tm-consent-body{padding:18px 18px 22px!important;font-size:13.5px!important}.tm-consent-intro{font-size:14px}.tm-consent-section-title{margin-top:22px}}';
+    body.appendChild(consentStyle);
     var signatureWrap = document.createElement('label');
     signatureWrap.style.cssText = 'display:grid;gap:7px;padding:0 22px 18px;font-size:12px;font-weight:700;color:var(--txt,#fff)';
     signatureWrap.textContent = 'Type your full legal name to sign';
