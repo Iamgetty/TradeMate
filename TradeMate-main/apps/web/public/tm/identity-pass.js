@@ -362,7 +362,7 @@ var s = document.createElement("style");
     header.appendChild(eyebrow); header.appendChild(title);
     var body = document.createElement('div');
     body.className = 'tm-consent-body';
-    body.style.cssText = 'padding:22px 24px 26px;overflow:auto;min-height:0;color:var(--txt,#fff);font:400 14px/1.65 inherit';
+    body.style.cssText = 'padding:22px 24px 26px;overflow:auto;min-height:0;color:var(--txt,#fff);font-family:inherit;font-size:14px;line-height:1.65;font-weight:400';
     var rawLines = String(agreement.content || '').split(/\\r?\\n/);
     // The document title is already prominent in the dialog header; do not repeat it.
     if (rawLines.length && /^TRADEMATE IDENTITY VERIFICATION AGREEMENT$/i.test(rawLines[0].trim())) rawLines.shift();
@@ -374,7 +374,7 @@ var s = document.createElement("style");
       var parts = text.split(urlPattern);
       parts.forEach(function (part) {
         if (!part) return;
-        if (urlPattern.test(part)) {
+        if (part === 'https://withpersona.com/legal/privacy-policy') {
           var link = document.createElement('a');
           link.href = 'https://withpersona.com/legal/privacy-policy';
           link.target = '_blank'; link.rel = 'noopener noreferrer';
