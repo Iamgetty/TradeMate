@@ -46,3 +46,19 @@ CREATE TABLE IF NOT EXISTS user_document_access (
 );
 CREATE INDEX IF NOT EXISTS user_document_access_user_idx
   ON user_document_access (user_id, created_at DESC);
+
+REVOKE ALL ON TABLE public.user_documents FROM PUBLIC;
+REVOKE ALL ON TABLE public.user_document_access FROM PUBLIC;
+DO $grants$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'trademate_app') THEN
+    GRANT SELECT, INSERT ON TABLE public.user_documents TO trademate_app;
+    GRANT SELECT ON TABLE public.user_document_access TO trademate_app;
+  END IF;
+END;
+$grants$;
+
+COMMENT ON TABLE public.user_documents IS
+  'Private TradeMate document vault. Runtime access is mediated by authenticated API authorization; public role access is revoked.';
+COMMENT ON TABLE public.user_document_access IS
+  'Explicit per-user document access grants, evaluated by the authenticated document API.';
