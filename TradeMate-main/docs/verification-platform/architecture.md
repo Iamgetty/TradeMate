@@ -7,7 +7,7 @@
 
 The product is installed and configured from a terminal, in the spirit of installing and using Node.js tooling. The developer installs a small CLI/package, initializes a project, connects an integration, and uses a documented SDK or HTTP API. The CLI is the installation and developer-operations surface; it is not the verification engine and does not make verification decisions locally.
 
-Illustrative developer journey (package name and commands are provisional until product naming and registry ownership are confirmed):
+Illustrative developer journey (package namespace ownership remains subject to registry availability):
 
 ```sh
 npm install --global @metadusk/verifire-cli
@@ -98,7 +98,7 @@ AWS and Cloudflare are the current infrastructure environments in this project, 
 ## Open decisions
 
 - Provider credential model: delegated provider authorization only, or provider secrets held outside the application database in an infrastructure secret manager. **Unresolved; do not implement either path yet.**
-- Product/package name and npm namespace ownership.
+- npm namespace ownership and package publication access.
 - First production countries and the precise authorized source/provider for each verification check.
 - Whether WebSocket subscriptions are required in v1 or signed webhooks are sufficient.
 - Data residency, retention schedule, deletion policy and legal basis by country.
