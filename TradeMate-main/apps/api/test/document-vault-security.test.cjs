@@ -72,6 +72,18 @@ test('Portfolio Documents supports authenticated private PDF, JPG and PNG upload
   assert.match(portfolioCss, /\.pm-upload-tools/);
 });
 
+test('contract conversations share negotiation attachments only with contract participants', () => {
+  const portfolioSource = readFileSync(join(root, '..', 'web', 'public', 'tm', 'app.js'), 'utf8');
+  const contractCss = readFileSync(join(root, '..', 'web', 'public', 'tm', 'runtime-contractf2.css'), 'utf8');
+  assert.match(portfolioSource, /function loadContractDocuments/);
+  assert.match(portfolioSource, /function contractDocumentsPanel/);
+  assert.match(portfolioSource, /contractAttachmentPick/);
+  assert.match(portfolioSource, /sourceType:"contract_negotiation"/);
+  assert.match(portfolioSource, /visibility:"contract_participants"/);
+  assert.match(portfolioSource, /data-act="pmdl"/);
+  assert.match(contractCss, /\.ct-files/);
+});
+
 test('new contract proposals generate a private participant-visible vault PDF without claiming signature', () => {
   assert.match(moduleSource, /const buildContractRecordPdf =/);
   assert.match(moduleSource, /TRADEMATE CONTRACT RECORD/);
