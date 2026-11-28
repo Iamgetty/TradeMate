@@ -349,8 +349,9 @@
         e.stopPropagation();
         /* Resolve the live source after app view changes; the old topbar node may
          * have been replaced while this persistent header proxy remains mounted. */
-        var current = document.querySelector('#app .view .top .avb[data-pg="profile"]');
-        (current || (b.isConnected ? b : null) || document.querySelector('#app .top .avb[data-pg="profile"]'))?.click();
+        var pg = b.getAttribute('data-pg');
+        var current = pg ? document.querySelector('#app .view .top [data-pg="' + pg + '"]') : null;
+        (current || (b.isConnected ? b : null) || (pg ? document.querySelector('#app .top [data-pg="' + pg + '"]') : null))?.click();
       });
       if (b.classList.contains('avb')) { c.classList.add('tm-av'); Lg.appendChild(c); } else Rg.appendChild(c);
     });
