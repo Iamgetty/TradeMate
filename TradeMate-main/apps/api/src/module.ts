@@ -705,6 +705,7 @@ class PersonaWebhookController {
        approved_at = CASE WHEN $1 = 'approved' THEN COALESCE(approved_at, now()) ELSE approved_at END
        WHERE inquiry_id = $2 AND (status <> 'approved' OR $1 = 'approved')`,
       [statusByEvent[eventName], inquiryId]);
+    await savePersonaVerificationEventEvidence(inquiryId);
     return { received: true, duplicate: inserted.rowCount === 0 };
   }
 }
@@ -942,6 +943,7 @@ class PersonaInquiryController {
          WHERE inquiry.inquiry_id = $1
            AND (inquiry.status <> 'approved' OR event.event_name = 'inquiry.approved')`,
         [inquiryId]);
+      await savePersonaVerificationEventEvidence(inquiryId);
     }
     return { inquiryId, url: hostedUrl, status: 'pending' };
     } catch (error) {
