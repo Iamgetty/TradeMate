@@ -150,11 +150,11 @@ test('completed P2P trades generate private receipt PDFs for both parties in the
   assert.match(p2pController, /confirmReceipt/);
   assert.match(p2pController, /FOR UPDATE OF t/);
   assert.match(p2pController, /saveP2PTradeReceiptVaultDocuments\(client, receiptTrade\)/);
-  assert.match(p2pController, /'marketplace_transaction'/);
-  assert.match(p2pController, /'p2p_completed_trade_receipt'/);
-  assert.match(p2pController, /payment_reference_included: false/);
+  assert.match(moduleSource, /'marketplace_transaction'/);
+  assert.match(moduleSource, /'p2p_completed_trade_receipt'/);
+  assert.match(moduleSource, /payment_reference_included: false/);
   assert.match(p2pController, /receipt_documents_created: 2/);
-  assert.match(p2pController, /TradeMate does not custody funds or provide escrow/);
+  assert.match(moduleSource, /TradeMate does not custody funds or provide escrow/);
 });
 
 test('signed Persona inquiry events generate one private verification evidence PDF per event', () => {
