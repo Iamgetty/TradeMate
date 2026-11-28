@@ -138,6 +138,7 @@
     'html:not(.tm-desktop) body:not(.tm-desktop) #nav button{display:grid!important;place-items:center;align-content:center;gap:2px;font-size:10px;font-weight:600;color:var(--mut)}',
     'html:not(.tm-desktop) body:not(.tm-desktop) #nav button.on:not(.plus){background:var(--s2)!important;color:var(--am)!important;border-radius:26px}',
     '#nav .tm-nl{font-size:10px;font-weight:600;line-height:1}',
+    '#nav button::after{content:none!important;display:none!important}',
     'html:not(.tm-desktop) body:not(.tm-desktop) #nav button.plus{color:var(--txt)}',
 
     /* ---------- Profile: bottom sheet, same hooks, v10 look (mobile only) ---------- */
