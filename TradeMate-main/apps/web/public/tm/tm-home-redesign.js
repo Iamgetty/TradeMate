@@ -347,7 +347,10 @@
       c.addEventListener('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
-        b.click();
+        /* Resolve the live source after app view changes; the old topbar node may
+         * have been replaced while this persistent header proxy remains mounted. */
+        var current = document.querySelector('#app .view .top .avb[data-pg="profile"]');
+        (current || (b.isConnected ? b : null) || document.querySelector('#app .top .avb[data-pg="profile"]'))?.click();
       });
       if (b.classList.contains('avb')) { c.classList.add('tm-av'); Lg.appendChild(c); } else Rg.appendChild(c);
     });
@@ -381,8 +384,12 @@
     labelNav();
     var v = document.querySelector('#app .view');
     var sc = v && v.querySelector('.home-market-shortcuts');
-    if (!sc) { clearBar(); return; }
-    var top = v.querySelector('.top');
+    var top = v && v.querySelector('.top');
+    /* #mwbar is persistent across app views. Keep its Profile/action proxies
+     * alive outside Home; clearBar here removed the only Profile entry and
+     * stranded every flow that switches account mode from Profile. */
+    if (top) syncBar(top);
+    if (!sc) return;
     if (top) {
       var av = top.querySelector('.avb');
       if (av && !top.querySelector('.tm-brand')) {
