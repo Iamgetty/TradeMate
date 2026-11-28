@@ -194,6 +194,7 @@ export const contractDecisionBodySchema = z.object({
 
 export const contractMessageBodySchema = z.object({
   message: z.string().trim().min(1).max(2000),
+  attachmentDocumentIds: z.array(z.string().uuid()).max(10).optional(),
 }).strict();
 
 const fixedDecimalInput = (scale: number, maxIntegerDigits: number, allowZero: boolean) => z.union([z.number(), z.string()]).refine((value) => {
