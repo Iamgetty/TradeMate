@@ -245,3 +245,13 @@ test('organization creation generates an honest registration-event PDF in the or
   assert.match(moduleSource, /organization_registration_event/);
   assert.match(moduleSource, /legal_registration_certificate: false/);
 });
+
+
+test('explicit document shares cannot bypass owner/admin restrictions on organization verification records', () => {
+  const sharePredicates = moduleSource.match(/user_document_access a WHERE a\.document_id = d\.id AND a\.user_id = \$[12][\s\S]{0,500}?\)\)\)/g) || [];
+  assert.equal(sharePredicates.length, 2, 'both single-document and list queries must guard explicit shares');
+  for (const predicate of sharePredicates) {
+    assert.match(predicate, /d\.source_type <> 'organization_verification'/);
+    assert.match(predicate, /om\.member_role IN \('owner','admin'\)/);
+  }
+});
