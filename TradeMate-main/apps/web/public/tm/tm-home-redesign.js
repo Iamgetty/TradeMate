@@ -342,6 +342,13 @@
       var c = el('button', 'hb'); c.type = 'button';
       ['data-pg', 'data-arg', 'data-act', 'aria-label'].forEach(function (a) { if (b.hasAttribute(a)) c.setAttribute(a, b.getAttribute(a)); });
       c.innerHTML = b.innerHTML;
+      /* The redesigned header uses proxy buttons. Forward activation to the original
+       * app button so its directly-bound handler and state logic remain intact. */
+      c.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        b.click();
+      });
       if (b.classList.contains('avb')) { c.classList.add('tm-av'); Lg.appendChild(c); } else Rg.appendChild(c);
     });
     return true;
