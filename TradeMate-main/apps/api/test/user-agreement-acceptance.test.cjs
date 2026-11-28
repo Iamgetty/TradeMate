@@ -6,6 +6,8 @@ const { join } = require('node:path');
 const root = join(__dirname, '..');
 const moduleSource = readFileSync(join(root, 'src', 'module.ts'), 'utf8');
 const migration = readFileSync(join(root, 'database', 'migrations', '057_user_agreement_acceptances.sql'), 'utf8');
+const personaMigration = readFileSync(join(root, 'database', 'migrations', '058_persona_verification_agreement_acceptances.sql'), 'utf8');
+const identityPass = readFileSync(join(root, '..', 'web', 'public', 'tm', 'identity-pass.js'), 'utf8');
 const manifest = readFileSync(join(root, 'scripts', 'migrate.js'), 'utf8');
 const appSource = readFileSync(join(root, '..', 'web', 'public', 'tm', 'app.js'), 'utf8');
 const agreement = readFileSync(join(root, '..', '..', 'docs', 'legal', 'trademate-platform-user-agreement-v1.md'), 'utf8');
@@ -43,4 +45,26 @@ test('password, email-verification and two-factor sign-in completion all show th
   assert.match(appSource, /I agree and continue/);
   assert.match(appSource, /I do not agree — sign out/);
   assert.match(appSource, /\/auth\/agreement\/accept/);
+});
+
+test('Persona verification consent is versioned, saved privately, and required by the API before inquiry creation', () => {
+  assert.match(manifest, /'058_persona_verification_agreement_acceptances\\.sql'/);
+  assert.match(personaMigration, /CREATE TABLE IF NOT EXISTS public\\.persona_verification_agreement_acceptances/);
+  assert.match(personaMigration, /UNIQUE \\(user_id, agreement_key, agreement_version\\)/);
+  assert.match(personaMigration, /REVOKE ALL ON TABLE public\\.persona_verification_agreement_acceptances FROM PUBLIC/);
+  assert.match(personaMigration, /GRANT SELECT, INSERT ON TABLE public\\.persona_verification_agreement_acceptances TO trademate_app/);
+  assert.doesNotMatch(personaMigration, /INSERT INTO persona_verification_agreement_acceptances/);
+  assert.match(moduleSource, /PERSONA_AGREEMENT_VERSION = '1\\.0'/);
+  assert.match(moduleSource, /@Get\\('agreement'\\)/);
+  assert.match(moduleSource, /@Post\\('agreement\\/accept'\\)/);
+  assert.match(moduleSource, /body\\?\\.accepted !== true/);
+  assert.match(moduleSource, /persona_verification_agreement_acceptances WHERE user_id = \\$1/);
+  assert.match(moduleSource, /HttpStatus\\.PRECONDITION_REQUIRED/);
+  assert.match(moduleSource, /account\\.persona_verification_consent_accepted/);
+  assert.match(moduleSource, /TradeMate-Identity-Verification-Consent-v1\\.0\\.pdf/);
+  assert.match(moduleSource, /PERSONA_AGREEMENT_CONTENT/);
+  assert.match(identityPass, /\\/api\\/integrations\\/persona\\/agreement/);
+  assert.match(identityPass, /\\/api\\/integrations\\/persona\\/agreement\\/accept/);
+  assert.match(identityPass, /I agree and continue/);
+  assert.match(identityPass, /Not now/);
 });
