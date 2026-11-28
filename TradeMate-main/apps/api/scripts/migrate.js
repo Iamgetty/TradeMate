@@ -61,6 +61,7 @@ const MIGRATIONS = [
   '052_render_view_reconciliation.sql',
   '053_persona_webhook_events.sql',
   '054_persona_user_inquiries.sql',
+  '055_platform_document_vault.sql',
 ];
 
 async function main() {
