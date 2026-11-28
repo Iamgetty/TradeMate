@@ -53,6 +53,18 @@ test('Portfolio all-documents panel waits for the live vault list before renderi
   const portfolioSource = readFileSync(join(root, '..', 'web', 'public', 'tm', 'app.js'), 'utf8');
   assert.match(portfolioSource, /pmLoadDocs\(\)\.then\(pmAllDocs\)/);
 });
+test('Portfolio Documents supports authenticated private PDF, JPG and PNG uploads', () => {
+  const portfolioSource = readFileSync(join(root, '..', 'web', 'public', 'tm', 'app.js'), 'utf8');
+  const portfolioCss = readFileSync(join(root, '..', 'web', 'public', 'tm', 'runtime-portfolio.css'), 'utf8');
+  assert.match(portfolioSource, /pm-upload-trigger/);
+  assert.match(portfolioSource, /new FileReader\(\)/);
+  assert.match(portfolioSource, /api\("POST","\\/documents"/);
+  assert.match(portfolioSource, /sourceType:"user_upload"/);
+  assert.match(portfolioSource, /documentStatus:"received",visibility:"private"/);
+  assert.match(portfolioSource, /10\*1024\*1024/);
+  assert.match(portfolioCss, /\.pm-upload-tools/);
+});
+
 test('new contract proposals generate a private participant-visible vault PDF without claiming signature', () => {
   assert.match(moduleSource, /const buildContractRecordPdf =/);
   assert.match(moduleSource, /TRADEMATE CONTRACT RECORD/);
