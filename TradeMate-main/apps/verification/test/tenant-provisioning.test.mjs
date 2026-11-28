@@ -116,6 +116,6 @@ test('invalid issuer, duplicate products and invalid entitlement windows are rej
   const persistence = fakePersistence();
   await assert.rejects(() => provisionTenant(persistence, admin, { ...input, owner: { ...input.owner, issuer: 'http://identity.example.test' } }, NOW), TenantProvisioningError);
   await assert.rejects(() => provisionTenant(persistence, admin, { ...input, products: [{ productId: 'kyc', startsAt: '2026-11-28T12:00:00.000Z', expiresAt: null }, { productId: 'kyc', startsAt: '2026-11-28T12:00:00.000Z', expiresAt: null }] }, NOW), TenantProvisioningError);
-  await assert.rejects(() => provisionTenant(persistence, admin, { ...input, products: [{ productId: 'kyc', startsAt: '2026-11-28T13:00:00.000Z', expiresAt: null }] }, NOW), TenantProvisioningError);
+  await assert.rejects(() => provisionTenant(persistence, admin, { ...input, products: [{ productId: 'kyc', startsAt: '2026-11-28T13:00:00.000Z', expiresAt: '2026-11-28T12:59:00.000Z' }] }, NOW), TenantProvisioningError);
   assert.equal(persistence.state.transactions, 0);
 });
