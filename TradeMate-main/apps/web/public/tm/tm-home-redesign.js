@@ -330,7 +330,7 @@
     }
     var Lg = bar.querySelector('.tm-hb-l'), Rg = bar.querySelector('.tm-hb-r');
     var sig = '';
-    var src = top ? [].slice.call(top.querySelectorAll('.avb, .ib[data-pg="support"]')) : [];
+    var src = top ? [].slice.call(top.querySelectorAll('.ib[data-pg="support"]')) : [];
     src.forEach(function (b) { sig += b.outerHTML; });
     if (Rg.getAttribute('data-sig') === sig) return true;
     Rg.setAttribute('data-sig', sig);
@@ -351,7 +351,7 @@
         var current = pg ? document.querySelector('#app .view .top [data-pg="' + pg + '"]') : null;
         (current || (b.isConnected ? b : null) || (pg ? document.querySelector('#app .top [data-pg="' + pg + '"]') : null))?.click();
       });
-      if (b.classList.contains('avb')) { c.classList.add('tm-av'); Lg.appendChild(c); } else Rg.appendChild(c);
+      Rg.appendChild(c);
     });
     return true;
   }
