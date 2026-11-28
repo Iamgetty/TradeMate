@@ -33,6 +33,10 @@ async function main() {
       ['Vault test organization ' + suffix],
     );
     const organizationId = org.rows[0].id;
+    const listing = await pool.query(
+      "INSERT INTO listings (seller_organization_id,title,description,listing_type,price_minor_units,currency_code,country_code,status) VALUES ($1,$2,'Vault contract integration fixture','service',10000,'NGN','NG','published') RETURNING id",
+      [organizationId, 'Vault contract offer ' + suffix],
+    );
     for (const role of ['owner', 'admin', 'member']) {
       await pool.query(
         'INSERT INTO organization_members (organization_id,user_id,member_role) VALUES ($1,$2,$3)',
@@ -65,6 +69,45 @@ async function main() {
     const request = (role, path) => fetch(baseUrl + '/api/documents' + path, {
       headers: { cookie: 'trademate_session=' + encodeURIComponent(actors[role].token) },
     });
+    const call = (role, method, path, body) => fetch(baseUrl + path, {
+      method,
+      headers: {
+        cookie: 'trademate_session=' + encodeURIComponent(actors[role].token),
+        ...(body ? { 'content-type': 'application/json' } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    const proposal = await call('outsider', 'POST', '/api/market/contracts', {
+      listingId: listing.rows[0].id,
+      amount: '100.00',
+      scope: 'Document vault contract evidence test.',
+      terms: 'Test-only contract terms.',
+    });
+    assert.equal(proposal.status, 201, 'buyer must be able to create the contract fixture');
+    const contractId = (await proposal.json()).data.id;
+    const contractPdf = Buffer.from('%PDF-1.4\\nContract participant document\\n', 'ascii');
+    const contractUpload = await call('outsider', 'POST', '/api/documents', {
+      fileName: 'contract-participants.pdf',
+      mimeType: 'application/pdf',
+      dataBase64: contractPdf.toString('base64'),
+      sourceType: 'contract',
+      sourceId: contractId,
+      documentType: 'contract',
+      visibility: 'contract_participants',
+    });
+    assert.equal(contractUpload.status, 201, 'contract buyer must upload a participant-visible document');
+    const contractDocumentId = (await contractUpload.json()).document.id;
+    assert.equal((await request('owner', '/' + contractDocumentId)).status, 200,
+      'seller organization owner must access contract participant documents');
+    assert.equal((await request('member', '/' + contractDocumentId)).status, 200,
+      'seller organization member must access contract participant documents');
+    assert.equal((await request('admin', '/' + contractDocumentId)).status, 200,
+      'seller organization admin must access contract participant documents');
+    assert.equal((await request('admin', '/' + contractDocumentId + '/download')).status, 200,
+      'seller participant must download contract participant document');
+    const outsiderContractList = await request('owner', '');
+    assert.ok((await outsiderContractList.json()).documents.some((document) => document.id === contractDocumentId),
+      'contract participants must see the contract document in list results');
 
     const ownerGet = await request('owner', '/' + privateId);
     assert.equal(ownerGet.status, 200, 'document owner must read private metadata');
