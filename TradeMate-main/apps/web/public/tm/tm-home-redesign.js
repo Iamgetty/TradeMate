@@ -107,10 +107,10 @@
     /* ---------- Top Categories ---------- */
     H + '>.home-market-shortcuts{display:flex!important;grid-template-columns:none!important;gap:10px!important;overflow-x:auto;scrollbar-width:none;margin:0!important;padding:0 20px 2px!important}',
     H + '>.home-market-shortcuts::-webkit-scrollbar{display:none}',
-    H + '>.home-market-shortcuts .mk-card{flex:none!important;width:60px!important;min-width:0!important;height:auto!important;min-height:0!important;padding:0!important;display:flex!important;flex-direction:column!important;align-items:center!important;gap:7px!important;background:none!important;border:0!important;box-shadow:none!important}',
-    H + '>.home-market-shortcuts .mk-ico{width:54px!important;height:54px!important;border-radius:50%!important;background:var(--s2)!important;color:var(--am)!important;display:grid!important;place-items:center!important;border:0!important;box-shadow:none!important}',
-    H + '>.home-market-shortcuts .mk-ico svg{width:22px!important;height:22px!important}',
-    H + '>.home-market-shortcuts .mk-name{font-size:11px!important;font-weight:600!important;line-height:1.15!important;text-align:center!important;white-space:normal!important;color:var(--txt)!important}',
+    H + '>.home-market-shortcuts .mk-card{flex:none!important;width:116px!important;min-width:116px!important;min-height:116px!important;height:auto!important;padding:16px!important;display:flex!important;flex-direction:column!important;align-items:flex-start!important;justify-content:space-between!important;gap:4px!important;text-align:left!important;border-radius:18px!important;background:var(--s1)!important;border:1px solid var(--line)!important;box-shadow:none!important}',
+    H + '>.home-market-shortcuts .mk-ico{width:42px!important;height:42px!important;border-radius:12px!important;margin:0!important;background:var(--s2)!important;color:var(--am)!important;display:grid!important;place-items:center!important;border:0!important;box-shadow:none!important}',
+    H + '>.home-market-shortcuts .mk-ico svg{width:21px!important;height:21px!important}',
+    H + '>.home-market-shortcuts .mk-name{font:800 17px/1.15 "Bricolage Grotesque",sans-serif!important;letter-spacing:-.01em!important;text-align:left!important;white-space:normal!important;color:var(--txt)!important}',
 
     /* ---------- Deals of the Day (+ loading skeleton) ---------- */
     '.tm-deals{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding:0 20px 2px}',
