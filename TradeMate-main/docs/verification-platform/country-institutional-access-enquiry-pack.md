@@ -26,6 +26,36 @@ Official references:
 - [NINAuth Terms of Service](https://ninauth.nimc.gov.ng/legal/terms-of-service)
 - NINAuth contact published on its official site: ninauth@nimc.gov.ng
 
+### Additional technical candidate — Enhanced NIMC Verification System (eNVS)
+
+NIMC's publicly hosted [Enhanced NIMC Verification System (eNVS) Web Service API Document, Version 1.0](https://nimc.gov.ng/pdfs/nimc_eNVS_API_doc.pdf) describes a separate institutional web-service interface. It is a technical specification, not proof that Metadusk or a customer is currently eligible for access.
+
+The document's stated connection sequence is:
+1. Establish connectivity to the service through a VPN.
+2. Call `createToken` using an organisation username, password and organisation ID.
+3. Use the returned `loginString` for subsequent calls; the document says tokens expire and must be refreshed.
+
+Documented methods include `getPermissionByLevel`, `searchByNIN`, `searchByDemo`, `searchByDemoPhone`, `searchByDocumentNumber`, fingerprint search methods and `verifyFingerWithData`. Permission responses expose field-level booleans for attributes including names, NIN, date of birth, address, phone, photo, signature and other sensitive demographic fields. The specification therefore reinforces the need for strict purpose limitation and field minimization.
+
+**Technical limitation:** the publicly accessible document does not provide a usable service endpoint, WSDL location, transport binding, network allowlisting procedure, complete deployment guide or sandbox details. It is not sufficient to write a production adapter. No endpoint, protocol variant, VPN topology or credential flow beyond what the document states should be inferred.
+
+**Access and governance remain unverified:** the document does not establish current programme status, applicant eligibility, whether customer-held eNVS access may be delegated to a technology processor, permitted use cases, pricing, SLA, retention, audit terms or whether eNVS is integrated with or separate from the current NINAuth partner process. Treat eNVS as a candidate institutional route pending written NIMC confirmation, not as an approved route or an alternative that bypasses NINAuth eligibility.
+
+#### Specific eNVS questions for NIMC
+
+1. Is this Version 1.0 eNVS specification current and supported for new institutional integrations in 2026?
+2. Is eNVS a separate access programme from NINAuth, or must an enterprise first qualify through NINAuth and an approved Verification Partner/aggregator?
+3. What applicant categories qualify for eNVS credentials and organisation IDs? Does the applicant need a Nigerian physical presence or local incorporation?
+4. Can an eligible Nigerian customer remain the credential-holding applicant while authorizing VeriFire as a named processor/subprocessor to operate the server-side integration? Is prior written NIMC approval required?
+5. Please provide the current service endpoint(s), WSDL or equivalent machine-readable interface contract, supported transport/security bindings, request/response examples, error catalogue and version/change policy.
+6. What VPN type, gateway ownership, IP allowlisting, network topology, certificate requirements, supported hosting regions and connection-monitoring controls are required?
+7. What are the credential issuance, rotation, reset, token lifetime, revocation and emergency-compromise procedures? Can credentials be restricted by user, organisation, method and field?
+8. Which methods, fields and assurance levels may be authorized for each applicant and purpose? Are biometric methods separately approved?
+9. Is there a sandbox or non-production environment with synthetic records, and what test credentials and acceptance process are available?
+10. What are the transaction fees, rate limits, concurrency limits, availability commitments, support channels and incident-notification obligations?
+11. What are the permitted purposes, consent evidence requirements, audit scope, retention/deletion rules and restrictions on downstream processor access?
+12. Are cross-border hosting and processing permitted for the applicant's approved integration, and what NDPA/NDPC transfer safeguards or approvals are required?
+
 ### Questions for NINAuth / NIMC
 
 1. Is VeriFire eligible to apply as the verification partner or enterprise applicant, given its current corporate structure and Nigerian physical-presence position?
