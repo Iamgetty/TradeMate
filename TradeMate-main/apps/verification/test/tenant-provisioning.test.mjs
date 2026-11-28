@@ -29,8 +29,8 @@ function fakePersistence() {
       async updateStatus() {},
     },
     tenantAdmins: {
-      async findByIdentity(issuer, subject) {
-        return [...state.memberships.values()].find((item) => item.identityIssuer === issuer && item.identitySubject === subject) ?? null;
+      async findByIdentity(tenantId, issuer, subject) {
+        return [...state.memberships.values()].find((item) => item.tenantId === tenantId && item.identityIssuer === issuer && item.identitySubject === subject) ?? null;
       },
       async findById(tenantId, id) {
         const item = state.memberships.get(id);
@@ -103,12 +103,13 @@ test('reusing a provisioning request key with changed parameters fails closed', 
   assert.equal(persistence.state.tenants.size, 1);
 });
 
-test('an external identity already assigned to a tenant cannot be provisioned again', async () => {
+test('the same external identity may own more than one tenant', async () => {
   const persistence = fakePersistence();
-  await provisionTenant(persistence, admin, input, NOW);
-  const second = { ...input, requestKey: 'provision-request-0002' };
-  await assert.rejects(() => provisionTenant(persistence, admin, second, NOW), TenantProvisioningError);
-  assert.equal(persistence.state.tenants.size, 1);
+  const first = await provisionTenant(persistence, admin, input, NOW);
+  const second = await provisionTenant(persistence, admin, { ...input, requestKey: 'provision-request-0002' }, NOW);
+  assert.notEqual(second.tenantId, first.tenantId);
+  assert.equal(persistence.state.tenants.size, 2);
+  assert.equal(persistence.state.memberships.size, 2);
 });
 
 test('invalid issuer, duplicate products and invalid entitlement windows are rejected before persistence', async () => {
