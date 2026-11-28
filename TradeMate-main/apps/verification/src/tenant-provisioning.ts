@@ -16,7 +16,7 @@ export interface TenantOwnerIdentity {
 
 export interface InitialProductEntitlement {
   productId: string;
-  startsAt?: string;
+  startsAt: string;
   expiresAt: string | null;
 }
 
@@ -82,7 +82,7 @@ function validateInput(admin: PlatformAdminContext, input: ProvisionTenantInput,
     if (!PRODUCT_ID_PATTERN.test(product.productId)) {
       throw new TenantProvisioningError('An initial product identifier is invalid.');
     }
-    const startsAt = product.startsAt ?? now.toISOString();
+    const startsAt = product.startsAt;
     const startTime = Date.parse(startsAt);
     const expiryTime = product.expiresAt === null ? Number.POSITIVE_INFINITY : Date.parse(product.expiresAt);
     if (!Number.isFinite(startTime) || (product.expiresAt !== null && !Number.isFinite(expiryTime)) ||
@@ -179,7 +179,7 @@ export async function provisionTenant(
     await tx.audit.append({
       id: randomUUID(),
       tenantId,
-      actorType: 'system',
+      actorType: 'platform_admin',
       actorId: admin.actorId,
       action: 'tenant.provisioned',
       targetType: 'tenant',
