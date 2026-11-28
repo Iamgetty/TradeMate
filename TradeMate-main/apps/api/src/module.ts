@@ -3184,6 +3184,8 @@ class MarketplaceContractsController {
                 FROM marketplace_contract_message_documents md
                 JOIN user_documents d ON d.id = md.document_id
                 WHERE md.contract_message_id = m.id AND md.contract_id = m.contract_id
+                  AND d.source_type = 'contract_negotiation' AND d.source_id = m.contract_id
+                  AND d.visibility = 'contract_participants'
               ), '[]'::jsonb) AS attachments
        FROM marketplace_contract_messages m
        JOIN users u ON u.id = m.sender_user_id
